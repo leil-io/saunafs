@@ -130,3 +130,11 @@
 #cmakedefine SOCKET_CONVERT_POLL_TO_SELECT
 #cmakedefine LIZARDFS_HAVE_STD_FUTURE
 #cmakedefine LIZARDFS_HAVE_WORKING_JUDY1
+
+// Define GSH_CAN_HOST_LOCAL_FS to define struct fsal_filesystem
+#cmakedefine GSH_CAN_HOST_LOCAL_FS 1
+
+// Define _USE_RQUOTA variable to include QUOTA features
+#cmakedefine _USE_RQUOTA 1
+
+#cmakedefine LINUX 1

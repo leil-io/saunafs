@@ -1,5 +1,5 @@
 /*
-   Copyright 2018 Skytechnology sp. z o.o.
+   Copyright 2022 LizardFS sp. z o.o.
 
    This file is part of LizardFS.
 
@@ -17,9 +17,7 @@
 */
 
 #include "fileinfo_cache.h"
-
 #include <time.h>
-
 #include <abstract_mem.h>
 #include <avltree.h>
 #include <common_utils.h>
@@ -56,9 +54,15 @@ static uint64_t get_time_ms() {
 	return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000;
 }
 
-static int cache_entry_cmp_function(const struct avltree_node *a, const struct avltree_node *b) {
-	liz_fileinfo_entry_t *a_entry = avltree_container_of(a, liz_fileinfo_entry_t, tree_hook);
-	liz_fileinfo_entry_t *b_entry = avltree_container_of(b, liz_fileinfo_entry_t, tree_hook);
+static int cache_entry_cmp_function(const struct avltree_node *a,
+                                    const struct avltree_node *b)
+{
+    liz_fileinfo_entry_t *a_entry = avltree_container_of(a,
+                                                         liz_fileinfo_entry_t,
+                                                         tree_hook);
+    liz_fileinfo_entry_t *b_entry = avltree_container_of(b,
+                                                         liz_fileinfo_entry_t,
+                                                         tree_hook);
 
 	if (a_entry->inode < b_entry->inode) {
 		return -1;
@@ -78,41 +82,49 @@ static int cache_entry_cmp_function(const struct avltree_node *a, const struct a
 	return 0;
 }
 
-liz_fileinfo_cache_t *liz_create_fileinfo_cache(unsigned max_entries, int min_timeout_ms) {
+liz_fileinfo_cache_t *liz_create_fileinfo_cache(unsigned max_entries,
+                                                int min_timeout_ms)
+{
 	liz_fileinfo_cache_t *cache;
 
 	cache = gsh_calloc(1, sizeof(liz_fileinfo_cache_t));
 	cache->max_entries = max_entries;
 	cache->min_timeout_ms = min_timeout_ms;
 	PTHREAD_MUTEX_init(&cache->lock, NULL);
-	glist_init(&cache->lru_list);
+
+    glist_init(&cache->lru_list);
 	glist_init(&cache->used_list);
 	avltree_init(&cache->entry_lookup, &cache_entry_cmp_function, 0);
 
 	return cache;
 }
 
-void liz_reset_fileinfo_cache_params(liz_fileinfo_cache_t *cache, unsigned max_entries,
-                                     int min_timeout_ms) {
+void liz_reset_fileinfo_cache_params(liz_fileinfo_cache_t *cache,
+                                     unsigned max_entries,
+                                     int min_timeout_ms)
+{
 	PTHREAD_MUTEX_lock(&cache->lock);
 	cache->max_entries = max_entries;
 	cache->min_timeout_ms = min_timeout_ms;
 	PTHREAD_MUTEX_unlock(&cache->lock);
 }
 
-void liz_destroy_fileinfo_cache(liz_fileinfo_cache_t *cache) {
+void liz_destroy_fileinfo_cache(liz_fileinfo_cache_t *cache)
+{
 	liz_fileinfo_entry_t *entry;
 
 	if (!cache) {
 		return;
 	}
 
-	while ((entry = glist_first_entry(&cache->used_list, liz_fileinfo_entry_t, list_hook))) {
+    while ((entry = glist_first_entry(&cache->used_list,
+                                      liz_fileinfo_entry_t, list_hook))) {
 		glist_del(&entry->list_hook);
 		gsh_free(entry);
 	}
 
-	while ((entry = glist_first_entry(&cache->lru_list, liz_fileinfo_entry_t, list_hook))) {
+    while ((entry = glist_first_entry(&cache->lru_list,
+                                      liz_fileinfo_entry_t, list_hook))) {
 		glist_del(&entry->list_hook);
 		gsh_free(entry);
 	}
@@ -120,7 +132,9 @@ void liz_destroy_fileinfo_cache(liz_fileinfo_cache_t *cache) {
 	gsh_free(cache);
 }
 
-liz_fileinfo_entry_t *liz_fileinfo_cache_acquire(liz_fileinfo_cache_t *cache, liz_inode_t inode) {
+liz_fileinfo_entry_t *liz_fileinfo_cache_acquire(liz_fileinfo_cache_t *cache,
+                                                 liz_inode_t inode)
+{
 	liz_fileinfo_entry_t key, *entry;
 	struct avltree_node *node;
 
@@ -136,12 +150,14 @@ liz_fileinfo_entry_t *liz_fileinfo_cache_acquire(liz_fileinfo_cache_t *cache, li
 		glist_del(&entry->list_hook);
 		glist_add(&cache->used_list, &entry->list_hook);
 		avltree_remove(node, &cache->entry_lookup);
-	} else {
+    }
+    else {
 		entry = gsh_calloc(1, sizeof(liz_fileinfo_entry_t));
 		glist_add(&cache->used_list, &entry->list_hook);
 		cache->entry_count++;
 	}
-	entry->is_used = true;
+
+    entry->is_used = true;
 	entry->inode = inode;
 	entry->timestamp = get_time_ms();
 
@@ -150,18 +166,23 @@ liz_fileinfo_entry_t *liz_fileinfo_cache_acquire(liz_fileinfo_cache_t *cache, li
 	return entry;
 }
 
-void liz_fileinfo_cache_release(liz_fileinfo_cache_t *cache, liz_fileinfo_entry_t *entry) {
+void liz_fileinfo_cache_release(liz_fileinfo_cache_t *cache,
+                                liz_fileinfo_entry_t *entry)
+{
 	PTHREAD_MUTEX_lock(&cache->lock);
 	assert(entry->is_used);
 	entry->is_used = false;
 	entry->timestamp = get_time_ms();
-	glist_del(&entry->list_hook);
+
+    glist_del(&entry->list_hook);
 	glist_add_tail(&cache->lru_list, &entry->list_hook);
 	avltree_insert(&entry->tree_hook, &cache->entry_lookup);
 	PTHREAD_MUTEX_unlock(&cache->lock);
 }
 
-void liz_fileinfo_cache_erase(liz_fileinfo_cache_t *cache, liz_fileinfo_entry_t *entry) {
+void liz_fileinfo_cache_erase(liz_fileinfo_cache_t *cache,
+                              liz_fileinfo_entry_t *entry)
+{
 	PTHREAD_MUTEX_lock(&cache->lock);
 	assert(entry->is_used);
 	glist_del(&entry->list_hook);
@@ -170,12 +191,14 @@ void liz_fileinfo_cache_erase(liz_fileinfo_cache_t *cache, liz_fileinfo_entry_t 
 	gsh_free(entry);
 }
 
-liz_fileinfo_entry_t *liz_fileinfo_cache_pop_expired(liz_fileinfo_cache_t *cache) {
+liz_fileinfo_entry_t *liz_fileinfo_cache_pop_expired(liz_fileinfo_cache_t *cache)
+{
 	PTHREAD_MUTEX_lock(&cache->lock);
 
 	liz_fileinfo_entry_t *entry =
 	    glist_first_entry(&cache->lru_list, liz_fileinfo_entry_t, list_hook);
-	if (!entry) {
+
+    if (!entry) {
 		PTHREAD_MUTEX_unlock(&cache->lock);
 		return NULL;
 	}
@@ -183,11 +206,13 @@ liz_fileinfo_entry_t *liz_fileinfo_cache_pop_expired(liz_fileinfo_cache_t *cache
 	bool is_full = cache->entry_count > cache->max_entries;
 	int timeout = is_full ? 0 : cache->min_timeout_ms;
 	uint64_t current_time = get_time_ms();
-	if ((current_time - entry->timestamp) >= timeout) {
+
+    if ((current_time - entry->timestamp) >= timeout) {
 		glist_del(&entry->list_hook);
 		avltree_remove(&entry->tree_hook, &cache->entry_lookup);
 		cache->entry_count--;
-	} else {
+    }
+    else {
 		entry = NULL;
 	}
 
@@ -195,15 +220,18 @@ liz_fileinfo_entry_t *liz_fileinfo_cache_pop_expired(liz_fileinfo_cache_t *cache
 	return entry;
 }
 
-void liz_fileinfo_entry_free(liz_fileinfo_entry_t *entry) {
+void liz_fileinfo_entry_free(liz_fileinfo_entry_t *entry)
+{
 	assert(!entry->is_used);
 	gsh_free(entry);
 }
 
-liz_fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry) {
+liz_fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry)
+{
 	return entry->fileinfo;
 }
 
-void liz_attach_fileinfo(liz_fileinfo_entry_t *entry, liz_fileinfo_t *fileinfo) {
+void liz_attach_fileinfo(liz_fileinfo_entry_t *entry, liz_fileinfo_t *fileinfo)
+{
 	entry->fileinfo = fileinfo;
 }

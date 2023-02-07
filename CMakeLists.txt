@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 2.8)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -37,7 +37,7 @@ option(ENABLE_TRACES            "Enable traces"                                 
 option(ENABLE_CRC               "Enable checksums"                                       ON)
 option(ENABLE_REQUEST_LOG       "Enable logging request times"                           OFF)
 option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"           OFF)
-option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              OFF)
+option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              ON)
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
 
 
