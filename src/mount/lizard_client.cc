@@ -113,7 +113,7 @@ struct ReaddirSession {
 using ReaddirSessions = std::map<std::uint64_t, ReaddirSession>;
 
 std::mutex gReaddirMutex;
-ReaddirSessions gReaddirSessions;
+inline ReaddirSessions gReaddirSessions;
 
 static void update_credentials(Context::IdType index, const GroupCache::Groups &groups);
 static void registerGroupsInMaster(Context &ctx);
@@ -152,7 +152,7 @@ void updateGroups(Context &ctx) {
 	} else {
 		gid = user_groups::encodeGroupCacheId(result.index);
 	}
-
+    // TODO: Check possible overflow
 	ctx.gid = gid;
 }
 
@@ -2568,10 +2568,16 @@ public:
 			if (cache_entry) {
 				value = richAclConverter::objectToRichACLXattr(cache_entry->acl);
 				valueLength = value.size();
-				return LIZARDFS_STATUS_OK;
-			} else {
-				return LIZARDFS_ERROR_ENOATTR;
-			}
+            }
+            else {
+                AttrReply attr_reply = LizardClient::getattr(ctx, ino);
+                RichACL generated_acl = RichACL::createFromMode(
+                            attr_reply.attr.st_mode & 0777,
+                            S_ISDIR(attr_reply.attr.st_mode));
+                value = richAclConverter::objectToRichACLXattr(generated_acl);
+                valueLength = value.size();
+            }
+            return LIZARDFS_STATUS_OK;
 		} catch (AclAcquisitionException& e) {
 			sassert((e.status() != LIZARDFS_STATUS_OK) && (e.status() != LIZARDFS_ERROR_ENOATTR));
 			return e.status();
