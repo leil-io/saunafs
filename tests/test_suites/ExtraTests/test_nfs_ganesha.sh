@@ -1,105 +1,177 @@
 #
-# To run this test you need to install libntirpc-1.5 and add following
-# line to /etc/sudoers.d/lizardfstest
-#
-# lizardfstest ALL = NOPASSWD: ALL
+# To run this test you need to install ganesha and liblizardfs-client.so
 #
 #
-
 timeout_set 5 minutes
+CHUNKSERVERS=1 \
+        USE_RAMDISK=YES \
+        MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+        CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
+        setup_local_empty_lizardfs info
 
-CHUNKSERVERS=5 \
-	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
-	setup_local_empty_lizardfs info
+mkdir -p ${TEMP_DIR}/mnt/ganesha
+mkdir -p ${TEMP_DIR}/mnt/ganesha/cthon_test
+mkdir -p ${info[mount0]}/data
+mkdir -p ${info[mount0]}/etc/ganesha
+mkdir -p ${info[mount0]}/lib/ganesha
+mkdir -p ${info[mount0]}/bin
 
-MINIMUM_PARALLEL_JOBS=4
-MAXIMUM_PARALLEL_JOBS=16
-PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
+MAX_PATH_DEPH=9
 
-test_error_cleanup() {
-	sudo umount $TEMP_DIR/mnt/nfs3
-	sudo umount $TEMP_DIR/mnt/nfs4
-	sudo umount $TEMP_DIR/mnt/nfs41
-	sudo pkill -9 ganesha.nfsd
-}
+USER_ID=$(id -u lizardfstest)
+GROUP_ID=$(id -g lizardfstest)
+GANESHA_BS="$((1<<20))"
 
-cd ${info[mount0]}
+# PID_FILE=${info[mount0]}/var/run/ganesha/ganesha.pid
+PID_FILE=/var/run/ganesha/ganesha.pid
+if [ ! -f ${PID_FILE} ]; then
+  echo "File doesn't exists, creating...";
+        sudo mkdir -p /var/run/ganesha;
+        sudo touch ${PID_FILE};
+else
+        echo "File exists";
+fi
 
-mkdir $TEMP_DIR/mnt/nfs3
-mkdir $TEMP_DIR/mnt/nfs4
-mkdir $TEMP_DIR/mnt/nfs41
-mkdir ganesha
+cp -a /usr/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha/
+cp -a /usr/bin/ganesha.nfsd ${info[mount0]}/bin/
 
-cp -R "$SOURCE_DIR"/external/nfs-ganesha-2.5-stable nfs-ganesha-2.5-stable
-cp -R "$SOURCE_DIR"/external/ntirpc-1.5 ntirpc-1.5
+cd ${info[mount0]}/data
+for i in $(seq 1 ${MAX_PATH_DEPH}); do
+        mkdir -p dir${i}
+        cd dir${i}
+done
 
-rm -R nfs-ganesha-2.5-stable/src/libntirpc
-ln -s ../../ntirpc-1.5 nfs-ganesha-2.5-stable/src/libntirpc
-
-mkdir nfs-ganesha-2.5-stable/src/build
-cd nfs-ganesha-2.5-stable/src/build
-CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} ..
-make -j${PARALLEL_JOBS} install
-cp ${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha
-
-# mkdir ${info[mount0]}/ntirpc-1.5/build
-# cd ${info[mount0]}/ntirpc-1.5/build
-# CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} ..
-# make -j${PARALLEL_JOBS} install
-
-cd ${info[mount0]}
+touch ./file
+echo 'Ganesha_Test_Ok' > ./file
+INODE=$(stat -c %i ./file)
 
 cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
-EXPORT
-{
-	Attr_Expiration_Time = 0;
-	Export_Id = 77;
-	Path = /;
-	Pseudo = /;
-	Access_Type = RW;
-	FSAL {
-		Name = LizardFS;
-		hostname = localhost;
-		port = ${lizardfs_info_[matocl]};
-	}
-	Protocols = 3, 4;
-}
-LizardFS {
-	PNFS_DS = true;
-	PNFS_MDS = true;
+NFS_KRB5 {
+        Active_krb5=false;
 }
 NFSV4 {
-	Grace_Period = 5;
+  Grace_Period = 5;
+}
+EXPORT
+{
+        Attr_Expiration_Time = 0;
+        Export_Id = 99;
+        Path = /data;
+        Pseudo = /data;
+        Access_Type = RW;
+        FSAL {
+                Name = LizardFS;
+                hostname = localhost;
+                port = ${lizardfs_info_[matocl]};
+                # How often to retry to connect
+                io_retries = 5;
+                cache_expiration_time_ms = 2500;
+        }
+        Protocols = 4;
+        CLIENT {
+                Clients = localhost;
+        }
+}
+LizardFS {
+        PNFS_DS = true;
+        PNFS_MDS = true;
 }
 EOF
 
+test_error_cleanup() {
+  cd ${TEMP_DIR}
+  # Umount Ganesha mountpoint
+  if mountpoint -q ${TEMP_DIR}/mnt/ganesha; then
+      sudo umount -l ${TEMP_DIR}/mnt/ganesha
+  fi
+  # Umount LizardFS mountpoint
+  if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+      sudo umount -l ${TEMP_DIR}/mnt/mfs0
+  fi
+  # Killing Ganesha daemon
+  sudo kill -9 "$(pgrep '^ganesha.nfsd' | awk '{print $1}')"
+}
+
 sudo ${info[mount0]}/bin/ganesha.nfsd -f ${info[mount0]}/etc/ganesha/ganesha.conf
-sudo mount -o nfsvers=4 localhost:/ $TEMP_DIR/mnt/nfs4
-sudo mount -o v4.1 localhost:/ $TEMP_DIR/mnt/nfs41
-sudo mount -o nfsvers=3 localhost:/ $TEMP_DIR/mnt/nfs3
+sudo mount -vvvv localhost:/data $TEMP_DIR/mnt/ganesha
 
-git clone git://git.linux-nfs.org/projects/steved/cthon04.git
-cd cthon04
-CC="ccache gcc" make all
+cat <<EOF > "${TEMP_DIR}/mnt/ganesha/cthon04.patch"
+diff --git a/lock/tlock.c b/lock/tlock.c
+index 8c837a8..7060cca 100644
+--- a/lock/tlock.c
++++ b/lock/tlock.c
+@@ -479,21 +479,21 @@ fmtrange(offset, length)
+ #ifdef LARGE_LOCKS                     /* non-native 64-bit */
+        if (length != 0)
+-               sprintf(buf, "[%16llx,%16llx] ", offset, length);
++               sprintf(buf, "[%16lx,%16lx] ", offset, length);
+        else
+-               sprintf(buf, "[%16llx,          ENDING] ", offset);
++               sprintf(buf, "[%16lx,          ENDING] ", offset);
+ #else /* LARGE_LOCKS */
+        if (sizeof (offset) == 4) {
+                if (length != 0)
+-                       sprintf(buf, "[%8lx,%8lx] ", (int32_t)offset,
++                       sprintf(buf, "[%i,%i] ", (int32_t)offset,
+                                (int32_t)length);
+                else
+-                       sprintf(buf, "[%8lx,  ENDING] ", (int32_t)offset);
++                       sprintf(buf, "[%i,  ENDING] ", (int32_t)offset);
+        } else {
+                if (length != 0)
+-                       sprintf(buf, "[%16llx,%16llx] ", offset, length);
++                       sprintf(buf, "[%16lx,%16lx] ", offset, length);
+                else
+-                       sprintf(buf, "[%16llx,          ENDING] ", offset);
++                       sprintf(buf, "[%16lx,          ENDING] ", offset);
+        }
+ #endif /* LARGE_LOCKS */
+EOF
 
-export NFSTESTDIR=$TEMP_DIR/mnt/nfs3/cthon_test
+sudo -i -u lizardfstest bash << EOF
+ cd "${TEMP_DIR}/mnt/ganesha"
+ chmod o+w "$(pwd)"
+ if test -d "${TEMP_DIR}/mnt/ganesha/cthon04"; then
+    rm -rf "${TEMP_DIR}/mnt/ganesha/cthon04"
+ fi
+ git clone --no-checkout git://git.linux-nfs.org/projects/steved/cthon04.git
+ cd cthon04
+ git reset --hard HEAD
+ git apply --ignore-whitespace "${TEMP_DIR}/mnt/ganesha/cthon04.patch"
+# sudo chown -R lizardfstest:lizardfstest $TEMP_DIR/mnt/ganesha/cthon04
+ make all
+# git status
+ export NFSTESTDIR=${TEMP_DIR}/mnt/ganesha/cthon_test
+ ./runtests -b -n
+ ./runtests -l -n
+ ./runtests -s -n
+EOF
 
-./runtests -b -n
-# ./runtests -l -n # locks do not work in ganesha with nfs v3
-# ./runtests -s -n # locks do not work in ganesha with nfs v3
+cd ${TEMP_DIR}/mnt/ganesha
+MAX_FILES=300
+### Check mkdir / rmdir syscall
+mkdir -p ./dir_on_ganesha
+test -d ./dir_on_ganesha
+rmdir ./dir_on_ganesha
+test ! -d ./dir_on_ganesha
 
-export NFSTESTDIR=$TEMP_DIR/mnt/nfs4/cthon_test
+for i in $(seq ${MAX_FILES}); do
+  touch ./file.${i};
+  test -f ./file.${i};
+done
 
-./runtests -b -n
-./runtests -l -n
-./runtests -s -n
+### Check getattr / stat / syscall
+STATS_REPORT="$(stat "$(find -name file)")"
+assert_equals ${INODE} "$(echo "${STATS_REPORT}" | grep -i inode | cut -d: -f3 | cut -d" " -f2)"
+assert_equals ${USER_ID} "$(echo "${STATS_REPORT}" | grep -i uid | cut -d/ -f2 | rev | awk '{print $1}' | rev)"
+assert_equals ${GROUP_ID} "$(echo "${STATS_REPORT}" | grep -i gid | cut -d/ -f3 | rev | awk '{print $1}' | rev)"
+assert_equals ${GANESHA_BS} "$(echo "${STATS_REPORT}" | grep -i 'io block' | cut -d: -f4 | awk '{print $1}')"
 
-export NFSTESTDIR=$TEMP_DIR/mnt/nfs41/cthon_test
+### Check readdir / ls|tree / syscall
+assert_equals $((${MAX_PATH_DEPH} + 12)) $(tree ${TEMP_DIR}/mnt/ganesha | grep directories | awk '{print $1}')
+assert_equals "$((${MAX_FILES} + 3))" "$(ls ${TEMP_DIR}/mnt/ganesha/ | wc -l)"
 
-./runtests -b -n
-./runtests -l -n
-./runtests -s -n
+### Check open2 / cat|dd / syscall
+assert_equals "Ganesha_Test_Ok" $(cat $(find -name file))
 
 test_error_cleanup || true

@@ -82,3 +82,8 @@ nfs4_getfacl dir1 | grep 'D::lizardfstest_5:rwDC'
 
 nfs4_getfacl dir1/dir2 | grep 'D::lizardfstest_7:Dx'
 nfs4_getfacl dir1/dir2 | grep 'A::lizardfstest_6:D'
+
+# Umount LizardFS mountpoint
+if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+    sudo umount -l ${TEMP_DIR}/mnt/mfs0
+fi

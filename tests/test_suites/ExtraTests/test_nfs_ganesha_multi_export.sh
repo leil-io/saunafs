@@ -19,34 +19,43 @@ MAXIMUM_PARALLEL_JOBS=16
 PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
 
 test_error_cleanup() {
-	for x in 1 2 97 99; do
-		sudo umount $TEMP_DIR/mnt/nfs$x
-	done
-	sudo pkill -9 ganesha.nfsd
+  # Umount Ganesha mountpoints
+  for x in 1 2 97 99; do
+      sudo umount -l $TEMP_DIR/mnt/nfs$x
+  done
+  # Umount LizardFS mountpoint
+  if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+      sudo umount -l ${TEMP_DIR}/mnt/mfs0
+  fi
+  # Killing Ganesha daemon
+  sudo pkill -9 ganesha.nfsd
 }
 
 cd ${info[mount0]}
 
+# Creating mountpoints for testing
 mkdir $TEMP_DIR/mnt/nfs{1,2,97,99}
-mkdir ganesha
+mkdir -p ${TEMP_DIR}/mnt/ganesha
 
-cp -R "$SOURCE_DIR"/external/nfs-ganesha-2.5-stable nfs-ganesha-2.5-stable
-cp -R "$SOURCE_DIR"/external/ntirpc-1.5 ntirpc-1.5
+# Creating LizardFS mountpoints
+mkdir -p ${info[mount0]}/data
+mkdir -p ${info[mount0]}/etc/ganesha
+mkdir -p ${info[mount0]}/lib/ganesha
+mkdir -p ${info[mount0]}/bin
 
-rm -R nfs-ganesha-2.5-stable/src/libntirpc
-ln -s ../../ntirpc-1.5 nfs-ganesha-2.5-stable/src/libntirpc
+# Creating PID file for Ganesha
+PID_FILE=/var/run/ganesha/ganesha.pid
+if [ ! -f ${PID_FILE} ]; then
+  echo "File doesn't exists, creating...";
+        sudo mkdir -p /var/run/ganesha;
+        sudo touch ${PID_FILE};
+else
+        echo "File exists";
+fi
 
-mkdir nfs-ganesha-2.5-stable/src/build
-cd nfs-ganesha-2.5-stable/src/build
-CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} ..
-make -j${PARALLEL_JOBS} install
-cp ${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha
-
-# mkdir ${info[mount0]}/ntirpc-1.5/build
-# cd ${info[mount0]}/ntirpc-1.5/build
-# CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} ..
-# make -j${PARALLEL_JOBS} install
-
+# Copying LizardFS FSAL and Ganesha daemon
+cp -a /usr/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha/
+cp -a /usr/bin/ganesha.nfsd ${info[mount0]}/bin/
 
 cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
 EXPORT

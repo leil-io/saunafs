@@ -124,3 +124,8 @@ done <<'END'
 	cp -ar dir dir2                    # Test copying a directory
 	cp -r dir dir2/dir3
 END
+
+# Umount LizardFS mountpoint
+if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+    sudo umount -l ${TEMP_DIR}/mnt/mfs0
+fi

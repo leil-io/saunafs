@@ -69,3 +69,8 @@ check_misses 4 4 2
 setfacl -b file1
 assert_equals "$(get_facl file1)" "user::rw- group::rw- other::-wx"
 check_misses 5 4 2
+
+# Umount LizardFS mountpoint
+if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+    sudo umount -l ${TEMP_DIR}/mnt/mfs0
+fi
