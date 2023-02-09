@@ -61,8 +61,3 @@ assert_awk_finds '/^group::---$/' "$acls"
 assert_awk_finds '/^other::---$/' "$acls"
 assert_awk_finds_no '/^group:fuse/' "$acls"
 assert_awk_finds_no '/^mask:/' "$acls"
-
-# Umount LizardFS mountpoint
-if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
-    sudo umount -l ${TEMP_DIR}/mnt/mfs0
-fi
