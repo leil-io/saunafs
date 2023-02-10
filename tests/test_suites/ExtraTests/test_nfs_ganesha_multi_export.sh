@@ -1,5 +1,5 @@
 #
-# To run this test you need to install libntirpc-1.5 and add following
+# To run this test you need to add following
 # line to /etc/sudoers.d/lizardfstest
 #
 # lizardfstest ALL = NOPASSWD: ALL
@@ -27,35 +27,46 @@ test_error_cleanup() {
   if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
       sudo umount -l ${TEMP_DIR}/mnt/mfs0
   fi
-  # Killing Ganesha daemon
+  # Kill Ganesha daemon
   sudo pkill -9 ganesha.nfsd
 }
 
 cd ${info[mount0]}
 
-# Creating mountpoints for testing
+# Create mountpoints for testing
 mkdir $TEMP_DIR/mnt/nfs{1,2,97,99}
-mkdir -p ${TEMP_DIR}/mnt/ganesha
+mkdir ganesha
 
-# Creating LizardFS mountpoints
-mkdir -p ${info[mount0]}/data
-mkdir -p ${info[mount0]}/etc/ganesha
-mkdir -p ${info[mount0]}/lib/ganesha
-mkdir -p ${info[mount0]}/bin
-
-# Creating PID file for Ganesha
+# Create PID file for Ganesha
 PID_FILE=/var/run/ganesha/ganesha.pid
 if [ ! -f ${PID_FILE} ]; then
-  echo "File doesn't exists, creating...";
+  echo "ganesha.pid doesn't exists, creating it...";
         sudo mkdir -p /var/run/ganesha;
         sudo touch ${PID_FILE};
 else
-        echo "File exists";
+        echo "ganesha.pid already exists";
 fi
 
-# Copying LizardFS FSAL and Ganesha daemon
-cp -a /usr/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha/
-cp -a /usr/bin/ganesha.nfsd ${info[mount0]}/bin/
+# Copy Ganesha and libntirpc source code
+cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.0 nfs-ganesha-4.0
+cp -R "$SOURCE_DIR"/external/ntirpc-4.0 ntirpc-4.0
+
+# Remove original libntirpc folder to create a soft link
+rm -R nfs-ganesha-4.0/src/libntirpc
+ln -s ../../ntirpc-4.0 nfs-ganesha-4.0/src/libntirpc
+
+# Create build folder to compile Ganesha
+mkdir nfs-ganesha-4.0/src/build
+cd nfs-ganesha-4.0/src/build
+
+# flag -DUSE_GSS=NO disables the use of Kerberos library when compiling Ganesha
+CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} -DUSE_GSS=NO ..
+make -j${PARALLEL_JOBS} install
+
+# Copy LizardFS FSAL
+fsal_lizardfs=${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs.so
+assert_file_exists "$fsal_lizardfs"
+cp ${fsal_lizardfs} ${info[mount0]}/lib/ganesha
 
 cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
 EXPORT
