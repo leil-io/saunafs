@@ -1,20 +1,40 @@
 #
-# To run this test you need to install ganesha and liblizardfs-client.so
+# To run this test you need to add following
+# line to /etc/sudoers.d/lizardfstest
+#
+# lizardfstest ALL = NOPASSWD: ALL
 #
 #
+
 timeout_set 5 minutes
+
 CHUNKSERVERS=1 \
         USE_RAMDISK=YES \
         MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
         CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
         setup_local_empty_lizardfs info
 
+MINIMUM_PARALLEL_JOBS=4
+MAXIMUM_PARALLEL_JOBS=16
+PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
+
+test_error_cleanup() {
+  cd ${TEMP_DIR}
+  # Umount Ganesha mountpoint
+  if mountpoint -q ${TEMP_DIR}/mnt/ganesha; then
+      sudo umount -l ${TEMP_DIR}/mnt/ganesha
+  fi
+  # Umount LizardFS mountpoint
+  if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+      sudo umount -l ${TEMP_DIR}/mnt/mfs0
+  fi
+  # Kill Ganesha daemon
+  sudo pkill -9 ganesha.nfsd
+}
+
 mkdir -p ${TEMP_DIR}/mnt/ganesha
 mkdir -p ${TEMP_DIR}/mnt/ganesha/cthon_test
 mkdir -p ${info[mount0]}/data
-mkdir -p ${info[mount0]}/etc/ganesha
-mkdir -p ${info[mount0]}/lib/ganesha
-mkdir -p ${info[mount0]}/bin
 
 MAX_PATH_DEPH=9
 
@@ -22,28 +42,50 @@ USER_ID=$(id -u lizardfstest)
 GROUP_ID=$(id -g lizardfstest)
 GANESHA_BS="$((1<<20))"
 
-# PID_FILE=${info[mount0]}/var/run/ganesha/ganesha.pid
-PID_FILE=/var/run/ganesha/ganesha.pid
-if [ ! -f ${PID_FILE} ]; then
-  echo "File doesn't exists, creating...";
-        sudo mkdir -p /var/run/ganesha;
-        sudo touch ${PID_FILE};
-else
-        echo "File exists";
-fi
-
-cp -a /usr/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha/
-cp -a /usr/bin/ganesha.nfsd ${info[mount0]}/bin/
-
+# Create some directories at data
 cd ${info[mount0]}/data
 for i in $(seq 1 ${MAX_PATH_DEPH}); do
         mkdir -p dir${i}
         cd dir${i}
 done
 
+# Create a file at data
 touch ./file
 echo 'Ganesha_Test_Ok' > ./file
 INODE=$(stat -c %i ./file)
+
+# Create PID file for Ganesha
+PID_FILE=/var/run/ganesha/ganesha.pid
+if [ ! -f ${PID_FILE} ]; then
+  echo "ganesha.pid doesn't exists, creating it...";
+        sudo mkdir -p /var/run/ganesha;
+        sudo touch ${PID_FILE};
+else
+        echo "ganesha.pid already exists";
+fi
+
+cd ${info[mount0]}
+
+# Copy Ganesha and libntirpc source code
+cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.0 nfs-ganesha-4.0
+cp -R "$SOURCE_DIR"/external/ntirpc-4.0 ntirpc-4.0
+
+# Remove original libntirpc folder to create a soft link
+rm -R nfs-ganesha-4.0/src/libntirpc
+ln -s ../../ntirpc-4.0 nfs-ganesha-4.0/src/libntirpc
+
+# Create build folder to compile Ganesha
+mkdir nfs-ganesha-4.0/src/build
+cd nfs-ganesha-4.0/src/build
+
+# flag -DUSE_GSS=NO disables the use of Kerberos library when compiling Ganesha
+CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} -DUSE_GSS=NO ..
+make -j${PARALLEL_JOBS} install
+
+# Copy LizardFS FSAL
+fsal_lizardfs=${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs.so
+assert_file_exists "$fsal_lizardfs"
+cp ${fsal_lizardfs} ${info[mount0]}/lib/ganesha
 
 cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
 NFS_KRB5 {
@@ -77,20 +119,6 @@ LizardFS {
         PNFS_MDS = true;
 }
 EOF
-
-test_error_cleanup() {
-  cd ${TEMP_DIR}
-  # Umount Ganesha mountpoint
-  if mountpoint -q ${TEMP_DIR}/mnt/ganesha; then
-      sudo umount -l ${TEMP_DIR}/mnt/ganesha
-  fi
-  # Umount LizardFS mountpoint
-  if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
-      sudo umount -l ${TEMP_DIR}/mnt/mfs0
-  fi
-  # Killing Ganesha daemon
-  sudo kill -9 "$(pgrep '^ganesha.nfsd' | awk '{print $1}')"
-}
 
 sudo ${info[mount0]}/bin/ganesha.nfsd -f ${info[mount0]}/etc/ganesha/ganesha.conf
 sudo mount -vvvv localhost:/data $TEMP_DIR/mnt/ganesha
