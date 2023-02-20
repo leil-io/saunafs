@@ -29,7 +29,8 @@ cmake .. \
         -DENABLE_NFS_GANESHA=YES \
 	-DPACKAGE_VERSION="${version}" \
 	-DENABLE_URAFT=YES \
-	-DENABLE_POLONAISE=OFF
+        -DENABLE_POLONAISE=OFF \
+        -DCMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized"
 
 cat >../Makefile <<END
 all:
