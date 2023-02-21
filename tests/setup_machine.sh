@@ -63,6 +63,7 @@ case "$release" in
 		apt-get -y install libboost-iostreams-dev libpam0g-dev libdb-dev nfs4-acl-tools libfmt-dev
 		apt-get -y install python3-pip valgrind ccache libfmt-dev libisal-dev libcrcutil-dev curl
 		apt-get -y install libgtest-dev libspdlog-dev libjudy-dev time bc
+		apt-get -y install libsystemd-dev liburcu
 		pip3 install mypy black flask requests types-requests
 		;;
 	CentOS/7*)
