@@ -124,6 +124,16 @@ struct lzfs_fsal_handle {
     struct fsal_share share;
 };
 
+struct lzfs_fsal_ds_wire {
+    uint32_t inode;
+};
+
+struct lzfs_fsal_ds_handle {
+    struct fsal_ds_handle ds;
+    uint32_t inode;
+    liz_fileinfo_entry_t *cache_handle;
+};
+
 /*
  * Structure to tell subfunctions whether they should close the
  * returned fd or not
