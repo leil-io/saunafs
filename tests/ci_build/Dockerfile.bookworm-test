@@ -27,6 +27,18 @@ RUN set -e ; \
   echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers ; \
   chmod 0440 /etc/sudoers
 WORKDIR /home/${USERNAME}
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+RUN set -e ; \
+    apt-get update ; \
+    apt-get install --yes \
+      python3-pip \
+      python3-setuptools \
+      python3-venv \
+      python3-wheel ; \
+    rm -rf /var/lib/apt/lists/* ; \
+    python3 -m venv "${VIRTUAL_ENV}"; \
+    pip install asciidoc
 RUN set -e ; \
     apt-get update ; \
     apt-get install --yes sudo ; \
