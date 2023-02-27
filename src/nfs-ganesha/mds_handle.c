@@ -31,7 +31,7 @@
  *
  * \see fsal_api.h for more information
  */
-/*
+
 static nfsstat4 lzfs_fsal_layoutget(struct fsal_obj_handle *obj_pub,
                                     XDR *loc_body,
                                     const struct fsal_layoutget_arg *arg,
@@ -79,7 +79,7 @@ static nfsstat4 lzfs_fsal_layoutget(struct fsal_obj_handle *obj_pub,
 
 	return nfs_status;
 }
-*/
+
 
 /*! \brief Potentially return one layout segment
  *
@@ -113,10 +113,9 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
     // Unused variable
     (void ) lou_body;
 
-	struct lzfs_fsal_export *lzfs_export;
-	struct lzfs_fsal_handle *lzfs_hdl;
-	struct liz_attr_reply lzfs_old;
-	int rc;
+    struct lzfs_fsal_export *export;
+    struct lzfs_fsal_handle *handle;
+    struct liz_attr_reply previous_reply;
 
 	// FIXME(haze): Does this function make sense for our implementation ?
 
@@ -126,17 +125,17 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
 		return NFS4ERR_UNKNOWN_LAYOUTTYPE;
 	}
 
-    lzfs_export = container_of(op_ctx->fsal_export,
-                               struct lzfs_fsal_export, export);
-	lzfs_hdl = container_of(obj_pub, struct lzfs_fsal_handle, handle);
+    export = container_of(op_ctx->fsal_export,
+                          struct lzfs_fsal_export, export);
+    handle = container_of(obj_pub, struct lzfs_fsal_handle, handle);
 
-    rc = liz_cred_getattr(lzfs_export->lzfs_instance, &op_ctx->creds,
-                          lzfs_hdl->inode, &lzfs_old);
+    int rc = liz_cred_getattr(export->lzfs_instance, &op_ctx->creds,
+                              handle->inode, &previous_reply);
 	if (rc < 0) {
         LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to get "
                 "attributes of file %lli.",
                 liz_error_string(liz_last_err()),
-                (long long)lzfs_hdl->inode);
+                (long long)handle->inode);
 		return lzfs_nfs4_last_err();
 	}
 
@@ -145,7 +144,7 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
 
 	memset(&attr, 0, sizeof(attr));
 
-    if (arg->new_offset && lzfs_old.attr.st_size < (long)arg->last_write + 1) {
+    if (arg->new_offset && previous_reply.attr.st_size < (long)arg->last_write + 1) {
 		mask |= LIZ_SET_ATTR_SIZE;
 		attr.st_size = arg->last_write + 1;
 		res->size_supplied = true;
@@ -153,22 +152,22 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
 	}
 
     if (arg->time_changed &&
-        (arg->new_time.seconds > lzfs_old.attr.st_mtim.tv_sec ||
-        (arg->new_time.seconds == lzfs_old.attr.st_mtim.tv_sec &&
-         arg->new_time.nseconds > lzfs_old.attr.st_mtim.tv_nsec))) {
+        (arg->new_time.seconds > previous_reply.attr.st_mtim.tv_sec ||
+        (arg->new_time.seconds == previous_reply.attr.st_mtim.tv_sec &&
+         arg->new_time.nseconds > previous_reply.attr.st_mtim.tv_nsec))) {
             attr.st_mtim.tv_sec = arg->new_time.seconds;
             attr.st_mtim.tv_sec = arg->new_time.nseconds;
             mask |= LIZ_SET_ATTR_MTIME;
     }
 
 	liz_attr_reply_t reply;
-    rc = liz_cred_setattr(lzfs_export->lzfs_instance, &op_ctx->creds,
-                          lzfs_hdl->inode, &attr, mask, &reply);
+    rc = liz_cred_setattr(export->lzfs_instance, &op_ctx->creds,
+                          handle->inode, &attr, mask, &reply);
 
 	if (rc < 0) {
         LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to set attributes "
                 "of file %lli.", liz_error_string(liz_last_err()),
-                (long long)lzfs_hdl->inode);
+                (long long)handle->inode);
 		return lzfs_nfs4_last_err();
 	}
 
@@ -178,11 +177,7 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
 
 void lzfs_handle_ops_pnfs(struct fsal_obj_ops *ops)
 {
-    (void ) ops;
-    // TODO: Fix logic
-    /*
     ops->layoutget = lzfs_fsal_layoutget;
     ops->layoutreturn = lzfs_fsal_layoutreturn;
     ops->layoutcommit = lzfs_fsal_layoutcommit;
-    */
 }

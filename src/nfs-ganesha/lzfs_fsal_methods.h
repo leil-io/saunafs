@@ -51,6 +51,8 @@ struct lzfs_fsal_handle *allocate_new_handle(
 
 void delete_handle(struct lzfs_fsal_handle *obj);
 
+void lzfs_fsal_ds_handle_ops_init(struct fsal_pnfs_ds_ops *ops);
+
 // Methods for support ACL
 fsal_status_t lzfs_int_getacl(struct lzfs_fsal_export *lzfs_export,
                               uint32_t inode, uint32_t owner,

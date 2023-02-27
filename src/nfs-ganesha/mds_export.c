@@ -479,16 +479,15 @@ static size_t lzfs_fsal_fs_da_addr_size(struct fsal_module *fsal_hdl)
 
 void lzfs_export_ops_pnfs(struct export_ops *ops)
 {
-    // TODO: Fix the logic
-    /*ops->getdevicelist = lzfs_fsal_getdevicelist;
+    ops->getdevicelist = lzfs_fsal_getdevicelist;
 	ops->fs_layouttypes = lzfs_fsal_fs_layouttypes;
 	ops->fs_layout_blocksize = lzfs_fsal_fs_layout_blocksize;
 	ops->fs_maximum_segments = lzfs_fsal_fs_maximum_segments;
-    ops->fs_loc_body_size = lzfs_fsal_fs_loc_body_size;*/
+    ops->fs_loc_body_size = lzfs_fsal_fs_loc_body_size;
 }
 
 void lzfs_fsal_ops_pnfs(struct fsal_ops *ops)
 {
-    /*ops->getdeviceinfo = lzfs_fsal_getdeviceinfo;
-    ops->fs_da_addr_size = lzfs_fsal_fs_da_addr_size;*/
+    ops->getdeviceinfo = lzfs_fsal_getdeviceinfo;
+    ops->fs_da_addr_size = lzfs_fsal_fs_da_addr_size;
 }

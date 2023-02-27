@@ -363,10 +363,10 @@ MODULE_INIT void lizardfs_init(void)
     }
 
     // Set up module operations
-    //myself->m_ops.fsal_pnfs_ds_ops = lzfs_fsal_ds_handle_ops_init;
     myself->m_ops.create_export = create_export;
     myself->m_ops.init_config = init_config;
-    //lzfs_fsal_ops_pnfs(&lzfs_module->m_ops);
+    myself->m_ops.fsal_pnfs_ds_ops = lzfs_fsal_ds_handle_ops_init;
+    lzfs_fsal_ops_pnfs(&myself->m_ops);
 
     /* Initialize the fsal_obj_handle ops for FSAL LizardFS */
     lzfs_handle_ops_init(&LizardFS.handle_ops);
