@@ -6,7 +6,7 @@
  * @brief File System Abstraction Layer types and constants.
  *
  * This file includes declarations of data types, variables, and constants
- * for the CRASH FSAL.
+ * for LizardFS FSAL.
  */
 
 #ifndef LZFS_FSAL_TYPES

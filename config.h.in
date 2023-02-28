@@ -138,3 +138,5 @@
 #cmakedefine _USE_RQUOTA 1
 
 #cmakedefine LINUX 1
+
+#cmakedefine _ENABLE_ACL_SUPPORT 1

@@ -59,7 +59,11 @@ struct lzfs_fsal_module LizardFS = {
             .lock_support_async_block = false,
             .named_attr = true,
             .unique_handles = true,
+        #ifdef _ENABLE_ACL_SUPPORT
             .acl_support = FSAL_ACLSUPPORT_ALLOW | FSAL_ACLSUPPORT_DENY,
+        #else
+            .acl_support = 0,
+        #endif
             .cansettime = true,
             .homogenous = true,
             .supported_attrs = LZFS_SUPPORTED_ATTRS,

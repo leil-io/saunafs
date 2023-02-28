@@ -205,6 +205,7 @@ static fsal_status_t lzfs_getattrs(struct fsal_obj_handle *obj_hdl,
     }
 
     posix2fsal_attributes_all(&lzfs_attrs.attr, attrs);
+#ifdef _ENABLE_ACL_SUPPORT
     if (attrs->request_mask & ATTR_ACL) {
         fsal_status_t status;
         status = lzfs_int_getacl(export, handle->inode,
@@ -214,6 +215,7 @@ static fsal_status_t lzfs_getattrs(struct fsal_obj_handle *obj_hdl,
             attrs->valid_mask |= ATTR_ACL;
         }
     }
+#endif
 
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
@@ -1097,10 +1099,12 @@ static fsal_status_t lzfs_setattr2(struct fsal_obj_handle *obj_hdl,
         goto out;
     }
 
+#ifdef _ENABLE_ACL_SUPPORT
     if (FSAL_TEST_MASK(attrib_set->valid_mask, ATTR_ACL)) {
         status = lzfs_int_setacl(export, handle->inode, attrib_set->acl,
                                  reply.attr.st_mode);
     }
+#endif
 
 out:
     if (has_lock) {
