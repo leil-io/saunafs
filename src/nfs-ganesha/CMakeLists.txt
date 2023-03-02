@@ -25,5 +25,22 @@ add_library(fsallizardfs MODULE ${NFS_GANESHA_PLUGIN_MAIN} ${NFS_GANESHA_PLUGIN_
 
 target_link_libraries(fsallizardfs lizardfs-client_pic)
 
-# LizardFS FSAL (libfsallizardfs.so) will be installed at ${LIZARDFS_ROOT}/lib/ganesha
-install(TARGETS fsallizardfs COMPONENT fsal DESTINATION ${LIB_SUBDIR}/ganesha)
+# Original DESTINATION was ${LIB_SUBDIR}/ganesha
+# For version 4.3, it was changed to install at the Ganesha lib folder:
+# Define FSAL Destination to: /usr/lib/x86_64-linux-gnu/ganesha/
+SET(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Install prefix for common files" FORCE)
+
+# Library path name
+get_property(USE_LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+if (USE_LIB64)
+        set(LIB_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib64)
+else (USE_LIB64)
+        set(LIB_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib/x86_64-linux-gnu)
+endif (USE_LIB64)
+
+IF(FSAL_DESTINATION)
+    set(FSAL_DESTINATION ${FSAL_DESTINATION} )
+ELSE()
+    set(FSAL_DESTINATION "${LIB_INSTALL_DIR}/ganesha")
+ENDIF()
+install(TARGETS fsallizardfs COMPONENT fsal DESTINATION ${FSAL_DESTINATION} )
