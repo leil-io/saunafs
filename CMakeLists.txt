@@ -303,8 +303,7 @@ endif()
 
 set(CHARTS_CSV_CHARTID_BASE 90000)
 
-# Define cmake _ENABLE_ACL_SUPPORT flag
-set(_ENABLE_ACL_SUPPORT ON CACHE BOOL "Enable nfs-ganesha ACL support") # Configurable by user
+set(ENABLE_NFS_ACL_SUPPORT ON CACHE BOOL "Enable nfs-ganesha ACL support") # Configurable by user
 
 # Create config.h file
 configure_file(config.h.in config.h)

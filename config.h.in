@@ -139,4 +139,4 @@
 
 #cmakedefine LINUX 1
 
-#cmakedefine _ENABLE_ACL_SUPPORT 1
+#cmakedefine ENABLE_NFS_ACL_SUPPORT 1
