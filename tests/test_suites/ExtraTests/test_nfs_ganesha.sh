@@ -67,16 +67,16 @@ fi
 cd ${info[mount0]}
 
 # Copy Ganesha and libntirpc source code
-cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.0 nfs-ganesha-4.0
-cp -R "$SOURCE_DIR"/external/ntirpc-4.0 ntirpc-4.0
+cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.3 nfs-ganesha-4.3
+cp -R "$SOURCE_DIR"/external/ntirpc-4.3 ntirpc-4.3
 
 # Remove original libntirpc folder to create a soft link
-rm -R nfs-ganesha-4.0/src/libntirpc
-ln -s ../../ntirpc-4.0 nfs-ganesha-4.0/src/libntirpc
+rm -R nfs-ganesha-4.3/src/libntirpc
+ln -s ../../ntirpc-4.3 nfs-ganesha-4.3/src/libntirpc
 
 # Create build folder to compile Ganesha
-mkdir nfs-ganesha-4.0/src/build
-cd nfs-ganesha-4.0/src/build
+mkdir nfs-ganesha-4.3/src/build
+cd nfs-ganesha-4.3/src/build
 
 # flag -DUSE_GSS=NO disables the use of Kerberos library when compiling Ganesha
 CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} -DUSE_GSS=NO ..
