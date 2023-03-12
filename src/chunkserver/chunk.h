@@ -71,6 +71,13 @@ struct folder {
 		kWorking = 5u           ///< Scan is complete and the folder can be used.
 	};
 
+	enum class MigrateState {
+		kDone = 0u,            ///< The migration process completely finished
+		kInProgress = 1u,      ///< Migration thread is running
+		kTerminate = 2u,       ///< Requested the migrate thread to stop ASAP
+		kThreadFinished = 3u   ///< The migration thread already finished and can be joined
+	};
+
 	char *path;
 
 	/// The status of scanning this disk.
@@ -81,11 +88,9 @@ struct folder {
 	unsigned int damaged:1;
 	unsigned int toremove:2;
 	uint8_t scanprogress;
-#define MGST_MIGRATEDONE 0u
-#define MGST_MIGRATEINPROGRESS 1u
-#define MGST_MIGRATETERMINATE 2u
-#define MGST_MIGRATEFINISHED 3u
-	uint8_t migratestate;
+
+	MigrateState migrateState;
+
 	uint64_t leavefree;
 	uint64_t avail;
 	uint64_t total;

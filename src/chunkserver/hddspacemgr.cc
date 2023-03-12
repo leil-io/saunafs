@@ -1030,9 +1030,9 @@ void hdd_check_folders() {
 			case folder::ScanState::kTerminate:
 				break;
 			}
-			if (f->migratestate == MGST_MIGRATEFINISHED) {
+			if (f->migrateState == folder::MigrateState::kThreadFinished) {
 				f->migratethread.join();
-				f->migratestate = MGST_MIGRATEDONE;
+				f->migrateState = folder::MigrateState::kDone;
 			}
 			if (f->toremove==0) { // 0 here means 'removed', so delete it from data structures
 				*fptr = f->next;
@@ -1099,9 +1099,9 @@ void hdd_check_folders() {
 		case folder::ScanState::kTerminate:
 			break;
 		}
-		if (f->migratestate == MGST_MIGRATEFINISHED) {
+		if (f->migrateState == folder::MigrateState::kThreadFinished) {
 			f->migratethread.join();
-			f->migratestate = MGST_MIGRATEDONE;
+			f->migrateState = folder::MigrateState::kDone;
 		}
 	}
 	folderlock_guard.unlock();
@@ -3360,7 +3360,7 @@ int64_t hdd_folder_migrate_directories(folder *f, int layout_version) {
 
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		if (f->migratestate == MGST_MIGRATETERMINATE) {
+		if (f->migrateState == folder::MigrateState::kTerminate) {
 			return count;
 		}
 	}
@@ -3417,7 +3417,7 @@ int64_t hdd_folder_migrate_directories(folder *f, int layout_version) {
 			check_cnt++;
 			if (check_cnt >= 100) {
 				std::lock_guard<std::mutex> folderlock_guard(folderlock);
-				if (f->migratestate == MGST_MIGRATETERMINATE) {
+				if (f->migrateState == folder::MigrateState::kTerminate) {
 					scan_term = true;
 				}
 				check_cnt = 0;
@@ -3448,7 +3448,7 @@ void *hdd_folder_migrate(void *arg) {
 	int64_t count = hdd_folder_migrate_directories(f, 1);
 
 	std::lock_guard<std::mutex> folderlock_guard(folderlock);
-	if (f->migratestate != MGST_MIGRATETERMINATE) {
+	if (f->migrateState != folder::MigrateState::kTerminate) {
 		if (count > 0) {
 			lzfs_pretty_syslog(LOG_NOTICE,
 			                   "converting directories in folder %s: complete (%" PRIu32 "s)",
@@ -3457,7 +3457,7 @@ void *hdd_folder_migrate(void *arg) {
 	} else {
 		lzfs_pretty_syslog(LOG_NOTICE, "converting directories in folder %s: interrupted", f->path);
 	}
-	f->migratestate = MGST_MIGRATEFINISHED;
+	f->migrateState = folder::MigrateState::kThreadFinished;
 
 	return NULL;
 }
@@ -3505,8 +3505,9 @@ void *hdd_folder_scan(void *arg) {
 		                   (uint32_t)(time(NULL)) - begin_time);
 	}
 
-	if (f->scanState != folder::ScanState::kTerminate && f->migratestate == MGST_MIGRATEDONE) {
-		f->migratestate = MGST_MIGRATEINPROGRESS;
+	if (f->scanState != folder::ScanState::kTerminate
+	        && f->migrateState == folder::MigrateState::kDone) {
+		f->migrateState = folder::MigrateState::kInProgress;
 		f->migratethread = std::thread(hdd_folder_migrate, f);
 	}
 
@@ -3563,13 +3564,15 @@ void hdd_term(void) {
 			if (f->scanState == folder::ScanState::kInProgress) {
 				f->scanState = folder::ScanState::kTerminate;
 			}
-			if (f->scanState == folder::ScanState::kTerminate || f->scanState == folder::ScanState::kThreadFinished) {
+			if (f->scanState == folder::ScanState::kTerminate
+			        || f->scanState == folder::ScanState::kThreadFinished) {
 				i++;
 			}
-			if (f->migratestate == MGST_MIGRATEINPROGRESS) {
-				f->migratestate = MGST_MIGRATETERMINATE;
+			if (f->migrateState == folder::MigrateState::kInProgress) {
+				f->migrateState = folder::MigrateState::kTerminate;
 			}
-			if (f->migratestate == MGST_MIGRATETERMINATE || f->migratestate == MGST_MIGRATEFINISHED) {
+			if (f->migrateState == folder::MigrateState::kTerminate
+			        || f->migrateState == folder::MigrateState::kThreadFinished) {
 				i++;
 			}
 		}
@@ -3584,9 +3587,9 @@ void hdd_term(void) {
 				f->scanState = folder::ScanState::kWorking;  // any state - to prevent calling join again
 				i--;
 			}
-			if (f->migratestate == MGST_MIGRATEFINISHED) {
+			if (f->migrateState == folder::MigrateState::kThreadFinished) {
 				f->migratethread.join();
-				f->migratestate = MGST_MIGRATEDONE;
+				f->migrateState = folder::MigrateState::kDone;
 				i--;
 			}
 		}
@@ -3855,7 +3858,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->damaged = damaged;
 	f->scanState = folder::ScanState::kNeeded;
 	f->scanprogress = 0;
-	f->migratestate = MGST_MIGRATEDONE;
+	f->migrateState = folder::MigrateState::kDone;
 	f->path = strdup(pptr);
 	passert(f->path);
 	f->toremove = 0;
