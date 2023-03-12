@@ -62,14 +62,20 @@ struct ioerror {
 };
 
 struct folder {
+	enum class ScanState {
+		kNeeded = 0u,           ///< Scanning is scheduled (the scanning thread is not running yet).
+		kInProgress = 1u,       ///< Scan in progress (the scanning thread is running).
+		kTerminate = 2u,        ///< Requested the scanning thread to stop scanning ASAP.
+		kThreadFinished = 3u,   ///< The scanning thread has finished its work and can be joined.
+		kSendNeeded = 4u,       ///< Resend the content of this folder to Master
+		kWorking = 5u           ///< Scan is complete and the folder can be used.
+	};
+
 	char *path;
-#define SCST_SCANNEEDED 0u
-#define SCST_SCANINPROGRESS 1u
-#define SCST_SCANTERMINATE 2u
-#define SCST_SCANFINISHED 3u
-#define SCST_SENDNEEDED 4u
-#define SCST_WORKING 5u
-	unsigned int scanstate:3;
+
+	/// The status of scanning this disk.
+	ScanState scanState = ScanState::kNeeded;
+
 	unsigned int needrefresh:1;
 	unsigned int todel:2;
 	unsigned int damaged:1;
