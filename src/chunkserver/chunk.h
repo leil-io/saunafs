@@ -33,8 +33,8 @@
 #include "common/disk_info.h"
 #include "protocol/MFSCommunication.h"
 
-#define STATSHISTORY (24*60)
-#define LASTERRSIZE 30
+#define STATS_HISTORY (24*60)
+#define LAST_ERROR_SIZE 30
 
 // Block data and crc summaric size.
 constexpr uint32_t kHddBlockSize = MFSBLOCKSIZE + 4;
@@ -55,12 +55,6 @@ struct cntcond {
 	struct cntcond *next;
 };
 
-struct ioerror {
-	uint64_t chunkid;
-	uint32_t timestamp;
-	int errornumber;
-};
-
 struct folder {
 	enum class ScanState {
 		kNeeded = 0u,           ///< Scanning is scheduled (the scanning thread is not running yet).
@@ -76,6 +70,21 @@ struct folder {
 		kInProgress = 1u,      ///< Migration thread is running
 		kTerminate = 2u,       ///< Requested the migrate thread to stop ASAP
 		kThreadFinished = 3u   ///< The migration thread already finished and can be joined
+	};
+
+	/// An I/O error which happened when accessing chunks in this folder.
+	struct IoError {
+		/// A constructor.
+		IoError() : chunkid(0), timestamp(0), errornumber(0) {}
+
+		/// The ID of the chunk which caused the error.
+		uint64_t chunkid;
+
+		/// The timestamp of the error.
+		uint32_t timestamp;
+
+		/// The error number (a.k.a., errno) of the error.
+		int errornumber;
 	};
 
 	char *path;
@@ -94,19 +103,23 @@ struct folder {
 	uint64_t leavefree;
 	uint64_t avail;
 	uint64_t total;
-	HddAtomicStatistics cstat;
-	HddStatistics stats[STATSHISTORY];
-	uint32_t statspos;
-	ioerror lasterrtab[LASTERRSIZE];
-	uint32_t chunkcount;
-	uint32_t lasterrindx;
-	uint32_t lastrefresh;
+
+	HddAtomicStatistics currentStat;                 ///< Current stats (updated with every operation)
+	std::array<HddStatistics, STATS_HISTORY> stats;  ///< History of stats for the last STATSHISTORY minutes
+	uint32_t statsPos;                               ///< Used to rotate the stats in the stats array
+
+	std::array<IoError, LAST_ERROR_SIZE> lastErrorTab;  ///< History with last LAST_ERROR_SIZE errors
+	uint32_t lastErrorIndex;                            ///< Index of the last error
+
+	uint32_t lastRefresh;  ///< Timestamp in seconds storing the last time this folder was refreshed
 	dev_t devid;
 	ino_t lockinode;
 	int lfd;
 	double carry;
 	std::thread scanthread;
 	std::thread migratethread;
+
+	uint32_t chunkcount;
 	Chunk *testhead,**testtail;
 };
 

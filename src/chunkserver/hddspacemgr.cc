@@ -339,10 +339,10 @@ static inline void hdd_stats_totalread(folder *f, uint64_t size, uint64_t rtime)
 	stats_totalbytesr += size;
 	stats_totalrtime += rtime;
 
-	f->cstat.rops++;
-	f->cstat.rbytes += size;
-	f->cstat.usecreadsum += rtime;
-	atomic_max<uint32_t>(f->cstat.usecreadmax, rtime);
+	f->currentStat.rops++;
+	f->currentStat.rbytes += size;
+	f->currentStat.usecreadsum += rtime;
+	atomic_max<uint32_t>(f->currentStat.usecreadmax, rtime);
 }
 
 static inline void hdd_stats_totalwrite(folder *f, uint64_t size, uint64_t wtime) {
@@ -354,10 +354,10 @@ static inline void hdd_stats_totalwrite(folder *f, uint64_t size, uint64_t wtime
 	stats_totalbytesw += size;
 	stats_totalwtime += wtime;
 
-	f->cstat.wops++;
-	f->cstat.wbytes += size;
-	f->cstat.usecwritesum += wtime;
-	atomic_max<uint32_t>(f->cstat.usecwritemax, wtime);
+	f->currentStat.wops++;
+	f->currentStat.wbytes += size;
+	f->currentStat.usecwritesum += wtime;
+	atomic_max<uint32_t>(f->currentStat.usecwritemax, wtime);
 }
 
 static inline void hdd_stats_datafsync(folder *f, uint64_t fsynctime) {
@@ -367,9 +367,9 @@ static inline void hdd_stats_datafsync(folder *f, uint64_t fsynctime) {
 	}
 	stats_totalwtime += fsynctime;
 
-	f->cstat.fsyncops++;
-	f->cstat.usecfsyncsum += fsynctime;
-	atomic_max<uint32_t>(f->cstat.usecfsyncmax, fsynctime);
+	f->currentStat.fsyncops++;
+	f->currentStat.usecfsyncsum += fsynctime;
+	atomic_max<uint32_t>(f->currentStat.usecfsyncmax, fsynctime);
 }
 
 static inline uint64_t get_usectime() {
@@ -473,9 +473,9 @@ void hdd_diskinfo_v1_data(uint8_t *buff) {
 			}
 			put8bit(&buff,((f->todel)?1:0) + ((f->damaged)?2:0)
 			        + ((f->scanState==folder::ScanState::kInProgress)?4:0));
-			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
-			put64bit(&buff,f->lasterrtab[ei].chunkid);
-			put32bit(&buff,f->lasterrtab[ei].timestamp);
+			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
+			put64bit(&buff,f->lastErrorTab[ei].chunkid);
+			put32bit(&buff,f->lastErrorTab[ei].timestamp);
 			put64bit(&buff,f->total-f->avail);
 			put64bit(&buff,f->total);
 			put32bit(&buff,f->chunkcount);
@@ -522,9 +522,9 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 			diskInfo.flags = (f->todel ? DiskInfo::kToDeleteFlagMask : 0)
 					+ (f->damaged ? DiskInfo::kDamagedFlagMask : 0)
 					+ (f->scanState == folder::ScanState::kInProgress ? DiskInfo::kScanInProgressFlagMask : 0);
-			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
-			diskInfo.errorChunkId = f->lasterrtab[ei].chunkid;
-			diskInfo.errorTimeStamp = f->lasterrtab[ei].timestamp;
+			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
+			diskInfo.errorChunkId = f->lastErrorTab[ei].chunkid;
+			diskInfo.errorTimeStamp = f->lastErrorTab[ei].timestamp;
 			if (f->scanState==folder::ScanState::kInProgress) {
 				diskInfo.used = f->scanprogress;
 				diskInfo.total = 0;
@@ -533,14 +533,14 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 				diskInfo.total = f->total;
 			}
 			diskInfo.chunksCount = f->chunkcount;
-			s = f->stats[f->statspos];
+			s = f->stats[f->statsPos];
 			diskInfo.lastMinuteStats = s;
 			for (pos=1 ; pos<60 ; pos++) {
-				s.add(f->stats[(f->statspos+pos)%STATSHISTORY]);
+				s.add(f->stats[(f->statsPos+pos)%STATS_HISTORY]);
 			}
 			diskInfo.lastHourStats = s;
 			for (pos=60 ; pos<24*60 ; pos++) {
-				s.add(f->stats[(f->statspos+pos)%STATSHISTORY]);
+				s.add(f->stats[(f->statsPos+pos)%STATS_HISTORY]);
 			}
 			diskInfo.lastDayStats = s;
 		}
@@ -554,13 +554,13 @@ void hdd_diskinfo_movestats(void) {
 
 	std::lock_guard<std::mutex> folderlock_guard(folderlock);
 	for (auto f : folders) {
-		if (f->statspos==0) {
-			f->statspos = STATSHISTORY-1;
+		if (f->statsPos==0) {
+			f->statsPos = STATS_HISTORY-1;
 		} else {
-			f->statspos--;
+			f->statsPos--;
 		}
-		f->stats[f->statspos] = f->cstat;
-		f->cstat.clear();
+		f->stats[f->statsPos] = f->currentStat;
+		f->currentStat.clear();
 	}
 }
 
@@ -1063,7 +1063,7 @@ void hdd_check_folders() {
 			f->scanState = folder::ScanState::kWorking;
 			hdd_refresh_usage(f);
 			f->needrefresh = 0;
-			f->lastrefresh = now;
+			f->lastRefresh = now;
 			changed = 1;
 			break;
 		case folder::ScanState::kSendNeeded:
@@ -1071,15 +1071,15 @@ void hdd_check_folders() {
 			f->scanState = folder::ScanState::kWorking;
 			hdd_refresh_usage(f);
 			f->needrefresh = 0;
-			f->lastrefresh = now;
+			f->lastRefresh = now;
 			changed = 1;
 			break;
 		case folder::ScanState::kWorking:
 			err = 0;
-			for (i=0 ; i<LASTERRSIZE; i++) {
-				if (f->lasterrtab[i].timestamp+LASTERRTIME>=now
-				        && (f->lasterrtab[i].errornumber==EIO
-				            || f->lasterrtab[i].errornumber==EROFS)) {
+			for (i=0 ; i<LAST_ERROR_SIZE; i++) {
+				if (f->lastErrorTab[i].timestamp+LASTERRTIME>=now
+				        && (f->lastErrorTab[i].errornumber==EIO
+				            || f->lastErrorTab[i].errornumber==EROFS)) {
 					err++;
 				}
 			}
@@ -1089,10 +1089,10 @@ void hdd_check_folders() {
 				f->damaged = 1;
 				changed = 1;
 			} else {
-				if (f->needrefresh || f->lastrefresh+60<now) {
+				if (f->needrefresh || f->lastRefresh+60<now) {
 					hdd_refresh_usage(f);
 					f->needrefresh = 0;
-					f->lastrefresh = now;
+					f->lastRefresh = now;
 					changed = 1;
 				}
 			}
@@ -1123,12 +1123,12 @@ void hdd_error_occured(Chunk *c) {
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		gettimeofday(&tv,NULL);
 		f = c->owner;
-		i = f->lasterrindx;
-		f->lasterrtab[i].chunkid = c->chunkid;
-		f->lasterrtab[i].errornumber = errmem;
-		f->lasterrtab[i].timestamp = tv.tv_sec;
-		i = (i+1)%LASTERRSIZE;
-		f->lasterrindx = i;
+		i = f->lastErrorIndex;
+		f->lastErrorTab[i].chunkid = c->chunkid;
+		f->lastErrorTab[i].errornumber = errmem;
+		f->lastErrorTab[i].timestamp = tv.tv_sec;
+		i = (i+1)%LAST_ERROR_SIZE;
+		f->lastErrorIndex = i;
 	}
 
 	++errorcounter;
@@ -3838,17 +3838,17 @@ int hdd_parseline(char *hddcfgline) {
 				f->total = 0ULL;
 				f->leavefree = gLeaveFree;
 				f->chunkcount = 0;
-				f->cstat.clear();
-				for (l=0 ; l<STATSHISTORY ; l++) {
+				f->currentStat.clear();
+				for (l=0 ; l<STATS_HISTORY ; l++) {
 					f->stats[l].clear();
 				}
-				f->statspos = 0;
-				for (l=0 ; l<LASTERRSIZE ; l++) {
-					f->lasterrtab[l].chunkid = 0ULL;
-					f->lasterrtab[l].timestamp = 0;
+				f->statsPos = 0;
+				for (l=0 ; l<LAST_ERROR_SIZE ; l++) {
+					f->lastErrorTab[l].chunkid = 0ULL;
+					f->lastErrorTab[l].timestamp = 0;
 				}
-				f->lasterrindx = 0;
-				f->lastrefresh = 0;
+				f->lastErrorIndex = 0;
+				f->lastRefresh = 0;
 				f->needrefresh = 1;
 			} else {
 				if ((f->todel==0 && td>0) || (f->todel>0 && td==0)) {
@@ -3878,17 +3878,17 @@ int hdd_parseline(char *hddcfgline) {
 	f->avail = 0ULL;
 	f->total = 0ULL;
 	f->chunkcount = 0;
-	f->cstat.clear();
-	for (l=0 ; l<STATSHISTORY ; l++) {
+	f->currentStat.clear();
+	for (l=0 ; l<STATS_HISTORY ; l++) {
 		f->stats[l].clear();
 	}
-	f->statspos = 0;
-	for (l=0 ; l<LASTERRSIZE ; l++) {
-		f->lasterrtab[l].chunkid = 0ULL;
-		f->lasterrtab[l].timestamp = 0;
+	f->statsPos = 0;
+	for (l=0 ; l<LAST_ERROR_SIZE ; l++) {
+		f->lastErrorTab[l].chunkid = 0ULL;
+		f->lastErrorTab[l].timestamp = 0;
 	}
-	f->lasterrindx = 0;
-	f->lastrefresh = 0;
+	f->lastErrorIndex = 0;
+	f->lastRefresh = 0;
 	f->needrefresh = 1;
 	if (damaged) {
 		f->lfd = -1;
