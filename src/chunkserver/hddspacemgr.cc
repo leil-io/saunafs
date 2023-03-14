@@ -111,14 +111,14 @@ static const char gLeaveSpaceDefaultDefaultStrValue[] = "4GiB";
 /// Value of HDD_ADVISE_NO_CACHE from config
 static std::atomic_bool gAdviseNoCache;
 
+/// The collection of data folders, i.e., directories on disk where chunks are stored.
+static std::list<folder*> folders;
+
 static std::atomic<bool> MooseFSChunkFormat;
 
 static std::atomic<bool> PerformFsync;
 
 static bool gPunchHolesInFiles;
-
-/* folders data */
-static folder *folderhead = NULL;
 
 /// Active folder scans in progress
 /* theoretically it would return a false positive if scans haven't started yet,
@@ -437,12 +437,11 @@ private:
 
 uint32_t hdd_diskinfo_v1_size() {
 	TRACETHIS();
-	folder *f;
 	uint32_t s,sl;
 
 	s = 0;
 	folderlock.lock();
-	for (f=folderhead ; f ; f=f->next) {
+	for (const auto f : folders) {
 		sl = strlen(f->path);
 		if (sl>255) {
 			sl = 255;
@@ -454,11 +453,11 @@ uint32_t hdd_diskinfo_v1_size() {
 
 void hdd_diskinfo_v1_data(uint8_t *buff) {
 	TRACETHIS();
-	folder *f;
+
 	uint32_t sl;
 	uint32_t ei;
 	if (buff) {
-		for (f=folderhead ; f ; f=f->next) {
+		for (auto f : folders) {
 			sl = strlen(f->path);
 			if (sl>255) {
 				put8bit(&buff,255);
@@ -487,12 +486,11 @@ void hdd_diskinfo_v1_data(uint8_t *buff) {
 
 uint32_t hdd_diskinfo_v2_size() {
 	TRACETHIS();
-	folder *f;
 	uint32_t s,sl;
 
 	s = 0;
 	folderlock.lock();
-	for (f=folderhead ; f ; f=f->next) {
+	for (const auto f : folders) {
 		sl = strlen(f->path);
 		if (sl>255) {
 			sl = 255;
@@ -504,13 +502,13 @@ uint32_t hdd_diskinfo_v2_size() {
 
 void hdd_diskinfo_v2_data(uint8_t *buff) {
 	TRACETHIS();
-	folder *f;
+
 	HddStatistics s;
 	uint32_t ei;
 	uint32_t pos;
 	if (buff) {
 		MooseFSVector<DiskInfo> diskInfoVector;
-		for (f = folderhead; f; f = f->next) {
+		for (const auto f : folders) {
 			diskInfoVector.emplace_back();
 			DiskInfo& diskInfo = diskInfoVector.back();
 			diskInfo.path = f->path;
@@ -553,9 +551,9 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 
 void hdd_diskinfo_movestats(void) {
 	TRACETHIS();
-	folder *f;
+
 	std::lock_guard<std::mutex> folderlock_guard(folderlock);
-	for (f=folderhead ; f ; f=f->next) {
+	for (auto f : folders) {
 		if (f->statspos==0) {
 			f->statspos = STATSHISTORY-1;
 		} else {
@@ -876,7 +874,7 @@ static inline void hdd_refresh_usage(folder *f) {
 
 static inline folder* hdd_getfolder() {
 	TRACETHIS();
-	folder *f,*bf;
+	folder *bf;
 	double maxcarry;
 	double minavail,maxavail;
 	double s,d;
@@ -888,8 +886,9 @@ static inline folder* hdd_getfolder() {
 	maxcarry = 1.0;
 	bf = NULL;
 	ok = 0;
-	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged || f->todel || f->total==0 || f->avail==0 || f->scanState!=folder::ScanState::kWorking) {
+	for (auto f : folders) {
+		if (f->damaged || f->todel || f->total==0 || f->avail==0
+		        || f->scanState!=folder::ScanState::kWorking) {
 			continue;
 		}
 		if (f->carry >= maxcarry) {
@@ -922,7 +921,7 @@ static inline folder* hdd_getfolder() {
 	}
 	d = maxavail-s;
 	maxcarry = 1.0;
-	for (f=folderhead ; f ; f=f->next) {
+	for (auto f : folders) {
 		if (f->damaged || f->todel || f->total==0 || f->avail==0 || f->scanState!=folder::ScanState::kWorking) {
 			continue;
 		}
@@ -988,7 +987,6 @@ void* hdd_folder_scan(void *arg);
 
 void hdd_check_folders() {
 	TRACETHIS();
-	folder *f,**fptr;
 	uint32_t i;
 	uint32_t now;
 	int changed,err;
@@ -998,18 +996,15 @@ void hdd_check_folders() {
 	now = tv.tv_sec;
 
 	changed = 0;
-//      syslog(LOG_NOTICE,"check folders ...");
 
 	std::unique_lock<std::mutex> folderlock_guard(folderlock);
 	if (folderactions==0) {
-//              syslog(LOG_NOTICE,"check folders: disabled");
 		return;
 	}
-//      for (f=folderhead ; f ; f=f->next) {
-//              syslog(LOG_NOTICE,"folder: %s, toremove:%u, damaged:%u, todel:%u, scanState:%u",f->path,f->toremove,f->damaged,f->todel,f->scanState);
-//      }
-	fptr = &folderhead;
-	while ((f=*fptr)) {
+
+	std::list<folder*> foldersToRemove;
+
+	for (auto f : folders) {
 		if (f->toremove) {
 			switch (f->scanState) {
 			case folder::ScanState::kInProgress:
@@ -1035,22 +1030,26 @@ void hdd_check_folders() {
 				f->migrateState = folder::MigrateState::kDone;
 			}
 			if (f->toremove==0) { // 0 here means 'removed', so delete it from data structures
-				*fptr = f->next;
+				// Delay the deletion after the loop
 				lzfs_pretty_syslog(LOG_NOTICE,"folder %s successfully removed",f->path);
+
 				if (f->lfd>=0) {
 					close(f->lfd);
 				}
+
 				free(f->path);
-				delete f;
+				foldersToRemove.emplace_back(f);
 				testerreset = 1;
-			} else {
-				fptr = &(f->next);
 			}
-		} else {
-			fptr = &(f->next);
 		}
 	}
-	for (f=folderhead ; f ; f=f->next) {
+
+	for (auto f : foldersToRemove) {
+		folders.remove(f);
+		delete f;
+	}
+
+	for (auto f : folders) {
 		if (f->damaged || f->toremove) {
 			continue;
 		}
@@ -1078,7 +1077,9 @@ void hdd_check_folders() {
 		case folder::ScanState::kWorking:
 			err = 0;
 			for (i=0 ; i<LASTERRSIZE; i++) {
-				if (f->lasterrtab[i].timestamp+LASTERRTIME>=now && (f->lasterrtab[i].errornumber==EIO || f->lasterrtab[i].errornumber==EROFS)) {
+				if (f->lasterrtab[i].timestamp+LASTERRTIME>=now
+				        && (f->lasterrtab[i].errornumber==EIO
+				            || f->lasterrtab[i].errornumber==EROFS)) {
 					err++;
 				}
 			}
@@ -1192,7 +1193,6 @@ void hdd_foreach_chunk_in_bulks(
 
 void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount,uint64_t *tdusedspace,uint64_t *tdtotalspace,uint32_t *tdchunkcount) {
 	TRACETHIS();
-	folder *f;
 	uint64_t avail,total;
 	uint64_t tdavail,tdtotal;
 	uint32_t chunks,tdchunks;
@@ -1200,7 +1200,7 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 	chunks = tdchunks = 0;
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		for (f=folderhead ; f ; f=f->next) {
+		for (const auto f : folders) {
 			if (f->damaged || f->toremove) {
 				continue;
 			}
@@ -3038,7 +3038,6 @@ void hdd_test_chunk(ChunkWithVersionAndType chunk) {
 
 void hdd_tester_thread() {
 	TRACETHIS();
-	folder *f, *of;
 	Chunk *c;
 	uint64_t chunkid;
 	uint32_t version;
@@ -3046,8 +3045,10 @@ void hdd_tester_thread() {
 	uint32_t cnt;
 	uint64_t start_us, end_us;
 
-	f = folderhead;
+	auto folderIt = folders.begin();
+	auto previousFolderIt = folderIt;
 	cnt = 0;
+
 	while (!term) {
 		start_us = get_usectime();
 		chunkid = 0;
@@ -3058,25 +3059,34 @@ void hdd_tester_thread() {
 			std::lock_guard<std::mutex> testlock_guard(testlock);
 			uint8_t testerresetExpected = 1;
 			if (testerreset.compare_exchange_strong(testerresetExpected, 0)) {
-				f = folderhead;
+				folderIt = folders.begin();
 				cnt = 0;
 			}
 			cnt += std::min(HDDTestFreq_ms.load(), 1000U);
-			if (cnt < HDDTestFreq_ms || folderactions == 0 || folderhead == nullptr) {
+			if (cnt < HDDTestFreq_ms || folderactions == 0 || folderIt == folders.end()) {
 				chunkid = 0;
 			} else {
 				cnt = 0;
-				of = f;
-				do {
-					f = f->next;
-					if (f == nullptr) {
-						f = folderhead;
-					}
-				} while ((f->damaged || f->todel || f->toremove || f->scanState != folder::ScanState::kWorking) && of != f);
-				if (of == f && (f->damaged || f->todel || f->toremove || f->scanState != folder::ScanState::kWorking)) {
+				previousFolderIt = folderIt;
+
+				if (folders.size()) {
+					do {
+						++folderIt;
+						if (folderIt == folders.end()) {
+							folderIt = folders.begin();
+						}
+					} while (((*folderIt)->damaged || (*folderIt)->todel
+					          || (*folderIt)->toremove
+					          || (*folderIt)->scanState != folder::ScanState::kWorking)
+					         && previousFolderIt != folderIt);
+				}
+
+				if (previousFolderIt == folderIt && ((*folderIt)->damaged || (*folderIt)->todel
+				                || (*folderIt)->toremove
+				                || (*folderIt)->scanState != folder::ScanState::kWorking)) {
 					chunkid = 0;
 				} else {
-					c = f->testhead;
+					c = (*folderIt)->testhead;
 					if (c && c->state==CH_AVAIL) {
 						chunkid = c->chunkid;
 						version = c->version;
@@ -3543,7 +3553,6 @@ void hdd_free_resources_thread() {
 void hdd_term(void) {
 	TRACETHIS();
 	uint32_t i;
-	folder *f,*fn;
 	cntcond *cc,*ccn;
 
 	i = term.exchange(1); // if term is non zero here then it means that threads have not been started, so do not join with them
@@ -3560,7 +3569,7 @@ void hdd_term(void) {
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		i = 0;
-		for (f = folderhead; f; f = f->next) {
+		for (auto f : folders) {
 			if (f->scanState == folder::ScanState::kInProgress) {
 				f->scanState = folder::ScanState::kTerminate;
 			}
@@ -3581,7 +3590,7 @@ void hdd_term(void) {
 	while (i>0) {
 		usleep(10000); // not very elegant solution.
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		for (f=folderhead ; f ; f=f->next) {
+		for (auto f : folders) {
 			if (f->scanState == folder::ScanState::kThreadFinished) {
 				f->scanthread.join();
 				f->scanState = folder::ScanState::kWorking;  // any state - to prevent calling join again
@@ -3618,14 +3627,16 @@ void hdd_term(void) {
 	gChunkRegistry.clear();
 	gOpenChunks.freeUnused(eventloop_time(), gChunkRegistryLock);
 
-	for (f = folderhead ; f ; f = fn) {
-		fn = f->next;
+	for (auto f : folders) {
 		if (f->lfd >= 0) {
 			close(f->lfd);
 		}
 		free(f->path);
 		delete f;
 	}
+
+	folders.clear();
+
 	for (cc = cclist; cc; cc = ccn) {
 		ccn = cc->next;
 		if (cc->wcnt) {
@@ -3730,7 +3741,6 @@ int hdd_parseline(char *hddcfgline) {
 	int damaged,lfd,td;
 	char *pptr;
 	struct stat sb;
-	folder *f;
 	uint8_t lockneeded;
 
 	damaged = 0;
@@ -3762,9 +3772,11 @@ int hdd_parseline(char *hddcfgline) {
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		lockneeded = 1;
-		for (f=folderhead ; f && lockneeded ; f=f->next) {
-			if (strcmp(f->path,pptr)==0) {
-				lockneeded = 0;
+		for (const auto f : folders) {
+			if (lockneeded) {
+				if (strcmp(f->path,pptr)==0) {
+					lockneeded = 0;
+				}
 			}
 		}
 	}
@@ -3797,7 +3809,7 @@ int hdd_parseline(char *hddcfgline) {
 		damaged = 1;
 	} else if (lockneeded) {
 		std::unique_lock<std::mutex> folderlock_guard(folderlock);
-		for (f=folderhead ; f ; f=f->next) {
+		for (const auto f : folders) {
 			if (f->lfd>=0 && f->devid==sb.st_dev) {
 				if (f->lockinode==sb.st_ino) {
 					std::string fPath = f->path;
@@ -3815,7 +3827,7 @@ int hdd_parseline(char *hddcfgline) {
 		}
 	}
 	std::unique_lock<std::mutex> folderlock_guard(folderlock);
-	for (f=folderhead ; f ; f=f->next) {
+	for (auto f : folders) {
 		if (strcmp(f->path,pptr)==0) {
 			f->toremove = 0;
 			if (f->damaged) {
@@ -3852,7 +3864,7 @@ int hdd_parseline(char *hddcfgline) {
 			return 1;
 		}
 	}
-	f = new folder();
+	folder *f = new folder();
 	passert(f);
 	f->todel = td;
 	f->damaged = damaged;
@@ -3888,15 +3900,15 @@ int hdd_parseline(char *hddcfgline) {
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
 	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);
-	f->next = folderhead;
-	folderhead = f;
+
+	folders.emplace_back(f);
+
 	testerreset = 1;
 	return 2;
 }
 
 static void hdd_folders_reinit(void) {
 	TRACETHIS();
-	folder *f;
 	cstream_t fd;
 	std::string hddfname;
 
@@ -3912,7 +3924,7 @@ static void hdd_folders_reinit(void) {
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		folderactions = 0; // stop folder actions
-		for (f=folderhead ; f ; f=f->next) {
+		for (auto f : folders) {
 			f->toremove = 1;
 		}
 	}
@@ -3927,7 +3939,7 @@ static void hdd_folders_reinit(void) {
 	bool anyDiskAvailable = false;
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		for (f=folderhead ; f ; f=f->next) {
+		for (auto f : folders) {
 			if (f->toremove==0) {
 				anyDiskAvailable = true;
 				if (f->scanState==folder::ScanState::kNeeded) {
@@ -3946,7 +3958,7 @@ static void hdd_folders_reinit(void) {
 
 	std::unique_lock<std::mutex> folderlock_lock(folderlock);
 	std::vector<std::string> paths;
-	for (f = folderhead; f; f = f->next) {
+	for (const auto f : folders) {
 		paths.emplace_back(f->path);
 	}
 	folderlock_lock.unlock();
@@ -4024,7 +4036,6 @@ int hdd_late_init(void) {
 
 int hdd_init(void) {
 	TRACETHIS();
-	folder *f;
 	char *LeaveFreeStr;
 
 #ifndef LIZARDFS_HAVE_THREAD_LOCAL
@@ -4060,7 +4071,7 @@ int hdd_init(void) {
 
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		for (f=folderhead ; f ; f=f->next) {
+		for (const auto f : folders) {
 			lzfs_pretty_syslog(LOG_INFO, "hdd space manager: path to scan: %s",f->path);
 		}
 	}

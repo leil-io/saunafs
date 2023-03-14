@@ -108,7 +108,6 @@ struct folder {
 	std::thread scanthread;
 	std::thread migratethread;
 	Chunk *testhead,**testtail;
-	struct folder *next;
 };
 
 class Chunk {
