@@ -28,9 +28,7 @@
 #include "common/slice_traits.h"
 
 Chunk::Chunk(uint64_t chunkId, ChunkPartType type, ChunkState state)
-	: testnext(NULL),
-	  testprev(NULL),
-	  ccond(NULL),
+	: ccond(NULL),
 	  owner(NULL),
 	  chunkid(chunkId),
 	  version(0),

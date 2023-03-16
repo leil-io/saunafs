@@ -29,6 +29,7 @@
 #include <thread>
 
 #include "chunkserver/chunk_format.h"
+#include "folder_chunks.h"
 #include "common/chunk_part_type.h"
 #include "common/disk_info.h"
 #include "protocol/MFSCommunication.h"
@@ -119,13 +120,20 @@ struct folder {
 	std::thread scanthread;
 	std::thread migratethread;
 
-	uint32_t chunkcount;
-	Chunk *testhead,**testtail;
+	/// A collection of chunks located in this folder.
+	///
+	/// The collection is ordered into a near-random sequence in which
+	/// the chunks will be tested for checksum correctness.
+	///
+	/// The collection is guarded by `hashlock`, which should be locked
+	/// when the collection is accessed for reading or modifying.
+	FolderChunks chunks;
 };
 
 class Chunk {
 public:
 	static const uint32_t kNumberOfSubfolders = 256;
+
 	enum { kCurrentDirectoryLayout = 0, kMooseFSDirectoryLayout };
 
 	Chunk(uint64_t chunkId, ChunkPartType type, ChunkState state);
@@ -152,7 +160,6 @@ public:
 	static std::string getSubfolderNameGivenNumber(uint32_t subfolderNumber, int layout_version = 0);
 	static std::string getSubfolderNameGivenChunkId(uint64_t chunkId, int layout_version = 0);
 
-	Chunk *testnext, **testprev;
 	cntcond *ccond;
 	struct folder *owner;
 	uint64_t chunkid;
@@ -172,6 +179,17 @@ public:
 	uint8_t todel;
 	uint8_t state;
 	uint8_t wasChanged;
+
+	/// The index of the chunk within the folder.
+	///
+	/// This value may change during the lifetime of the chunk, and corresponds
+	/// to the order in which the chunk will be subject to checksum testing.
+	///
+	/// This is `kInvalidIndex` if the value
+	/// is not valid, i.e., when the chunk is not assigned into a folder yet.
+	///
+	/// This value is governed by the owning folder's `chunks` collection.
+	size_t indexInFolder = FolderChunks::kInvalidIndex;
 };
 
 class MooseFSChunk : public Chunk {

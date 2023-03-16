@@ -478,7 +478,7 @@ void hdd_diskinfo_v1_data(uint8_t *buff) {
 			put32bit(&buff,f->lastErrorTab[ei].timestamp);
 			put64bit(&buff,f->total-f->avail);
 			put64bit(&buff,f->total);
-			put32bit(&buff,f->chunkcount);
+			put32bit(&buff,f->chunks.size());
 		}
 	}
 	folderlock.unlock();
@@ -532,7 +532,7 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 				diskInfo.used = f->total-f->avail;
 				diskInfo.total = f->total;
 			}
-			diskInfo.chunksCount = f->chunkcount;
+			diskInfo.chunksCount = f->chunks.size();
 			s = f->stats[f->statsPos];
 			diskInfo.lastMinuteStats = s;
 			for (pos=1 ; pos<60 ; pos++) {
@@ -577,12 +577,7 @@ static inline void hdd_chunk_remove(Chunk *c) {
 	if (cp->owner) {
 		// remove this chunk from its folder's testlist
 		std::lock_guard<std::mutex> testlock_guard(testlock);
-		if (cp->testnext) {
-			cp->testnext->testprev = cp->testprev;
-		} else {
-			cp->owner->testtail = cp->testprev;
-		}
-		*(cp->testprev) = cp->testnext;
+		cp->owner->chunks.remove(c);
 	}
 	gChunkRegistry.erase(chunkIter);
 }
@@ -665,7 +660,8 @@ static Chunk *hdd_chunk_recreate(Chunk *c, uint64_t chunkid, ChunkPartType type,
 
 		if (c->state != CH_DELETED && c->owner) {
 			std::lock_guard<std::mutex> folderlock_guard(folderlock);
-			c->owner->chunkcount--;
+			std::lock_guard<std::mutex> testlock_guard(testlock);
+			c->owner->chunks.remove(c);
 			c->owner->needrefresh = 1;
 		}
 
@@ -799,7 +795,6 @@ static void hdd_chunk_delete(Chunk *c) {
 		}
 	}
 	std::lock_guard<std::mutex> folderlock_guard(folderlock);
-	f->chunkcount--;
 	f->needrefresh = 1;
 }
 
@@ -823,14 +818,10 @@ static Chunk* hdd_chunk_create(
 	}
 	c->version = version;
 	f->needrefresh = 1;
-	f->chunkcount++;
 	c->owner = f;
 	c->setFilenameLayout(Chunk::kCurrentDirectoryLayout);
 	std::lock_guard<std::mutex> testlock_guard(testlock);
-	c->testnext = NULL;
-	c->testprev = f->testtail;
-	(*c->testprev) = c;
-	f->testtail = &(c->testnext);
+	f->chunks.insert(c);
 	return c;
 }
 
@@ -842,15 +833,9 @@ static inline Chunk* hdd_chunk_find(uint64_t chunkId, ChunkPartType chunkType) {
 static void hdd_chunk_testmove(Chunk *c) {
 	TRACETHIS();
 	assert(c);
+
 	std::lock_guard<std::mutex> testlock_guard(testlock);
-	if (c->testnext) {
-		*(c->testprev) = c->testnext;
-		c->testnext->testprev = c->testprev;
-		c->testnext = NULL;
-		c->testprev = c->owner->testtail;
-		*(c->testprev) = c;
-		c->owner->testtail = &(c->testnext);
-	}
+	c->owner->chunks.markAsTested(c);
 }
 
 // no locks - locked by caller
@@ -952,7 +937,7 @@ void hdd_senddata(folder *f,int rmflag) {
 	// and then each is erased from gChunkRegistry outside the loop over gChunkRegistry's entries.
 	std::vector<Chunk *> chunksToRemove;
 	if (rmflag) {
-		chunksToRemove.reserve(f->chunkcount);
+		chunksToRemove.reserve(f->chunks.size());
 	}
 	for (const auto &chunkEntry : gChunkRegistry) {
 		Chunk *c = chunkEntry.second.get();
@@ -970,12 +955,7 @@ void hdd_senddata(folder *f,int rmflag) {
 		hdd_report_lost_chunk(c->chunkid, c->type());
 		if (c->state==CH_AVAIL) {
 			gOpenChunks.purge(c->fd);
-			if (c->testnext) {
-				c->testnext->testprev = c->testprev;
-			} else {
-				c->owner->testtail = c->testprev;
-			}
-			*(c->testprev) = c->testnext;
+			c->owner->chunks.remove(c);
 			gChunkRegistry.erase(chunkToKey(*c));
 		} else if (c->state==CH_LOCKED) {
 			c->state = CH_TOBEDELETED;
@@ -1209,13 +1189,13 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 					avail += f->avail;
 					total += f->total;
 				}
-				chunks += f->chunkcount;
+				chunks += f->chunks.size();
 			} else {
 				if (f->scanState==folder::ScanState::kWorking) {
 					tdavail += f->avail;
 					tdtotal += f->total;
 				}
-				tdchunks += f->chunkcount;
+				tdchunks += f->chunks.size();
 			}
 		}
 	}
@@ -3086,7 +3066,7 @@ void hdd_tester_thread() {
 				                || (*folderIt)->scanState != folder::ScanState::kWorking)) {
 					chunkid = 0;
 				} else {
-					c = (*folderIt)->testhead;
+					c = (*folderIt)->chunks.chunkToTest();
 					if (c && c->state==CH_AVAIL) {
 						chunkid = c->chunkid;
 						version = c->version;
@@ -3112,47 +3092,12 @@ void hdd_tester_thread() {
 	}
 }
 
-void hdd_testshuffle(folder *f) {
+void hdd_testshuffle(folder * f) {
 	TRACETHIS();
-	uint32_t i,j,chunksno;
-	Chunk **csorttab,*c;
+
 	std::lock_guard<std::mutex> testlock_guard(testlock);
-	chunksno = 0;
-	for (c=f->testhead ; c ; c=c->testnext) {
-		chunksno++;
-	}
-	if (chunksno>0) {
-		csorttab = (Chunk**) malloc(sizeof(Chunk*)*chunksno);
-		passert(csorttab);
-		chunksno = 0;
-		for (c=f->testhead ; c ; c=c->testnext) {
-			csorttab[chunksno++] = c;
-		}
-		if (chunksno>1) {
-			for (i=0 ; i<chunksno-1 ; i++) {
-				j = i+rnd_ranged<uint32_t>(chunksno-i);
-				if (j!=i) {
-					c = csorttab[i];
-					csorttab[i] = csorttab[j];
-					csorttab[j] = c;
-				}
-			}
-		}
-	} else {
-		csorttab = NULL;
-	}
-	f->testhead = NULL;
-	f->testtail = &(f->testhead);
-	for (i=0 ; i<chunksno ; i++) {
-		c = csorttab[i];
-		c->testnext = NULL;
-		c->testprev = f->testtail;
-		*(c->testprev) = c;
-		f->testtail = &(c->testnext);
-	}
-	if (csorttab) {
-		free(csorttab);
-	}
+	lzfs_pretty_syslog(LOG_NOTICE, "Randomizing chunks for: %s", f->path);
+	f->chunks.shuffle();
 }
 
 /* initialization */
@@ -3204,18 +3149,14 @@ static inline void hdd_add_chunk(folder *f,
 	c->setFilenameLayout(layout_version);
 	sassert(c->filename() == fullname);
 	{
-		std::lock_guard<std::mutex> testlock_guard(testlock);
-		c->testprev = f->testtail;
-		*(c->testprev) = c;
-		f->testtail = &(c->testnext);
+		std::lock_guard<std::mutex> folderlock_guard(folderlock);
+		f->chunks.insert(c);
 	}
 	if (new_chunk) {
 		hdd_report_new_chunk(c->chunkid, c->version, c->todel, c->type());
 	}
 
 	hdd_chunk_release(c);
-	std::lock_guard<std::mutex> folderlock_guard(folderlock);
-	f->chunkcount++;
 }
 
 void hdd_convert_chunk_to_ec2(const std::string &subfolder_path, const std::string &name,
@@ -3837,7 +3778,6 @@ int hdd_parseline(char *hddcfgline) {
 				f->avail = 0ULL;
 				f->total = 0ULL;
 				f->leavefree = gLeaveFree;
-				f->chunkcount = 0;
 				f->currentStat.clear();
 				for (l=0 ; l<STATS_HISTORY ; l++) {
 					f->stats[l].clear();
@@ -3877,7 +3817,6 @@ int hdd_parseline(char *hddcfgline) {
 	f->leavefree = gLeaveFree;
 	f->avail = 0ULL;
 	f->total = 0ULL;
-	f->chunkcount = 0;
 	f->currentStat.clear();
 	for (l=0 ; l<STATS_HISTORY ; l++) {
 		f->stats[l].clear();
@@ -3897,8 +3836,6 @@ int hdd_parseline(char *hddcfgline) {
 		f->devid = sb.st_dev;
 		f->lockinode = sb.st_ino;
 	}
-	f->testhead = NULL;
-	f->testtail = &(f->testhead);
 	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);
 
 	folders.emplace_back(f);
