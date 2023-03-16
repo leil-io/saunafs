@@ -16,7 +16,10 @@ RUN set -e ; \
   mkdir -p /home/${USERNAME} ; \
   groupadd -g ${GROUP_ID} ${USERNAME} ; \
   useradd -r -u ${USER_ID} -g ${USERNAME} -d /home/${USERNAME} ${USERNAME} ; \
-  chown ${USERNAME}:${USERNAME} /home/${USERNAME}
+  chown ${USERNAME}:${USERNAME} /home/${USERNAME} ; \
+  echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers ; \
+  chmod 0440 /etc/sudoers
+
 WORKDIR /home/${USERNAME}
 RUN set -e ; \
     apt-get update ; \
