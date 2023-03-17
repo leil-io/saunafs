@@ -13,12 +13,32 @@ ENV GROUP_ID=${GROUP_ID}
 ENV USER_ID=${USER_ID}
 ENV USERNAME=${USERNAME}
 ENV GTEST_ROOT=/usr/local
+
+RUN set -e ; \
+  apt-get update ; \
+  apt-get install --yes --assume-yes \
+    sudo ; \
+  rm -rf /var/lib/apt/lists/*
 RUN set -e ; \
   mkdir -p /home/${USERNAME} ; \
   groupadd -g ${GROUP_ID} ${USERNAME} ; \
-  useradd -r -u ${USER_ID} -g ${USERNAME} -d /home/${USERNAME} ${USERNAME} ; \
-  chown ${USERNAME}:${USERNAME} /home/${USERNAME}
+  useradd -u ${USER_ID} -g ${USERNAME} -d /home/${USERNAME} ${USERNAME} ; \
+  chown ${USERNAME}:${USERNAME} /home/${USERNAME} ; \
+  echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers ; \
+  chmod 0440 /etc/sudoers
 WORKDIR /home/${USERNAME}
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+RUN set -e ; \
+    apt-get update ; \
+    apt-get install --yes \
+      python3-pip \
+      python3-setuptools \
+      python3-venv \
+      python3-wheel ; \
+    rm -rf /var/lib/apt/lists/* ; \
+    python3 -m venv "${VIRTUAL_ENV}"; \
+    pip install asciidoc
 RUN set -e ; \
     apt-get update ; \
     apt-get install --yes sudo ; \

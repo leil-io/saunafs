@@ -19,6 +19,18 @@ RUN set -e ; \
     useradd -r -u ${USER_ID} -g ${USERNAME} -d /home/${USERNAME} ${USERNAME} ; \
     chown ${USERNAME}:${USERNAME} /home/${USERNAME}
 WORKDIR /home/${USERNAME}
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+RUN set -e ; \
+    apt-get update ; \
+    apt-get install --yes \
+      python3-pip \
+      python3-setuptools \
+      python3-venv \
+      python3-wheel ; \
+    rm -rf /var/lib/apt/lists/* ; \
+    python3 -m venv "${VIRTUAL_ENV}" ; \
+    pip install asciidoc
 RUN set -e ; \
     apt-get update ; \
     apt-get install --yes sudo ; \

@@ -537,16 +537,7 @@ add_mount_() {
 	max_tries=30
 
 	if [ -z ${LZFS_MOUNT_COMMAND+x} ]; then
-		if [ "$mfsmount3_available" = true ] && [ "$mfsmount_available" = true ]; then
-			echo "Both versions of mfsmount are available so choose one randomly."
-			if (($RANDOM % 2)); then
-				LZFS_MOUNT_COMMAND=mfsmount3
-				echo "Random chose libfuse3 for mounting filesystem."
-			else
-				LZFS_MOUNT_COMMAND=mfsmount
-				echo "Random chose libfuse2 for mounting filesystem."
-			fi
-		elif [ "$mfsmount3_available" = true ]; then
+		if [ "$mfsmount3_available" = true ]; then
 			LZFS_MOUNT_COMMAND=mfsmount3
 			echo "Using libfuse3 for mounting filesystem."
 		elif [ "$mfsmount_available" = true ]; then

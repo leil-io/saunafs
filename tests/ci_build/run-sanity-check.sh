@@ -17,4 +17,6 @@ rm -rf /mnt/ramdisk/* || true
 [ -f "${LIZARDFS_ROOT}/bin/lizardfs-tests" ] || \
 	die "${LIZARDFS_ROOT}/bin/lizardfs-tests" not found, did you build the project?
 export PATH="${LIZARDFS_ROOT}/bin:${PATH}"
-"${LIZARDFS_ROOT}/bin/lizardfs-tests" --gtest_color=yes --gtest_filter='SanityChecks.*' --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml"
+sudo sed -E -i '\,.*:\s+\$\{LIZARDFS_ROOT\s*:=.*,d' /etc/lizardfs_tests.conf || true
+echo ": \${LIZARDFS_ROOT:=${LIZARDFS_ROOT}}" | sudo tee -a /etc/lizardfs_tests.conf >/dev/null || true
+sudo "${LIZARDFS_ROOT}/bin/lizardfs-tests" --gtest_color=yes --gtest_filter='SanityChecks.*' --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml"
