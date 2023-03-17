@@ -662,7 +662,7 @@ static Chunk *hdd_chunk_recreate(Chunk *c, uint64_t chunkid, ChunkPartType type,
 			std::lock_guard<std::mutex> folderlock_guard(folderlock);
 			std::lock_guard<std::mutex> testlock_guard(testlock);
 			c->owner->chunks.remove(c);
-			c->owner->needrefresh = 1;
+			c->owner->needRefresh = true;
 		}
 
 		waiting = c->ccond;
@@ -795,7 +795,7 @@ static void hdd_chunk_delete(Chunk *c) {
 		}
 	}
 	std::lock_guard<std::mutex> folderlock_guard(folderlock);
-	f->needrefresh = 1;
+	f->needRefresh = true;
 }
 
 static Chunk* hdd_chunk_create(
@@ -817,7 +817,7 @@ static Chunk* hdd_chunk_create(
 		return NULL;
 	}
 	c->version = version;
-	f->needrefresh = 1;
+	f->needRefresh = true;
 	c->owner = f;
 	c->setFilenameLayout(Chunk::kCurrentDirectoryLayout);
 	std::lock_guard<std::mutex> testlock_guard(testlock);
@@ -1042,7 +1042,7 @@ void hdd_check_folders() {
 			f->scanthread.join();
 			f->scanState = Folder::ScanState::kWorking;
 			hdd_refresh_usage(f);
-			f->needrefresh = 0;
+			f->needRefresh = false;
 			f->lastRefresh = now;
 			changed = 1;
 			break;
@@ -1050,7 +1050,7 @@ void hdd_check_folders() {
 			hdd_senddata(f,0);
 			f->scanState = Folder::ScanState::kWorking;
 			hdd_refresh_usage(f);
-			f->needrefresh = 0;
+			f->needRefresh = false;
 			f->lastRefresh = now;
 			changed = 1;
 			break;
@@ -1069,9 +1069,9 @@ void hdd_check_folders() {
 				f->damaged = 1;
 				changed = 1;
 			} else {
-				if (f->needrefresh || f->lastRefresh+60<now) {
+				if (f->needRefresh || f->lastRefresh + kSecondsInOneMinute < now) {
 					hdd_refresh_usage(f);
-					f->needrefresh = 0;
+					f->needRefresh = false;
 					f->lastRefresh = now;
 					changed = 1;
 				}
@@ -1274,7 +1274,7 @@ static inline int chunk_writecrc(MooseFSChunk *c) {
 	TRACETHIS();
 	assert(c);
 	folderlock.lock();
-	c->owner->needrefresh = 1;
+	c->owner->needRefresh = true;
 	folderlock.unlock();
 	uint8_t *crc_data = gOpenChunks.getResource(c->fd).crc_data();
 	{
@@ -2366,7 +2366,7 @@ static int hdd_int_duplicate(uint64_t chunkId, uint32_t chunkVersion, uint32_t c
 	}
 	c->blocks = oc->blocks;
 	folderlock.lock();
-	c->owner->needrefresh = 1;
+	c->owner->needRefresh = true;
 	folderlock.unlock();
 	hdd_chunk_release(c);
 	hdd_chunk_release(oc);
@@ -2563,7 +2563,7 @@ static int hdd_int_truncate(uint64_t chunkId, ChunkPartType chunkType, uint32_t 
 	}
 	if (c->blocks != blocks) {
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		c->owner->needrefresh = 1;
+		c->owner->needRefresh = true;
 	}
 	c->blocks = blocks;
 	status = hdd_io_end(c);
@@ -2901,7 +2901,7 @@ static int hdd_int_duptrunc(uint64_t chunkId, uint32_t chunkVersion, uint32_t ch
 	}
 	c->blocks = blocks;
 	folderlock.lock();
-	c->owner->needrefresh = 1;
+	c->owner->needRefresh = true;
 	folderlock.unlock();
 	hdd_chunk_release(c);
 	hdd_chunk_release(oc);
@@ -3789,7 +3789,7 @@ int hdd_parseline(char *hddcfgline) {
 				}
 				f->lastErrorIndex = 0;
 				f->lastRefresh = 0;
-				f->needrefresh = 1;
+				f->needRefresh = true;
 			} else {
 				if ((f->todel==0 && td>0) || (f->todel>0 && td==0)) {
 					// the change is important - chunks need to be send to master again
@@ -3828,7 +3828,7 @@ int hdd_parseline(char *hddcfgline) {
 	}
 	f->lastErrorIndex = 0;
 	f->lastRefresh = 0;
-	f->needrefresh = 1;
+	f->needRefresh = true;
 	if (damaged) {
 		f->lfd = -1;
 	} else {

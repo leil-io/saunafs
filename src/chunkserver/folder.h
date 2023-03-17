@@ -8,6 +8,8 @@
 #define STATS_HISTORY (24*60)
 #define LAST_ERROR_SIZE 30
 
+constexpr uint32_t kSecondsInOneMinute = 60;
+
 class Chunk;
 
 struct Folder {
@@ -44,10 +46,11 @@ struct Folder {
 
 	char *path;
 
-	/// The status of scanning this disk.
-	ScanState scanState = ScanState::kNeeded;
+	ScanState scanState = ScanState::kNeeded;  ///< The status of scanning this disk.
 
-	unsigned int needrefresh:1;
+	bool needRefresh = true;  ///< Tells if the disk usage related fields need to be recalculated
+	uint32_t lastRefresh;     ///< Timestamp in seconds storing the last time this folder was refreshed
+
 	unsigned int todel:2;
 	unsigned int damaged:1;
 	unsigned int toremove:2;
@@ -66,7 +69,6 @@ struct Folder {
 	std::array<IoError, LAST_ERROR_SIZE> lastErrorTab;  ///< History with last LAST_ERROR_SIZE errors
 	uint32_t lastErrorIndex;                            ///< Index of the last error
 
-	uint32_t lastRefresh;  ///< Timestamp in seconds storing the last time this folder was refreshed
 	dev_t devid;
 	ino_t lockinode;
 	int lfd;
