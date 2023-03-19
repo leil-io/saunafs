@@ -42,11 +42,10 @@ enum ChunkState {
 	CH_TOBEDELETED
 };
 
-struct cntcond {
-	std::condition_variable cond;
-	uint32_t wcnt;
-	Chunk *owner;
-	struct cntcond *next;
+/// Condition variable with a count of threads which are waiting on it.
+struct CondVarWithWaitCount {
+	std::condition_variable condVar;
+	uint32_t numberOfWaitingThreads = 0;
 };
 
 class Chunk {
@@ -56,7 +55,14 @@ public:
 	enum { kCurrentDirectoryLayout = 0, kMooseFSDirectoryLayout };
 
 	Chunk(uint64_t chunkId, ChunkPartType type, ChunkState state);
-	virtual ~Chunk() {}
+
+	// We use unique_ptr and we do not need to copy or move the chunks
+	Chunk(const Chunk&) = delete;
+	Chunk(Chunk&&) = default;
+	Chunk& operator=(const Chunk&) = delete;
+	Chunk& operator=(Chunk&&) = default;
+
+	virtual ~Chunk() = default;
 
 	std::string filename() const {
 		return filename_layout_ >= kCurrentDirectoryLayout
@@ -79,7 +85,14 @@ public:
 	static std::string getSubfolderNameGivenNumber(uint32_t subfolderNumber, int layout_version = 0);
 	static std::string getSubfolderNameGivenChunkId(uint64_t chunkId, int layout_version = 0);
 
-	cntcond *ccond;
+	/// The pointer to the condition variable on which threads wait until this
+	/// chunk is unlocked.
+	///
+	/// We only assign a condition variable to a chunk which is locked
+	/// and another thread attempts to lock it.
+	/// Guarded by `gChunkRegistryLock`.
+	std::unique_ptr<CondVarWithWaitCount> condVar;
+
 	struct Folder *owner;
 	uint64_t chunkid;
 	uint32_t version;

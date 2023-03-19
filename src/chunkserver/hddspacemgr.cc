@@ -190,7 +190,9 @@ static std::mutex gMasterReportsLock;
  * Chunk objects stored in the registry have their own separate locks.
  */
 static std::mutex gChunkRegistryLock;
-static cntcond *cclist = NULL;
+
+/// Container to reuse free condition variables (guarded by `gChunkRegistryLock`)
+static std::vector<std::unique_ptr<CondVarWithWaitCount>> gFreeCondVars;
 
 // folderhead + all data in structures (except folder::cstat)
 static std::mutex folderlock;
@@ -586,18 +588,16 @@ void hdd_chunk_release(Chunk *c) {
 	TRACETHIS();
 	assert(c);
 	std::lock_guard<std::mutex> registryLockGuard(gChunkRegistryLock);
-//      syslog(LOG_WARNING,"hdd_chunk_release got chunk: %016" PRIX64 " (c->state:%u)",c->chunkid,c->state);
+
 	if (c->state==CH_LOCKED) {
 		c->state = CH_AVAIL;
-		if (c->ccond) {
-//                      printf("wake up one thread waiting for AVAIL chunk: %" PRIu64 " on ccond:%p\n",c->chunkid,c->ccond);
-			c->ccond->cond.notify_one();
+		if (c->condVar) {
+			c->condVar->condVar.notify_one();
 		}
 	} else if (c->state==CH_TOBEDELETED) {
-		if (c->ccond) {
+		if (c->condVar) {
 			c->state = CH_DELETED;
-//                      printf("wake up one thread waiting for DELETED chunk: %" PRIu64 " on ccond:%p\n",c->chunkid,c->ccond);
-			c->ccond->cond.notify_one();
+			c->condVar->condVar.notify_one();
 		} else {
 			hdd_chunk_remove(c);
 		}
@@ -653,7 +653,7 @@ static void hdd_chunk_delete(Chunk *c);
  */
 static Chunk *hdd_chunk_recreate(Chunk *c, uint64_t chunkid, ChunkPartType type,
 		ChunkFormat format) {
-	cntcond *waiting = nullptr;
+	std::unique_ptr<CondVarWithWaitCount> waiting;
 
 	if (c) {
 		assert(c->chunkid == chunkid);
@@ -665,7 +665,7 @@ static Chunk *hdd_chunk_recreate(Chunk *c, uint64_t chunkid, ChunkPartType type,
 			c->owner->needRefresh = true;
 		}
 
-		waiting = c->ccond;
+		waiting = std::move(c->condVar);
 
 		// It's possible to reuse object c
 		// if the format is the same,
@@ -684,10 +684,7 @@ static Chunk *hdd_chunk_recreate(Chunk *c, uint64_t chunkid, ChunkPartType type,
 	bool success = gChunkRegistry.insert({makeChunkKey(chunkid, type), std::unique_ptr<Chunk>(c)}).second;
 	massert(success, "Cannot insert new chunk to the registry as a chunk with its chunkId and chunkPartType already exists");
 
-	c->ccond = waiting;
-	if (waiting) {
-		waiting->owner = c;
-	}
+	c->condVar = std::move(waiting);
 
 	return c;
 }
@@ -699,7 +696,6 @@ static Chunk* hdd_chunk_get(
 		ChunkFormat format) {
 	TRACETHIS2(chunkid, (unsigned)cflag);
 	Chunk *c = nullptr;
-	cntcond *cc = nullptr;
 
 	std::unique_lock<std::mutex> registryLockGuard(gChunkRegistryLock);
 	auto chunkIter = gChunkRegistry.find(makeChunkKey(chunkid, chunkType));
@@ -719,7 +715,6 @@ static Chunk* hdd_chunk_get(
 		switch (c->state) {
 		case CH_AVAIL:
 			c->state = CH_LOCKED;
-//                      syslog(LOG_WARNING,"hdd_chunk_get returns chunk: %016" PRIX64 " (c->state:%u)",c->chunkid,c->state);
 			registryLockGuard.unlock();
 			if (c->validattr==0) {
 				if (hdd_chunk_getattr(c) == -1) {
@@ -741,39 +736,30 @@ static Chunk* hdd_chunk_get(
 				c = hdd_chunk_recreate(c, chunkid, chunkType, format);
 				return c;
 			}
-			if (c->ccond==NULL) {   // no more waiting threads - remove
+			if (c->condVar == nullptr) {   // no more waiting threads - remove
 				hdd_chunk_remove(c);
 			} else {        // there are waiting threads - wake them up
-//                              printf("wake up one thread waiting for DELETED chunk: %" PRIu64 " on ccond:%p\n",c->chunkid,c->ccond);
-				c->ccond->cond.notify_one();
+				c->condVar->condVar.notify_one();
 			}
 			return NULL;
 		case CH_TOBEDELETED:
 		case CH_LOCKED:
-			cc = c->ccond;
-			if (cc == nullptr) {
-				for (cc = cclist; cc && cc->wcnt; cc = cc->next) {
+			if (c->condVar == nullptr) {
+				// Try to reuse one if possible.
+				if (!gFreeCondVars.empty()) {
+					c->condVar = std::move(gFreeCondVars.back());
+					gFreeCondVars.pop_back();
+				} else {
+					c->condVar = std::unique_ptr<CondVarWithWaitCount>(
+					            new CondVarWithWaitCount());
 				}
-				if (cc == nullptr) {
-					cc = new cntcond();
-					passert(cc);
-					cc->wcnt = 0;
-					cc->next = cclist;
-					cclist = cc;
-				}
-				cc->owner = c;
-				c->ccond = cc;
 			}
-			cc->wcnt++;
-			cc->cond.wait(registryLockGuard);
-			// Chunk could be recreated (different address)
-			// so we need to get it's new address.
-			c = cc->owner;
-			assert(c);
-			cc->wcnt--;
-			if (cc->wcnt == 0) {
-				c->ccond = nullptr;
-				cc->owner = nullptr;
+			c->condVar->numberOfWaitingThreads++;
+			c->condVar->condVar.wait(registryLockGuard);
+			c->condVar->numberOfWaitingThreads--;
+			if (c->condVar->numberOfWaitingThreads == 0) {
+				// No more waiting threads, store it in `gFreeCondVars` to be reused
+				gFreeCondVars.emplace_back(std::move(c->condVar));
 			}
 		}
 	}
@@ -786,10 +772,10 @@ static void hdd_chunk_delete(Chunk *c) {
 	{
 		std::lock_guard<std::mutex> registryLockGuard(gChunkRegistryLock);
 		f = c->owner;
-		if (c->ccond) {
+		if (c->condVar) {
 			c->state = CH_DELETED;
 			//printf("wake up one thread waiting for DELETED chunk: %" PRIu64 " ccond:%p\n",c->chunkid,c->ccond);
-			c->ccond->cond.notify_one();
+			c->condVar->condVar.notify_one();
 		} else {
 			hdd_chunk_remove(c);
 		}
@@ -3494,7 +3480,6 @@ void hdd_free_resources_thread() {
 void hdd_term(void) {
 	TRACETHIS();
 	uint32_t i;
-	cntcond *cc,*ccn;
 
 	i = term.exchange(1); // if term is non zero here then it means that threads have not been started, so do not join with them
 	if (i==0) {
@@ -3527,7 +3512,7 @@ void hdd_term(void) {
 			}
 		}
 	}
-//      syslog(LOG_NOTICE,"waiting for scanning threads (%" PRIu32 ")",i);
+
 	while (i>0) {
 		usleep(10000); // not very elegant solution.
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
@@ -3577,14 +3562,6 @@ void hdd_term(void) {
 	}
 
 	folders.clear();
-
-	for (cc = cclist; cc; cc = ccn) {
-		ccn = cc->next;
-		if (cc->wcnt) {
-			lzfs_pretty_syslog(LOG_WARNING, "hddspacemgr (atexit): used cond !!!");
-		}
-		delete cc;
-	}
 }
 
 int hdd_size_parse(const char *str,uint64_t *ret) {
