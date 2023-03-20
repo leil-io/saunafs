@@ -44,6 +44,47 @@ struct Folder {
 		int errornumber;
 	};
 
+	/// Lock class to avoid different chunkservers using the same folder
+	class LockFile {
+	public:
+		/// Constructor of a LockFile object.
+		///
+		/// \param fd    Lock-file's file descriptor.
+		/// \param dev   Lock-file's device number (probably from stat).
+		/// \param inode Lock-file's Inode number.
+		LockFile(int fd, dev_t dev, ino_t inode)
+		    : fd_(fd), device_(dev), inode_(inode) {
+			sassert(fd != -1);
+		}
+
+		// Disable copying and moving lock file objects.
+		LockFile(const LockFile&) = delete;
+		LockFile(LockFile&&) = delete;
+		LockFile& operator=(const LockFile&) = delete;
+		LockFile& operator=(LockFile&&) = delete;
+
+		/// Releases the lock file if needed.
+		~LockFile() {
+			if (fd_ >= 0)
+				close(fd_);
+		}
+
+		/// True if this lock file is in the device `dev`.
+		bool isInTheSameDevice(dev_t dev) const {
+			return device_ == dev;
+		}
+
+		/// True if this lock file is the same.
+		bool isTheSameFile(dev_t dev, ino_t inode) const {
+			return device_ == dev && inode_ == inode;
+		}
+
+	private:
+		int fd_ = -1;   ///< Lock-file's file descriptor.
+		dev_t device_;  ///< Lock-file's device number.
+		ino_t inode_;   ///< Lock-file's Inode number.
+	};
+
 	char *path;
 
 	ScanState scanState = ScanState::kNeeded;  ///< The status of scanning this disk.
@@ -69,10 +110,14 @@ struct Folder {
 	std::array<IoError, LAST_ERROR_SIZE> lastErrorTab;  ///< History with last LAST_ERROR_SIZE errors
 	uint32_t lastErrorIndex;                            ///< Index of the last error
 
-	dev_t devid;
-	ino_t lockinode;
-	int lfd;
+	/// Folder's lock file.
+	///
+	/// Used to prevent the same data folder from being used by different
+	/// chunkserver processes.
+	std::unique_ptr<const LockFile> lock = nullptr;
+
 	double carry;
+
 	std::thread scanthread;
 	std::thread migratethread;
 

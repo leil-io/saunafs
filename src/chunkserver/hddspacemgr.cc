@@ -999,10 +999,6 @@ void hdd_check_folders() {
 				// Delay the deletion after the loop
 				lzfs_pretty_syslog(LOG_NOTICE,"folder %s successfully removed",f->path);
 
-				if (f->lfd>=0) {
-					close(f->lfd);
-				}
-
 				free(f->path);
 				foldersToRemove.emplace_back(f);
 				testerreset = 1;
@@ -3554,9 +3550,6 @@ void hdd_term(void) {
 	gOpenChunks.freeUnused(eventloop_time(), gChunkRegistryLock);
 
 	for (auto f : folders) {
-		if (f->lfd >= 0) {
-			close(f->lfd);
-		}
 		free(f->path);
 		delete f;
 	}
@@ -3728,8 +3721,8 @@ int hdd_parseline(char *hddcfgline) {
 	} else if (lockneeded) {
 		std::unique_lock<std::mutex> folderlock_guard(folderlock);
 		for (const auto f : folders) {
-			if (f->lfd>=0 && f->devid==sb.st_dev) {
-				if (f->lockinode==sb.st_ino) {
+			if (f->lock && f->lock->isInTheSameDevice(sb.st_dev)) {
+				if (f->lock->isTheSameFile(sb.st_dev, sb.st_ino)) {
 					std::string fPath = f->path;
 					folderlock_guard.unlock();
 					close(lfd);
@@ -3806,12 +3799,9 @@ int hdd_parseline(char *hddcfgline) {
 	f->lastErrorIndex = 0;
 	f->lastRefresh = 0;
 	f->needRefresh = true;
-	if (damaged) {
-		f->lfd = -1;
-	} else {
-		f->lfd = lfd;
-		f->devid = sb.st_dev;
-		f->lockinode = sb.st_ino;
+	if (!damaged) {
+		f->lock = std::unique_ptr<const Folder::LockFile>(
+		            new Folder::LockFile(lfd, sb.st_dev, sb.st_ino));
 	}
 	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);
 
