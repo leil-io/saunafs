@@ -4,7 +4,7 @@ pipeline {
         label 'docker'
     }
     environment{
-        projectName = 'rabbitfs'
+        projectName = 'saunafs'
         registryPrefix = "registry.ci.leil.io"
         dockerRegistry = "https://${registryPrefix}"
         dockerRegistrySecretId = 'private-docker-registry-credentials'
@@ -64,7 +64,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/rabbitfs:' + imageTags['cpplint']
+                            image 'registry.ci.leil.io/saunafs:' + imageTags['cpplint']
                             registryUrl env.dockerRegistry
                             registryCredentialsId env.dockerRegistrySecretId
                         }
@@ -80,7 +80,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/rabbitfs:' + imageTags['cppcheck']
+                            image 'registry.ci.leil.io/saunafs:' + imageTags['cppcheck']
                             registryUrl env.dockerRegistry
                             registryCredentialsId env.dockerRegistrySecretId
                         }
@@ -97,7 +97,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/rabbitfs:' + imageTags['bookworm-build']
+                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-build']
                             registryUrl env.dockerRegistry
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined'
@@ -114,7 +114,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/rabbitfs:' + imageTags['bookworm-build']
+                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-build']
                             registryUrl env.dockerRegistry
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined'
@@ -142,7 +142,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/rabbitfs:' + imageTags['bookworm-test']
+                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-test']
                             registryUrl env.dockerRegistry
                             registryCredentialsId env.dockerRegistrySecretId
                         }
@@ -159,7 +159,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/rabbitfs:' + imageTags['bookworm-test']
+                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-test']
                             registryUrl env.dockerRegistry
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
@@ -183,7 +183,7 @@ pipeline {
             agent {
                 docker {
                     label 'docker'
-                    image 'registry.ci.leil.io/rabbitfs:' + imageTags['bookworm-build']
+                    image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-build']
                     registryUrl env.dockerRegistry
                     registryCredentialsId env.dockerRegistrySecretId
                     args  '--security-opt seccomp=unconfined'
