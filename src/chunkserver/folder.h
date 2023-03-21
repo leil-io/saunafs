@@ -93,7 +93,7 @@ struct Folder {
 	uint32_t lastRefresh;     ///< Timestamp in seconds storing the last time this folder was refreshed
 
 	unsigned int todel:2;
-	unsigned int damaged:1;
+	bool isDamaged = true;
 	unsigned int toremove:2;
 	uint8_t scanprogress;
 

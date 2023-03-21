@@ -473,7 +473,7 @@ void hdd_diskinfo_v1_data(uint8_t *buff) {
 					buff += sl;
 				}
 			}
-			put8bit(&buff,((f->todel)?1:0) + ((f->damaged)?2:0)
+			put8bit(&buff,((f->todel)?1:0) + ((f->isDamaged)?2:0)
 			        + ((f->scanState==Folder::ScanState::kInProgress)?4:0));
 			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
 			put64bit(&buff,f->lastErrorTab[ei].chunkid);
@@ -522,7 +522,7 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 			}
 			diskInfo.entrySize = serializedSize(diskInfo) - serializedSize(diskInfo.entrySize);
 			diskInfo.flags = (f->todel ? DiskInfo::kToDeleteFlagMask : 0)
-					+ (f->damaged ? DiskInfo::kDamagedFlagMask : 0)
+					+ (f->isDamaged ? DiskInfo::kDamagedFlagMask : 0)
 					+ (f->scanState == Folder::ScanState::kInProgress ? DiskInfo::kScanInProgressFlagMask : 0);
 			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
 			diskInfo.errorChunkId = f->lastErrorTab[ei].chunkid;
@@ -858,7 +858,7 @@ static inline Folder* hdd_getfolder() {
 	bf = NULL;
 	ok = 0;
 	for (auto f : folders) {
-		if (f->damaged || f->todel || f->total==0 || f->avail==0
+		if (f->isDamaged || f->todel || f->total==0 || f->avail==0
 		        || f->scanState!=Folder::ScanState::kWorking) {
 			continue;
 		}
@@ -893,7 +893,8 @@ static inline Folder* hdd_getfolder() {
 	d = maxavail-s;
 	maxcarry = 1.0;
 	for (auto f : folders) {
-		if (f->damaged || f->todel || f->total==0 || f->avail==0 || f->scanState!=Folder::ScanState::kWorking) {
+		if (f->isDamaged || f->todel || f->total==0 || f->avail==0
+		        || f->scanState!=Folder::ScanState::kWorking) {
 			continue;
 		}
 		pavail = (double)(f->avail)/(double)(f->total);
@@ -1012,7 +1013,7 @@ void hdd_check_folders() {
 	}
 
 	for (auto f : folders) {
-		if (f->damaged || f->toremove) {
+		if (f->isDamaged || f->toremove) {
 			continue;
 		}
 		switch (f->scanState) {
@@ -1048,7 +1049,7 @@ void hdd_check_folders() {
 			if (err>=ERRORLIMIT && f->todel<2) {
 				lzfs_pretty_syslog(LOG_WARNING,"%u errors occurred in %u seconds on folder: %s",err,LASTERRTIME,f->path);
 				hdd_senddata(f,1);
-				f->damaged = 1;
+				f->isDamaged = true;
 				changed = 1;
 			} else {
 				if (f->needRefresh || f->lastRefresh + kSecondsInOneMinute < now) {
@@ -1163,7 +1164,7 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		for (const auto f : folders) {
-			if (f->damaged || f->toremove) {
+			if (f->isDamaged || f->toremove) {
 				continue;
 			}
 			if (f->todel==0) {
@@ -3037,13 +3038,13 @@ void hdd_tester_thread() {
 						if (folderIt == folders.end()) {
 							folderIt = folders.begin();
 						}
-					} while (((*folderIt)->damaged || (*folderIt)->todel
+					} while (((*folderIt)->isDamaged || (*folderIt)->todel
 					          || (*folderIt)->toremove
 					          || (*folderIt)->scanState != Folder::ScanState::kWorking)
 					         && previousFolderIt != folderIt);
 				}
 
-				if (previousFolderIt == folderIt && ((*folderIt)->damaged || (*folderIt)->todel
+				if (previousFolderIt == folderIt && ((*folderIt)->isDamaged || (*folderIt)->todel
 				                || (*folderIt)->toremove
 				                || (*folderIt)->scanState != Folder::ScanState::kWorking)) {
 					chunkid = 0;
@@ -3649,12 +3650,12 @@ int hdd_size_parse(const char *str,uint64_t *ret) {
 int hdd_parseline(char *hddcfgline) {
 	TRACETHIS();
 	uint32_t l;
-	int damaged,lfd,td;
+	int lfd,td;
+	bool damaged = false;
 	char *pptr;
 	struct stat sb;
 	uint8_t lockneeded;
 
-	damaged = 0;
 	if (hddcfgline[0]=='#') {
 		return 0;
 	}
@@ -3700,7 +3701,7 @@ int hdd_parseline(char *hddcfgline) {
 	} else if (lfd<0) {
 		lzfs_pretty_errlog(LOG_WARNING, "can't create lock file %s, marking hdd as damaged",
 				lockfname.c_str());
-		damaged = 1;
+		damaged = true;
 	} else if (lockneeded && lockf(lfd,F_TLOCK,0)<0) {
 		int err = errno;
 		close(lfd);
@@ -3710,14 +3711,14 @@ int hdd_parseline(char *hddcfgline) {
 		} else {
 			lzfs_pretty_syslog(LOG_WARNING, "lockf(%s) failed, marking hdd as damaged: %s",
 					lockfname.c_str(), strerr(err));
-			damaged = 1;
+			damaged = true;
 		}
 	} else if (fstat(lfd,&sb)<0) {
 		int err = errno;
 		close(lfd);
 		lzfs_pretty_syslog(LOG_WARNING, "fstat(%s) failed, marking hdd as damaged: %s",
 				lockfname.c_str(), strerr(err));
-		damaged = 1;
+		damaged = true;
 	} else if (lockneeded) {
 		std::unique_lock<std::mutex> folderlock_guard(folderlock);
 		for (const auto f : folders) {
@@ -3738,13 +3739,14 @@ int hdd_parseline(char *hddcfgline) {
 		}
 	}
 	std::unique_lock<std::mutex> folderlock_guard(folderlock);
+	// TODO(Guillex) Check why is this loop needed.
 	for (auto f : folders) {
 		if (strcmp(f->path,pptr)==0) {
 			f->toremove = 0;
-			if (f->damaged) {
+			if (f->isDamaged) {
 				f->scanState = Folder::ScanState::kNeeded;
 				f->scanprogress = 0;
-				f->damaged = damaged;
+				f->isDamaged = damaged;
 				f->avail = 0ULL;
 				f->total = 0ULL;
 				f->leavefree = gLeaveFree;
@@ -3777,7 +3779,7 @@ int hdd_parseline(char *hddcfgline) {
 	Folder *f = new Folder();
 	passert(f);
 	f->todel = td;
-	f->damaged = damaged;
+	f->isDamaged = damaged;
 	f->scanState = Folder::ScanState::kNeeded;
 	f->scanprogress = 0;
 	f->migrateState = Folder::MigrateState::kDone;
