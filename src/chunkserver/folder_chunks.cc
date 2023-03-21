@@ -36,35 +36,32 @@ void FolderChunks::markAsTested(Chunk* testedChunk) {
 }
 
 Chunk* FolderChunks::getRandomChunk() const {
-	if (chunks_.empty()) {
-		return nullptr;
-	} else {
-		return chunks_[rnd_ranged(Index(0), chunks_.size() - 1)];
-	}
+	if (chunks_.empty())
+		return NO_CHUNKS_IN_COLLECTION;
+
+	return chunks_[rnd_ranged(Index(0), chunks_.size() - 1)];
 }
 
 Chunk* FolderChunks::chunkToTest() const {
-	if (chunks_.empty()) {
-		return nullptr;
-	} else {
-		if (firstUntestedChunk_ == chunks_.size()) {
-			// Start a new chunk test loop.
-			firstUntestedChunk_ = 0;
-		}
-		return chunks_[firstUntestedChunk_];
-	}
+	if (chunks_.empty())
+		return NO_CHUNKS_IN_COLLECTION;
+
+	if (firstUntestedChunk_ == chunks_.size())
+		firstUntestedChunk_ = 0; // Start a new chunk test loop.
+
+	return chunks_[firstUntestedChunk_];
 }
 
 void FolderChunks::shuffle() {
-	if (chunks_.size() <= 1) {
+	if (chunks_.size() <= 1)
 		return;
-	}
 
 	// This is the regular Fisher-Yates shuffle but we need to update
 	// the `indexInFolder` values for chunks so we're using our own `swap()`.
 	for (Index i = chunks_.size() - 1; i >= 1; --i) {
 		swap(i, rnd_ranged(Index(0), i));
 	}
+
 	firstUntestedChunk_ = 0;
 }
 

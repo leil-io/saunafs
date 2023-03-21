@@ -5,6 +5,8 @@
 #include <mutex>
 #include <vector>
 
+#define NO_CHUNKS_IN_COLLECTION nullptr
+
 class Chunk;
 
 /// A class which holds pointers to the chunks of a single folder (disk).
@@ -39,7 +41,7 @@ public:
 	FolderChunks(const FolderChunks&) = delete;
 
 	/// Disable moving.
-	FolderChunks(FolderChunks&& other) = delete;
+	FolderChunks(FolderChunks&&) = delete;
 
 	/// Destructor.
 	~FolderChunks() = default;
@@ -48,7 +50,7 @@ public:
 	FolderChunks& operator=(const FolderChunks&) = delete;
 
 	/// Disable moving.
-	FolderChunks& operator=(FolderChunks&& other) = delete;
+	FolderChunks& operator=(FolderChunks&&) = delete;
 
 	/// Inserts a new chunk into the collection.
 	///
@@ -60,7 +62,7 @@ public:
 
 	/// Returns the next chunk to be tested.
 	///
-	/// This returns `nullptr` if there are no chunks in the collection.
+	/// Returns NO_CHUNKS_IN_COLLECTION if the collection of chunks is empty.
 	Chunk* chunkToTest() const;
 
 	/// Marks the given chunk as "tested".
@@ -71,7 +73,7 @@ public:
 	/// The sequence in which chunks are returned from this method
 	/// is not related to the random sequence coming from `shuffle`.
 	///
-	/// A `nullptr` is returned if the collection of chunks is empty.
+	/// Returns NO_CHUNKS_IN_COLLECTION if the collection of chunks is empty.
 	Chunk* getRandomChunk() const;
 
 	/// Shuffles all chunks in the collection into a random order.
@@ -95,7 +97,7 @@ private:
 	/// The vector containing all chunks in the collection.
 	///
 	/// This vector has two "sections": one holding chunks which were already tested,
-	/// and one holding tested chunks. The sections are delimited by the index
+	/// and one holding untested chunks. The sections are delimited by the index
 	/// `firstUntestedChunk_`. The order of chunks within a single section is not
 	/// important, but it is important that all untested chunks come after all
 	/// tested chunks.
