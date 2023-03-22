@@ -55,6 +55,7 @@
 #include <array>
 #endif // LIZARDFS_HAVE_THREAD_LOCAL
 #include <atomic>
+#include <bitset>
 #include <deque>
 #include <list>
 #include <mutex>
@@ -473,8 +474,13 @@ void hdd_diskinfo_v1_data(uint8_t *buff) {
 					buff += sl;
 				}
 			}
-			put8bit(&buff,((f->todel)?1:0) + ((f->isDamaged)?2:0)
-			        + ((f->scanState==Folder::ScanState::kInProgress)?4:0));
+
+			std::bitset<8> folderStatus;
+			folderStatus.set(0, f->isMarkedForDeletion());
+			folderStatus.set(1, f->isDamaged);
+			folderStatus.set(2, f->scanState == Folder::ScanState::kInProgress);
+			put8bit(&buff, static_cast<uint8_t>(folderStatus.to_ulong()));
+
 			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
 			put64bit(&buff,f->lastErrorTab[ei].chunkid);
 			put32bit(&buff,f->lastErrorTab[ei].timestamp);
@@ -521,7 +527,7 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 						- substrSize, substrSize);
 			}
 			diskInfo.entrySize = serializedSize(diskInfo) - serializedSize(diskInfo.entrySize);
-			diskInfo.flags = (f->todel ? DiskInfo::kToDeleteFlagMask : 0)
+			diskInfo.flags = (f->isMarkedForDeletion() ? DiskInfo::kToDeleteFlagMask : 0)
 					+ (f->isDamaged ? DiskInfo::kDamagedFlagMask : 0)
 					+ (f->scanState == Folder::ScanState::kInProgress ? DiskInfo::kScanInProgressFlagMask : 0);
 			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
@@ -858,7 +864,7 @@ static inline Folder* hdd_getfolder() {
 	bf = NULL;
 	ok = 0;
 	for (auto f : folders) {
-		if (f->isDamaged || f->todel || f->total==0 || f->avail==0
+		if (f->isDamaged || f->isMarkedForDeletion() || f->total==0 || f->avail==0
 		        || f->scanState!=Folder::ScanState::kWorking) {
 			continue;
 		}
@@ -893,7 +899,7 @@ static inline Folder* hdd_getfolder() {
 	d = maxavail-s;
 	maxcarry = 1.0;
 	for (auto f : folders) {
-		if (f->isDamaged || f->todel || f->total==0 || f->avail==0
+		if (f->isDamaged || f->isMarkedForDeletion() || f->total==0 || f->avail==0
 		        || f->scanState!=Folder::ScanState::kWorking) {
 			continue;
 		}
@@ -914,7 +920,7 @@ static inline Folder* hdd_getfolder() {
 
 void hdd_senddata(Folder *f,int rmflag) {
 	TRACETHIS();
-	uint8_t todel = f->todel;
+	bool markedForDeletion = f->isMarkedForDeletion();
 
 	std::lock_guard<std::mutex> registryLockGuard(gChunkRegistryLock);
 	std::lock_guard<std::mutex> testlock_guard(testlock);
@@ -929,12 +935,11 @@ void hdd_senddata(Folder *f,int rmflag) {
 	for (const auto &chunkEntry : gChunkRegistry) {
 		Chunk *c = chunkEntry.second.get();
 		if (c->owner==f) {
-			c->todel = todel;
 			if (rmflag) {
 				chunksToRemove.push_back(c);
 			} else {
 				hdd_report_new_chunk(c->chunkid,
-					c->version, c->todel, c->type());
+					c->version, markedForDeletion, c->type());
 			}
 		}
 	}
@@ -1047,7 +1052,7 @@ void hdd_check_folders() {
 					err++;
 				}
 			}
-			if (err>=ERRORLIMIT && f->todel<2) {
+			if (err>=ERRORLIMIT && !(f->isMarkedForRemoval && f->isReadOnly)) {
 				lzfs_pretty_syslog(LOG_WARNING,"%u errors occurred in %u seconds on folder: %s",err,LASTERRTIME,f->path);
 				hdd_senddata(f,1);
 				f->isDamaged = true;
@@ -1121,8 +1126,12 @@ void hdd_foreach_chunk_in_bulks(
 		}
 	};
 	auto addChunkToBulk = [&bulk](const Chunk *chunk) {
-		common::chunk_version_t versionWithTodelFlag = common::combineVersionWithTodelFlag(chunk->version, chunk->todel);
-		bulk.push_back(ChunkWithVersionAndType(chunk->chunkid, versionWithTodelFlag, chunk->type()));
+		common::chunk_version_t versionWithTodelFlag
+		        = common::combineVersionWithTodelFlag(chunk->version,
+		                                              chunk->owner->isMarkedForDeletion());
+		bulk.push_back(ChunkWithVersionAndType(chunk->chunkid,
+		                                       versionWithTodelFlag,
+		                                       chunk->type()));
 	};
 
 	{
@@ -1168,7 +1177,7 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 			if (f->isDamaged || f->wasRemovedFromConfig) {
 				continue;
 			}
-			if (f->todel==0) {
+			if (!f->isMarkedForDeletion()) {
 				if (f->scanState==Folder::ScanState::kWorking) {
 					avail += f->avail;
 					total += f->total;
@@ -1298,10 +1307,10 @@ static int hdd_io_begin(Chunk *c,int newflag, uint32_t chunk_version = std::nume
 				if (newflag) {
 					c->fd = open(c->filename().c_str(), O_RDWR | O_TRUNC | O_CREAT, 0666);
 				} else {
-					if (c->todel < 2) {
-						c->fd = open(c->filename().c_str(), O_RDWR);
-					} else {
+					if (c->owner->isReadOnly) {
 						c->fd = open(c->filename().c_str(), O_RDONLY);
+					} else {
+						c->fd = open(c->filename().c_str(), O_RDWR);
 					}
 				}
 				if (c->fd < 0 && errno != ENFILE) {
@@ -3039,15 +3048,17 @@ void hdd_tester_thread() {
 						if (folderIt == folders.end()) {
 							folderIt = folders.begin();
 						}
-					} while (((*folderIt)->isDamaged || (*folderIt)->todel
+					} while (((*folderIt)->isDamaged
+					          || (*folderIt)->isMarkedForDeletion()
 					          || (*folderIt)->wasRemovedFromConfig
 					          || (*folderIt)->scanState != Folder::ScanState::kWorking)
 					         && previousFolderIt != folderIt);
 				}
 
-				if (previousFolderIt == folderIt && ((*folderIt)->isDamaged || (*folderIt)->todel
-				                || (*folderIt)->wasRemovedFromConfig
-				                || (*folderIt)->scanState != Folder::ScanState::kWorking)) {
+				if (previousFolderIt == folderIt
+				        && ((*folderIt)->isDamaged || (*folderIt)->isMarkedForDeletion()
+				            || (*folderIt)->wasRemovedFromConfig
+				            || (*folderIt)->scanState != Folder::ScanState::kWorking)) {
 					chunkid = 0;
 				} else {
 					c = (*folderIt)->chunks.chunkToTest();
@@ -3092,7 +3103,6 @@ static inline void hdd_add_chunk(Folder *f,
 		ChunkFormat chunkFormat,
 		uint32_t version,
 		ChunkPartType chunkType,
-		uint8_t todel,
 		int layout_version) {
 	TRACETHIS();
 	Chunk *c;
@@ -3109,15 +3119,15 @@ static inline void hdd_add_chunk(Folder *f,
 		// already have this chunk
 		if (version <= c->version) {
 			// current chunk is older
-			if (todel < 2) { // this is R/W fs?
-				unlink(fullname.c_str()); // if yes then remove file
+			if (!f->isReadOnly) {
+				unlink(fullname.c_str());
 			}
 			hdd_chunk_release(c);
 			return;
 		}
 
-		if (c->todel < 2) { // current chunk is on R/W fs?
-			unlink(c->filename().c_str()); // if yes then remove file
+		if (!f->isReadOnly) {
+			unlink(c->filename().c_str());
 		}
 	}
 
@@ -3129,7 +3139,6 @@ static inline void hdd_add_chunk(Folder *f,
 	c->version = version;
 	c->blocks = 0;
 	c->owner = f;
-	c->todel = todel;
 	c->setFilenameLayout(layout_version);
 	sassert(c->filename() == fullname);
 	{
@@ -3137,7 +3146,8 @@ static inline void hdd_add_chunk(Folder *f,
 		f->chunks.insert(c);
 	}
 	if (new_chunk) {
-		hdd_report_new_chunk(c->chunkid, c->version, c->todel, c->type());
+		hdd_report_new_chunk(c->chunkid, c->version,
+		                     c->owner->isMarkedForDeletion(), c->type());
 	}
 
 	hdd_chunk_release(c);
@@ -3252,7 +3262,7 @@ void hdd_folder_scan_layout(Folder *f, uint32_t begin_time, int layout_version) 
 
 			hdd_add_chunk(f, subfolder_path + chunk_name, filenameParser.chunkId(),
 			              filenameParser.chunkFormat(), filenameParser.chunkVersion(),
-			              filenameParser.chunkType(), f->todel, layout_version);
+			              filenameParser.chunkType(), layout_version);
 			tcheckcnt++;
 			if (tcheckcnt >= 1000) {
 				std::lock_guard<std::mutex> folderlock_guard(folderlock);
@@ -3405,20 +3415,20 @@ void *hdd_folder_scan(void *arg) {
 
 	gScansInProgress++;
 
-	unsigned todel = 0;
+	bool isMarkedForDeletion = false;
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
-		todel = f->todel;
+		isMarkedForDeletion = f->isMarkedForDeletion();
 		hdd_refresh_usage(f);
 	}
 
-	if (todel == 0) {
+	if (!isMarkedForDeletion) {
 		mkdir(f->path, 0755);
 	}
 
 	hddspacechanged = 1;
 
-	if (todel == 0) {
+	if (!isMarkedForDeletion) {
 		for (unsigned subfolderNumber = 0; subfolderNumber < Chunk::kNumberOfSubfolders;
 		     ++subfolderNumber) {
 			std::string subfolderPath =
@@ -3651,7 +3661,9 @@ int hdd_size_parse(const char *str,uint64_t *ret) {
 int hdd_parseline(char *hddcfgline) {
 	TRACETHIS();
 	uint32_t l;
-	int lfd,td;
+	int lfd;
+	bool markedForRemoval = false;
+	bool readOnly = false;
 	bool damaged = false;
 	char *pptr;
 	struct stat sb;
@@ -3675,11 +3687,10 @@ int hdd_parseline(char *hddcfgline) {
 		hddcfgline[l]='\0';
 	}
 	if (hddcfgline[0]=='*') {
-		td = 1;
+		markedForRemoval = true;
 		pptr = hddcfgline+1;
 		l--;
 	} else {
-		td = 0;
 		pptr = hddcfgline;
 	}
 	{
@@ -3697,8 +3708,14 @@ int hdd_parseline(char *hddcfgline) {
 	std::string dataDir(pptr, l);
 	std::string lockfname = dataDir + ".lock";
 	lfd = open(lockfname.c_str(),O_RDWR|O_CREAT|O_TRUNC,0640);
-	if (lfd<0 && errno==EROFS && td) {
-		td = 2;
+
+	if (lfd<0 && errno==EROFS) {
+		readOnly = true;
+	}
+
+	if (readOnly && markedForRemoval) {
+		// Nothing to do, we can use a read only file system if it was
+		// marked for removal.
 	} else if (lfd<0) {
 		lzfs_pretty_errlog(LOG_WARNING, "can't create lock file %s, marking hdd as damaged",
 				lockfname.c_str());
@@ -3747,6 +3764,8 @@ int hdd_parseline(char *hddcfgline) {
 			if (f->isDamaged) {
 				f->scanState = Folder::ScanState::kNeeded;
 				f->scanprogress = 0;
+				f->isReadOnly = readOnly;
+				f->isMarkedForRemoval = markedForRemoval;
 				f->isDamaged = damaged;
 				f->avail = 0ULL;
 				f->total = 0ULL;
@@ -3764,12 +3783,13 @@ int hdd_parseline(char *hddcfgline) {
 				f->lastRefresh = 0;
 				f->needRefresh = true;
 			} else {
-				if ((f->todel==0 && td>0) || (f->todel>0 && td==0)) {
+				if ((!f->isMarkedForDeletion() && (markedForRemoval || readOnly))
+				        || (f->isMarkedForDeletion() && !(markedForRemoval || readOnly))) {
 					// the change is important - chunks need to be send to master again
 					f->scanState = Folder::ScanState::kSendNeeded;
 				}
 			}
-			f->todel = td;
+
 			folderlock_guard.unlock();
 			if (lfd>=0) {
 				close(lfd);
@@ -3779,7 +3799,8 @@ int hdd_parseline(char *hddcfgline) {
 	}
 	Folder *f = new Folder();
 	passert(f);
-	f->todel = td;
+	f->isReadOnly = readOnly;
+	f->isMarkedForRemoval = markedForRemoval;
 	f->isDamaged = damaged;
 	f->scanState = Folder::ScanState::kNeeded;
 	f->scanprogress = 0;

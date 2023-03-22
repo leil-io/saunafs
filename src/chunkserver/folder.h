@@ -85,6 +85,15 @@ struct Folder {
 		ino_t inode_;   ///< Lock-file's Inode number.
 	};
 
+	/// Tells if this folder is 'logically' marked for deletion.
+	///
+	/// Folders are considered marked for deletion, from the master's
+	/// perspective, if they are explicitly marked for removal in the hdd.cfg
+	/// file or if it is on a read-only file system.
+	inline bool isMarkedForDeletion() const {
+		return isMarkedForRemoval || isReadOnly;
+	}
+
 	char *path;
 
 	ScanState scanState = ScanState::kNeeded;  ///< The status of scanning this disk.
@@ -92,7 +101,9 @@ struct Folder {
 	bool needRefresh = true;  ///< Tells if the disk usage related fields need to be recalculated
 	uint32_t lastRefresh;     ///< Timestamp in seconds storing the last time this folder was refreshed
 
-	unsigned int todel:2;
+	bool isMarkedForRemoval = false;  ///< Marked with * in the hdd.cfg file
+	bool isReadOnly = false;          ///< A read-only file system was detected
+
 	bool isDamaged = true;
 	bool wasRemovedFromConfig = false;  ///< Tells if this folder is missing in the config file after reloading
 	uint8_t scanprogress;

@@ -39,7 +39,6 @@ Chunk::Chunk(uint64_t chunkId, ChunkPartType type, ChunkState state)
 	  type_(type),
 	  filename_layout_(-1),
 	  validattr(0),
-	  todel(0),
 	  state(state),
 	  wasChanged(0) {
 }

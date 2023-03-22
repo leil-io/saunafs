@@ -108,7 +108,6 @@ protected:
 	                              >0 - older directory layouts */
 public:
 	uint8_t validattr;
-	uint8_t todel;
 	uint8_t state;
 	uint8_t wasChanged;
 
