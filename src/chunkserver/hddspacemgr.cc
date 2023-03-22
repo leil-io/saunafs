@@ -972,7 +972,7 @@ void hdd_check_folders() {
 	std::list<Folder*> foldersToRemove;
 
 	for (auto f : folders) {
-		if (f->toremove) {
+		if (f->wasRemovedFromConfig) {
 			switch (f->scanState) {
 			case Folder::ScanState::kInProgress:
 				f->scanState = Folder::ScanState::kTerminate;
@@ -987,7 +987,7 @@ void hdd_check_folders() {
 			case Folder::ScanState::kWorking:
 				hdd_senddata(f,1);
 				changed = 1;
-				f->toremove = 0;
+				f->wasRemovedFromConfig = false;
 				break;
 			case Folder::ScanState::kTerminate:
 				break;
@@ -996,7 +996,8 @@ void hdd_check_folders() {
 				f->migratethread.join();
 				f->migrateState = Folder::MigrateState::kDone;
 			}
-			if (f->toremove==0) { // 0 here means 'removed', so delete it from data structures
+			// At this point, this is only true if it was already sent to master
+			if (!f->wasRemovedFromConfig) {
 				// Delay the deletion after the loop
 				lzfs_pretty_syslog(LOG_NOTICE,"folder %s successfully removed",f->path);
 
@@ -1013,7 +1014,7 @@ void hdd_check_folders() {
 	}
 
 	for (auto f : folders) {
-		if (f->isDamaged || f->toremove) {
+		if (f->isDamaged || f->wasRemovedFromConfig) {
 			continue;
 		}
 		switch (f->scanState) {
@@ -1164,7 +1165,7 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		for (const auto f : folders) {
-			if (f->isDamaged || f->toremove) {
+			if (f->isDamaged || f->wasRemovedFromConfig) {
 				continue;
 			}
 			if (f->todel==0) {
@@ -3039,13 +3040,13 @@ void hdd_tester_thread() {
 							folderIt = folders.begin();
 						}
 					} while (((*folderIt)->isDamaged || (*folderIt)->todel
-					          || (*folderIt)->toremove
+					          || (*folderIt)->wasRemovedFromConfig
 					          || (*folderIt)->scanState != Folder::ScanState::kWorking)
 					         && previousFolderIt != folderIt);
 				}
 
 				if (previousFolderIt == folderIt && ((*folderIt)->isDamaged || (*folderIt)->todel
-				                || (*folderIt)->toremove
+				                || (*folderIt)->wasRemovedFromConfig
 				                || (*folderIt)->scanState != Folder::ScanState::kWorking)) {
 					chunkid = 0;
 				} else {
@@ -3742,7 +3743,7 @@ int hdd_parseline(char *hddcfgline) {
 	// TODO(Guillex) Check why is this loop needed.
 	for (auto f : folders) {
 		if (strcmp(f->path,pptr)==0) {
-			f->toremove = 0;
+			f->wasRemovedFromConfig = false;
 			if (f->isDamaged) {
 				f->scanState = Folder::ScanState::kNeeded;
 				f->scanprogress = 0;
@@ -3785,7 +3786,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->migrateState = Folder::MigrateState::kDone;
 	f->path = strdup(pptr);
 	passert(f->path);
-	f->toremove = 0;
+	f->wasRemovedFromConfig = false;
 	f->leavefree = gLeaveFree;
 	f->avail = 0ULL;
 	f->total = 0ULL;
@@ -3830,8 +3831,13 @@ static void hdd_folders_reinit(void) {
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		folderactions = 0; // stop folder actions
+
+		// Makes sense only at the reload scenario. All folders are marked as
+		// removed and later scanned and unmarked as they appear in the hdd.cfg.
+		// After reading the hdd.cfg, the missing entries will be actually
+		// deleted from the in-memory data structures.
 		for (auto f : folders) {
-			f->toremove = 1;
+			f->wasRemovedFromConfig = true;
 		}
 	}
 
@@ -3846,7 +3852,7 @@ static void hdd_folders_reinit(void) {
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		for (auto f : folders) {
-			if (f->toremove==0) {
+			if (!f->wasRemovedFromConfig) {
 				anyDiskAvailable = true;
 				if (f->scanState==Folder::ScanState::kNeeded) {
 					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be scanned",f->path);

@@ -94,7 +94,7 @@ struct Folder {
 
 	unsigned int todel:2;
 	bool isDamaged = true;
-	unsigned int toremove:2;
+	bool wasRemovedFromConfig = false;  ///< Tells if this folder is missing in the config file after reloading
 	uint8_t scanprogress;
 
 	MigrateState migrateState;
