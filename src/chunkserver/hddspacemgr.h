@@ -40,8 +40,6 @@ void hdd_get_lost_chunks(std::vector<ChunkWithType>& chunks, std::size_t limit);
 void hdd_get_new_chunks(std::vector<ChunkWithVersionAndType>& chunks, std::size_t limit);
 
 /* lock/unlock pair */
-uint32_t hdd_diskinfo_v1_size();
-void hdd_diskinfo_v1_data(uint8_t *buff);
 uint32_t hdd_diskinfo_v2_size();
 void hdd_diskinfo_v2_data(uint8_t *buff);
 

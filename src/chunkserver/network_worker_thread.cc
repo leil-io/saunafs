@@ -864,23 +864,6 @@ void worker_get_chunk_blocks(csserventry *eptr, const uint8_t *data,
 
 /* IDLE operations */
 
-void worker_hdd_list_v1(csserventry *eptr, const uint8_t *data,
-		uint32_t length) {
-	TRACETHIS();
-	uint32_t l;
-	uint8_t *ptr;
-
-	(void) data;
-	if (length != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOCS_HDD_LIST(1) - wrong size (%" PRIu32 "/0)",length);
-		eptr->state = CLOSE;
-		return;
-	}
-	l = hdd_diskinfo_v1_size(); // lock
-	ptr = worker_create_attached_packet(eptr, CSTOCL_HDD_LIST_V1, l);
-	hdd_diskinfo_v1_data(ptr); // unlock
-}
-
 void worker_hdd_list_v2(csserventry *eptr, const uint8_t *data,
 		uint32_t length) {
 	TRACETHIS();
@@ -1029,9 +1012,6 @@ void worker_gotpacket(csserventry *eptr, uint32_t type, const uint8_t *data, uin
 			break;
 		case LIZ_CSTOCS_GET_CHUNK_BLOCKS:
 			worker_liz_get_chunk_blocks(eptr, data, length);
-			break;
-		case CLTOCS_HDD_LIST_V1:
-			worker_hdd_list_v1(eptr, data, length);
 			break;
 		case CLTOCS_HDD_LIST_V2:
 			worker_hdd_list_v2(eptr, data, length);

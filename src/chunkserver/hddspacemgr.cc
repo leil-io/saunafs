@@ -436,62 +436,6 @@ private:
 	IOStatsUpdater updater_;
 };
 
-
-
-uint32_t hdd_diskinfo_v1_size() {
-	TRACETHIS();
-	uint32_t s,sl;
-
-	s = 0;
-	folderlock.lock();
-	for (const auto f : folders) {
-		sl = strlen(f->path);
-		if (sl>255) {
-			sl = 255;
-		}
-		s += 34+sl;
-	}
-	return s;
-}
-
-void hdd_diskinfo_v1_data(uint8_t *buff) {
-	TRACETHIS();
-
-	uint32_t sl;
-	uint32_t ei;
-	if (buff) {
-		for (auto f : folders) {
-			sl = strlen(f->path);
-			if (sl>255) {
-				put8bit(&buff,255);
-				memcpy(buff,"(...)",5);
-				memcpy(buff+5,f->path+(sl-250),250);
-				buff += 255;
-			} else {
-				put8bit(&buff,sl);
-				if (sl>0) {
-					memcpy(buff,f->path,sl);
-					buff += sl;
-				}
-			}
-
-			std::bitset<8> folderStatus;
-			folderStatus.set(0, f->isMarkedForDeletion());
-			folderStatus.set(1, f->isDamaged);
-			folderStatus.set(2, f->scanState == Folder::ScanState::kInProgress);
-			put8bit(&buff, static_cast<uint8_t>(folderStatus.to_ulong()));
-
-			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
-			put64bit(&buff,f->lastErrorTab[ei].chunkid);
-			put32bit(&buff,f->lastErrorTab[ei].timestamp);
-			put64bit(&buff,f->total-f->avail);
-			put64bit(&buff,f->total);
-			put32bit(&buff,f->chunks.size());
-		}
-	}
-	folderlock.unlock();
-}
-
 uint32_t hdd_diskinfo_v2_size() {
 	TRACETHIS();
 	uint32_t s,sl;

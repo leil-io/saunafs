@@ -15,8 +15,6 @@ PROTO_BASE = @PROTO_BASE@
 
 CLTOMA_CSERV_LIST = (PROTO_BASE + 500)
 MATOCL_CSERV_LIST = (PROTO_BASE + 501)
-CLTOCS_HDD_LIST_V1 = (PROTO_BASE + 502)
-CSTOCL_HDD_LIST_V1 = (PROTO_BASE + 503)
 CLTOMA_SESSION_LIST = (PROTO_BASE + 508)
 MATOCL_SESSION_LIST = (PROTO_BASE + 509)
 CLTOMA_INFO = (PROTO_BASE + 510)
@@ -1576,157 +1574,114 @@ if "HD" in sectionset:
             except Exception:
                 hoststr = "(unresolved)"
             if port > 0:
-                if (v1, v2, v3) <= (1, 6, 8):
-                    s = socket.socket()
-                    s.connect((hostip, port))
-                    mysend(s, struct.pack(">LL", CLTOCS_HDD_LIST_V1, 0))
-                    header = myrecv(s, 8)
-                    cmd, length = struct.unpack(">LL", header)
-                    if cmd == CSTOCL_HDD_LIST_V1:
-                        data = myrecv(s, length)
-                        while length > 0:
-                            plen = data[0]
-                            if HDaddrname == 1:
-                                path = "%s:%u:%s" % (
-                                    hoststr, port, data[1:plen + 1].decode('utf-8'))
-                            else:
-                                path = "%s:%u:%s" % (
-                                    hostip, port, data[1:plen + 1].decode('utf-8'))
-                            flags, errchunkid, errtime, used, total, chunkscnt = struct.unpack(
-                                ">BQLQQL", data[plen + 1:plen + 34])
-                            length -= plen + 34
-                            data = data[plen + 34:]
-                            if HDorder == 1 or HDorder == 0:
-                                sf = (ip1, ip2, ip3, ip4, port, data[1:plen + 1])
-                            elif HDorder == 2:
-                                sf = chunkscnt
-                            elif HDorder == 3:
-                                sf = errtime
-                            elif HDorder == 4:
-                                sf = -flags
-                            elif HDorder == 20:
-                                sf = used
-                            elif HDorder == 21:
-                                sf = total
-                            elif HDorder == 22:
-                                if total > 0:
-                                    sf = (1.0 * used) / total
-                                else:
-                                    sf = 0
-                            else:
-                                sf = 0
-                            hdd.append((sf, path, flags, errchunkid, errtime, used,
-                                        total, chunkscnt, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-                    s.close()
-                else:
-                    s = socket.socket()
-                    s.connect((hostip, port))
-                    mysend(s, struct.pack(">LL", CLTOCS_HDD_LIST_V2, 0))
-                    header = myrecv(s, 8)
-                    cmd, length = struct.unpack(">LL", header)
-                    if cmd == CSTOCL_HDD_LIST_V2:
-                        data = myrecv(s, length)
-                        while length > 0:
-                            entrysize = struct.unpack(">H", data[:2])[0]
-                            entry = data[2:2 + entrysize]
-                            data = data[2 + entrysize:]
-                            length -= 2 + entrysize
+                s = socket.socket()
+                s.connect((hostip, port))
+                mysend(s, struct.pack(">LL", CLTOCS_HDD_LIST_V2, 0))
+                header = myrecv(s, 8)
+                cmd, length = struct.unpack(">LL", header)
+                if cmd == CSTOCL_HDD_LIST_V2:
+                    data = myrecv(s, length)
+                    while length > 0:
+                        entrysize = struct.unpack(">H", data[:2])[0]
+                        entry = data[2:2 + entrysize]
+                        data = data[2 + entrysize:]
+                        length -= 2 + entrysize
 
-                            plen = entry[0]
-                            if HDaddrname == 1:
-                                path = "%s:%u:%s" % (
-                                    hoststr, port, entry[1:plen + 1].decode('utf-8'))
+                        plen = entry[0]
+                        if HDaddrname == 1:
+                            path = "%s:%u:%s" % (
+                                hoststr, port, entry[1:plen + 1].decode('utf-8'))
+                        else:
+                            path = "%s:%u:%s" % (
+                                hostip, port, entry[1:plen + 1].decode('utf-8'))
+                        flags, errchunkid, errtime, used, total, chunkscnt = struct.unpack(
+                            ">BQLQQL", entry[plen + 1:plen + 34])
+                        rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = (
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+                        if entrysize == plen + 34 + 144:
+                            if HDperiod == 0:
+                                rbytes, wbytes, usecreadsum, usecwritesum, rops, wops, usecreadmax, usecwritemax = struct.unpack(
+                                    ">QQQQLLLL", entry[plen + 34:plen + 34 + 48])
+                            elif HDperiod == 1:
+                                rbytes, wbytes, usecreadsum, usecwritesum, rops, wops, usecreadmax, usecwritemax = struct.unpack(
+                                    ">QQQQLLLL", entry[plen + 34 + 48:plen + 34 + 96])
+                            elif HDperiod == 2:
+                                rbytes, wbytes, usecreadsum, usecwritesum, rops, wops, usecreadmax, usecwritemax = struct.unpack(
+                                    ">QQQQLLLL", entry[plen + 34 + 96:plen + 34 + 144])
+                        elif entrysize == plen + 34 + 192:
+                            if HDperiod == 0:
+                                rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = struct.unpack(
+                                    ">QQQQQLLLLLL", entry[plen + 34:plen + 34 + 64])
+                            elif HDperiod == 1:
+                                rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = struct.unpack(
+                                    ">QQQQQLLLLLL", entry[plen + 34 + 64:plen + 34 + 128])
+                            elif HDperiod == 2:
+                                rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = struct.unpack(
+                                    ">QQQQQLLLLLL", entry[plen + 34 + 128:plen + 34 + 192])
+                        if usecreadsum > 0:
+                            rbw = rbytes * 1000000 / usecreadsum
+                        else:
+                            rbw = 0
+                        if usecwritesum + usecfsyncsum > 0:
+                            wbw = wbytes * 1000000 / \
+                                (usecwritesum + usecfsyncsum)
+                        else:
+                            wbw = 0
+                        if HDtime == 1:
+                            if rops > 0:
+                                rtime = usecreadsum / rops
                             else:
-                                path = "%s:%u:%s" % (
-                                    hostip, port, entry[1:plen + 1].decode('utf-8'))
-                            flags, errchunkid, errtime, used, total, chunkscnt = struct.unpack(
-                                ">BQLQQL", entry[plen + 1:plen + 34])
-                            rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = (
-                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-                            if entrysize == plen + 34 + 144:
-                                if HDperiod == 0:
-                                    rbytes, wbytes, usecreadsum, usecwritesum, rops, wops, usecreadmax, usecwritemax = struct.unpack(
-                                        ">QQQQLLLL", entry[plen + 34:plen + 34 + 48])
-                                elif HDperiod == 1:
-                                    rbytes, wbytes, usecreadsum, usecwritesum, rops, wops, usecreadmax, usecwritemax = struct.unpack(
-                                        ">QQQQLLLL", entry[plen + 34 + 48:plen + 34 + 96])
-                                elif HDperiod == 2:
-                                    rbytes, wbytes, usecreadsum, usecwritesum, rops, wops, usecreadmax, usecwritemax = struct.unpack(
-                                        ">QQQQLLLL", entry[plen + 34 + 96:plen + 34 + 144])
-                            elif entrysize == plen + 34 + 192:
-                                if HDperiod == 0:
-                                    rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = struct.unpack(
-                                        ">QQQQQLLLLLL", entry[plen + 34:plen + 34 + 64])
-                                elif HDperiod == 1:
-                                    rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = struct.unpack(
-                                        ">QQQQQLLLLLL", entry[plen + 34 + 64:plen + 34 + 128])
-                                elif HDperiod == 2:
-                                    rbytes, wbytes, usecreadsum, usecwritesum, usecfsyncsum, rops, wops, fsyncops, usecreadmax, usecwritemax, usecfsyncmax = struct.unpack(
-                                        ">QQQQQLLLLLL", entry[plen + 34 + 128:plen + 34 + 192])
-                            if usecreadsum > 0:
-                                rbw = rbytes * 1000000 / usecreadsum
+                                rtime = 0
+                            if wops > 0:
+                                wtime = usecwritesum / wops
                             else:
-                                rbw = 0
-                            if usecwritesum + usecfsyncsum > 0:
-                                wbw = wbytes * 1000000 / \
-                                    (usecwritesum + usecfsyncsum)
+                                wtime = 0
+                            if fsyncops > 0:
+                                fsynctime = usecfsyncsum / fsyncops
                             else:
-                                wbw = 0
-                            if HDtime == 1:
-                                if rops > 0:
-                                    rtime = usecreadsum / rops
-                                else:
-                                    rtime = 0
-                                if wops > 0:
-                                    wtime = usecwritesum / wops
-                                else:
-                                    wtime = 0
-                                if fsyncops > 0:
-                                    fsynctime = usecfsyncsum / fsyncops
-                                else:
-                                    fsynctime = 0
-                            else:
-                                rtime = usecreadmax
-                                wtime = usecwritemax
-                                fsynctime = usecfsyncmax
-                            if HDorder == 1 or HDorder == 0:
-                                sf = (ip1, ip2, ip3, ip4, port, data[1:plen + 1])
-                            elif HDorder == 2:
-                                sf = chunkscnt
-                            elif HDorder == 3:
-                                sf = errtime
-                            elif HDorder == 4:
-                                sf = -flags
-                            elif HDorder == 5:
-                                sf = rbw
-                            elif HDorder == 6:
-                                sf = wbw
-                            elif HDorder == 7:
-                                sf = -rtime
-                            elif HDorder == 8:
-                                sf = -wtime
-                            elif HDorder == 9:
-                                sf = -fsynctime
-                            elif HDorder == 10:
-                                sf = rops
-                            elif HDorder == 11:
-                                sf = wops
-                            elif HDorder == 12:
-                                sf = fsyncops
-                            elif HDorder == 20:
-                                sf = used
-                            elif HDorder == 21:
-                                sf = total
-                            elif HDorder == 22:
-                                if total > 0:
-                                    sf = (1.0 * used) / total
-                                else:
-                                    sf = 0
+                                fsynctime = 0
+                        else:
+                            rtime = usecreadmax
+                            wtime = usecwritemax
+                            fsynctime = usecfsyncmax
+                        if HDorder == 1 or HDorder == 0:
+                            sf = (ip1, ip2, ip3, ip4, port, data[1:plen + 1])
+                        elif HDorder == 2:
+                            sf = chunkscnt
+                        elif HDorder == 3:
+                            sf = errtime
+                        elif HDorder == 4:
+                            sf = -flags
+                        elif HDorder == 5:
+                            sf = rbw
+                        elif HDorder == 6:
+                            sf = wbw
+                        elif HDorder == 7:
+                            sf = -rtime
+                        elif HDorder == 8:
+                            sf = -wtime
+                        elif HDorder == 9:
+                            sf = -fsynctime
+                        elif HDorder == 10:
+                            sf = rops
+                        elif HDorder == 11:
+                            sf = wops
+                        elif HDorder == 12:
+                            sf = fsyncops
+                        elif HDorder == 20:
+                            sf = used
+                        elif HDorder == 21:
+                            sf = total
+                        elif HDorder == 22:
+                            if total > 0:
+                                sf = (1.0 * used) / total
                             else:
                                 sf = 0
-                            hdd.append((sf, path, flags, errchunkid, errtime, used, total, chunkscnt, rbw, wbw, rtime,
-                                        wtime, fsynctime, rops, wops, fsyncops, rbytes, wbytes, usecreadsum, usecwritesum))
-                    s.close()
+                        else:
+                            sf = 0
+                        hdd.append((sf, path, flags, errchunkid, errtime, used, total, chunkscnt, rbw, wbw, rtime,
+                                    wtime, fsynctime, rops, wops, fsyncops, rbytes, wbytes, usecreadsum, usecwritesum))
+                s.close()
 
         if len(hdd) > 0:
             out.append("""<table class="FR" cellspacing="0" summary="Disks">""")

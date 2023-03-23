@@ -1316,14 +1316,6 @@ enum class SugidClearMode {
 // since version 1.5.13:
 //      N*[version:32 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32]
 
-// 0x001F6
-#define CLTOCS_HDD_LIST_V1 (PROTO_BASE+502)
-/// -
-
-// 0x001F7
-#define CSTOCL_HDD_LIST_V1 (PROTO_BASE+503)
-// N*[ path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 ]
-
 // 0x001F8
 #define CLTOAN_CHART (PROTO_BASE+504)
 /// chartid:32
