@@ -3757,15 +3757,14 @@ int hdd_parseline(char *hddcfgline) {
 		}
 	}
 	std::unique_lock<std::mutex> folderlock_guard(folderlock);
-	// TODO(Guillex) Check why is this loop needed.
+	// This loop is used at reload time, we need to update the already existing
+	// Folders' properties according to the hdd.cfg file.
 	for (auto f : folders) {
 		if (strcmp(f->path,pptr)==0) {
 			f->wasRemovedFromConfig = false;
 			if (f->isDamaged) {
 				f->scanState = Folder::ScanState::kNeeded;
 				f->scanprogress = 0;
-				f->isReadOnly = readOnly;
-				f->isMarkedForRemoval = markedForRemoval;
 				f->isDamaged = damaged;
 				f->avail = 0ULL;
 				f->total = 0ULL;
@@ -3783,12 +3782,15 @@ int hdd_parseline(char *hddcfgline) {
 				f->lastRefresh = 0;
 				f->needRefresh = true;
 			} else {
-				if ((!f->isMarkedForDeletion() && (markedForRemoval || readOnly))
-				        || (f->isMarkedForDeletion() && !(markedForRemoval || readOnly))) {
+				if (f->isMarkedForRemoval != markedForRemoval
+				        || f->isReadOnly != readOnly) {
 					// the change is important - chunks need to be send to master again
 					f->scanState = Folder::ScanState::kSendNeeded;
 				}
 			}
+
+			f->isReadOnly = readOnly;
+			f->isMarkedForRemoval = markedForRemoval;
 
 			folderlock_guard.unlock();
 			if (lfd>=0) {
