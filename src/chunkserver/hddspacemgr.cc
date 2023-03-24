@@ -103,12 +103,6 @@
 
 static std::atomic<unsigned> HDDTestFreq_ms(10 * 1000);
 
-/// Number of bytes which should be addded to each disk's used space
-static uint64_t gLeaveFree;
-
-/// Default value for HDD_LEAVE_SPACE_DEFAULT
-static const char gLeaveSpaceDefaultDefaultStrValue[] = "4GiB";
-
 /// Value of HDD_ADVISE_NO_CACHE from config
 static std::atomic_bool gAdviseNoCache;
 
@@ -443,7 +437,7 @@ uint32_t hdd_diskinfo_v2_size() {
 	s = 0;
 	folderlock.lock();
 	for (const auto f : folders) {
-		sl = strlen(f->path);
+		sl = f->path.size();
 		if (sl>255) {
 			sl = 255;
 		}
@@ -478,11 +472,11 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 			diskInfo.errorChunkId = f->lastErrorTab[ei].chunkid;
 			diskInfo.errorTimeStamp = f->lastErrorTab[ei].timestamp;
 			if (f->scanState==Folder::ScanState::kInProgress) {
-				diskInfo.used = f->scanprogress;
+				diskInfo.used = f->scanProgress;
 				diskInfo.total = 0;
 			} else {
-				diskInfo.used = f->total-f->avail;
-				diskInfo.total = f->total;
+				diskInfo.used = f->totalSpace - f->availableSpace;
+				diskInfo.total = f->totalSpace;
 			}
 			diskInfo.chunksCount = f->chunks.size();
 			s = f->stats[f->statsPos];
@@ -779,17 +773,18 @@ static inline void hdd_refresh_usage(Folder *f) {
 	TRACETHIS();
 	struct statvfs fsinfo;
 
-	if (statvfs(f->path,&fsinfo)<0) {
-		f->avail = 0ULL;
-		f->total = 0ULL;
+	if (statvfs(f->path.c_str(), &fsinfo) < 0) {
+		f->availableSpace = 0ULL;
+		f->totalSpace = 0ULL;
 		return;
 	}
-	f->avail = (uint64_t)(fsinfo.f_frsize)*(uint64_t)(fsinfo.f_bavail);
-	f->total = (uint64_t)(fsinfo.f_frsize)*(uint64_t)(fsinfo.f_blocks-(fsinfo.f_bfree-fsinfo.f_bavail));
-	if (f->avail < f->leavefree) {
-		f->avail = 0ULL;
+	f->availableSpace = (uint64_t)(fsinfo.f_frsize) * (uint64_t)(fsinfo.f_bavail);
+	f->totalSpace = (uint64_t)(fsinfo.f_frsize)
+	           * (uint64_t)(fsinfo.f_blocks - (fsinfo.f_bfree - fsinfo.f_bavail));
+	if (f->availableSpace < f->leaveFreeSpace) {
+		f->availableSpace = 0ULL;
 	} else {
-		f->avail -= f->leavefree;
+		f->availableSpace -= f->leaveFreeSpace;
 	}
 }
 
@@ -929,7 +924,7 @@ void hdd_check_folders() {
 				f->scanState = Folder::ScanState::kTerminate;
 				break;
 			case Folder::ScanState::kThreadFinished:
-				f->scanthread.join();
+				f->scanThread.join();
 				/* fallthrough */
 			case Folder::ScanState::kSendNeeded:
 			case Folder::ScanState::kNeeded:
@@ -944,15 +939,15 @@ void hdd_check_folders() {
 				break;
 			}
 			if (f->migrateState == Folder::MigrateState::kThreadFinished) {
-				f->migratethread.join();
+				f->migrateThread.join();
 				f->migrateState = Folder::MigrateState::kDone;
 			}
 			// At this point, this is only true if it was already sent to master
 			if (!f->wasRemovedFromConfig) {
 				// Delay the deletion after the loop
-				lzfs_pretty_syslog(LOG_NOTICE,"folder %s successfully removed",f->path);
+				lzfs_pretty_syslog(LOG_NOTICE,"folder %s successfully removed",
+				                   f->path.c_str());
 
-				free(f->path);
 				foldersToRemove.emplace_back(f);
 				testerreset = 1;
 			}
@@ -971,10 +966,10 @@ void hdd_check_folders() {
 		switch (f->scanState) {
 		case Folder::ScanState::kNeeded:
 			f->scanState = Folder::ScanState::kInProgress;
-			f->scanthread = std::thread(hdd_folder_scan, f);
+			f->scanThread = std::thread(hdd_folder_scan, f);
 			break;
 		case Folder::ScanState::kThreadFinished:
-			f->scanthread.join();
+			f->scanThread.join();
 			f->scanState = Folder::ScanState::kWorking;
 			hdd_refresh_usage(f);
 			f->needRefresh = false;
@@ -999,7 +994,9 @@ void hdd_check_folders() {
 				}
 			}
 			if (err>=ERRORLIMIT && !(f->isMarkedForRemoval && f->isReadOnly)) {
-				lzfs_pretty_syslog(LOG_WARNING,"%u errors occurred in %u seconds on folder: %s",err,LASTERRTIME,f->path);
+				lzfs_pretty_syslog(LOG_WARNING,
+				                   "%u errors occurred in %u seconds on folder: %s",
+				                   err,LASTERRTIME,f->path.c_str());
 				hdd_senddata(f,1);
 				f->isDamaged = true;
 				changed = 1;
@@ -1016,7 +1013,7 @@ void hdd_check_folders() {
 			break;
 		}
 		if (f->migrateState == Folder::MigrateState::kThreadFinished) {
-			f->migratethread.join();
+			f->migrateThread.join();
 			f->migrateState = Folder::MigrateState::kDone;
 		}
 	}
@@ -1125,14 +1122,14 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 			}
 			if (!f->isMarkedForDeletion()) {
 				if (f->scanState==Folder::ScanState::kWorking) {
-					avail += f->avail;
-					total += f->total;
+					avail += f->availableSpace;
+					total += f->totalSpace;
 				}
 				chunks += f->chunks.size();
 			} else {
 				if (f->scanState==Folder::ScanState::kWorking) {
-					tdavail += f->avail;
-					tdtotal += f->total;
+					tdavail += f->availableSpace;
+					tdtotal += f->totalSpace;
 				}
 				tdchunks += f->chunks.size();
 			}
@@ -3037,7 +3034,7 @@ void hdd_testshuffle(Folder * f) {
 	TRACETHIS();
 
 	std::lock_guard<std::mutex> testlock_guard(testlock);
-	lzfs_pretty_syslog(LOG_NOTICE, "Randomizing chunks for: %s", f->path);
+	lzfs_pretty_syslog(LOG_NOTICE, "Randomizing chunks for: %s", f->path.c_str());
 	f->chunks.shuffle();
 }
 
@@ -3226,11 +3223,11 @@ void hdd_folder_scan_layout(Folder *f, uint32_t begin_time, int layout_version) 
 			lastperc = currentperc;
 			lasttime = currenttime;
 			folderlock.lock();
-			f->scanprogress = currentperc;
+			f->scanProgress = currentperc;
 			folderlock.unlock();
 			hddspacechanged = 1;  // report chunk count to master
 			lzfs_pretty_syslog(LOG_NOTICE, "scanning folder %s: %" PRIu8 "%% (%" PRIu32 "s)",
-			                   f->path, lastperc, currenttime - begin_time);
+			                   f->path.c_str(), lastperc, currenttime - begin_time);
 		}
 	}
 }
@@ -3343,10 +3340,12 @@ void *hdd_folder_migrate(void *arg) {
 		if (count > 0) {
 			lzfs_pretty_syslog(LOG_NOTICE,
 			                   "converting directories in folder %s: complete (%" PRIu32 "s)",
-			                   f->path, (uint32_t)(time(NULL)) - begin_time);
+			                   f->path.c_str(), (uint32_t)(time(NULL)) - begin_time);
 		}
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "converting directories in folder %s: interrupted", f->path);
+		lzfs_pretty_syslog(LOG_NOTICE,
+		                   "converting directories in folder %s: interrupted",
+		                   f->path.c_str());
 	}
 	f->migrateState = Folder::MigrateState::kThreadFinished;
 
@@ -3369,7 +3368,7 @@ void *hdd_folder_scan(void *arg) {
 	}
 
 	if (!isMarkedForDeletion) {
-		mkdir(f->path, 0755);
+		mkdir(f->path.c_str(), 0755);
 	}
 
 	hddspacechanged = 1;
@@ -3390,20 +3389,20 @@ void *hdd_folder_scan(void *arg) {
 
 	std::lock_guard<std::mutex> folderlock_guard(folderlock);
 	if (f->scanState == Folder::ScanState::kTerminate) {
-		lzfs_pretty_syslog(LOG_NOTICE, "scanning folder %s: interrupted", f->path);
+		lzfs_pretty_syslog(LOG_NOTICE, "scanning folder %s: interrupted", f->path.c_str());
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "scanning folder %s: complete (%" PRIu32 "s)", f->path,
-		                   (uint32_t)(time(NULL)) - begin_time);
+		lzfs_pretty_syslog(LOG_NOTICE, "scanning folder %s: complete (%" PRIu32 "s)",
+		                   f->path.c_str(), (uint32_t)(time(NULL)) - begin_time);
 	}
 
 	if (f->scanState != Folder::ScanState::kTerminate
 	        && f->migrateState == Folder::MigrateState::kDone) {
 		f->migrateState = Folder::MigrateState::kInProgress;
-		f->migratethread = std::thread(hdd_folder_migrate, f);
+		f->migrateThread = std::thread(hdd_folder_migrate, f);
 	}
 
 	f->scanState = Folder::ScanState::kThreadFinished;
-	f->scanprogress = 100;
+	f->scanProgress = 100;
 
 	return NULL;
 }
@@ -3472,12 +3471,12 @@ void hdd_term(void) {
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		for (auto f : folders) {
 			if (f->scanState == Folder::ScanState::kThreadFinished) {
-				f->scanthread.join();
+				f->scanThread.join();
 				f->scanState = Folder::ScanState::kWorking;  // any state - to prevent calling join again
 				i--;
 			}
 			if (f->migrateState == Folder::MigrateState::kThreadFinished) {
-				f->migratethread.join();
+				f->migrateThread.join();
 				f->migrateState = Folder::MigrateState::kDone;
 				i--;
 			}
@@ -3508,7 +3507,6 @@ void hdd_term(void) {
 	gOpenChunks.freeUnused(eventloop_time(), gChunkRegistryLock);
 
 	for (auto f : folders) {
-		free(f->path);
 		delete f;
 	}
 
@@ -3606,58 +3604,52 @@ int hdd_size_parse(const char *str,uint64_t *ret) {
 
 int hdd_parseline(char *hddcfgline) {
 	TRACETHIS();
-	uint32_t l;
 	int lfd;
 	bool markedForRemoval = false;
 	bool readOnly = false;
 	bool damaged = false;
-	char *pptr;
+	std::string cfgLine(hddcfgline);
 	struct stat sb;
 	uint8_t lockneeded;
 
-	if (hddcfgline[0]=='#') {
+	if (cfgLine.at(0) == '#')  // Skip comments
 		return 0;
-	}
-	l = strlen(hddcfgline);
-	while (l>0 && (hddcfgline[l-1]=='\r' || hddcfgline[l-1]=='\n' || hddcfgline[l-1]==' ' || hddcfgline[l-1]=='\t')) {
-		l--;
-	}
-	if (l==0) {
+
+	// Trim trailing whitespace characters
+	auto it = std::find_if(cfgLine.rbegin(), cfgLine.rend(),
+	                       [](char c) {
+		return !std::isspace<char>(c, std::locale::classic());
+	});
+	cfgLine.erase(it.base(), cfgLine.end());
+
+	if (cfgLine.empty())
 		return 0;
-	}
-	if (hddcfgline[l-1]!='/') {
-		hddcfgline[l]='/';
-		hddcfgline[l+1]='\0';
-		l++;
-	} else {
-		hddcfgline[l]='\0';
-	}
-	if (hddcfgline[0]=='*') {
+
+	if (cfgLine.at(cfgLine.size() - 1) != '/')
+		cfgLine.append("/");
+
+	if (cfgLine.at(0) == '*') {
 		markedForRemoval = true;
-		pptr = hddcfgline+1;
-		l--;
-	} else {
-		pptr = hddcfgline;
+		cfgLine.erase(cfgLine.begin());
 	}
+
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		lockneeded = 1;
 		for (const auto f : folders) {
 			if (lockneeded) {
-				if (strcmp(f->path,pptr)==0) {
+				if (f->path == cfgLine) {
 					lockneeded = 0;
 				}
 			}
 		}
 	}
 
-	std::string dataDir(pptr, l);
-	std::string lockfname = dataDir + ".lock";
+	std::string lockfname = cfgLine + ".lock";
 	lfd = open(lockfname.c_str(),O_RDWR|O_CREAT|O_TRUNC,0640);
 
-	if (lfd<0 && errno==EROFS) {
+	if (lfd<0 && errno==EROFS)
 		readOnly = true;
-	}
 
 	if (readOnly && markedForRemoval) {
 		// Nothing to do, we can use a read only file system if it was
@@ -3671,7 +3663,7 @@ int hdd_parseline(char *hddcfgline) {
 		close(lfd);
 		if (err==EAGAIN) {
 			throw InitializeException(
-					"data folder " + dataDir + " already locked by another process");
+					"data folder " + cfgLine + " already locked by another process");
 		} else {
 			lzfs_pretty_syslog(LOG_WARNING, "lockf(%s) failed, marking hdd as damaged: %s",
 					lockfname.c_str(), strerr(err));
@@ -3691,13 +3683,13 @@ int hdd_parseline(char *hddcfgline) {
 					std::string fPath = f->path;
 					folderlock_guard.unlock();
 					close(lfd);
-					throw InitializeException("data folders '" + dataDir + "' and "
+					throw InitializeException("data folders '" + cfgLine + "' and "
 							"'" + fPath + "' have the same lockfile");
 				} else {
 					lzfs_pretty_syslog(LOG_WARNING,
-							"data folders '%s' and '%s' are on the same "
-							"physical device (could lead to unexpected behaviours)",
-							dataDir.c_str(), f->path);
+					                   "data folders '%s' and '%s' are on the same "
+					                   "physical device (could lead to unexpected behaviours)",
+					                   cfgLine.c_str(), f->path.c_str());
 				}
 			}
 		}
@@ -3706,21 +3698,21 @@ int hdd_parseline(char *hddcfgline) {
 	// This loop is used at reload time, we need to update the already existing
 	// Folders' properties according to the hdd.cfg file.
 	for (auto f : folders) {
-		if (strcmp(f->path,pptr)==0) {
+		if (f->path == cfgLine) {
 			f->wasRemovedFromConfig = false;
 			if (f->isDamaged) {
 				f->scanState = Folder::ScanState::kNeeded;
-				f->scanprogress = 0;
+				f->scanProgress = 0;
 				f->isDamaged = damaged;
-				f->avail = 0ULL;
-				f->total = 0ULL;
-				f->leavefree = gLeaveFree;
+				f->availableSpace = 0ULL;
+				f->totalSpace = 0ULL;
+				f->leaveFreeSpace = gLeaveFree;
 				f->currentStat.clear();
-				for (l=0 ; l<STATS_HISTORY ; l++) {
+				for (int l = 0 ; l < STATS_HISTORY ; ++l) {
 					f->stats[l].clear();
 				}
 				f->statsPos = 0;
-				for (l=0 ; l<LAST_ERROR_SIZE ; l++) {
+				for (int l = 0 ; l < LAST_ERROR_SIZE ; ++l) {
 					f->lastErrorTab[l].chunkid = 0ULL;
 					f->lastErrorTab[l].timestamp = 0;
 				}
@@ -3745,37 +3737,16 @@ int hdd_parseline(char *hddcfgline) {
 			return 1;
 		}
 	}
-	Folder *f = new Folder();
+
+	Folder *f = new Folder(std::move(cfgLine), markedForRemoval);
 	passert(f);
 	f->isReadOnly = readOnly;
-	f->isMarkedForRemoval = markedForRemoval;
 	f->isDamaged = damaged;
-	f->scanState = Folder::ScanState::kNeeded;
-	f->scanprogress = 0;
-	f->migrateState = Folder::MigrateState::kDone;
-	f->path = strdup(pptr);
-	passert(f->path);
-	f->wasRemovedFromConfig = false;
-	f->leavefree = gLeaveFree;
-	f->avail = 0ULL;
-	f->total = 0ULL;
-	f->currentStat.clear();
-	for (l=0 ; l<STATS_HISTORY ; l++) {
-		f->stats[l].clear();
-	}
-	f->statsPos = 0;
-	for (l=0 ; l<LAST_ERROR_SIZE ; l++) {
-		f->lastErrorTab[l].chunkid = 0ULL;
-		f->lastErrorTab[l].timestamp = 0;
-	}
-	f->lastErrorIndex = 0;
-	f->lastRefresh = 0;
-	f->needRefresh = true;
+
 	if (!damaged) {
 		f->lock = std::unique_ptr<const Folder::LockFile>(
 		            new Folder::LockFile(lfd, sb.st_dev, sb.st_ino));
 	}
-	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);
 
 	folders.emplace_back(f);
 
@@ -3824,14 +3795,14 @@ static void hdd_folders_reinit(void) {
 			if (!f->wasRemovedFromConfig) {
 				anyDiskAvailable = true;
 				if (f->scanState==Folder::ScanState::kNeeded) {
-					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be scanned",f->path);
+					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be scanned",f->path.c_str());
 				} else if (f->scanState==Folder::ScanState::kSendNeeded) {
-					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be resend",f->path);
+					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be resend",f->path.c_str());
 				} else {
-					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s didn't change",f->path);
+					lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s didn't change",f->path.c_str());
 				}
 			} else {
-				lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be removed",f->path);
+				lzfs_pretty_syslog(LOG_NOTICE,"hdd space manager: folder %s will be removed",f->path.c_str());
 			}
 		}
 		folderactions = 1; // continue folder actions
@@ -3953,11 +3924,12 @@ int hdd_init(void) {
 	{
 		std::lock_guard<std::mutex> folderlock_guard(folderlock);
 		for (const auto f : folders) {
-			lzfs_pretty_syslog(LOG_INFO, "hdd space manager: path to scan: %s",f->path);
+			lzfs_pretty_syslog(LOG_INFO, "hdd space manager: path to scan: %s",
+			                   f->path.c_str());
 		}
 	}
 	lzfs_pretty_syslog(LOG_INFO, "hdd space manager: start background hdd scanning "
-				"(searching for available chunks)");
+	                             "(searching for available chunks)");
 
 	gAdviseNoCache = cfg_getuint32("HDD_ADVISE_NO_CACHE", 0);
 	HDDTestFreq_ms = cfg_ranged_get("HDD_TEST_FREQ", 10., 0.001, 1000000.) * 1000;

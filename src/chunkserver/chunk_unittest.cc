@@ -52,9 +52,7 @@ TEST_F(ChunkTests, MaxBlocksInFile) {
 }
 
 TEST_F(ChunkTests, GetFileName) {
-	Folder f;
-	std::vector<char> folderPath = { '/', 'm', 'n', 't', '/', 0 };
-	f.path = folderPath.data();
+	Folder f("/mnt/", false);
 
 	standardChunk.chunkid = 0x123456;
 	standardChunk.owner = &f;

@@ -10,6 +10,12 @@
 
 constexpr uint32_t kSecondsInOneMinute = 60;
 
+/// Number of bytes which should be addded to each disk's used space
+inline uint64_t gLeaveFree;
+
+/// Default value for HDD_LEAVE_SPACE_DEFAULT
+constexpr char gLeaveSpaceDefaultDefaultStrValue[] = "4GiB";
+
 class Chunk;
 
 struct Folder {
@@ -85,6 +91,14 @@ struct Folder {
 		ino_t inode_;   ///< Lock-file's Inode number.
 	};
 
+	/// Constructs a `Folder` with previous information from hdd.cfg and assigns default values.
+	Folder(std::string _path, bool _isMarkedForRemoval)
+	    : path(std::move(_path)),
+	      isMarkedForRemoval(_isMarkedForRemoval),
+	      leaveFreeSpace(gLeaveFree),
+	      carry(random() / static_cast<double>(RAND_MAX)) {
+	}
+
 	/// Tells if this folder is 'logically' marked for deletion.
 	///
 	/// Folders are considered marked for deletion, from the master's
@@ -101,31 +115,37 @@ struct Folder {
 		         || scanState != Folder::ScanState::kWorking);
 	}
 
-	char *path;
+	std::string path;
+
 	ScanState scanState = ScanState::kNeeded;  ///< The status of scanning this disk.
+	uint8_t scanProgress = 0;                  ///< Scan progress percentage
 
-	bool needRefresh = true;  ///< Tells if the disk usage related fields need to be recalculated
-	uint32_t lastRefresh;     ///< Timestamp in seconds storing the last time this folder was refreshed
+	bool needRefresh = true;   ///< Tells if the disk usage related fields need to be recalculated
+	uint32_t lastRefresh = 0;  ///< Timestamp in seconds storing the last time this folder was refreshed
 
-	bool isMarkedForRemoval = false;  ///< Marked with * in the hdd.cfg file
-	bool isReadOnly = false;          ///< A read-only file system was detected
-
-	bool isDamaged = true;
 	bool wasRemovedFromConfig = false;  ///< Tells if this folder is missing in the config file after reloading
-	uint8_t scanprogress;
+	bool isMarkedForRemoval = false;    ///< Marked with * in the hdd.cfg file
+	bool isReadOnly = false;            ///< A read-only file system was detected
 
-	MigrateState migrateState;
+	/// Tells if this folder contains important errors
+	///
+	/// Most common errors are related to:
+	/// * Being unable to create a needed lock file
+	/// * Read/write errors greater than the specified limit
+	bool isDamaged = true;
 
-	uint64_t leavefree;
-	uint64_t avail;
-	uint64_t total;
+	MigrateState migrateState = MigrateState::kDone;  ///< Controls the migration process
+
+	uint64_t leaveFreeSpace = 0;    ///< Reserved space in bytes on this disk (from configuration)
+	uint64_t availableSpace = 0;    ///< Total space - used space - leaveFreeSpace (bytes)
+	uint64_t totalSpace = 0;        ///< Total usable space in bytes in this device
 
 	HddAtomicStatistics currentStat;                 ///< Current stats (updated with every operation)
 	std::array<HddStatistics, STATS_HISTORY> stats;  ///< History of stats for the last STATSHISTORY minutes
-	uint32_t statsPos;                               ///< Used to rotate the stats in the stats array
+	uint32_t statsPos = 0;                           ///< Used to rotate the stats in the stats array
 
 	std::array<IoError, LAST_ERROR_SIZE> lastErrorTab;  ///< History with last LAST_ERROR_SIZE errors
-	uint32_t lastErrorIndex;                            ///< Index of the last error
+	uint32_t lastErrorIndex = 0;                        ///< Index of the last error
 
 	/// Folder's lock file.
 	///
@@ -135,8 +155,8 @@ struct Folder {
 
 	double carry;               ///< Assists in the process of selecting the Folder for a new Chunk
 
-	std::thread scanthread;
-	std::thread migratethread;
+	std::thread scanThread;     ///< Holds the thread for scanning this folder, so far hdd_folder_scan on hddspacemgr
+	std::thread migrateThread;  ///< Holds the thread for migrating the chunks' filenames from old layouts
 
 	/// A collection of chunks located in this folder.
 	///
