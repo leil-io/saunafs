@@ -795,71 +795,73 @@ static inline void hdd_refresh_usage(Folder *f) {
 
 static inline Folder* hdd_getfolder() {
 	TRACETHIS();
-	Folder *bf;
-	double maxcarry;
-	double minavail,maxavail;
+	Folder *bestFolder = nullptr;
+	double maxCarry = 1.0;
+	double minPercentAvail = std::numeric_limits<double>::max();
+	double maxPercentAvail = 0.0;
 	double s,d;
-	double pavail;
-	int ok;
+	double percentAvail;
 
-	minavail = 0.0;
-	maxavail = 0.0;
-	maxcarry = 1.0;
-	bf = NULL;
-	ok = 0;
+	if (folders.empty())
+		return nullptr;
+
 	for (auto f : folders) {
-		if (f->isDamaged || f->isMarkedForDeletion() || f->total==0 || f->avail==0
-		        || f->scanState!=Folder::ScanState::kWorking) {
+		if (!f->isSelectableForNewChunk())
 			continue;
+
+		if (f->carry >= maxCarry) {
+			maxCarry = f->carry;
+			bestFolder = f;
 		}
-		if (f->carry >= maxcarry) {
-			maxcarry = f->carry;
-			bf = f;
-		}
-		pavail = (double)(f->avail)/(double)(f->total);
-		if (ok==0 || minavail>pavail) {
-			minavail = pavail;
-			ok = 1;
-		}
-		if (pavail>maxavail) {
-			maxavail = pavail;
-		}
+
+		percentAvail = (double)(f->availableSpace) / (double)(f->totalSpace);
+		minPercentAvail = std::min(minPercentAvail, percentAvail);
+		maxPercentAvail = std::max(maxPercentAvail, percentAvail);
 	}
-	if (bf) {
-		bf->carry -= 1.0;
-		return bf;
+
+	if (bestFolder) {
+		bestFolder->carry -= 1.0;  // Lower the probability of being choosen again
+		return bestFolder;
 	}
-	if (maxavail==0.0) {    // no space
-		return NULL;
+
+	if (maxPercentAvail == 0.0) {  // no space
+		return nullptr;
 	}
-	if (maxavail<0.01) {
+
+	if (maxPercentAvail < 0.01) {
 		s = 0.0;
 	} else {
-		s = minavail*0.8;
-		if (s<0.01) {
+		s = minPercentAvail * 0.8;
+		if (s < 0.01) {
 			s = 0.01;
 		}
 	}
-	d = maxavail-s;
-	maxcarry = 1.0;
+
+	d = maxPercentAvail - s;
+	maxCarry = 1.0;
+
 	for (auto f : folders) {
-		if (f->isDamaged || f->isMarkedForDeletion() || f->total==0 || f->avail==0
-		        || f->scanState!=Folder::ScanState::kWorking) {
+		if (!f->isSelectableForNewChunk()) {
 			continue;
 		}
-		pavail = (double)(f->avail)/(double)(f->total);
-		if (pavail>s) {
-			f->carry += ((pavail-s)/d);
+
+		percentAvail = (double)(f->availableSpace) / (double)(f->totalSpace);
+
+		if (percentAvail > s) {
+			f->carry += ((percentAvail - s) / d);
 		}
-		if (f->carry >= maxcarry) {
-			maxcarry = f->carry;
-			bf = f;
+
+		if (f->carry >= maxCarry) {
+			maxCarry = f->carry;
+			bestFolder = f;
 		}
 	}
-	if (bf) {       // should be always true
-		bf->carry -= 1.0;
+
+	if (bestFolder) {       // should be always true
+		bestFolder->carry -= 1.0;
 	}
-	return bf;
+
+	return bestFolder;
 }
 
 void hdd_senddata(Folder *f,int rmflag) {

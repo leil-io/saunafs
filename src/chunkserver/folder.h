@@ -94,8 +94,14 @@ struct Folder {
 		return isMarkedForRemoval || isReadOnly;
 	}
 
-	char *path;
+	/// Tells if this folder is suitable for storing new chunks, according it general state
+	inline bool isSelectableForNewChunk() const {
+		return !(isDamaged || isMarkedForDeletion() || totalSpace == 0
+		         || availableSpace == 0
+		         || scanState != Folder::ScanState::kWorking);
+	}
 
+	char *path;
 	ScanState scanState = ScanState::kNeeded;  ///< The status of scanning this disk.
 
 	bool needRefresh = true;  ///< Tells if the disk usage related fields need to be recalculated
@@ -127,7 +133,7 @@ struct Folder {
 	/// chunkserver processes.
 	std::unique_ptr<const LockFile> lock = nullptr;
 
-	double carry;
+	double carry;               ///< Assists in the process of selecting the Folder for a new Chunk
 
 	std::thread scanthread;
 	std::thread migratethread;
