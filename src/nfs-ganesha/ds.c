@@ -65,7 +65,7 @@ static void lzfs_fsal_ds_handle_release(struct fsal_ds_handle *const ds_pub)
                           struct lzfs_fsal_export, export);
     dataServer = container_of(ds_pub, struct lzfs_fsal_ds_handle, ds);
 
-	assert(lzfs_export->fileinfo_cache);
+	assert(export->fileinfo_cache);
 
     if (dataServer->cache_handle != NULL) {
         liz_fileinfo_cache_release(export->fileinfo_cache,
