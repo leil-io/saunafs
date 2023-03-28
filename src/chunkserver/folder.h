@@ -110,16 +110,13 @@ struct Folder {
 	/// Folders are considered marked for deletion, from the master's
 	/// perspective, if they are explicitly marked for removal in the hdd.cfg
 	/// file or if it is on a read-only file system.
-	inline bool isMarkedForDeletion() const {
-		return isMarkedForRemoval || isReadOnly;
-	}
+	bool isMarkedForDeletion() const;
 
 	/// Tells if this folder is suitable for storing new chunks, according it general state
-	inline bool isSelectableForNewChunk() const {
-		return !(isDamaged || isMarkedForDeletion() || totalSpace == 0
-		         || availableSpace == 0
-		         || scanState != Folder::ScanState::kWorking);
-	}
+	bool isSelectableForNewChunk() const;
+
+	/// Returns a DiskInfo object from the information inside this Folder
+	DiskInfo toDiskInfo() const;
 
 	std::string path;  ///< Location of this data folder (e.g., /mnt/hdd07).
 

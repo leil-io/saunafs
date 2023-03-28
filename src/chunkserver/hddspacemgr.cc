@@ -449,50 +449,16 @@ uint32_t hdd_diskinfo_v2_size() {
 void hdd_diskinfo_v2_data(uint8_t *buff) {
 	TRACETHIS();
 
-	HddStatistics s;
-	uint32_t ei;
-	uint32_t pos;
 	if (buff) {
 		MooseFSVector<DiskInfo> diskInfoVector;
-		for (const auto f : folders) {
-			diskInfoVector.emplace_back();
-			DiskInfo& diskInfo = diskInfoVector.back();
-			diskInfo.path = f->path;
-			if (diskInfo.path.length() > MooseFsString<uint8_t>::maxLength()) {
-				std::string dots("(...)");
-				uint32_t substrSize = MooseFsString<uint8_t>::maxLength() - dots.length();
-				diskInfo.path = dots + diskInfo.path.substr(diskInfo.path.length()
-						- substrSize, substrSize);
-			}
-			diskInfo.entrySize = serializedSize(diskInfo) - serializedSize(diskInfo.entrySize);
-			diskInfo.flags = (f->isMarkedForDeletion() ? DiskInfo::kToDeleteFlagMask : 0)
-					+ (f->isDamaged ? DiskInfo::kDamagedFlagMask : 0)
-					+ (f->scanState == Folder::ScanState::kInProgress ? DiskInfo::kScanInProgressFlagMask : 0);
-			ei = (f->lastErrorIndex+(LAST_ERROR_SIZE-1))%LAST_ERROR_SIZE;
-			diskInfo.errorChunkId = f->lastErrorTab[ei].chunkid;
-			diskInfo.errorTimeStamp = f->lastErrorTab[ei].timestamp;
-			if (f->scanState==Folder::ScanState::kInProgress) {
-				diskInfo.used = f->scanProgress;
-				diskInfo.total = 0;
-			} else {
-				diskInfo.used = f->totalSpace - f->availableSpace;
-				diskInfo.total = f->totalSpace;
-			}
-			diskInfo.chunksCount = f->chunks.size();
-			s = f->stats[f->statsPos];
-			diskInfo.lastMinuteStats = s;
-			for (pos=1 ; pos<60 ; pos++) {
-				s.add(f->stats[(f->statsPos+pos)%STATS_HISTORY]);
-			}
-			diskInfo.lastHourStats = s;
-			for (pos=60 ; pos<24*60 ; pos++) {
-				s.add(f->stats[(f->statsPos+pos)%STATS_HISTORY]);
-			}
-			diskInfo.lastDayStats = s;
-		}
+
+		for (const auto& folder : folders)
+			diskInfoVector.emplace_back(folder->toDiskInfo());
+
 		serialize(&buff, diskInfoVector);
 	}
-	folderlock.unlock();
+
+	folderlock.unlock();  //Locked by hdd_diskinfo_v2_size
 }
 
 void hdd_diskinfo_movestats(void) {
