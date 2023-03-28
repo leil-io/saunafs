@@ -18,6 +18,17 @@ constexpr char gLeaveSpaceDefaultDefaultStrValue[] = "4GiB";
 
 class Chunk;
 
+/// Represents a data folder in the Chunkserver context.
+///
+/// Each Folder maps to a single line in the hdd.cfg file.
+/// In production, the recommended configuration is one Folder per physical drive.
+/// For tests, it is fine to have different Folders pointing to the same device.
+/// Entries starting with '*' are considered marked for removal, and the system
+/// will copy their Chunks to other Chunkservers or Folders.
+/// E.g.:
+/// /mnt/hdd_02
+/// /mnt/ssd_04
+/// */mnt/ssd_08
 struct Folder {
 	enum class ScanState {
 		kNeeded = 0u,           ///< Scanning is scheduled (the scanning thread is not running yet).
@@ -40,14 +51,9 @@ struct Folder {
 		/// A constructor.
 		IoError() : chunkid(0), timestamp(0), errornumber(0) {}
 
-		/// The ID of the chunk which caused the error.
-		uint64_t chunkid;
-
-		/// The timestamp of the error.
-		uint32_t timestamp;
-
-		/// The error number (a.k.a., errno) of the error.
-		int errornumber;
+		uint64_t chunkid;    ///< The ID of the chunk which caused the error.
+		uint32_t timestamp;  ///< The timestamp of the error.
+		int errornumber;     ///< The error number (a.k.a., errno) of the error.
 	};
 
 	/// Lock class to avoid different chunkservers using the same folder
@@ -115,7 +121,7 @@ struct Folder {
 		         || scanState != Folder::ScanState::kWorking);
 	}
 
-	std::string path;
+	std::string path;  ///< Location of this data folder (e.g., /mnt/hdd07).
 
 	ScanState scanState = ScanState::kNeeded;  ///< The status of scanning this disk.
 	uint8_t scanProgress = 0;                  ///< Scan progress percentage
