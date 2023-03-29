@@ -54,41 +54,41 @@
 
 static void release(struct fsal_export *export_handle)
 {
-    struct lzfs_fsal_export *export;
+    struct FSExport *export;
 
-    export = container_of(export_handle, struct lzfs_fsal_export, export);
+    export = container_of(export_handle, struct FSExport, export);
 
-    delete_handle(export->root);
-    export->root = NULL;
+    deleteHandle(export->rootHandle);
+    export->rootHandle = NULL;
 
     fsal_detach_export(export->export.fsal, &export->export.exports);
     free_export_ops(&export->export);
 
-    if (export->fileinfo_cache) {
-        liz_reset_fileinfo_cache_params(export->fileinfo_cache, 0, 0);
+    if (export->fileinfoCache) {
+        liz_reset_fileinfo_cache_params(export->fileinfoCache, 0, 0);
 
         while (1) {
             liz_fileinfo_entry_t *cache_handle;
             liz_fileinfo_t *file_handle;
 
             cache_handle = liz_fileinfo_cache_pop_expired(
-                        export->fileinfo_cache);
+                        export->fileinfoCache);
             if (!cache_handle) {
                 break;
             }
 
             file_handle = liz_extract_fileinfo(cache_handle);
-            liz_release(export->lzfs_instance, file_handle);
+            liz_release(export->fsInstance, file_handle);
             liz_fileinfo_entry_free(cache_handle);
         }
 
-        liz_destroy_fileinfo_cache(export->fileinfo_cache);
-        export->fileinfo_cache = NULL;
+        liz_destroy_fileinfo_cache(export->fileinfoCache);
+        export->fileinfoCache = NULL;
     }
 
-    liz_destroy(export->lzfs_instance);
-    export->lzfs_instance = NULL;
-    gsh_free((char *)export->lzfs_params.subfolder);
+    liz_destroy(export->fsInstance);
+    export->fsInstance = NULL;
+    gsh_free((char *)export->initialParameters.subfolder);
     gsh_free(export);
 }
 
@@ -100,15 +100,15 @@ fsal_status_t lookup_path(struct fsal_export *export_hdl,
 {
     static const char *root_dir_path = "/";
 
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_handle *obj_handle = NULL;
+    struct FSExport *export;
+    struct FSHandle *obj_handle = NULL;
     const char *real_path;
     int rc;
 
     LogFullDebug(COMPONENT_FSAL, "export_id=%" PRIu16 " path=%s",
                  export_hdl->export_id, path);
 
-    export = container_of(export_hdl, struct lzfs_fsal_export, export);
+    export = container_of(export_hdl, struct FSExport, export);
 
     *handle = NULL;
 
@@ -142,18 +142,18 @@ fsal_status_t lookup_path(struct fsal_export *export_hdl,
     // special case the root
     if (strcmp(real_path, "/") == 0) {
         assert(export->root);
-        *handle = &export->root->handle;
+        *handle = &export->rootHandle->fileHandle;
         if (attrs_out == NULL) {
             return fsalstat(ERR_FSAL_NO_ERROR, 0);
         }
     }
 
     liz_entry_t result;
-    rc = liz_cred_lookup(export->lzfs_instance, &op_ctx->creds,
+    rc = fs_lookup(export->fsInstance, &op_ctx->creds,
                          SPECIAL_INODE_ROOT, real_path, &result);
 
     if (rc < 0) {
-        return lzfs_fsal_last_err();
+        return fsalLastError();
     }
 
     if (attrs_out != NULL) {
@@ -161,8 +161,8 @@ fsal_status_t lookup_path(struct fsal_export *export_hdl,
     }
 
     if (*handle == NULL) {
-        obj_handle = allocate_new_handle(&result.attr, export);
-        *handle = &obj_handle->handle;
+        obj_handle = allocateNewHandle(&result.attr, export);
+        *handle = &obj_handle->fileHandle;
     }
 
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
@@ -187,16 +187,16 @@ static fsal_status_t get_dynamic_info(struct fsal_export *export_handle,
     //Unused variable
     (void ) obj_handle;
 
-    struct lzfs_fsal_export *export;
+    struct FSExport *export;
     int rc;
 
-    export = container_of(export_handle, struct lzfs_fsal_export, export);
+    export = container_of(export_handle, struct FSExport, export);
 
     liz_stat_t st;
 
-    rc = liz_statfs(export->lzfs_instance, &st);
+    rc = liz_statfs(export->fsInstance, &st);
     if (rc < 0) {
-        return lzfs_fsal_last_err();
+        return fsalLastError();
     }
 
     memset(info, 0, sizeof(fsal_dynamicfsinfo_t));
@@ -217,15 +217,15 @@ struct state_t *allocate_state(struct fsal_export *exp_hdl,
                                struct state_t *related_state)
 {
     struct state_t *state;
-    struct lzfs_fd *my_fd;
+    struct FSFileDescriptor *my_fd;
 
-    state = init_state(gsh_calloc(1, sizeof(struct lzfs_state_fd)),
+    state = init_state(gsh_calloc(1, sizeof(struct FSFileDescriptorState)),
                        exp_hdl, state_type, related_state);
 
-    my_fd = &container_of(state, struct lzfs_state_fd, state)->fd;
+    my_fd = &container_of(state, struct FSFileDescriptorState, state)->fileDescriptor;
 
-    my_fd->fd = NULL;
-    my_fd->openflags = FSAL_O_CLOSED;
+    my_fd->fileDescriptor = NULL;
+    my_fd->openFlags = FSAL_O_CLOSED;
     return state;
 }
 
@@ -244,8 +244,8 @@ void free_state(struct fsal_export *exp_hdl, struct state_t *state)
     // Unused variable
     (void ) exp_hdl;
 
-    struct lzfs_state_fd *state_fd;
-    state_fd = container_of(state, struct lzfs_state_fd, state);
+    struct FSFileDescriptorState *state_fd;
+    state_fd = container_of(state, struct FSFileDescriptorState, state);
     gsh_free(state_fd);
 }
 
@@ -324,12 +324,12 @@ fsal_status_t create_handle(struct fsal_export *exp_hdl,
                             struct fsal_obj_handle **pub_handle,
                             struct fsal_attrlist *attrs_out)
 {
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_handle *handle = NULL;
+    struct FSExport *export;
+    struct FSHandle *handle = NULL;
     liz_inode_t *inode;
     int rc;
 
-    export = container_of(exp_hdl, struct lzfs_fsal_export, export);
+    export = container_of(exp_hdl, struct FSExport, export);
     inode = (liz_inode_t *)desc->addr;
 
     *pub_handle = NULL;
@@ -338,20 +338,20 @@ fsal_status_t create_handle(struct fsal_export *exp_hdl,
     }
 
     liz_attr_reply_t result;
-    rc = liz_cred_getattr(export->lzfs_instance, &op_ctx->creds,
+    rc = liz_cred_getattr(export->fsInstance, &op_ctx->creds,
                           *inode, &result);
 
     if (rc < 0) {
-        return lzfs_fsal_last_err();
+        return fsalLastError();
     }
 
-    handle = allocate_new_handle(&result.attr, export);
+    handle = allocateNewHandle(&result.attr, export);
 
     if (attrs_out != NULL) {
         posix2fsal_attributes_all(&result.attr, attrs_out);
     }
 
-    *pub_handle = &handle->handle;
+    *pub_handle = &handle->fileHandle;
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
@@ -386,8 +386,7 @@ static attrmask_t fs_supported_attrs(struct fsal_export *exp_hdl)
  *
  * @param[in,out] ops Operations vector
  */
-
-void lzfs_export_ops_init(struct export_ops *ops)
+void initializeExportOperations(struct export_ops *ops)
 {
     ops->release = release;
     ops->lookup_path = lookup_path;

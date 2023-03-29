@@ -18,62 +18,52 @@
 
 #include "lzfs_fsal_types.h"
 
-/* FSAL methods */
+/// FSAL methods
 
-liz_context_t *lzfs_fsal_create_context(liz_t *instance, struct user_cred *cred);
+liz_context_t *fsal_create_context(liz_t *instance, struct user_cred *cred);
 
-fsal_staticfsinfo_t *lzfs_fsal_staticfsinfo(struct fsal_module *module_hdl);
+void initializeExportOperations(struct export_ops *ops);
+void initializeFilesystemOperations(struct fsal_obj_ops *ops);
 
-void lzfs_export_ops_init(struct export_ops *ops);
-
-void lzfs_handle_ops_init(struct fsal_obj_ops *ops);
-
-static inline int root_fd(struct fsal_filesystem *fs)
+static inline int rootFileDescriptor(struct fsal_filesystem *fs)
 {
-    int fd = (long) fs->private_data;
-    return fd;
+    return (long) fs->private_data;
 }
 
-static inline int get_root_fd(struct fsal_export *exp_hdl)
+static inline int rootFileDescriptorFromExport(struct fsal_export *exp_hdl)
 {
-    return root_fd(exp_hdl->root_fs);
+    return rootFileDescriptor(exp_hdl->root_fs);
 }
 
-bool set_credentials(const struct user_cred *creds,
-                     const struct fsal_module *fsal_module);
+bool setCredentials(const struct user_cred *creds,
+                    const struct fsal_module *fsal_module);
 
-void restore_ganesha_credentials(const struct fsal_module *fsal_module);
+void restoreGaneshaCredentials(const struct fsal_module *fsal_module);
 
-// Methods for allocating/deleting handles
+/// Methods for allocating/deleting handles
 
-struct lzfs_fsal_handle *allocate_new_handle(
-        const struct stat *attr, struct lzfs_fsal_export *export);
+struct FSHandle *allocateNewHandle(const struct stat *attr,
+                                   struct FSExport *export);
 
-void delete_handle(struct lzfs_fsal_handle *obj);
-
-void lzfs_fsal_ds_handle_ops_init(struct fsal_pnfs_ds_ops *ops);
+void deleteHandle(struct FSHandle *obj);
 
 // Methods for support ACL
-fsal_status_t lzfs_int_getacl(struct lzfs_fsal_export *lzfs_export,
-                              uint32_t inode, uint32_t owner,
-                              fsal_acl_t **fsal_acl);
+fsal_status_t getACL(struct FSExport *export, uint32_t inode,
+                     uint32_t owner, fsal_acl_t **fsal_acl);
 
-fsal_status_t lzfs_int_setacl(struct lzfs_fsal_export *lzfs_export,
-                              uint32_t inode, const fsal_acl_t *fsal_acl,
-                              unsigned int mode);
+fsal_status_t setACL(struct FSExport *export, uint32_t inode,
+                     const fsal_acl_t *fsal_acl, unsigned int mode);
 
 // Methods for handling errors
-fsal_status_t lizardfs2fsal_error(liz_err_t err);
-
-fsal_status_t lzfs_fsal_last_err(void);
-
-nfsstat4 lzfs_nfs4_last_err(void);
+fsal_status_t lizardfsToFsalError(liz_err_t err);
+fsal_status_t fsalLastError(void);
+nfsstat4 Nfs4LastError(void);
 
 // Methods for handling pNFS
-void lzfs_fsal_ops_pnfs(struct fsal_ops *ops);
+void initializePnfsOperations(struct fsal_ops *ops);
+void initializePnfsExportOperations(struct export_ops *ops);
 
-void lzfs_export_ops_pnfs(struct export_ops *ops);
-
-void lzfs_handle_ops_pnfs(struct fsal_obj_ops *ops);
+void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops);
+void initializeMetaDataServerOperations(struct fsal_obj_ops *ops);
 
 #endif  /* LZFS_FSAL_METHODS */

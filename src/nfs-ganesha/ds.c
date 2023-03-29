@@ -30,7 +30,7 @@
 #include "lzfs_fsal_types.h"
 #include "lzfs_fsal_methods.h"
 
-static void lzfs_int_clear_fileinfo_cache(struct lzfs_fsal_export *export,
+static void lzfs_int_clear_fileinfo_cache(struct FSExport *export,
                                           int count)
 {
     // Sanity Check
@@ -41,13 +41,13 @@ static void lzfs_int_clear_fileinfo_cache(struct lzfs_fsal_export *export,
         liz_fileinfo_entry_t *cache_handle;
         liz_fileinfo_t *file_handle;
 
-        cache_handle = liz_fileinfo_cache_pop_expired(export->fileinfo_cache);
+        cache_handle = liz_fileinfo_cache_pop_expired(export->fileinfoCache);
         if (cache_handle == NULL) {
             break;
         }
 
         file_handle = liz_extract_fileinfo(cache_handle);
-        liz_release(export->lzfs_instance, file_handle);
+        liz_release(export->fsInstance, file_handle);
         liz_fileinfo_entry_free(cache_handle);
     }
 }
@@ -58,59 +58,59 @@ static void lzfs_int_clear_fileinfo_cache(struct lzfs_fsal_export *export,
  */
 static void lzfs_fsal_ds_handle_release(struct fsal_ds_handle *const ds_pub)
 {
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_ds_handle *dataServer;
+    struct FSExport *export;
+    struct DataServerHandle *dataServer;
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-                          struct lzfs_fsal_export, export);
-    dataServer = container_of(ds_pub, struct lzfs_fsal_ds_handle, ds);
+                          struct FSExport, export);
+    dataServer = container_of(ds_pub, struct DataServerHandle, dsHandle);
 
-	assert(export->fileinfo_cache);
+    assert(export->fileinfoCache);
 
-    if (dataServer->cache_handle != NULL) {
-        liz_fileinfo_cache_release(export->fileinfo_cache,
-                                   dataServer->cache_handle);
+    if (dataServer->cacheHandle != NULL) {
+        liz_fileinfo_cache_release(export->fileinfoCache,
+                                   dataServer->cacheHandle);
     }
 
     gsh_free(dataServer);
     lzfs_int_clear_fileinfo_cache(export, 5);
 }
 
-static nfsstat4 lzfs_int_openfile(struct lzfs_fsal_export *export,
-                                  struct lzfs_fsal_ds_handle *dataServer)
+static nfsstat4 lzfs_int_openfile(struct FSExport *export,
+                                  struct DataServerHandle *dataServer)
 {
     // Sanity Check
     if (export == NULL)
         return NFS4ERR_IO;
 
-    if (dataServer->cache_handle != NULL) {
+    if (dataServer->cacheHandle != NULL) {
 		return NFS4_OK;
 	}
 
     lzfs_int_clear_fileinfo_cache(export, 2);
 
-    dataServer->cache_handle = liz_fileinfo_cache_acquire(
-                                    export->fileinfo_cache,
+    dataServer->cacheHandle = liz_fileinfo_cache_acquire(
+                                    export->fileinfoCache,
                                     dataServer->inode);
-    if (dataServer->cache_handle == NULL) {
+    if (dataServer->cacheHandle == NULL) {
 		return NFS4ERR_IO;
 	}
 
-    liz_fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cache_handle);
+    liz_fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
 	if (file_handle != NULL) {
 		return NFS4_OK;
 	}
 
-    file_handle = liz_cred_open(export->lzfs_instance, NULL,
+    file_handle = fs_open(export->fsInstance, NULL,
                                 dataServer->inode, O_RDWR);
 	if (file_handle == NULL) {
-        liz_fileinfo_cache_erase(export->fileinfo_cache,
-                                 dataServer->cache_handle);
-        dataServer->cache_handle = NULL;
+        liz_fileinfo_cache_erase(export->fileinfoCache,
+                                 dataServer->cacheHandle);
+        dataServer->cacheHandle = NULL;
 		return NFS4ERR_IO;
 	}
 
-    liz_attach_fileinfo(dataServer->cache_handle, file_handle);
+    liz_attach_fileinfo(dataServer->cacheHandle, file_handle);
 	return NFS4_OK;
 }
 
@@ -129,13 +129,13 @@ static nfsstat4 lzfs_fsal_ds_handle_read(struct fsal_ds_handle *const ds_hdl,
     // Unused variable
     (void ) stateid;
 
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_ds_handle *dataServer;
+    struct FSExport *export;
+    struct DataServerHandle *dataServer;
 	liz_fileinfo_t *file_handle;
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-                               struct lzfs_fsal_export, export);
-    dataServer = container_of(ds_hdl, struct lzfs_fsal_ds_handle, ds);
+                               struct FSExport, export);
+    dataServer = container_of(ds_hdl, struct DataServerHandle, dsHandle);
 
 	LogFullDebug(COMPONENT_FSAL,
                  "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
@@ -147,12 +147,12 @@ static nfsstat4 lzfs_fsal_ds_handle_read(struct fsal_ds_handle *const ds_hdl,
 		return nfs_status;
 	}
 
-    file_handle = liz_extract_fileinfo(dataServer->cache_handle);
-    ssize_t nb_read = liz_cred_read(export->lzfs_instance, NULL, file_handle,
+    file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
+    ssize_t nb_read = fs_read(export->fsInstance, NULL, file_handle,
                                     offset, requested_length, buffer);
 
 	if (nb_read < 0) {
-		return lzfs_nfs4_last_err();
+        return Nfs4LastError();
     }
 
 	*supplied_length = nb_read;
@@ -179,16 +179,16 @@ static nfsstat4 lzfs_fsal_ds_handle_write(struct fsal_ds_handle *const ds_hdl,
     (void ) stateid;
     (void ) writeverf;
 
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_ds_handle *dataServer;
+    struct FSExport *export;
+    struct DataServerHandle *dataServer;
 	liz_fileinfo_t *file_handle;
 	ssize_t nb_write;
 	nfsstat4 nfs_status;
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-                          struct lzfs_fsal_export, export);
+                          struct FSExport, export);
 
-    dataServer = container_of(ds_hdl, struct lzfs_fsal_ds_handle, ds);
+    dataServer = container_of(ds_hdl, struct DataServerHandle, dsHandle);
 
 	LogFullDebug(COMPONENT_FSAL,
                  "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
@@ -200,18 +200,18 @@ static nfsstat4 lzfs_fsal_ds_handle_write(struct fsal_ds_handle *const ds_hdl,
 		return nfs_status;
 	}
 
-    file_handle = liz_extract_fileinfo(dataServer->cache_handle);
-    nb_write = liz_cred_write(export->lzfs_instance, NULL,
+    file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
+    nb_write = fs_write(export->fsInstance, NULL,
                               file_handle, offset, write_length, buffer);
 
 	if (nb_write < 0) {
-		return lzfs_nfs4_last_err();
+        return Nfs4LastError();
     }
 
 	int rc = 0;
 
     if (stability_wanted != UNSTABLE4) {
-        rc = liz_cred_flush(export->lzfs_instance, NULL, file_handle);
+        rc = liz_cred_flush(export->fsInstance, NULL, file_handle);
     }
 
     *written_length = nb_write;
@@ -229,16 +229,16 @@ static nfsstat4 lzfs_fsal_ds_handle_commit(struct fsal_ds_handle *const ds_hdl,
                                            const count4 count,
                                            verifier4 *const writeverf)
 {
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_ds_handle *dataServer;
+    struct FSExport *export;
+    struct DataServerHandle *dataServer;
 	liz_fileinfo_t *file_handle;
 	nfsstat4 nfs_status;
 
     memset(writeverf, 0, NFS4_VERIFIER_SIZE);
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-                          struct lzfs_fsal_export, export);
-    dataServer = container_of(ds_hdl, struct lzfs_fsal_ds_handle, ds);
+                          struct FSExport, export);
+    dataServer = container_of(ds_hdl, struct DataServerHandle, dsHandle);
 
 	LogFullDebug(COMPONENT_FSAL,
                  "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
@@ -252,9 +252,9 @@ static nfsstat4 lzfs_fsal_ds_handle_commit(struct fsal_ds_handle *const ds_hdl,
         return NFS4_OK;
 	}
 
-    file_handle = liz_extract_fileinfo(dataServer->cache_handle);
+    file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
 
-    int rc = liz_cred_flush(export->lzfs_instance, NULL, file_handle);
+    int rc = liz_cred_flush(export->fsInstance, NULL, file_handle);
 	if (rc < 0) {
         LogMajor(COMPONENT_PNFS, "ds_commit() failed  '%s'",
                  liz_error_string(liz_last_err()));
@@ -304,18 +304,18 @@ static nfsstat4 lzfs_fsal_make_ds_handle(struct fsal_pnfs_ds *const pds,
     // Unused variable
     (void ) pds;
 
-    struct lzfs_fsal_ds_wire *dataServerWire = (struct lzfs_fsal_ds_wire *)desc->addr;
-    struct lzfs_fsal_ds_handle *dataServer;
+    struct DataServerWire *dataServerWire = (struct DataServerWire *)desc->addr;
+    struct DataServerHandle *dataServer;
 
     *handle = NULL;
 
-    if (desc->len != sizeof(struct lzfs_fsal_ds_wire))
+    if (desc->len != sizeof(struct DataServerWire))
         return NFS4ERR_BADHANDLE;
     if (dataServerWire->inode == 0)
         return NFS4ERR_BADHANDLE;
 
-    dataServer = gsh_calloc(1, sizeof(struct lzfs_fsal_ds_handle));
-    *handle = &dataServer->ds;
+    dataServer = gsh_calloc(1, sizeof(struct DataServerHandle));
+    *handle = &dataServer->dsHandle;
 
     if (flags & FH_FSAL_BIG_ENDIAN) {
 #if (BYTE_ORDER != BIG_ENDIAN)
@@ -352,7 +352,7 @@ static nfsstat4 lzfs_fsal_pds_permissions(struct fsal_pnfs_ds *const pds,
 	return NFS4_OK;
 }
 
-void lzfs_fsal_ds_handle_ops_init(struct fsal_pnfs_ds_ops *ops)
+void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops)
 {
     memcpy(ops, &def_pnfs_ds_ops, sizeof(struct fsal_pnfs_ds_ops));
     ops->make_ds_handle = lzfs_fsal_make_ds_handle;

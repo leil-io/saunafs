@@ -50,7 +50,7 @@ static int is_disconnected(const void *a, void *unused)
     (void ) unused;
 
     return ((const liz_chunkserver_info_t *)a)->version ==
-            kDisconnectedChunkserverVersion;
+            kDisconnectedChunkServerVersion;
 }
 
 static int is_same_ip(const void *a, void *base)
@@ -101,7 +101,7 @@ static void shuffle(void *base, size_t num, size_t size)
 }
 
 static liz_chunkserver_info_t *lzfs_int_get_randomized_chunkserver_list(
-    struct lzfs_fsal_export *lzfs_export, uint32_t *chunkserver_count)
+    struct FSExport *lzfs_export, uint32_t *chunkserver_count)
 {
 	liz_chunkserver_info_t *chunkserver_info = NULL;
 	int rc;
@@ -109,7 +109,7 @@ static liz_chunkserver_info_t *lzfs_int_get_randomized_chunkserver_list(
     chunkserver_info = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT *
                                   sizeof(liz_chunkserver_info_t));
 
-    rc = liz_get_chunkservers_info(lzfs_export->lzfs_instance,
+    rc = liz_get_chunkservers_info(lzfs_export->fsInstance,
                                    chunkserver_info,
                                    LZFS_BIGGEST_STRIPE_COUNT,
                                    chunkserver_count);
@@ -280,7 +280,7 @@ static nfsstat4 lzfs_fsal_getdeviceinfo(struct fsal_module *fsal_hdl,
                                         const struct pnfs_deviceid *deviceid)
 {
 	struct fsal_export *export_hdl;
-	struct lzfs_fsal_export *lzfs_export = NULL;
+	struct FSExport *lzfs_export = NULL;
 	liz_chunk_info_t *chunk_info = NULL;
 	liz_chunkserver_info_t *chunkserver_info = NULL;
 	uint32_t chunk_count, chunkserver_count, stripe_count, chunkserver_index;
@@ -298,7 +298,7 @@ static nfsstat4 lzfs_fsal_getdeviceinfo(struct fsal_module *fsal_hdl,
 		export_hdl = glist_entry(glist, struct fsal_export, exports);
 		if (export_hdl->export_id == export_id) {
             lzfs_export = container_of(export_hdl,
-                                       struct lzfs_fsal_export, export);
+                                       struct FSExport, export);
 			break;
 		}
 	}
@@ -312,9 +312,9 @@ static nfsstat4 lzfs_fsal_getdeviceinfo(struct fsal_module *fsal_hdl,
 	// get the chunk list for file
     chunk_info = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT *
                             sizeof(liz_chunk_info_t));
-    rc = liz_cred_get_chunks_info(lzfs_export->lzfs_instance, &op_ctx->creds,
-                                  deviceid->devid, 0, chunk_info,
-                                  LZFS_BIGGEST_STRIPE_COUNT, &chunk_count);
+    rc = fs_get_chunks_info(lzfs_export->fsInstance, &op_ctx->creds,
+                            deviceid->devid, 0, chunk_info,
+                            LZFS_BIGGEST_STRIPE_COUNT, &chunk_count);
 	if (rc < 0) {
 		LogCrit(COMPONENT_PNFS,
                 "Failed to get LizardFS layout for export=%"
@@ -477,7 +477,7 @@ static size_t lzfs_fsal_fs_da_addr_size(struct fsal_module *fsal_hdl)
             (4 + (4 + LZFS_EXPECTED_BACKUP_DS_COUNT * 40)) + 32;
 }
 
-void lzfs_export_ops_pnfs(struct export_ops *ops)
+void initializePnfsExportOperations(struct export_ops *ops)
 {
     ops->getdevicelist = lzfs_fsal_getdevicelist;
 	ops->fs_layouttypes = lzfs_fsal_fs_layouttypes;
@@ -486,7 +486,7 @@ void lzfs_export_ops_pnfs(struct export_ops *ops)
     ops->fs_loc_body_size = lzfs_fsal_fs_loc_body_size;
 }
 
-void lzfs_fsal_ops_pnfs(struct fsal_ops *ops)
+void initializePnfsOperations(struct fsal_ops *ops)
 {
     ops->getdeviceinfo = lzfs_fsal_getdeviceinfo;
     ops->fs_da_addr_size = lzfs_fsal_fs_da_addr_size;

@@ -37,18 +37,18 @@ static nfsstat4 lzfs_fsal_layoutget(struct fsal_obj_handle *obj_pub,
                                     const struct fsal_layoutget_arg *arg,
                                     struct fsal_layoutget_res *res)
 {
-	struct lzfs_fsal_handle *lzfs_hdl;
-	struct lzfs_fsal_ds_wire ds_wire;
+	struct FSHandle *lzfs_hdl;
+    struct DataServerWire ds_wire;
     struct gsh_buffdesc ds_desc = {
             .addr = &ds_wire,
-            .len = sizeof(struct lzfs_fsal_ds_wire)
+            .len = sizeof(struct DataServerWire)
     };
 
     struct pnfs_deviceid deviceid = DEVICE_ID_INIT_ZERO(FSAL_ID_LIZARDFS);
 	nfl_util4 layout_util = 0;
 	nfsstat4 nfs_status = NFS4_OK;
 
-	lzfs_hdl = container_of(obj_pub, struct lzfs_fsal_handle, handle);
+    lzfs_hdl = container_of(obj_pub, struct FSHandle, fileHandle);
 
 	if (arg->type != LAYOUT4_NFSV4_1_FILES) {
 		LogMajor(COMPONENT_PNFS, "Unsupported layout type: %x", arg->type);
@@ -113,8 +113,8 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
     // Unused variable
     (void ) lou_body;
 
-    struct lzfs_fsal_export *export;
-    struct lzfs_fsal_handle *handle;
+    struct FSExport *export;
+    struct FSHandle *handle;
     struct liz_attr_reply previous_reply;
 
 	// FIXME(haze): Does this function make sense for our implementation ?
@@ -126,17 +126,17 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
 	}
 
     export = container_of(op_ctx->fsal_export,
-                          struct lzfs_fsal_export, export);
-    handle = container_of(obj_pub, struct lzfs_fsal_handle, handle);
+                          struct FSExport, export);
+    handle = container_of(obj_pub, struct FSHandle, fileHandle);
 
-    int rc = liz_cred_getattr(export->lzfs_instance, &op_ctx->creds,
-                              handle->inode, &previous_reply);
+    int rc = fs_getattr(export->fsInstance, &op_ctx->creds,
+                        handle->inode, &previous_reply);
 	if (rc < 0) {
         LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to get "
                 "attributes of file %lli.",
                 liz_error_string(liz_last_err()),
                 (long long)handle->inode);
-		return lzfs_nfs4_last_err();
+        return Nfs4LastError();
 	}
 
 	struct stat attr;
@@ -161,21 +161,21 @@ static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
     }
 
 	liz_attr_reply_t reply;
-    rc = liz_cred_setattr(export->lzfs_instance, &op_ctx->creds,
-                          handle->inode, &attr, mask, &reply);
+    rc = fs_setattr(export->fsInstance, &op_ctx->creds,
+                    handle->inode, &attr, mask, &reply);
 
 	if (rc < 0) {
         LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to set attributes "
                 "of file %lli.", liz_error_string(liz_last_err()),
                 (long long)handle->inode);
-		return lzfs_nfs4_last_err();
+        return Nfs4LastError();
 	}
 
 	res->commit_done = true;
 	return NFS4_OK;
 }
 
-void lzfs_handle_ops_pnfs(struct fsal_obj_ops *ops)
+void initializeMetaDataServerOperations(struct fsal_obj_ops *ops)
 {
     ops->layoutget = lzfs_fsal_layoutget;
     ops->layoutreturn = lzfs_fsal_layoutreturn;

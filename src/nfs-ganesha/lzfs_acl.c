@@ -148,9 +148,8 @@ fsal_acl_t *lzfs_int_convert_lzfs_acl(const liz_acl_t *lzfs_acl)
     return fsal_acl;
 }
 
-fsal_status_t lzfs_int_getacl(struct lzfs_fsal_export *export,
-                              uint32_t inode, uint32_t owner_id,
-                              fsal_acl_t **fsal_acl)
+fsal_status_t getACL(struct FSExport *export, uint32_t inode,
+                     uint32_t owner_id, fsal_acl_t **fsal_acl)
 {
     if (*fsal_acl) {
         nfs4_acl_release_entry(*fsal_acl);
@@ -158,14 +157,13 @@ fsal_status_t lzfs_int_getacl(struct lzfs_fsal_export *export,
     }
 
     liz_acl_t *acl = NULL;
-    int rc = liz_cred_getacl(export->lzfs_instance, &op_ctx->creds,
-                             inode, &acl);
+    int rc = fs_getacl(export->fsInstance, &op_ctx->creds, inode, &acl);
     if (rc < 0) {
         LogFullDebug(COMPONENT_FSAL,
                      "ALLI: getacl status = %s export=%" PRIu16 " inode=%" PRIu32,
                      liz_error_string(liz_last_err()),
                      export->export.export_id, inode);
-        return lzfs_fsal_last_err();
+        return fsalLastError();
     }
 
     liz_acl_apply_masks(acl, owner_id);
@@ -184,9 +182,8 @@ fsal_status_t lzfs_int_getacl(struct lzfs_fsal_export *export,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-fsal_status_t lzfs_int_setacl(struct lzfs_fsal_export *export,
-                              uint32_t inode, const fsal_acl_t *fsal_acl,
-                              unsigned int mode)
+fsal_status_t setACL(struct FSExport *export, uint32_t inode,
+                     const fsal_acl_t *fsal_acl, unsigned int mode)
 {
     if (!fsal_acl) {
         return fsalstat(ERR_FSAL_NO_ERROR, 0);
@@ -198,12 +195,11 @@ fsal_status_t lzfs_int_setacl(struct lzfs_fsal_export *export,
         LogFullDebug(COMPONENT_FSAL, "Failed to convert acl");
         return fsalstat(ERR_FSAL_FAULT, 0);
     }
-    int rc = liz_cred_setacl(export->lzfs_instance, &op_ctx->creds,
-                             inode, lzfs_acl);
+    int rc = fs_setacl(export->fsInstance, &op_ctx->creds, inode, lzfs_acl);
     liz_destroy_acl(lzfs_acl);
 
     if (rc < 0) {
-        return lzfs_fsal_last_err();
+        return fsalLastError();
     }
 
     return fsalstat(ERR_FSAL_NO_ERROR, 0);

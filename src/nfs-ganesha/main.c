@@ -42,7 +42,7 @@ static const char *module_name = "LizardFS";
  * my module private storage
  */
 
-struct lzfs_fsal_module LizardFS = {
+struct FSModule LizardFS = {
     .module = {
         .fs_info = {
             .maxfilesize = UINT64_MAX,
@@ -79,7 +79,7 @@ struct lzfs_fsal_module LizardFS = {
             .xattr_support = true,
         }
     },
-    .only_one_user = false
+    .onlyOneUser = false
 };
 
 static struct config_item export_params[] = {
@@ -99,7 +99,7 @@ static struct config_item export_params[] = {
     CONF_ITEM_BOOL("PNFS_DS", false, fsal_staticfsinfo_t, pnfs_ds),
     CONF_ITEM_BOOL("fsal_trace", true, fsal_staticfsinfo_t, fsal_trace),
     CONF_ITEM_BOOL("fsal_grace", false, fsal_staticfsinfo_t, fsal_grace),
-    CONF_ITEM_BOOL("only_one_user", false, lzfs_fsal_module, only_one_user),
+    CONF_ITEM_BOOL("only_one_user", false, FSModule, onlyOneUser),
     CONFIG_EOL
 };
 
@@ -114,58 +114,58 @@ static struct config_block export_param = {
 
 static struct config_item fsal_export_params[] = {
     CONF_ITEM_NOOP("name"),
-    CONF_MAND_STR("hostname", 1, MAXPATHLEN, NULL, lzfs_fsal_export,
-                  lzfs_params.host),
-    CONF_ITEM_STR("port", 1, MAXPATHLEN, "9421", lzfs_fsal_export,
-                  lzfs_params.port),
+    CONF_MAND_STR("hostname", 1, MAXPATHLEN, NULL, FSExport,
+                  initialParameters.host),
+    CONF_ITEM_STR("port", 1, MAXPATHLEN, "9421", FSExport,
+                  initialParameters.port),
     CONF_ITEM_STR("mountpoint", 1, MAXPATHLEN, "nfs-ganesha",
-                  lzfs_fsal_export, lzfs_params.mountpoint),
-    CONF_ITEM_STR("subfolder", 1, MAXPATHLEN, "/", lzfs_fsal_export,
-                  lzfs_params.subfolder),
-    CONF_ITEM_BOOL("delayed_init", false, lzfs_fsal_export,
-                   lzfs_params.delayed_init),
-    CONF_ITEM_UI32("io_retries", 0, 1024, 30, lzfs_fsal_export,
-                   lzfs_params.io_retries),
+                  FSExport, initialParameters.mountpoint),
+    CONF_ITEM_STR("subfolder", 1, MAXPATHLEN, "/", FSExport,
+                  initialParameters.subfolder),
+    CONF_ITEM_BOOL("delayed_init", false, FSExport,
+                   initialParameters.delayed_init),
+    CONF_ITEM_UI32("io_retries", 0, 1024, 30, FSExport,
+                   initialParameters.io_retries),
     CONF_ITEM_UI32("chunkserver_round_time_ms", 0, 65536, 200,
-                   lzfs_fsal_export, lzfs_params.chunkserver_round_time_ms),
+                   FSExport, initialParameters.chunkserver_round_time_ms),
     CONF_ITEM_UI32("chunkserver_connect_timeout_ms", 0, 65536, 2000,
-                   lzfs_fsal_export,
-                   lzfs_params.chunkserver_connect_timeout_ms),
+                   FSExport,
+                   initialParameters.chunkserver_connect_timeout_ms),
     CONF_ITEM_UI32("chunkserver_wave_read_timeout_ms", 0, 65536, 500,
-                   lzfs_fsal_export,
-                   lzfs_params.chunkserver_wave_read_timeout_ms),
+                   FSExport,
+                   initialParameters.chunkserver_wave_read_timeout_ms),
     CONF_ITEM_UI32("total_read_timeout_ms", 0, 65536, 2000,
-                   lzfs_fsal_export, lzfs_params.total_read_timeout_ms),
+                   FSExport, initialParameters.total_read_timeout_ms),
     CONF_ITEM_UI32("cache_expiration_time_ms", 0, 65536, 1000,
-                   lzfs_fsal_export, lzfs_params.cache_expiration_time_ms),
+                   FSExport, initialParameters.cache_expiration_time_ms),
     CONF_ITEM_UI32("readahead_max_window_size_kB", 0, 65536, 16384,
-                   lzfs_fsal_export, lzfs_params.readahead_max_window_size_kB),
-    CONF_ITEM_UI32("write_cache_size", 0, 1024, 64, lzfs_fsal_export,
-                   lzfs_params.write_cache_size),
-    CONF_ITEM_UI32("write_workers", 0, 32, 10, lzfs_fsal_export,
-                   lzfs_params.write_workers),
-    CONF_ITEM_UI32("write_window_size", 0, 256, 32, lzfs_fsal_export,
-                   lzfs_params.write_window_size),
+                   FSExport, initialParameters.readahead_max_window_size_kB),
+    CONF_ITEM_UI32("write_cache_size", 0, 1024, 64, FSExport,
+                   initialParameters.write_cache_size),
+    CONF_ITEM_UI32("write_workers", 0, 32, 10, FSExport,
+                   initialParameters.write_workers),
+    CONF_ITEM_UI32("write_window_size", 0, 256, 32, FSExport,
+                   initialParameters.write_window_size),
     CONF_ITEM_UI32("chunkserver_write_timeout_ms", 0, 60000, 5000,
-                   lzfs_fsal_export, lzfs_params.chunkserver_write_timeout_ms),
+                   FSExport, initialParameters.chunkserver_write_timeout_ms),
     CONF_ITEM_UI32("cache_per_inode_percentage", 0, 80, 25,
-                   lzfs_fsal_export, lzfs_params.cache_per_inode_percentage),
+                   FSExport, initialParameters.cache_per_inode_percentage),
     CONF_ITEM_UI32("symlink_cache_timeout_s", 0, 60000, 3600,
-                   lzfs_fsal_export, lzfs_params.symlink_cache_timeout_s),
-    CONF_ITEM_BOOL("debug_mode", false, lzfs_fsal_export,
-                   lzfs_params.debug_mode),
-    CONF_ITEM_I32("keep_cache", 0, 2, 0, lzfs_fsal_export,
-                  lzfs_params.keep_cache),
-    CONF_ITEM_BOOL("verbose", false, lzfs_fsal_export,
-                   lzfs_params.verbose),
-    CONF_ITEM_UI32("fileinfo_cache_timeout", 1, 3600, 60, lzfs_fsal_export,
-                   fileinfo_cache_timeout),
+                   FSExport, initialParameters.symlink_cache_timeout_s),
+    CONF_ITEM_BOOL("debug_mode", false, FSExport,
+                   initialParameters.debug_mode),
+    CONF_ITEM_I32("keep_cache", 0, 2, 0, FSExport,
+                  initialParameters.keep_cache),
+    CONF_ITEM_BOOL("verbose", false, FSExport,
+                   initialParameters.verbose),
+    CONF_ITEM_UI32("fileinfo_cache_timeout", 1, 3600, 60, FSExport,
+                   cacheTimeout),
     CONF_ITEM_UI32("fileinfo_cache_max_size", 100, 1000000, 1000,
-                   lzfs_fsal_export, fileinfo_cache_max_size),
-    CONF_ITEM_STR("password", 1, 128, NULL, lzfs_fsal_export,
-                  lzfs_params.password),
-    CONF_ITEM_STR("md5_pass", 32, 32, NULL, lzfs_fsal_export,
-                  lzfs_params.md5_pass),
+                   FSExport, cacheMaximumSize),
+    CONF_ITEM_STR("password", 1, 128, NULL, FSExport,
+                  initialParameters.password),
+    CONF_ITEM_STR("md5_pass", 32, 32, NULL, FSExport,
+                  initialParameters.md5_pass),
     CONFIG_EOL
 };
 
@@ -183,18 +183,18 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
                                    struct config_error_type *err_type,
                                    const struct fsal_up_vector *up_ops)
 {
-    struct lzfs_fsal_export *export;
+    struct FSExport *export;
     fsal_status_t status;
     int rc;
     struct fsal_pnfs_ds *pds = NULL;
 
-    export = gsh_calloc(1, sizeof(struct lzfs_fsal_export));
+    export = gsh_calloc(1, sizeof(struct FSExport));
 
     fsal_export_init(&export->export);
-    lzfs_export_ops_init(&export->export.exp_ops);
+    initializeExportOperations(&export->export.exp_ops);
 
     // parse params for this export
-    liz_set_default_init_params(&export->lzfs_params, "", "", "");
+    liz_set_default_init_params(&export->initialParameters, "", "", "");
     if (parse_node) {
         rc = load_config_from_node(parse_node, &fsal_export_param_block,
                                    export, true, err_type);
@@ -208,10 +208,10 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
         }
     }
 
-    export->lzfs_params.subfolder = gsh_strdup(CTX_FULLPATH(op_ctx));
-    export->lzfs_instance = liz_init_with_params(&export->lzfs_params);
+    export->initialParameters.subfolder = gsh_strdup(CTX_FULLPATH(op_ctx));
+    export->fsInstance = liz_init_with_params(&export->initialParameters);
 
-    if (export->lzfs_instance == NULL) {
+    if (export->fsInstance == NULL) {
         LogCrit(COMPONENT_FSAL, "Unable to mount LizardFS cluster for %s.",
                 CTX_FULLPATH(op_ctx));
         status = fsalstat(ERR_FSAL_SERVERFAULT, 0);
@@ -228,14 +228,14 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
     export->export.fsal = fsal_hdl;
     export->export.up_ops = up_ops;
 
-    export->pnfs_ds_enabled =
+    export->isDSEnabled =
             export->export.exp_ops.fs_supports(&export->export,
                                                fso_pnfs_ds_supported);
-    if (export->pnfs_ds_enabled) {
-        export->fileinfo_cache = liz_create_fileinfo_cache(
-                    export->fileinfo_cache_max_size,
-                    export->fileinfo_cache_timeout * 1000);
-        if (export->fileinfo_cache == NULL) {
+    if (export->isDSEnabled) {
+        export->fileinfoCache = liz_create_fileinfo_cache(
+                    export->cacheMaximumSize,
+                    export->cacheTimeout * 1000);
+        if (export->fileinfoCache == NULL) {
             LogCrit(COMPONENT_FSAL, "Unable to create fileinfo cache for %s.",
                     CTX_FULLPATH(op_ctx));
             status = fsalstat(ERR_FSAL_SERVERFAULT, 0);
@@ -267,21 +267,21 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
                  CTX_FULLPATH(op_ctx));
     }
 
-    export->pnfs_mds_enabled =
+    export->isMDSEnabled =
             export->export.exp_ops.fs_supports(
                 &export->export, fso_pnfs_mds_supported);
-    if (export->pnfs_mds_enabled) {
+    if (export->isMDSEnabled) {
         LogDebug(COMPONENT_PNFS, "pnfs mds was enabled for [%s]",
                  CTX_FULLPATH(op_ctx));
-        lzfs_export_ops_pnfs(&export->export.exp_ops);
+        initializePnfsExportOperations(&export->export.exp_ops);
     }
 
     // get attributes for root inode
     liz_attr_reply_t ret;
-    rc = liz_cred_getattr(export->lzfs_instance, &op_ctx->creds,
-                          SPECIAL_INODE_ROOT, &ret);
+    rc = fs_getattr(export->fsInstance, &op_ctx->creds,
+                    SPECIAL_INODE_ROOT, &ret);
     if (rc < 0) {
-        status = lzfs_fsal_last_err();
+        status = fsalLastError();
 
         if (pds != NULL) {
             /* Remove and destroy the fsal_pnfs_ds */
@@ -290,7 +290,7 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
         goto error_pds;
     }
 
-    export->root = allocate_new_handle(&ret.attr, export);
+    export->rootHandle = allocateNewHandle(&ret.attr, export);
     op_ctx->fsal_export = &export->export;
 
     LogDebug(COMPONENT_FSAL, "LizardFS module export %s.",
@@ -305,11 +305,11 @@ error_pds:
 
 error:
     if (export) {
-        if (export->lzfs_instance) {
-            liz_destroy(export->lzfs_instance);
+        if (export->fsInstance) {
+            liz_destroy(export->fsInstance);
         }
-        if (export->fileinfo_cache) {
-            liz_destroy_fileinfo_cache(export->fileinfo_cache);
+        if (export->fileinfoCache) {
+            liz_destroy_fileinfo_cache(export->fileinfoCache);
         }
         gsh_free(export);
     }
@@ -323,11 +323,11 @@ static fsal_status_t init_config(struct fsal_module *module_in,
                                  config_file_t config_struct,
                                  struct config_error_type *err_type)
 {
-    struct lzfs_fsal_module *myself;
-    myself = container_of(module_in, struct lzfs_fsal_module, module);
+    struct FSModule *myself;
+    myself = container_of(module_in, struct FSModule, module);
 
     (void) load_config_from_parse(config_struct, &export_param,
-                                  &myself->fs_info, true, err_type);
+                                  &myself->filesystemInfo, true, err_type);
 
     if (!config_error_is_harmless(err_type)) {
         LogDebug(COMPONENT_FSAL, "config_error_is_harmless failed.");
@@ -369,11 +369,11 @@ MODULE_INIT void lizardfs_init(void)
     // Set up module operations
     myself->m_ops.create_export = create_export;
     myself->m_ops.init_config = init_config;
-    myself->m_ops.fsal_pnfs_ds_ops = lzfs_fsal_ds_handle_ops_init;
-    lzfs_fsal_ops_pnfs(&myself->m_ops);
+    myself->m_ops.fsal_pnfs_ds_ops = initializeDataServerOperations;
+    initializePnfsOperations(&myself->m_ops);
 
     /* Initialize the fsal_obj_handle ops for FSAL LizardFS */
-    lzfs_handle_ops_init(&LizardFS.handle_ops);
+    initializeFilesystemOperations(&LizardFS.operations);
 }
 
 /**
