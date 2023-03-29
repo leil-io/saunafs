@@ -359,6 +359,9 @@ int read_data(void *rr, off_t fuseOffset, size_t fuseSize,
 		return err;
 	}
 
+	// Reset the timer for the entry we have just received to avoid early expiration
+	result.entries.back()->timer.reset();
+
 	ret = std::move(result);
 	return LIZARDFS_STATUS_OK;
 }
