@@ -41,3 +41,8 @@ T rnd_ranged(T range) {
 	std::uniform_int_distribution<T> distribution(0, range - 1);
 	return distribution(kRandomEngine);
 }
+
+template <typename T>
+inline T rnd_ranged(T min, T max) {
+	return std::uniform_int_distribution<T>(min, max)(kRandomEngine);
+}

@@ -18,6 +18,7 @@
 
 #include "common/platform.h"
 #include "common/slice_traits.h"
+#include "chunkserver/folder.h"
 #include "chunkserver/chunk.h"
 
 #include <gtest/gtest.h>
@@ -51,9 +52,7 @@ TEST_F(ChunkTests, MaxBlocksInFile) {
 }
 
 TEST_F(ChunkTests, GetFileName) {
-	folder f;
-	std::vector<char> folderPath = { '/', 'm', 'n', 't', '/', 0 };
-	f.path = folderPath.data();
+	Folder f("/mnt/", false);
 
 	standardChunk.chunkid = 0x123456;
 	standardChunk.owner = &f;
