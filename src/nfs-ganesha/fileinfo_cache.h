@@ -24,6 +24,7 @@ extern "C" {
 
 typedef struct liz_fileinfo_cache liz_fileinfo_cache_t;
 typedef struct liz_fileinfo_entry liz_fileinfo_entry_t;
+typedef liz_fileinfo_t fileinfo_t;
 
 /*!
  * \brief Create fileinfo cache
@@ -103,7 +104,7 @@ void liz_fileinfo_entry_free(liz_fileinfo_entry_t *entry);
 * \param cache cache to be modified
 * \return fileinfo extracted from entry
 */
-liz_fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry);
+fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry);
 
 /*!
 * \brief Attach fileinfo to an existing cache entry
@@ -111,7 +112,7 @@ liz_fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry);
 * \param fileinfo fileinfo to be attached to entry
 */
 void liz_attach_fileinfo(liz_fileinfo_entry_t *entry,
-                         liz_fileinfo_t *fileinfo);
+                         fileinfo_t *fileinfo);
 
 #ifdef __cplusplus
 }

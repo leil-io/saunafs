@@ -17,6 +17,8 @@
 */
 
 #include "fileinfo_cache.h"
+#include "lzfs_fsal_types.h"
+
 #include <time.h>
 #include <abstract_mem.h>
 #include <avltree.h>
@@ -28,7 +30,7 @@ struct liz_fileinfo_entry {
 	struct avltree_node tree_hook;
 
 	liz_inode_t inode;
-	liz_fileinfo_t *fileinfo;
+	fileinfo_t *fileinfo;
 	uint64_t timestamp;
 	bool is_used;
 	bool lookup;
@@ -226,12 +228,12 @@ void liz_fileinfo_entry_free(liz_fileinfo_entry_t *entry)
 	gsh_free(entry);
 }
 
-liz_fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry)
+fileinfo_t *liz_extract_fileinfo(liz_fileinfo_entry_t *entry)
 {
 	return entry->fileinfo;
 }
 
-void liz_attach_fileinfo(liz_fileinfo_entry_t *entry, liz_fileinfo_t *fileinfo)
+void liz_attach_fileinfo(liz_fileinfo_entry_t *entry, fileinfo_t *fileinfo)
 {
 	entry->fileinfo = fileinfo;
 }

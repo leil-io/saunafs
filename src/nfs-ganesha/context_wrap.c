@@ -49,7 +49,7 @@ int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
     return rc;
 }
 
-liz_fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
+fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
                         liz_inode_t inode, int flags)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
@@ -57,14 +57,14 @@ liz_fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
     if (ctx == NULL) {
         return NULL;
     }
-    liz_fileinfo_t *ret = liz_open(instance, ctx, inode, flags);
+	fileinfo_t *ret = liz_open(instance, ctx, inode, flags);
 
     liz_destroy_context(ctx);
     return ret;
 }
 
 ssize_t fs_read(liz_t *instance, struct user_cred *cred,
-                liz_fileinfo_t *fileinfo, off_t offset,
+                fileinfo_t *fileinfo, off_t offset,
                 size_t size, char *buffer)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
@@ -79,7 +79,7 @@ ssize_t fs_read(liz_t *instance, struct user_cred *cred,
 }
 
 ssize_t fs_write(liz_t *instance, struct user_cred *cred,
-                 liz_fileinfo_t *fileinfo, off_t offset,
+                 fileinfo_t *fileinfo, off_t offset,
                  size_t size, const char *buffer)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
@@ -94,7 +94,7 @@ ssize_t fs_write(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_flush(liz_t *instance, struct user_cred *cred,
-             liz_fileinfo_t *fileinfo)
+             fileinfo_t *fileinfo)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
 
@@ -121,7 +121,7 @@ int fs_getattr(liz_t *instance, struct user_cred *cred,
     return rc;
 }
 
-liz_fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
+fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
                            liz_inode_t inode)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
@@ -129,7 +129,7 @@ liz_fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
     if (ctx == NULL) {
         return NULL;
     }
-    liz_fileinfo_t *ret = liz_opendir(instance, ctx, inode);
+	fileinfo_t *ret = liz_opendir(instance, ctx, inode);
 
     liz_destroy_context(ctx);
     return ret;
@@ -328,7 +328,7 @@ int fs_getacl(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_setlk(liz_t *instance, struct user_cred *cred,
-             liz_fileinfo_t *fileinfo, const liz_lock_info_t *lock)
+             fileinfo_t *fileinfo, const liz_lock_info_t *lock)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
 
@@ -342,7 +342,7 @@ int fs_setlk(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_getlk(liz_t *instance, struct user_cred *cred,
-             liz_fileinfo_t *fileinfo, liz_lock_info_t *lock)
+             fileinfo_t *fileinfo, liz_lock_info_t *lock)
 {
     liz_context_t *ctx = fsal_create_context(instance, cred);
 

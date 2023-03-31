@@ -56,6 +56,9 @@
 #define LZFS_EXPECTED_BACKUP_DS_COUNT 3
 #define TCP_PROTO_NUMBER 6
 
+
+typedef liz_fileinfo_t fileinfo_t;
+
 struct FSModule {
     struct fsal_module module;
     struct fsal_obj_ops operations;

@@ -38,7 +38,7 @@ static void clearFileinfoCache(struct FSExport *export, int count)
 
     for (int i = 0; i < count; ++i) {
         liz_fileinfo_entry_t *cacheHandle;
-        liz_fileinfo_t *fileHandle;
+	    fileinfo_t *fileHandle;
 
         cacheHandle = liz_fileinfo_cache_pop_expired(export->fileinfoCache);
         if (cacheHandle == NULL) {
@@ -101,7 +101,7 @@ static nfsstat4 openfile(struct FSExport *export,
         return NFS4ERR_IO;
     }
 
-    liz_fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
+	fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
     if (file_handle != NULL) {
         return NFS4_OK;
     }
@@ -135,7 +135,7 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
 
     struct FSExport *export;
     struct DataServerHandle *dataServer;
-    liz_fileinfo_t *fileHandle;
+	fileinfo_t *fileHandle;
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
                           struct FSExport, export);
@@ -189,7 +189,7 @@ static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
     struct FSExport *export;
     struct DataServerHandle *dataServer;
 
-    liz_fileinfo_t *fileHandle;
+	fileinfo_t *fileHandle;
     int rc = 0;
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
@@ -237,7 +237,7 @@ static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
 {
     struct FSExport *export;
     struct DataServerHandle *dataServer;
-    liz_fileinfo_t *fileHandle;
+	fileinfo_t *fileHandle;
 
     memset(writeVerifier, 0, NFS4_VERIFIER_SIZE);
 

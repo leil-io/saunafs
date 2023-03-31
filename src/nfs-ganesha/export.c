@@ -68,7 +68,7 @@ static void release(struct fsal_export *exportHandle)
 
         while (1) {
             liz_fileinfo_entry_t *cache_handle;
-            liz_fileinfo_t *file_handle;
+	        fileinfo_t *file_handle;
 
             cache_handle = liz_fileinfo_cache_pop_expired(export->fileinfoCache);
             if (!cache_handle) {

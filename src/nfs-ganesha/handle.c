@@ -1225,7 +1225,7 @@ fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
     struct FSExport *export;
 
     liz_err_t lastError;
-    liz_fileinfo_t *fileinfo;
+    fileinfo_t *fileinfo;
     liz_lock_info_t lockInfo;
 
     fsal_status_t status = {0, 0};
