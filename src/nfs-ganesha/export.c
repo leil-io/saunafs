@@ -138,7 +138,7 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle,
 
     // special case the root
     if (strcmp(realPath, "/") == 0) {
-        assert(export->root);
+        assert(export->rootHandle);
         *handle = &export->rootHandle->fileHandle;
 
         if (attributes == NULL) {
