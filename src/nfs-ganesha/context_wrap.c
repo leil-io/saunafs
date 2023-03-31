@@ -50,7 +50,7 @@ int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
 }
 
 fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
-                    liz_inode_t inode, int flags)
+					liz_inode_t inode, int flags)
 {
     liz_context_t *ctx = createFSALContext(instance, cred);
 

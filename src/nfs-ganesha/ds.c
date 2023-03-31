@@ -29,6 +29,7 @@
 #include "context_wrap.h"
 #include "lzfs_fsal_types.h"
 #include "lzfs_fsal_methods.h"
+#include "fileinfo_cache.h"
 
 /**
  * @brief Remove count expired instances from cache.
@@ -45,7 +46,7 @@ static void clearFileinfoCache(struct FSExport *export, int count)
         return;
 
     for (int i = 0; i < count; ++i) {
-        liz_fileinfo_entry_t *cacheHandle;
+        FileInfoEntry_t *cacheHandle;
 	    fileinfo_t *fileHandle;
 
         cacheHandle = liz_fileinfo_cache_pop_expired(export->fileinfoCache);
@@ -55,7 +56,7 @@ static void clearFileinfoCache(struct FSExport *export, int count)
 
         fileHandle = liz_extract_fileinfo(cacheHandle);
         liz_release(export->fsInstance, fileHandle);
-        liz_fileinfo_entry_free(cacheHandle);
+		fileInfoEntryFree(cacheHandle);
     }
 }
 
@@ -88,8 +89,8 @@ static void _dsh_release(struct fsal_ds_handle *const dataServerHandle)
     assert(export->fileinfoCache);
 
     if (dataServer->cacheHandle != NULL) {
-        liz_fileinfo_cache_release(export->fileinfoCache,
-                                   dataServer->cacheHandle);
+	    releaseFileInfoCache(export->fileinfoCache,
+	                         dataServer->cacheHandle);
     }
 
     gsh_free(dataServer);
@@ -119,15 +120,15 @@ static nfsstat4 openfile(struct FSExport *export,
 
     clearFileinfoCache(export, 2);
 
-    struct liz_fileinfo_entry *entry;
-    entry = liz_fileinfo_cache_acquire(export->fileinfoCache, dataServer->inode);
+    struct FileInfoEntry *entry;
+    entry = acquireFileInfoCache(export->fileinfoCache, dataServer->inode);
 
     dataServer->cacheHandle = entry;
     if (dataServer->cacheHandle == NULL) {
         return NFS4ERR_IO;
     }
 
-    fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
+	fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
     if (file_handle != NULL) {
         return NFS4_OK;
     }
@@ -135,7 +136,7 @@ static nfsstat4 openfile(struct FSExport *export,
     file_handle = fs_open(export->fsInstance, NULL, dataServer->inode, O_RDWR);
 
     if (file_handle == NULL) {
-        liz_fileinfo_cache_erase(export->fileinfoCache, dataServer->cacheHandle);
+	    eraseFileInfoCache(export->fileinfoCache, dataServer->cacheHandle);
         dataServer->cacheHandle = NULL;
         return NFS4ERR_IO;
     }
@@ -176,7 +177,7 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
 
     struct FSExport *export;
     struct DataServerHandle *dataServer;
-	fileinfo_t *fileHandle;
+    fileinfo_t *fileHandle;
 
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
                           struct FSExport, export);

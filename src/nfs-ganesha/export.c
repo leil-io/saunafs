@@ -65,10 +65,10 @@ static void release(struct fsal_export *exportHandle)
     free_export_ops(&export->export);
 
     if (export->fileinfoCache) {
-        liz_reset_fileinfo_cache_params(export->fileinfoCache, 0, 0);
+	    resetFileInfoCacheParameters(export->fileinfoCache, 0, 0);
 
         while (1) {
-            liz_fileinfo_entry_t *cache_handle;
+            FileInfoEntry_t *cache_handle;
 	        fileinfo_t *file_handle;
 
             cache_handle = liz_fileinfo_cache_pop_expired(export->fileinfoCache);
@@ -78,10 +78,10 @@ static void release(struct fsal_export *exportHandle)
 
             file_handle = liz_extract_fileinfo(cache_handle);
             liz_release(export->fsInstance, file_handle);
-            liz_fileinfo_entry_free(cache_handle);
+	        fileInfoEntryFree(cache_handle);
         }
 
-        liz_destroy_fileinfo_cache(export->fileinfoCache);
+	    destroyFileInfoCache(export->fileinfoCache);
         export->fileinfoCache = NULL;
     }
 

@@ -94,7 +94,7 @@ struct FSExport {
 
     liz_t *fsInstance; /// Filesystem instance
     liz_init_params_t initialParameters; /// Initial parameters
-    liz_fileinfo_cache_t *fileinfoCache; /// Cache of export
+    FileInfoCache_t *fileinfoCache; /// Cache of export
 
     bool isMDSEnabled; /// pNFS Metadata Server enabled
     bool isDSEnabled;  /// pNFS Data Server enabled
@@ -142,6 +142,7 @@ struct FSALKey {
  * It contains information related with the public structure of the
  * filesystem and its operations.
  */
+
 struct FSHandle {
     struct fsal_obj_handle fileHandle; /// Public structure for filesystem objects.
     struct FSFileDescriptor fileDescriptor; /// File descriptor instance
@@ -158,7 +159,7 @@ struct DataServerWire {
 struct DataServerHandle {
     struct fsal_ds_handle dsHandle; /// Public structure for DS file handles
     uint32_t inode; /// inode
-    liz_fileinfo_entry_t *cacheHandle; /// Cache entry for inode
+    FileInfoEntry_t *cacheHandle; /// Cache entry for inode
 };
 
 #endif // LZFS_FSAL_TYPES

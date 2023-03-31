@@ -21,21 +21,21 @@
 #include <gtest/gtest.h>
 
 TEST(FileInfoCache, Basic) {
-	liz_fileinfo_cache_t *cache = liz_create_fileinfo_cache(16, 0);
+	FileInfoCache_t *cache = liz_create_fileinfo_cache(16, 0);
 
-	liz_fileinfo_entry_t *entry7 = liz_fileinfo_cache_acquire(cache, 7);
-	liz_fileinfo_entry_t *entry11 = liz_fileinfo_cache_acquire(cache, 11);
+	FileInfoEntry_t *entry7 = liz_fileinfo_cache_acquire(cache, 7);
+	FileInfoEntry_t *entry11 = liz_fileinfo_cache_acquire(cache, 11);
 	ASSERT_EQ(liz_extract_fileinfo(entry7), nullptr);
 	ASSERT_EQ(liz_extract_fileinfo(entry11), nullptr);
 
 	liz_attach_fileinfo(entry7, (fileinfo_t *)0xb00b1e5);
 	liz_attach_fileinfo(entry11, (fileinfo_t *)0xface);
 
-	liz_fileinfo_entry_t *expired = liz_fileinfo_cache_pop_expired(cache);
+	FileInfoEntry_t *expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_EQ(expired, nullptr);
 	liz_fileinfo_cache_release(cache, entry7);
 
-	liz_fileinfo_entry_t *entry7_2 = liz_fileinfo_cache_acquire(cache, 7);
+	FileInfoEntry_t *entry7_2 = liz_fileinfo_cache_acquire(cache, 7);
 	ASSERT_NE(liz_extract_fileinfo(entry7_2), nullptr);
 	ASSERT_EQ(liz_extract_fileinfo(entry7_2), (fileinfo_t *)0xb00b1e5);
 	ASSERT_EQ(liz_extract_fileinfo(entry11), (fileinfo_t *)0xface);
@@ -47,12 +47,12 @@ TEST(FileInfoCache, Basic) {
 
 	expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_NE(expired, nullptr);
-	liz_fileinfo_entry_free(expired);
+	fileInfoEntryFree(expired);
 
 	liz_fileinfo_cache_release(cache, entry11);
 	expired = liz_fileinfo_cache_pop_expired(cache);
 	while (expired) {
-		liz_fileinfo_entry_free(expired);
+		fileInfoEntryFree(expired);
 		expired = liz_fileinfo_cache_pop_expired(cache);
 	}
 
@@ -60,7 +60,7 @@ TEST(FileInfoCache, Basic) {
 }
 
 TEST(FileInfoCache, Full) {
-	liz_fileinfo_cache_t *cache = liz_create_fileinfo_cache(3, 0);
+	FileInfoCache_t *cache = liz_create_fileinfo_cache(3, 0);
 
 	auto a1 = liz_fileinfo_cache_acquire(cache, 1);
 	auto a2 = liz_fileinfo_cache_acquire(cache, 1);
@@ -79,15 +79,15 @@ TEST(FileInfoCache, Full) {
 
 	auto expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_NE(expired, nullptr);
-	liz_fileinfo_entry_free(expired);
+	fileInfoEntryFree(expired);
 
 	expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_NE(expired, nullptr);
-	liz_fileinfo_entry_free(expired);
+	fileInfoEntryFree(expired);
 
 	expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_NE(expired, nullptr);
-	liz_fileinfo_entry_free(expired);
+	fileInfoEntryFree(expired);
 
 	expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_EQ(expired, nullptr);
@@ -96,7 +96,7 @@ TEST(FileInfoCache, Full) {
 }
 
 TEST(FileInfoCache, Reset) {
-	liz_fileinfo_cache_t *cache = liz_create_fileinfo_cache(100000, 100000);
+	FileInfoCache_t *cache = liz_create_fileinfo_cache(100000, 100000);
 
 	auto a1 = liz_fileinfo_cache_acquire(cache, 1);
 	liz_fileinfo_cache_release(cache, a1);
@@ -108,7 +108,7 @@ TEST(FileInfoCache, Reset) {
 
 	expired = liz_fileinfo_cache_pop_expired(cache);
 	ASSERT_NE(expired, nullptr);
-	liz_fileinfo_entry_free(expired);
+	fileInfoEntryFree(expired);
 
 	liz_destroy_fileinfo_cache(cache);
 }

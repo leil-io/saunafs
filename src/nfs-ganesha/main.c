@@ -251,9 +251,9 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
                 &export->export, fso_pnfs_ds_supported);
 
     if (export->isDSEnabled) {
-        export->fileinfoCache = liz_create_fileinfo_cache(
-                    export->cacheMaximumSize,
-                    export->cacheTimeout * 1000);
+        export->fileinfoCache = createFileInfoCache(
+		        export->cacheMaximumSize,
+		        export->cacheTimeout * 1000);
 
         if (export->fileinfoCache == NULL) {
             LogCrit(COMPONENT_FSAL, "Unable to create fileinfo cache for %s.",
@@ -336,7 +336,7 @@ error:
         }
 
         if (export->fileinfoCache) {
-            liz_destroy_fileinfo_cache(export->fileinfoCache);
+	        destroyFileInfoCache(export->fileinfoCache);
         }
 
         gsh_free(export);
