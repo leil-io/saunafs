@@ -18,7 +18,7 @@
 
 #include <fsal_types.h>
 
-#include "mount/client/lizardfs_c_api.h"
+#include "lzfs_fsal_types.h"
 
 int fs_lookup(liz_t *instance, struct user_cred *cred,
               liz_inode_t parent, const char *path,
@@ -28,24 +28,24 @@ int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
               const char *path, mode_t mode, dev_t rdev,
               struct liz_entry *entry);
 
-liz_fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
+fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
                         liz_inode_t inode, int flags);
 
 ssize_t fs_read(liz_t *instance, struct user_cred *cred,
-                liz_fileinfo_t *fileinfo, off_t offset,
+                fileinfo_t *fileinfo, off_t offset,
                 size_t size, char *buffer);
 
 ssize_t fs_write(liz_t *instance, struct user_cred *cred,
-                 liz_fileinfo_t *fileinfo, off_t offset,
+                 fileinfo_t *fileinfo, off_t offset,
                  size_t size, const char *buffer);
 
 int fs_flush(liz_t *instance, struct user_cred *cred,
-             liz_fileinfo_t *fileinfo);
+             fileinfo_t *fileinfo);
 
 int fs_getattr(liz_t *instance, struct user_cred *cred,
                liz_inode_t inode, struct liz_attr_reply *reply);
 
-liz_fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
+fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
                            liz_inode_t inode);
 
 int fs_readdir(liz_t *instance, struct user_cred *cred,
@@ -96,10 +96,10 @@ int fs_getacl(liz_t *instance, struct user_cred *cred,
               liz_inode_t inode, liz_acl_t **acl);
 
 int fs_setlk(liz_t *instance, struct user_cred *cred,
-             liz_fileinfo_t *fileinfo, const liz_lock_info_t *lock);
+             fileinfo_t *fileinfo, const liz_lock_info_t *lock);
 
 int fs_getlk(liz_t *instance, struct user_cred *cred,
-             liz_fileinfo_t *fileinfo, liz_lock_info_t *lock);
+             fileinfo_t *fileinfo, liz_lock_info_t *lock);
 
 int fs_getxattr(liz_t *instance, struct user_cred *cred,
                 liz_inode_t ino, const char *name,
