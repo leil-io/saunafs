@@ -178,26 +178,27 @@ static struct config_block fsal_export_param_block = {
     .blk_desc.u.blk.commit = noop_conf_commit
 };
 
-static fsal_status_t create_export(struct fsal_module *fsal_hdl,
-                                   void *parse_node,
-                                   struct config_error_type *err_type,
-                                   const struct fsal_up_vector *up_ops)
+static fsal_status_t create_export(struct fsal_module *FSALModule,
+                                   void *parseNode,
+                                   struct config_error_type *errorType,
+                                   const struct fsal_up_vector *upcallOperations)
 {
-    struct FSExport *export;
     fsal_status_t status;
+    struct fsal_pnfs_ds *pnfsDataServer = NULL;
     int rc;
-    struct fsal_pnfs_ds *pds = NULL;
 
-    export = gsh_calloc(1, sizeof(struct FSExport));
+    struct FSExport *export = gsh_calloc(1, sizeof(struct FSExport));
 
     fsal_export_init(&export->export);
     initializeExportOperations(&export->export.exp_ops);
 
-    // parse params for this export
+    // parse parameters for this export
     liz_set_default_init_params(&export->initialParameters, "", "", "");
-    if (parse_node) {
-        rc = load_config_from_node(parse_node, &fsal_export_param_block,
-                                   export, true, err_type);
+
+    if (parseNode) {
+        rc = load_config_from_node(parseNode, &fsal_export_param_block,
+                                   export, true, errorType);
+
         if (rc != 0) {
             LogCrit(COMPONENT_FSAL,
                     "Failed to parse export configuration for %s",
@@ -214,52 +215,58 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
     if (export->fsInstance == NULL) {
         LogCrit(COMPONENT_FSAL, "Unable to mount LizardFS cluster for %s.",
                 CTX_FULLPATH(op_ctx));
+
         status = fsalstat(ERR_FSAL_SERVERFAULT, 0);
         goto error;
     }
 
-    if (fsal_attach_export(fsal_hdl, &export->export.exports) != 0) {
+    if (fsal_attach_export(FSALModule, &export->export.exports) != 0) {
         LogCrit(COMPONENT_FSAL, "Unable to attach export for %s.",
                 CTX_FULLPATH(op_ctx));
+
         status = fsalstat(ERR_FSAL_SERVERFAULT, 0);
         goto error;
     }
 
-    export->export.fsal = fsal_hdl;
-    export->export.up_ops = up_ops;
+    export->export.fsal = FSALModule;
+    export->export.up_ops = upcallOperations;
 
-    export->isDSEnabled =
-            export->export.exp_ops.fs_supports(&export->export,
-                                               fso_pnfs_ds_supported);
+    export->isDSEnabled = export->export.exp_ops.fs_supports(
+                &export->export, fso_pnfs_ds_supported);
+
     if (export->isDSEnabled) {
         export->fileinfoCache = liz_create_fileinfo_cache(
                     export->cacheMaximumSize,
                     export->cacheTimeout * 1000);
+
         if (export->fileinfoCache == NULL) {
             LogCrit(COMPONENT_FSAL, "Unable to create fileinfo cache for %s.",
                     CTX_FULLPATH(op_ctx));
+
             status = fsalstat(ERR_FSAL_SERVERFAULT, 0);
             goto error;
         }
 
-        status = fsal_hdl->m_ops.create_fsal_pnfs_ds(fsal_hdl,
-                                                     parse_node, &pds);
+        status = FSALModule->m_ops.create_fsal_pnfs_ds(FSALModule, parseNode,
+                                                       &pnfsDataServer);
+
         if (status.major != ERR_FSAL_NO_ERROR) {
             goto error;
         }
 
-        /* special case: server_id matches export_id */
-        pds->id_servers = op_ctx->ctx_export->export_id;
-        pds->mds_export = op_ctx->ctx_export;
-        pds->mds_fsal_export = &export->export;
+        // special case: server_id matches export_id
+        pnfsDataServer->id_servers = op_ctx->ctx_export->export_id;
+        pnfsDataServer->mds_export = op_ctx->ctx_export;
+        pnfsDataServer->mds_fsal_export = &export->export;
 
-        if (!pnfs_ds_insert(pds)) {
+        if (!pnfs_ds_insert(pnfsDataServer)) {
             LogCrit(COMPONENT_CONFIG, "Server id %d already in use.",
-                    pds->id_servers);
+                    pnfsDataServer->id_servers);
+
             status.major = ERR_FSAL_EXIST;
 
-            /* Return the ref taken by create_fsal_pnfs_ds */
-            pnfs_ds_put(pds);
+            // Return the ref taken by create_fsal_pnfs_ds
+            pnfs_ds_put(pnfsDataServer);
             goto error;
         }
 
@@ -267,30 +274,33 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
                  CTX_FULLPATH(op_ctx));
     }
 
-    export->isMDSEnabled =
-            export->export.exp_ops.fs_supports(
+    export->isMDSEnabled = export->export.exp_ops.fs_supports(
                 &export->export, fso_pnfs_mds_supported);
+
     if (export->isMDSEnabled) {
         LogDebug(COMPONENT_PNFS, "pnfs mds was enabled for [%s]",
                  CTX_FULLPATH(op_ctx));
+
         initializePnfsExportOperations(&export->export.exp_ops);
     }
 
     // get attributes for root inode
-    liz_attr_reply_t ret;
+    liz_attr_reply_t reply;
     rc = fs_getattr(export->fsInstance, &op_ctx->creds,
-                    SPECIAL_INODE_ROOT, &ret);
+                    SPECIAL_INODE_ROOT, &reply);
+
     if (rc < 0) {
         status = fsalLastError();
 
-        if (pds != NULL) {
-            /* Remove and destroy the fsal_pnfs_ds */
-            pnfs_ds_remove(pds->id_servers);
+        if (pnfsDataServer != NULL) {
+            // Remove and destroy the fsal_pnfs_ds
+            pnfs_ds_remove(pnfsDataServer->id_servers);
         }
+
         goto error_pds;
     }
 
-    export->rootHandle = allocateNewHandle(&ret.attr, export);
+    export->rootHandle = allocateNewHandle(&reply.attr, export);
     op_ctx->fsal_export = &export->export;
 
     LogDebug(COMPONENT_FSAL, "LizardFS module export %s.",
@@ -299,42 +309,45 @@ static fsal_status_t create_export(struct fsal_module *fsal_hdl,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 
 error_pds:
-    if (pds != NULL)
-        /* Return the ref taken by create_fsal_pnfs_ds */
-        pnfs_ds_put(pds);
+    if (pnfsDataServer != NULL)
+        // Return the ref taken by create_fsal_pnfs_ds
+        pnfs_ds_put(pnfsDataServer);
 
 error:
     if (export) {
         if (export->fsInstance) {
             liz_destroy(export->fsInstance);
         }
+
         if (export->fileinfoCache) {
             liz_destroy_fileinfo_cache(export->fileinfoCache);
         }
+
         gsh_free(export);
     }
 
     return status;
 }
 
-/* Module methods */
-/* init_config must be called with a reference taken (via lookup_fsal) */
-static fsal_status_t init_config(struct fsal_module *module_in,
-                                 config_file_t config_struct,
-                                 struct config_error_type *err_type)
+// Module methods
+// init_config must be called with a reference taken (via lookup_fsal)
+static fsal_status_t init_config(struct fsal_module *FSALModule,
+                                 config_file_t configFile,
+                                 struct config_error_type *errorType)
 {
     struct FSModule *myself;
-    myself = container_of(module_in, struct FSModule, module);
+    myself = container_of(FSALModule, struct FSModule, module);
 
-    (void) load_config_from_parse(config_struct, &export_param,
-                                  &myself->filesystemInfo, true, err_type);
+    (void) load_config_from_parse(configFile, &export_param,
+                                  &myself->filesystemInfo, true, errorType);
 
-    if (!config_error_is_harmless(err_type)) {
+    if (!config_error_is_harmless(errorType)) {
         LogDebug(COMPONENT_FSAL, "config_error_is_harmless failed.");
         return fsalstat(ERR_FSAL_INVAL, 0);
     }
 
     display_fsinfo(&myself->module);
+
     LogDebug(COMPONENT_FSAL,
              "ALLI: FSAL INIT: Supported attributes mask = 0x%" PRIx64,
              myself->module.fs_info.supported_attrs);
@@ -342,7 +355,7 @@ static fsal_status_t init_config(struct fsal_module *module_in,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/* Internal LizardFS method linkage to export object */
+// Internal LizardFS method linkage to export object
 
 /**
  * @brief Initialize and register the FSAL
@@ -352,7 +365,7 @@ static fsal_status_t init_config(struct fsal_module *module_in,
  * keep a private pointer to me in myself
  */
 
-/* linkage to the exports and handle ops initializers */
+// Linkage to the exports and handle operations initializers
 
 MODULE_INIT void lizardfs_init(void)
 {
@@ -372,7 +385,7 @@ MODULE_INIT void lizardfs_init(void)
     myself->m_ops.fsal_pnfs_ds_ops = initializeDataServerOperations;
     initializePnfsOperations(&myself->m_ops);
 
-    /* Initialize the fsal_obj_handle ops for FSAL LizardFS */
+    // Initialize fsal_obj_handle ops for FSAL LizardFS
     initializeFilesystemOperations(&LizardFS.operations);
 }
 

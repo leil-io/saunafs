@@ -45,7 +45,7 @@ void restoreGaneshaCredentials(const struct fsal_module *fsal_module);
 struct FSHandle *allocateNewHandle(const struct stat *attr,
                                    struct FSExport *export);
 
-void deleteHandle(struct FSHandle *obj);
+void deleteHandle(struct FSHandle *object);
 
 // Methods for support ACL
 fsal_status_t getACL(struct FSExport *export, uint32_t inode,

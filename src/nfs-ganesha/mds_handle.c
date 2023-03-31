@@ -31,53 +31,55 @@
  *
  * \see fsal_api.h for more information
  */
-
-static nfsstat4 lzfs_fsal_layoutget(struct fsal_obj_handle *obj_pub,
-                                    XDR *loc_body,
-                                    const struct fsal_layoutget_arg *arg,
-                                    struct fsal_layoutget_res *res)
+static nfsstat4 _layoutget(struct fsal_obj_handle *objectHandle,
+                           XDR *xdrStream,
+                           const struct fsal_layoutget_arg *arguments,
+                           struct fsal_layoutget_res *output)
 {
-	struct FSHandle *lzfs_hdl;
-    struct DataServerWire ds_wire;
-    struct gsh_buffdesc ds_desc = {
-            .addr = &ds_wire,
+    struct FSHandle *handle;
+    struct DataServerWire dataServerWire;
+
+    struct gsh_buffdesc dsBufferDescriptor = {
+            .addr = &dataServerWire,
             .len = sizeof(struct DataServerWire)
     };
 
     struct pnfs_deviceid deviceid = DEVICE_ID_INIT_ZERO(FSAL_ID_LIZARDFS);
-	nfl_util4 layout_util = 0;
-	nfsstat4 nfs_status = NFS4_OK;
+    nfl_util4 layout_util = 0;
+    nfsstat4 nfs_status = NFS4_OK;
 
-    lzfs_hdl = container_of(obj_pub, struct FSHandle, fileHandle);
+    handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
-	if (arg->type != LAYOUT4_NFSV4_1_FILES) {
-		LogMajor(COMPONENT_PNFS, "Unsupported layout type: %x", arg->type);
+    if (arguments->type != LAYOUT4_NFSV4_1_FILES) {
+        LogMajor(COMPONENT_PNFS, "Unsupported layout type: %x",
+                 arguments->type);
 
-		return NFS4ERR_UNKNOWN_LAYOUTTYPE;
-	}
+        return NFS4ERR_UNKNOWN_LAYOUTTYPE;
+    }
 
     LogDebug(COMPONENT_PNFS, "will issue layout offset: %" PRIu64
-             " length: %" PRIu64, res->segment.offset, res->segment.length);
+             " length: %" PRIu64, output->segment.offset,
+             output->segment.length);
 
-	deviceid.device_id2 = lzfs_hdl->export->export.export_id;
-	deviceid.devid = lzfs_hdl->inode;
-	ds_wire.inode = lzfs_hdl->inode;
-	layout_util = MFSCHUNKSIZE;
+    deviceid.device_id2 = handle->export->export.export_id;
+    deviceid.devid = handle->inode;
 
-    nfs_status = FSAL_encode_file_layout(loc_body, &deviceid, layout_util,
-                                         0, 0,
-                                         &op_ctx->ctx_export->export_id,
-                                         1, &ds_desc);
-	if (nfs_status) {
-        LogMajor(COMPONENT_PNFS, "Failed to encode "
-                 "nfsv4_1_file_layout.");
-		return nfs_status;
-	}
+    dataServerWire.inode = handle->inode;
+    layout_util = MFSCHUNKSIZE;
 
-	res->return_on_close = true;
-	res->last_segment = true;
+    nfs_status = FSAL_encode_file_layout(xdrStream, &deviceid, layout_util,
+                                         0, 0, &op_ctx->ctx_export->export_id,
+                                         1, &dsBufferDescriptor);
 
-	return nfs_status;
+    if (nfs_status) {
+        LogMajor(COMPONENT_PNFS, "Failed to encode nfsv4_1_file_layout.");
+        return nfs_status;
+    }
+
+    output->return_on_close = true;
+    output->last_segment = true;
+
+    return nfs_status;
 }
 
 
@@ -85,99 +87,105 @@ static nfsstat4 lzfs_fsal_layoutget(struct fsal_obj_handle *obj_pub,
  *
  * \see fsal_api.h for more information
  */
-static nfsstat4 lzfs_fsal_layoutreturn(struct fsal_obj_handle *obj_pub,
-                                       XDR *lrf_body,
-                                       const struct fsal_layoutreturn_arg *arg)
+static nfsstat4 _layoutreturn(struct fsal_obj_handle *objectHandle,
+                              XDR *xdrStream,
+                              const struct fsal_layoutreturn_arg *arguments)
 {
     // Unused variables
-    (void ) obj_pub;
-    (void ) lrf_body;
+    (void ) objectHandle;
+    (void ) xdrStream;
 
-	if (arg->lo_type != LAYOUT4_NFSV4_1_FILES) {
-		LogDebug(COMPONENT_PNFS, "Unsupported layout type: %x", arg->lo_type);
-		return NFS4ERR_UNKNOWN_LAYOUTTYPE;
-	}
+    if (arguments->lo_type != LAYOUT4_NFSV4_1_FILES) {
+        LogDebug(COMPONENT_PNFS, "Unsupported layout type: %x",
+                 arguments->lo_type);
 
-	return NFS4_OK;
+        return NFS4ERR_UNKNOWN_LAYOUTTYPE;
+    }
+
+    return NFS4_OK;
 }
 
 /*! \brief Commit a segment of a layout
  *
  * \see fsal_api.h for more information
  */
-static nfsstat4 lzfs_fsal_layoutcommit(struct fsal_obj_handle *obj_pub,
-                                       XDR *lou_body,
-                                       const struct fsal_layoutcommit_arg *arg,
-                                       struct fsal_layoutcommit_res *res)
+static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
+                              XDR *xdrStream,
+                              const struct fsal_layoutcommit_arg *arguments,
+                              struct fsal_layoutcommit_res *output)
 {
     // Unused variable
-    (void ) lou_body;
+    (void ) xdrStream;
 
     struct FSExport *export;
     struct FSHandle *handle;
-    struct liz_attr_reply previous_reply;
+    struct liz_attr_reply previousReply;
 
-	// FIXME(haze): Does this function make sense for our implementation ?
+    // FIXME(haze): Does this function make sense for our implementation ?
 
-	/* Sanity check on type */
-	if (arg->type != LAYOUT4_NFSV4_1_FILES) {
-		LogCrit(COMPONENT_PNFS, "Unsupported layout type: %x", arg->type);
-		return NFS4ERR_UNKNOWN_LAYOUTTYPE;
-	}
+    /* Sanity check on type */
+    if (arguments->type != LAYOUT4_NFSV4_1_FILES) {
+        LogCrit(COMPONENT_PNFS, "Unsupported layout type: %x", arguments->type);
+        return NFS4ERR_UNKNOWN_LAYOUTTYPE;
+    }
 
-    export = container_of(op_ctx->fsal_export,
-                          struct FSExport, export);
-    handle = container_of(obj_pub, struct FSHandle, fileHandle);
+    export = container_of(op_ctx->fsal_export, struct FSExport, export);
+    handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
     int rc = fs_getattr(export->fsInstance, &op_ctx->creds,
-                        handle->inode, &previous_reply);
-	if (rc < 0) {
+                        handle->inode, &previousReply);
+
+    if (rc < 0) {
         LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to get "
                 "attributes of file %lli.",
                 liz_error_string(liz_last_err()),
                 (long long)handle->inode);
+
         return Nfs4LastError();
-	}
+    }
 
-	struct stat attr;
-	int mask = 0;
+    struct stat posixAttributes;
+    int mask = 0;
 
-	memset(&attr, 0, sizeof(attr));
+    memset(&posixAttributes, 0, sizeof(posixAttributes));
 
-    if (arg->new_offset && previous_reply.attr.st_size < (long)arg->last_write + 1) {
-		mask |= LIZ_SET_ATTR_SIZE;
-		attr.st_size = arg->last_write + 1;
-		res->size_supplied = true;
-		res->new_size = arg->last_write + 1;
-	}
+    if (arguments->new_offset &&
+        previousReply.attr.st_size < (long)arguments->last_write + 1)
+    {
+        mask |= LIZ_SET_ATTR_SIZE;
+        posixAttributes.st_size = arguments->last_write + 1;
+        output->size_supplied = true;
+        output->new_size = arguments->last_write + 1;
+    }
 
-    if (arg->time_changed &&
-        (arg->new_time.seconds > previous_reply.attr.st_mtim.tv_sec ||
-        (arg->new_time.seconds == previous_reply.attr.st_mtim.tv_sec &&
-         arg->new_time.nseconds > previous_reply.attr.st_mtim.tv_nsec))) {
-            attr.st_mtim.tv_sec = arg->new_time.seconds;
-            attr.st_mtim.tv_sec = arg->new_time.nseconds;
+    if (arguments->time_changed &&
+        (arguments->new_time.seconds > previousReply.attr.st_mtim.tv_sec ||
+        (arguments->new_time.seconds == previousReply.attr.st_mtim.tv_sec &&
+         arguments->new_time.nseconds > previousReply.attr.st_mtim.tv_nsec)))
+    {
+            posixAttributes.st_mtim.tv_sec = arguments->new_time.seconds;
+            posixAttributes.st_mtim.tv_sec = arguments->new_time.nseconds;
             mask |= LIZ_SET_ATTR_MTIME;
     }
 
-	liz_attr_reply_t reply;
-    rc = fs_setattr(export->fsInstance, &op_ctx->creds,
-                    handle->inode, &attr, mask, &reply);
+    liz_attr_reply_t reply;
+    rc = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+                    &posixAttributes, mask, &reply);
 
-	if (rc < 0) {
+    if (rc < 0) {
         LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to set attributes "
                 "of file %lli.", liz_error_string(liz_last_err()),
                 (long long)handle->inode);
         return Nfs4LastError();
-	}
+    }
 
-	res->commit_done = true;
-	return NFS4_OK;
+    output->commit_done = true;
+    return NFS4_OK;
 }
 
 void initializeMetaDataServerOperations(struct fsal_obj_ops *ops)
 {
-    ops->layoutget = lzfs_fsal_layoutget;
-    ops->layoutreturn = lzfs_fsal_layoutreturn;
-    ops->layoutcommit = lzfs_fsal_layoutcommit;
+    ops->layoutget = _layoutget;
+    ops->layoutreturn = _layoutreturn;
+    ops->layoutcommit = _layoutcommit;
 }
