@@ -178,6 +178,22 @@ static struct config_block fsal_export_param_block = {
     .blk_desc.u.blk.commit = noop_conf_commit
 };
 
+/**
+ * @brief Create a new export.
+ *
+ * This function creates a new export in the FSAL using the supplied path and options.
+ * The function is expected to allocate its own export (the full, private structure).
+ *
+ * @param [in]  FSALModule           FSAL module.
+ * @param [in]  parseNode            opaque pointer to parse tree node for export
+ *                                   options to be passed to load_config_from_node.
+ * @param [out] errorType            config processing error reporting.
+ * @param [in]  upcallOperations     Upcall ops.
+ *
+ * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
+ */
 static fsal_status_t create_export(struct fsal_module *FSALModule,
                                    void *parseNode,
                                    struct config_error_type *errorType,
@@ -329,8 +345,20 @@ error:
     return status;
 }
 
-// Module methods
-// init_config must be called with a reference taken (via lookup_fsal)
+/**
+ * @brief Initialize the configuration.
+ *
+ * Subclass/instance methods in each fsal
+ *
+ * Given the root of the Ganesha configuration structure, initialize
+ * the FSAL parameters.
+ *
+ * @param [in]  FSALModule     FSAL module.
+ * @param [in]  configFile     Parsed ganesha configuration file.
+ * @param [out] errorType      config processing error reporting.
+ *
+ * @returns: FSAL status
+ */
 static fsal_status_t init_config(struct fsal_module *FSALModule,
                                  config_file_t configFile,
                                  struct config_error_type *errorType)
@@ -383,6 +411,7 @@ MODULE_INIT void lizardfs_init(void)
     myself->m_ops.create_export = create_export;
     myself->m_ops.init_config = init_config;
     myself->m_ops.fsal_pnfs_ds_ops = initializeDataServerOperations;
+
     initializePnfsOperations(&myself->m_ops);
 
     // Initialize fsal_obj_handle ops for FSAL LizardFS

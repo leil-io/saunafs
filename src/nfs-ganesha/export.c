@@ -43,15 +43,16 @@
 /* Flags to determine if ACLs are supported */
 #define NFSv4_ACL_SUPPORT (!op_ctx_export_has_option(EXPORT_OPTION_DISABLE_ACL))
 
-// export object methods
 /**
  * @brief Finalize an export
  *
- * \see fsal_api.h for more information
+ * This function is called as part of cleanup when the last reference to an
+ * export is released and it is no longer part of the list.
  *
- * @param[in,out] export The export to be released
+ * It should clean up all private resources and destroy the object.
+ *
+ * @param[in] exportHandle     The export to release
  */
-
 static void release(struct fsal_export *exportHandle)
 {
     struct FSExport *export;
@@ -91,8 +92,22 @@ static void release(struct fsal_export *exportHandle)
     gsh_free(export);
 }
 
-// lookup_path
-// modeled on old api except we don't stuff attributes.
+/** @brief Look up a path.
+ *
+ *  Create an object handles within this export.
+ *
+ *  This function looks up a path within the export, it is now exclusively
+ *  used to get a handle for the root directory of the export.
+ *
+ *  @param [in]     exportHandle     The export in which to look up
+ *  @param [in]     path             The path to look up
+ *  @param [out]    handle           The object found
+ *  @param [in,out] attributes       Optional attributes for newly created object
+ *
+ *  \see fsal_api.h for more information
+ *
+ *  @returns: FSAL status
+ */
 fsal_status_t lookup_path(struct fsal_export *exportHandle,
                           const char *path, struct fsal_obj_handle **handle,
                           struct fsal_attrlist *attributes)
@@ -167,16 +182,16 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle,
 }
 
 /**
- * @brief Get dynamic filesystem statistics and configuration
+ * @brief Get dynamic filesystem statistics and configuration for this filesystem.
  *
  * This function gets information on inodes and space in use and free for a
  * filesystem. See fsal_dynamicfsinfo_t for details of what to fill out.
  *
- * @param[in]  export_handle    Export handle to interrogate
- * @param[in]  obj_hdl          Directory
+ * @param[in]  exportHandle     Export handle to interrogate
+ * @param[in]  objectHandle     Directory
  * @param[out] info             Buffer to fill with information
  *
- * @return FSAL status.
+ * @returns: FSAL status.
  */
 static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
                                       struct fsal_obj_handle *objectHandle,
@@ -210,6 +225,17 @@ static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
+/** @brief Allocate a state_t structure.
+ *
+ *  Note that this is not expected to fail since memory allocation is
+ *  expected to abort on failure.
+ *
+ *  @param [in] export           Export state_t will be associated with
+ *  @param [in] stateType        Type of state to allocate
+ *  @param [in] relatedState     Related state if appropriate
+ *
+ *  @returns: a state structure.
+ */
 struct state_t *allocate_state(struct fsal_export *export,
                                enum state_type stateType,
                                struct state_t *relatedState)
@@ -228,12 +254,12 @@ struct state_t *allocate_state(struct fsal_export *export,
     return state;
 }
 
-/*! \brief Free a state_t structure
+/** \brief Free a state_t structure.
  *
  * @param[in] export     Export state_t is associated with
  * @param[in] state      state_t structure to free
  *
- * @return  NULL on failure otherwise a state structure.
+ * @returns: NULL on failure otherwise a state structure.
  */
 void free_state(struct fsal_export *export, struct state_t *state)
 {
@@ -246,15 +272,13 @@ void free_state(struct fsal_export *export, struct state_t *state)
 }
 
 /**
- * \brief Convert a wire handle to a host handle
+ * @brief Convert a wire handle to a host handle.
  *
  * This function extracts a host handle from a wire handle. That is, when
  * given a handle as passed to a client, this method will extract the handle
  * to create objects.
  *
- * \see fsal_api.h for more information
- *
- * @param[in]     export             Export handle
+ * @param[in]     export             Export handle.
  * @param[in]     protocol           Protocol through which buffer was received.
  * @param[in]     flags              Flags to describe the wire handle. Example,
  *                                   if the handle is a big endian handle.
@@ -264,6 +288,7 @@ void free_state(struct fsal_export *export, struct state_t *state)
  *                                   in the buffer, bufferDescriptor->len must be updated to
  *                                   the correct host handle size.
  *
+ * @returns: FSAL type.
  */
 static fsal_status_t wire_to_host(struct fsal_export *export,
                                   fsal_digesttype_t protocol,
@@ -302,18 +327,22 @@ static fsal_status_t wire_to_host(struct fsal_export *export,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/* create_handle
- * Does what original FSAL_ExpandHandle did (sort of)
- * returns a ref counted handle to be later used in mdcache etc.
- * NOTE! you must release this thing when done with it!
- * BEWARE! Thanks to some holes in the *AT syscalls implementation,
- * we cannot get an fd on an AF_UNIX socket, nor reliably on block or
- * character special devices.  Sorry, it just doesn't...
- * we could if we had the handle of the dir it is in, but this method
- * is for getting handles off the wire for cache entries that have LRU'd.
- * Ideas and/or clever hacks are welcome...
+/**
+ * @brief Create a FSAL object handle from a host handle.
+ *
+ * This function creates a FSAL object handle from a host handle
+ * (when an object is no longer in cache but the client still
+ * remembers the handle).
+ *
+ * @param[in]     exportHandle         The export in which to create the handle.
+ * @param[in]     bufferDescriptor     Buffer descriptor for the host handle.
+ * @param[in]     publicHandle         FSAL object handle.
+ * @param[in,out] attributes           Optional attributes for newly created object.
+ *
+ * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
-
 fsal_status_t create_handle(struct fsal_export *exportHandle,
                             struct gsh_buffdesc *bufferDescriptor,
                             struct fsal_obj_handle **publicHandle,
@@ -349,17 +378,31 @@ fsal_status_t create_handle(struct fsal_export *exportHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Get supported ACL types
+/**
+ * @brief Get supported ACL types.
  *
- * \see fsal_api.h for more information
+ * This function returns a bitmask indicating whether it supports
+ * ALLOW, DENY, neither, or both types of ACL.
+ *
+ * @param[in] export       Filesystem to interrogate.
+ *
+ * @returns: supported ACL types.
  */
 static fsal_aclsupp_t fs_acl_support(struct fsal_export *export)
 {
     return fsal_acl_support(&export->fsal->fs_info);
 }
 
-/*! \brief Get supported attributes
+/**
+ * @brief Get supported attributes.
  *
+ * This function returns a list of all attributes that this FSAL will support.
+ * Be aware that this is specifically the attributes in struct fsal_attrlist,
+ * other NFS attributes (fileid and so forth) are supported through other means.
+ *
+ * @param[in] export       Filesystem to interrogate.
+ *
+ * @returns: supported attributes.
  */
 static attrmask_t fs_supported_attrs(struct fsal_export *export)
 {
@@ -380,7 +423,7 @@ static attrmask_t fs_supported_attrs(struct fsal_export *export)
  * This function overrides operations that we've implemented, leaving
  * the rest for the default.
  *
- * @param[in,out] ops Operations vector
+ * @param[in,out] ops     Operations vector
  */
 void initializeExportOperations(struct export_ops *ops)
 {
