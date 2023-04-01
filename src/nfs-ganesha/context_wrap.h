@@ -29,7 +29,7 @@ int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
               struct liz_entry *entry);
 
 fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
-                        liz_inode_t inode, int flags);
+                    liz_inode_t inode, int flags);
 
 ssize_t fs_read(liz_t *instance, struct user_cred *cred,
                 fileinfo_t *fileinfo, off_t offset,
@@ -46,7 +46,7 @@ int fs_getattr(liz_t *instance, struct user_cred *cred,
                liz_inode_t inode, struct liz_attr_reply *reply);
 
 fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
-                           liz_inode_t inode);
+                       liz_inode_t inode);
 
 int fs_readdir(liz_t *instance, struct user_cred *cred,
                struct liz_fileinfo *fileinfo, off_t offset,

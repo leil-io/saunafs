@@ -20,7 +20,7 @@
 
 /// FSAL methods
 
-liz_context_t *fsal_create_context(liz_t *instance, struct user_cred *cred);
+liz_context_t *createFSALContext(liz_t *instance, struct user_cred *cred);
 
 void initializeExportOperations(struct export_ops *ops);
 void initializeFilesystemOperations(struct fsal_obj_ops *ops);

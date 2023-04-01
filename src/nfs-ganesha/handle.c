@@ -111,7 +111,7 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
     directory = container_of(dirHandle, struct FSHandle, fileHandle);
 
     liz_context_t *context;
-    context = fsal_create_context(export->fsInstance, &op_ctx->creds);
+    context = createFSALContext(export->fsInstance, &op_ctx->creds);
 
     struct liz_fileinfo *fileDescriptor;
     fileDescriptor = liz_opendir(export->fsInstance, context, directory->inode);

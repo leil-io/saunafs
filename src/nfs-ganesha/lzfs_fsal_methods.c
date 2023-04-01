@@ -4,7 +4,7 @@
 
 #include "lzfs_fsal_methods.h"
 
-liz_context_t *fsal_create_context(liz_t *instance, struct user_cred *cred)
+liz_context_t *createFSALContext(liz_t *instance, struct user_cred *cred)
 {
     if (cred == NULL) {
         return liz_create_user_context(0, 0, 0, 0);
@@ -58,7 +58,7 @@ void restoreGaneshaCredentials(const struct fsal_module *fsal_module)
     }
 }
 
-nfsstat4 lizardfs2nfs4_error(int ec)
+nfsstat4 lizardfsToNfs4Error(int ec)
 {
     if (!ec) {
         LogWarn(COMPONENT_FSAL, "appropriate errno not set");
@@ -90,5 +90,5 @@ fsal_status_t fsalLastError(void)
 
 nfsstat4 Nfs4LastError(void)
 {
-    return lizardfs2nfs4_error(liz_last_err());
+    return lizardfsToNfs4Error(liz_last_err());
 }
