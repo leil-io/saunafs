@@ -29,70 +29,140 @@
 #include "mount/client/lizardfs_c_api.h"
 #include "protocol/MFSCommunication.h"
 
-static int compare(const void *a, const void *b)
+/**
+ * @brief Comparison function for based-ip sorting of chunkservers.
+ *
+ * This function sorts chunkserver in ascending order of their ip attribute.
+ *
+ * @param[in] chunkserverA      void* pointer to chunkserver A
+ * @param[in] chunkserverB      void* pointer to chunkserver B
+ *
+ * @returns: Integer number representing the natural order of chunkserver
+ *
+ * @retval value < 0: chunkserverA's ip is less than chunkserverB's ip
+ * @retval value > 0: chunkserverA's ip is greater than chunkserverB's ip
+ * @retval     0    : Both chunkservers have the same ip
+ */
+static int ascendingIpCompare(const void *chunkserverA,
+                              const void *chunkserverB)
 {
-    uint32_t ipFromChunkserverA = ((const liz_chunkserver_info_t *)a)->ip;
-    uint32_t ipFromChunkserverB = ((const liz_chunkserver_info_t *)b)->ip;
+    uint32_t ipFromChunkserverA = ((const liz_chunkserver_info_t *)
+                                   chunkserverA)->ip;
+    uint32_t ipFromChunkserverB = ((const liz_chunkserver_info_t *)
+                                   chunkserverB)->ip;
 
     return ipFromChunkserverA - ipFromChunkserverB;
 }
 
-static int is_disconnected(const void *a, void *unused)
+/**
+ * @brief Check if one chunkserver is disconnected.
+ *
+ * @param[in] chunkserver      void* pointer to chunkserver instance
+ *
+ * @returns: Integer number representing if chunkserver is disconnected
+ *
+ * @retval 0: chunkserver is connected
+ * @retval 1: chunkserver is disconnected
+ */
+static int isChunkserverDisconnected(const void *chunkserver, void *unused)
 {
     // Unused variable
     (void ) unused;
 
-    return ((const liz_chunkserver_info_t *)a)->version ==
+    return ((const liz_chunkserver_info_t *)chunkserver)->version ==
             kDisconnectedChunkServerVersion;
 }
 
-static int is_same_ip(const void *a, void *base)
+/**
+ * @brief Check if two adjacent chunkservers have the same ip.
+ *
+ * @param[in] chunkserver      void* pointer to chunkserver instance
+ * @param[in] base             void* pointer to the first chunkserver of the
+ *                             collection
+ *
+ * @returns: Integer number representing if chunkserver instance and
+ *           its predecessor have the same ip.
+ *
+ * @retval 0: chunkserver and its predecessor doesn't have the same ip
+ * @retval 1: chunkserver and its predecessor have the same ip
+ */
+static int adjacentChunkserversWithSameIp(const void *chunkserver, void *base)
 {
-    if (a == base) {
+    if (chunkserver == base) {
         return 0;
     }
 
-    return ((const liz_chunkserver_info_t *)a)->ip ==
-           ((const liz_chunkserver_info_t *)a - 1)->ip;
+    return ((const liz_chunkserver_info_t *)chunkserver)->ip ==
+           ((const liz_chunkserver_info_t *)chunkserver - 1)->ip;
 }
 
-static size_t remove_if(void *base, size_t num, size_t size,
-                        int (*predicate)(const void *a, void *work_data),
-                        void *work_data)
+/**
+ * @brief Remove chunkservers if predicate is successfully evaluated.
+ *
+ * @param[in,out] data       void* pointer to the chunkservers collection
+ * @param[in] size           Size of the collection
+ * @param[in] itemSize       Size of each item of the collection
+ * @param[in] predicate      Predicate to evaluate
+ * @param[in] targetData     void* pointer to targetData
+ *
+ * @returns: Number of removed elements.
+ */
+static size_t remove_if(void *data, size_t size, size_t itemSize,
+                        int (*predicate)(const void *chunkserver, void *targetData),
+                        void *targetData)
 {
     size_t j = 0;
 
-    for (size_t i = 0; i < num; ++i) {
-        if (!predicate((uint8_t *)base + i * size, work_data)) {
-            memcpy((uint8_t *)base + i * size,
-                   (uint8_t *)base + j * size,
-                   size);
+    for (size_t i = 0; i < size; ++i) {
+        if (!predicate((uint8_t *)data + i * itemSize, targetData))
+        {
+            memcpy((uint8_t *)data + i * itemSize,
+                   (uint8_t *)data + j * itemSize,
+                   itemSize);
             j++;
         }
     }
     return j;
 }
 
-static void shuffle(void *base, size_t num, size_t size)
+/**
+ * @brief Randomly rearrange the elements of a collection.
+ *
+ * @param[in,out] data       void* pointer to the collection
+ * @param[in] size           Size of the collection
+ * @param[in] itemSize       Size of each item of the collection
+ *
+ * @returns: Nothing. The elements of the collection are rearranged after
+ *                    finishing the execution of the method.
+ */
+static void shuffle(void *data, size_t size, size_t itemSize)
 {
-    uint8_t temp[size];
+    uint8_t temp[itemSize];
 
-    if (num == 0) {
+    if (size == 0) {
         return;
     }
 
-    for (size_t i = 0; i < num - 1; ++i) {
-        size_t j = i + rand() % (num - i);
+    for (size_t i = 0; i < size - 1; ++i) {
+        size_t j = i + rand() % (size - i);
 
-        memcpy(temp, (uint8_t *)base + i * size, size);
+        memcpy(temp, (uint8_t *)data + i * itemSize, itemSize);
 
-        memcpy((uint8_t *)base + i * size,
-               (uint8_t *)base + j * size, size);
+        memcpy((uint8_t *)data + i * itemSize,
+               (uint8_t *)data + j * itemSize, itemSize);
 
-        memcpy((uint8_t *)base + j * size, temp, size);
+        memcpy((uint8_t *)data + j * itemSize, temp, itemSize);
     }
 }
 
+/**
+ * @brief Randomly rearrange the list of chunkservers.
+ *
+ * @param[in] export                Export where the chunkservers live on
+ * @param[in] chunkserverCount      Pointer to store the number of chunkservers
+ *
+ * @returns: Randomized chunkservers list.
+ */
 static liz_chunkserver_info_t *randomizedChunkserverList(
         struct FSExport *export, uint32_t *chunkserverCount)
 {
@@ -115,25 +185,36 @@ static liz_chunkserver_info_t *randomizedChunkserverList(
 
     // remove disconnected
     *chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
-                                   sizeof(liz_chunkserver_info_t),
-                                   is_disconnected, NULL);
+                                  sizeof(liz_chunkserver_info_t),
+                                  isChunkserverDisconnected, NULL);
+
+    // sorting chunkservers based on its ip attribute
+    qsort(chunkserverInfo, *chunkserverCount,
+          sizeof(liz_chunkserver_info_t), ascendingIpCompare);
 
     // remove entries with the same ip
-    qsort(chunkserverInfo, *chunkserverCount,
-          sizeof(liz_chunkserver_info_t), compare);
-
     *chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
-                                   sizeof(liz_chunkserver_info_t),
-                                   is_same_ip, chunkserverInfo);
+                                  sizeof(liz_chunkserver_info_t),
+                                  adjacentChunkserversWithSameIp,
+                                  chunkserverInfo);
 
     // randomize
-    shuffle(chunkserverInfo, *chunkserverCount,
-            sizeof(liz_chunkserver_info_t));
+    shuffle(chunkserverInfo, *chunkserverCount, sizeof(liz_chunkserver_info_t));
 
     return chunkserverInfo;
 }
 
-/*! \brief Fill DS list with entries corresponding to chunks */
+/**
+ * @brief Fill Data Server list with entries corresponding to chunks.
+ *
+ * @param[in] export                Export where the chunkservers live on
+ * @param[in] chunkserverCount      Pointer to store the number of chunkservers
+ *
+ * @returns: Operation status.
+ *
+ * @retval   0: Successful operation
+ * @retval  -1: Failing operation
+ */
 static int fillChunkDataServerList(XDR *da_addr_body,
                                    liz_chunk_info_t *chunkInfo,
                                    liz_chunkserver_info_t *chunkserverInfo,
@@ -204,8 +285,21 @@ static int fillChunkDataServerList(XDR *da_addr_body,
     return 0;
 }
 
-/*! \brief Fill unused part of DS list with servers from randomized chunkserver
- *  list */
+/**
+ * @brief Fill unused part of DS list with servers from randomized chunkserver list.
+ *
+ * @param[in] xdrStream             XDR stream
+ * @param[in] chunkserverInfo       Collection of chunkservers
+ * @param[in] chunkCount            Number of chunks
+ * @param[in] stripeCount           Number of stripe
+ * @param[in] chunkserverCount      Number of chunkservers
+ * @param[in] chunkserverIndex      Index of chunkserver
+ *
+ * @returns: Operation status.
+ *
+ * @retval   0: Successful operation
+ * @retval  -1: Failing operation
+ */
 static int fillUnusedDataServerList(XDR *xdrStream,
                                     liz_chunkserver_info_t *chunkserverInfo,
                                     uint32_t chunkCount,
@@ -248,7 +342,11 @@ static int fillUnusedDataServerList(XDR *xdrStream,
     return 0;
 }
 
-/*! \brief Get information about a pNFS device
+/**
+ * @brief Get information about a pNFS device.
+ *
+ * pNFS functions. When this function is called, the FSAL should write device
+ * information to the da_addr_body stream.
  *
  * The function converts LizardFS file's chunk information to pNFS device info.
  *
@@ -271,7 +369,13 @@ static int fillUnusedDataServerList(XDR *xdrStream,
  * rest of the stripe entries with addresses from RCSL (again LZFS_EXPECTED_BACKUP_DS_COUNT
  * addresses for each stripe entry).
  *
- * \see fsal_api.h for more information
+ * @param[in] FSALModule      FSAL module
+ * @param[out] xdrStream      An XDR stream to which the FSAL is to write the layout
+ *                            type-specific information corresponding to the deviceid.
+ * @param[in] type            The type of layout that specified the device
+ * @param[in] deviceid        The device to look up
+ *
+ * @returns: Valid error codes in RFC 5661, p. 365.
  */
 static nfsstat4 _getdeviceinfo(struct fsal_module *FSALModule,
                                XDR *xdrStream,
@@ -397,14 +501,31 @@ generic_err:
     return NFS4ERR_SERVERFAULT;
 }
 
-/*! \brief Get list of available devices
+/**
+ * @brief Get list of available devices.
  *
- * \see fsal_api.h for more information
+ * This function should populate calls cb values representing the low quad of
+ * deviceids it wishes to make the available to the caller. it should continue
+ * calling cb until cb returns false or it runs out of deviceids to make available.
+ *
+ * If cb returns false, it should assume that cb has not stored the most recent
+ * deviceid and set res->cookie to a value that will begin with the most recently
+ * provided.
+ *
+ * If it wishes to return no deviceids, it may set res->eof to true without
+ * calling cb at all.
+ *
+ * @param[in] exportHandle     Export handle
+ * @param[in] type             Type of layout to get devices for
+ * @param[in] opaque           Opaque pointer to be passed to callback
+ * @param[in] cb               Function taking device ID halves
+ * @param[in] res              In/out and output arguments of the function
+ *
+ * @returns: Valid error codes in RFC 5661, p. 365-6.
  */
 static nfsstat4 _getdevicelist(struct fsal_export *exportHandle,
                                layouttype4 type, void *opaque,
-                               bool (*cb)(void *opaque,
-                                          const uint64_t id),
+                               bool (*cb)(void *opaque, const uint64_t id),
                                struct fsal_getdevicelist_res *res)
 {
     // Unused variables to avoid compiler warnings
@@ -417,9 +538,18 @@ static nfsstat4 _getdevicelist(struct fsal_export *exportHandle,
     return NFS4_OK;
 }
 
-/*! \brief Get layout types supported by export
+/**
+ * @brief Get layout types supported by export.
  *
- * \see fsal_api.h for more information
+ * This function is the handler of the NFS4.1 FATTR4_FS_LAYOUT_TYPES file attribute.
+ *
+ * @param[in]  exportHandle      Filesystem to interrogate
+ * @param[out] count             Number of layout types in array
+ * @param[out] types             Static array of layout types that must not be freed
+ *                               or modified and must not be dereferenced after
+ *                               export reference is relinquished
+ *
+ * @returns: Nothing
  */
 static void _fs_layouttypes(struct fsal_export *exportHandle,
                             int32_t *count,
@@ -433,9 +563,20 @@ static void _fs_layouttypes(struct fsal_export *exportHandle,
     *count = 1;
 }
 
-/*! \brief Get layout block size for export
+/**
+ * @brief Get layout block size for export.
  *
- * \see fsal_api.h for more information
+ * This function is the handler of the NFS4.1 FATTR4_LAYOUT_BLKSIZE f-attribute.
+ *
+ * This is the preferred read/write block size. Clients are requested (but
+ * don't have to) read and write in multiples.
+ *
+ * NOTE: The Linux client only asks for this in blocks-layout, where this is
+ * the filesystem wide block-size. (Minimum write size and alignment).
+ *
+ * @param[in] exportHandle      Filesystem to interrogate
+ *
+ * @returns: The preferred layout block size.
  */
 static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle)
 {
@@ -445,9 +586,16 @@ static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle)
     return MFSCHUNKSIZE;
 }
 
-/*! \brief Maximum number of segments we will use
+/**
+ * @brief Maximum number of segments we will use.
  *
- * \see fsal_api.h for more information
+ * This function returns the maximum number of segments that will be used to
+ * construct the response to any single layoutget call. Bear in mind that
+ * current clients only support 1 segment.
+ *
+ * @param[in] exportHandle      Filesystem to interrogate
+ *
+ * @returns: The Maximum number of layout segments in a compound layoutget.
  */
 static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle)
 {
@@ -457,9 +605,17 @@ static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle)
     return 1;
 }
 
-/*! \brief Size of the buffer needed for loc_body at layoutget
+/**
+ * @brief Size of the buffer needed for loc_body at layoutget.
  *
- * \see fsal_api.h for more information
+ * This function sets policy for XDR buffer allocation in layoutget vector below.
+ * If FSAL has a const size, just return it here. If it is dependent on what the
+ * client can take return ~0UL. In any case the buffer allocated will not be
+ * bigger than client's requested maximum.
+ *
+ * @param[in] exportHandle      Filesystem to interrogate
+ *
+ * @returns: Max size of the buffer needed for a loc_body.
  */
 static size_t _fs_loc_body_size(struct fsal_export *exportHandle)
 {
@@ -469,9 +625,17 @@ static size_t _fs_loc_body_size(struct fsal_export *exportHandle)
 	return 0x100;  // typical value in NFS FSAL plugins
 }
 
-/*! \brief Max Size of the buffer needed for da_addr_body in getdeviceinfo
+/**
+ * @brief Max Size of the buffer needed for da_addr_body in getdeviceinfo.
  *
- * \see fsal_api.h for more information
+ * This function sets policy for XDR buffer allocation in getdeviceinfo.
+ * If FSAL has a const size, just return it here. If it is dependent on
+ * what the client can take return ~0UL. In any case the buffer allocated
+ * will not be bigger than client's requested maximum.
+ *
+ * @param[in] FSALModule      FSAL Module
+ *
+ * @returns: Max size of the buffer needed for a da_addr_body.
  */
 static size_t _fs_da_addr_size(struct fsal_module *FSALModule)
 {
@@ -486,6 +650,14 @@ static size_t _fs_da_addr_size(struct fsal_module *FSALModule)
             (4 + (4 + LZFS_EXPECTED_BACKUP_DS_COUNT * 40)) + 32;
 }
 
+/**
+ * @brief Initialize pNFS export vector operations
+ *
+ * @param[in] ops      Export operations vector
+ *
+ * @returns: Nothing. After running the methods, the operations vectors
+ *           is initialized.
+ */
 void initializePnfsExportOperations(struct export_ops *ops)
 {
     ops->getdevicelist = _getdevicelist;
@@ -495,6 +667,14 @@ void initializePnfsExportOperations(struct export_ops *ops)
     ops->fs_loc_body_size = _fs_loc_body_size;
 }
 
+/**
+ * @brief Initialize pNFS related operations
+ *
+ * @param[in] ops      Export operations vector
+ *
+ * @returns: Nothing. After running the methods, the operations vectors
+ *           is initialized with the pNFS related operations.
+ */
 void initializePnfsOperations(struct fsal_ops *ops)
 {
     ops->getdeviceinfo = _getdeviceinfo;

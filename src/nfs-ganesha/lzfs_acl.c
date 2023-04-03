@@ -19,6 +19,14 @@
 #include "context_wrap.h"
 #include "lzfs_fsal_methods.h"
 
+/**
+ * @brief Convert an FSAL ACL to a LizardFS ACL.
+ *
+ * @param[in] fsalACL     FSAL ACL
+ * @param[in] mode        Mode used to create the acl and set POSIX permission flags
+ *
+ * @returns: Converted LizardFS ACL
+ */
 liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
                                      unsigned int mode)
 {
@@ -86,6 +94,13 @@ liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
     return nativeACL;
 }
 
+/**
+ * @brief Convert a LizardFS ACL to an FSAL ACL.
+ *
+ * @param[in] nativeACL     LizardFS ACL
+ *
+ * @returns: Converted FSAL ACL
+ */
 fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL)
 {
     fsal_acl_data_t ACLData;
@@ -149,6 +164,18 @@ fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL)
     return fsalACL;
 }
 
+/**
+ * @brief Get ACL from a file.
+ *
+ * This function returns the FSAL ACL of the file.
+ *
+ * @param[in] export       LizardFS export instance
+ * @param[in] inode        inode of the file
+ * @param[in] ownerId      ownerId of the file
+ * @param[in] fsalACL      Buffer to fill with information
+ *
+ * @returns: FSAL status.
+ */
 fsal_status_t getACL(struct FSExport *export, uint32_t inode,
                      uint32_t ownerId, fsal_acl_t **fsalACL)
 {
@@ -185,6 +212,18 @@ fsal_status_t getACL(struct FSExport *export, uint32_t inode,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
+/**
+ * @brief Set ACL to a file.
+ *
+ * This function sets the native ACL to a file from the FSAL ACL.
+ *
+ * @param[in] export      LizardFS export instance
+ * @param[in] inode       inode of the file
+ * @param[in] fsalACL     FSAL ACL to set
+ * @param[in] mode        Mode used to create the acl and set POSIX permission flags
+ *
+ * @returns: FSAL status.
+ */
 fsal_status_t setACL(struct FSExport *export, uint32_t inode,
                      const fsal_acl_t *fsalACL, unsigned int mode)
 {

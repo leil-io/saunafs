@@ -30,6 +30,14 @@
 #include "lzfs_fsal_types.h"
 #include "lzfs_fsal_methods.h"
 
+/**
+ * @brief Remove count expired instances from cache.
+ *
+ * @param[in] export     export that store the cache
+ * @param[in] count      number of instances to be removed
+ *
+ * @returns: Nothing
+ */
 static void clearFileinfoCache(struct FSExport *export, int count)
 {
     // Sanity Check
@@ -51,9 +59,17 @@ static void clearFileinfoCache(struct FSExport *export, int count)
     }
 }
 
-/*! \brief Clean up a DS handle
+/**
+ * @brief Clean up a DS handle.
  *
- * \see fsal_api.h for more information
+ * DS handle Lifecycle management.
+ * This function cleans up private resources associated with a filehandle
+ * and deallocates it. Implement this method or you will leak. This function
+ * should not be called directly.
+ *
+ * @param[in] dataServerHandle     Handle to release
+ *
+ * @returns: Nothing
  */
 static void _dsh_release(struct fsal_ds_handle *const dataServerHandle)
 {
@@ -80,6 +96,16 @@ static void _dsh_release(struct fsal_ds_handle *const dataServerHandle)
     clearFileinfoCache(export, 5);
 }
 
+/**
+ * @brief Open a file from DataServerHandle.
+ *
+ * Auxiliar function to open files in the syscalls related with Data Server.
+ *
+ * @param[in] export         Handle to release
+ * @param[in] dataServer     Data Server handle
+ *
+ * @returns: nfsstat4 status returned after opening the file
+ */
 static nfsstat4 openfile(struct FSExport *export,
                          struct DataServerHandle *dataServer)
 {
@@ -101,7 +127,7 @@ static nfsstat4 openfile(struct FSExport *export,
         return NFS4ERR_IO;
     }
 
-	fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
+    fileinfo_t *file_handle = liz_extract_fileinfo(dataServer->cacheHandle);
     if (file_handle != NULL) {
         return NFS4_OK;
     }
@@ -118,9 +144,24 @@ static nfsstat4 openfile(struct FSExport *export,
     return NFS4_OK;
 }
 
-/*! \brief Read from a data-server handle.
+/**
+ * @brief Read from a data-server handle.
  *
- * \see fsal_api.h for more information
+ * DS handle I/O Functions
+ *
+ * NFSv4.1 data server handles are disjount from normal filehandles (in Ganesha,
+ * there is a ds_flag in the filehandle_v4_t structure) and do not get loaded
+ * into mdcache or processed the normal way.
+ *
+ * @param[in] dataServerHandle      Handle to release
+ * @param[in] stateid               The stateid supplied with the READ operation, for validation
+ * @param[in] offset                The offset at which to read
+ * @param[in] requestedLength       Length of read requested (and size of buffer)
+ * @param[out] buffer               The buffer to which to store read data
+ * @param[out] suppliedLength       Length of data read
+ * @param[out] eof                  true on end of file
+ *
+ * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
                           const stateid4 *stateid,
@@ -168,9 +209,24 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
     return NFS4_OK;
 }
 
-/*! \brief Write to a data-server handle.
+/**
+ * @brief Write to a data-server handle.
  *
- * \see fsal_api.h for more information
+ * NFSv4.1 data server filehandles are disjount from normal filehandles (in Ganesha,
+ * there is a ds_flag in the filehandle_v4_t structure) and do not get loaded into
+ * mdcache or processed the normal way.
+ *
+ * @param[in] dataServerHandle      FSAL DS handle
+ * @param[in] stateid               The stateid supplied with the READ operation, for validation
+ * @param[in] offset                The offset at which to read
+ * @param[in] writeLength           Length of write requested (and size of buffer)
+ * @param[out] buffer               The buffer to which to store read data
+ * @param[in] stability             wanted Stability of write
+ * @param[out] writtenLength        Length of data written
+ * @param[out] writeVerifier        Write verifier
+ * @param[out] stabilityGot         Stability used for write (must be as or more stable than request)
+ *
+ * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
                            const stateid4 *stateid,
@@ -226,9 +282,19 @@ static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
     return NFS4_OK;
 }
 
-/*! \brief Commit a byte range to a DS handle.
+/**
+ * @brief Commit a byte range to a DS handle.
  *
- * \see fsal_api.h for more information
+ * NFSv4.1 data server filehandles are disjount from normal filehandles (in Ganesha,
+ * there is a ds_flag in the filehandle_v4_t structure) and do not get loaded into
+ * mdcache or processed the normal way.
+ *
+ * @param[in] dataServerHandle      FSAL DS handle
+ * @param[in] offset                Start of commit window
+ * @param[in] count                 Length of commit window
+ * @param[out] writeVerifier        Write verifier
+ *
+ * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
                             const offset4 offset,
@@ -272,9 +338,23 @@ static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
     return NFS4_OK;
 }
 
-/*! \brief Read plus from a data-server handle.
+/**
+ * @brief Read plus from a data-server handle.
  *
- * \see fsal_api.h for more information
+ * NFSv4.2 data server handles are disjount from normal filehandles (in Ganesha,
+ * there is a ds_flag in the filehandle_v4_t structure) and do not get loaded into
+ * mdcache or processed the normal way.
+ *
+ * @param[in]  dataServerHandle      FSAL DS handle
+ * @param[in]  stateid               The stateid supplied with the READ operation, for validation
+ * @param[in]  offset                The offset at which to read
+ * @param[in]  requestedLength       Length of read requested (and size of buffer)
+ * @param[out] buffer                The buffer to which to store read data
+ * @param[out] suppliedLength        Length of data read
+ * @param[out] eof                   true on end of file
+ * @param[out] info                  IO info
+ *
+ * @returns: An NFSv4.2 status code.
  */
 static nfsstat4 _dsh_read_plus(struct fsal_ds_handle *const dataServerHandle,
                                const stateid4 *stateid,
@@ -299,9 +379,17 @@ static nfsstat4 _dsh_read_plus(struct fsal_ds_handle *const dataServerHandle,
     return NFS4ERR_NOTSUPP;
 }
 
-/*! \brief Create a FSAL data server handle from a wire handle
+/**
+ * @brief Create a FSAL data server handle from a wire handle.
  *
- * \see fsal_api.h for more information
+ * This function creates a FSAL data server handle from a client supplied "wire" handle.
+ *
+ * @param[in]  pnfsDataServer       FSAL pNFS DS
+ * @param[in]  bufferDescriptor     Buffer from which to create the struct
+ * @param[out] handle               FSAL DS handle
+ * @param[out] flags                Flags used to create the FSAL data server handle
+ *
+ * @returns: NFSv4.1 error codes.
  */
 static nfsstat4 _make_ds_handle(struct fsal_pnfs_ds *const pnfsDataServer,
                                 const struct gsh_buffdesc *const bufferDescriptor,
@@ -345,9 +433,13 @@ static nfsstat4 _make_ds_handle(struct fsal_pnfs_ds *const pnfsDataServer,
     return NFS4_OK;
 }
 
-/*! \brief Initialize FSAL specific permissions per pNFS DS
+/**
+ * @brief Initialize FSAL specific permissions per pNFS DS.
  *
- * \see fsal_api.h for more information
+ * @param[in] pnfsDataServer     FSAL pNFS DS
+ * @param[in] request            Incoming request
+ *
+ * @returns: NFSv4.1 error codes: NFS4_OK, NFS4ERR_ACCESS, NFS4ERR_WRONGSEC
  */
 static nfsstat4 _ds_permissions(struct fsal_pnfs_ds *const pnfsDataServer,
                                 struct svc_req *request)
@@ -361,6 +453,13 @@ static nfsstat4 _ds_permissions(struct fsal_pnfs_ds *const pnfsDataServer,
     return NFS4_OK;
 }
 
+/**
+ * @brief Initialize FSAL specific values for pNFS Data Server.
+ *
+ * @param[in] ops     FSAL pNFS Data Server operations vector
+ *
+ * @returns: Nothing, it just initializes Data Server operations vector
+ */
 void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops)
 {
     memcpy(ops, &def_pnfs_ds_ops, sizeof(struct fsal_pnfs_ds_ops));

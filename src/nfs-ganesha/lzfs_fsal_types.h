@@ -59,6 +59,14 @@
 
 typedef liz_fileinfo_t fileinfo_t;
 
+/**
+ * @struct FSModule lzfs_fsal_types.h [lzfs_fsal_types.h]
+ *
+ * @brief LizardFS Main global module object.
+ *
+ * FSModule contains the global module object, FSAL object
+ * operations vector and the parameters of the filesystem info.
+ */
 struct FSModule {
     struct fsal_module module;
     struct fsal_obj_ops operations;
@@ -71,7 +79,15 @@ extern struct FSModule LizardFS;
 // forward reference
 struct FSHandle;
 
-// internal fsal export
+/**
+ * @struct FSExport lzfs_fsal_types.h [lzfs_fsal_types.h]
+ *
+ * @brief LizardFS private export object.
+ *
+ * FSExport contains information related with the export,
+ * the filesystem operations, the parameters used to connect
+ * to the master server, the cache used and the pNFS support.
+ */
 struct FSExport {
     struct fsal_export export; /// Export object
     struct FSHandle *rootHandle; /// root handle of export
@@ -87,11 +103,24 @@ struct FSExport {
     uint32_t cacheMaximumSize; /// Maximum size of cache
 };
 
+/**
+ * @struct FSFileDescriptor lzfs_fsal_types.h [lzfs_fsal_types.h]
+ *
+ * @brief LizardFS FSAL file descriptor.
+ *
+ * FSFileDescriptor works as a container to handle the information of a
+ * file descriptor and its flags associated like open and share mode.
+ */
 struct FSFileDescriptor {
     fsal_openflags_t openFlags; /// The open and share mode
     struct liz_fileinfo *fileDescriptor; /// File descriptor instance
 };
 
+/**
+ * @struct FSFileDescriptorState lzfs_fsal_types.h [lzfs_fsal_types.h]
+ *
+ * @brief Associates a single NFSv4 state structure with a file descriptor.
+ */
 struct FSFileDescriptorState {
     struct state_t state; /// Structure representing a single NFSv4 state
     struct FSFileDescriptor fileDescriptor; /// File descriptor instance
@@ -103,12 +132,16 @@ struct FSALKey {
     liz_inode_t inode; /// inode
 };
 
-/*
- * FSHandle is one of the most important concepts of Ganesha.
- * It contains the information related with the public structure of
- * the filesystem and its operations.
+/**
+ * @struct FSHandle lzfs_fsal_types.h [lzfs_fsal_types.h]
+ *
+ * @brief LizardFS FSAL handle.
+ *
+ * FSHandle is one of the most important concepts of LizardFS FSAL.
+ *
+ * It contains information related with the public structure of the
+ * filesystem and its operations.
  */
-
 struct FSHandle {
     struct fsal_obj_handle fileHandle; /// Public structure for filesystem objects.
     struct FSFileDescriptor fileDescriptor; /// File descriptor instance

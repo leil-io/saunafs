@@ -27,9 +27,28 @@
 #include "lzfs_fsal_methods.h"
 #include "protocol/MFSCommunication.h"
 
-/*! \brief Grant a layout segment.
+/**
+ * @brief Grant a layout segment.
  *
- * \see fsal_api.h for more information
+ * pNFS functions.
+ *
+ * This function is called by nfs41_op_layoutget. It may be called multiple times,
+ * to satisfy a request with multiple segments. The FSAL may track state (what
+ * portion of the request has been or remains to be satisfied or any other
+ * information it wishes) in the bookkeeper member of res. Each segment may have
+ * FSAL-specific information associated with it its segid. This segid will be
+ * supplied to the FSAL when the segment is committed or returned.
+ *
+ * When the granting the last segment it intends to grant, the FSAL must set the
+ * last_segment flag in res.
+ *
+ * @param[in] objectHandle      The handle of the file on which the layout is requested
+ * @param[out] xdrStream        An XDR stream to which the FSAL must encode the layout
+ *                              specific portion of the granted layout segment
+ * @param[in] arguments         Input arguments of the function
+ * @param[in,out] output        In/out and output arguments of the function
+ *
+ * @returns: Valid error codes in RFC 5661, pp. 366-7.
  */
 static nfsstat4 _layoutget(struct fsal_obj_handle *objectHandle,
                            XDR *xdrStream,
@@ -83,9 +102,26 @@ static nfsstat4 _layoutget(struct fsal_obj_handle *objectHandle,
 }
 
 
-/*! \brief Potentially return one layout segment
+/**
+ * @brief Potentially return one layout segment.
  *
- * \see fsal_api.h for more information
+ * This function is called once on each segment matching the IO mode and
+ * intersecting the range specified in a LAYOUTRETURN operation or for all
+ * layouts corresponding to a given stateid on last close, lease expiry, or
+ * a layoutreturn with a return-type of FSID or ALL. Whether it is called in
+ * the former or latter case is indicated by the synthetic flag in the arg
+ * structure, with synthetic being true in the case of last-close or lease expiry.
+ *
+ * If arg->dispose is true, all resources associated with the layout must be freed.
+ *
+ * @param[in] objectHandle      The object on which a segment is to be returned
+ * @param[in] xdrStream         In the case of a non-synthetic return, this is an
+ *                              XDR stream corresponding to the layout type-specific
+ *                              argument to LAYOUTRETURN. In the case of a synthetic
+ *                              or bulk return, this is a NULL pointer
+ * @param[in] arguments         Input arguments of the function
+ *
+ * @returns: Valid error codes in RFC 5661, p. 367.
  */
 static nfsstat4 _layoutreturn(struct fsal_obj_handle *objectHandle,
                               XDR *xdrStream,
@@ -105,9 +141,23 @@ static nfsstat4 _layoutreturn(struct fsal_obj_handle *objectHandle,
     return NFS4_OK;
 }
 
-/*! \brief Commit a segment of a layout
+/**
+ * @brief Commit a segment of a layout.
  *
- * \see fsal_api.h for more information
+ * This function is called once on every segment of a layout.
+ * The FSAL may avoid being called again after it has finished all tasks
+ * necessary for the commit by setting res->commit_done to true.
+ *
+ * The calling function does not inspect or act on the value of size_supplied
+ * or new_size until after the last call to FSAL_layoutcommit.
+ *
+ * @param[in] objectHandle      The object on which to commit
+ * @param[in] xdrStream         An XDR stream containing the layout type-specific
+ *                              portion of the LAYOUTCOMMIT arguments
+ * @param[in] arguments         Input arguments of the function
+ * @param[in,out] output        In/out and output arguments of the function
+ *
+ * @returns: Valid error codes in RFC 5661, p. 366.
  */
 static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
                               XDR *xdrStream,
@@ -183,6 +233,14 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
     return NFS4_OK;
 }
 
+/**
+ * @brief Initialize pNFS related operations
+ *
+ * @param[in] ops      FSAL object operations vector
+ *
+ * @returns: Nothing. After running this method, the operations vector
+ *           is initialized with the pNFS related operations.
+ */
 void initializeMetaDataServerOperations(struct fsal_obj_ops *ops)
 {
     ops->layoutget = _layoutget;

@@ -92,21 +92,22 @@ static void release(struct fsal_export *exportHandle)
     gsh_free(export);
 }
 
-/** @brief Look up a path.
+/**
+ * @brief Look up a path.
  *
- *  Create an object handles within this export.
+ * Create an object handles within this export.
  *
- *  This function looks up a path within the export, it is now exclusively
- *  used to get a handle for the root directory of the export.
+ * This function looks up a path within the export, it is now exclusively
+ * used to get a handle for the root directory of the export.
  *
- *  @param [in]     exportHandle     The export in which to look up
- *  @param [in]     path             The path to look up
- *  @param [out]    handle           The object found
- *  @param [in,out] attributes       Optional attributes for newly created object
+ * @param [in]     exportHandle     The export in which to look up
+ * @param [in]     path             The path to look up
+ * @param [out]    handle           The object found
+ * @param [in,out] attributes       Optional attributes for newly created object
  *
- *  \see fsal_api.h for more information
+ * \see fsal_api.h for more information
  *
- *  @returns: FSAL status
+ * @returns: FSAL status
  */
 fsal_status_t lookup_path(struct fsal_export *exportHandle,
                           const char *path, struct fsal_obj_handle **handle,
@@ -225,16 +226,17 @@ static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/** @brief Allocate a state_t structure.
+/**
+ * @brief Allocate a state_t structure.
  *
- *  Note that this is not expected to fail since memory allocation is
- *  expected to abort on failure.
+ * Note that this is not expected to fail since memory allocation is
+ * expected to abort on failure.
  *
- *  @param [in] export           Export state_t will be associated with
- *  @param [in] stateType        Type of state to allocate
- *  @param [in] relatedState     Related state if appropriate
+ * @param [in] export           Export state_t will be associated with
+ * @param [in] stateType        Type of state to allocate
+ * @param [in] relatedState     Related state if appropriate
  *
- *  @returns: a state structure.
+ * @returns: a state structure.
  */
 struct state_t *allocate_state(struct fsal_export *export,
                                enum state_type stateType,
@@ -254,7 +256,8 @@ struct state_t *allocate_state(struct fsal_export *export,
     return state;
 }
 
-/** \brief Free a state_t structure.
+/**
+ * @brief Free a state_t structure.
  *
  * @param[in] export     Export state_t is associated with
  * @param[in] state      state_t structure to free

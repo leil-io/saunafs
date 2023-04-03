@@ -39,9 +39,16 @@
 #include "context_wrap.h"
 #include "common/lizardfs_error_codes.h"
 
-/*! \brief Clean up a filehandle
+/**
+ * @brief Clean up a filehandle.
  *
- * \see fsal_api.h for more information
+ * This function cleans up private resources associated with a
+ * filehandle and deallocates it.
+ *
+ * Implement this method or you will leak. Refcount (if used)
+ * should be 1.
+ *
+ * @param[in] objectHandle     Handle to release
  */
 static void _release(struct fsal_obj_handle *objectHandle)
 {
@@ -53,9 +60,20 @@ static void _release(struct fsal_obj_handle *objectHandle)
     }
 }
 
-/*! \brief Look up a filename
+/**
+ * @brief Look up a filename.
+ *
+ * Directory operations.
+ * This function looks up the given name in the supplied directory.
+ *
+ * @param [in]     dirHandle        Directory to search
+ * @param [in]     path             Name to look up
+ * @param [out]    objectHandle     Object found
+ * @param [in,out] attributes       Optional attributes for newly created object
  *
  * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _lookup(struct fsal_obj_handle *dirHandle,
                              const char *path,
@@ -86,9 +104,19 @@ static fsal_status_t _lookup(struct fsal_obj_handle *dirHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Read a directory
+/**
+ * @brief Read a directory.
  *
- * \see fsal_api.h for more information
+ * This function reads directory entries from the FSAL and supplies them to a callback.
+ *
+ * @param [in]  dirHandle          Directory to read
+ * @param [in]  whence             Point at which to start reading. NULL to start at beginning
+ * @param [in]  dirState           Opaque pointer to be passed to callback
+ * @param [in]  readdirCb          Callback to receive names
+ * @param [in]  attributesMask     Indicate which attributes the caller is interested in
+ * @param [out] eof                true if the last entry was reached
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
                               fsal_cookie_t *whence, void *dirState,
@@ -173,9 +201,19 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Get attributes
+/**
+ * @brief Get attributes.
+ *
+ * This function fetches the attributes for the object.
+ * The attributes requested in the mask are copied out
+ * (though other attributes might be copied out).
+ *
+ * @param [in]  objectHandle       Object to query
+ * @param [out] attributes         Attribute list for file
  *
  * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _getattrs(struct fsal_obj_handle *objectHandle,
                                struct fsal_attrlist *attributes)
@@ -216,9 +254,18 @@ static fsal_status_t _getattrs(struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Write wire handle
+/**
+ * @brief Write wire handle.
  *
- * \see fsal_api.h for more information
+ * Handle operations.
+ * This function writes a "wire" handle or file ID to the given buffer.
+ *
+ * @param [in]     objectHandle       The handle to digest
+ * @param [in]     outputType         The type of digest to write
+ * @param [in,out] bufferDescriptor   Buffer descriptor to which to write digest.
+ *                                    Set fh_desc->len to final output length.
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _handle_to_wire(const struct fsal_obj_handle *objectHandle,
                                      uint32_t outputType,
@@ -244,9 +291,15 @@ static fsal_status_t _handle_to_wire(const struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Get key for handle
+/**
+ * @brief Get key for handle.
  *
- * \see fsal_api.h for more information
+ * Indicate the unique part of the handle that should be used for hashing.
+ *
+ * @param [in]  objectHandle         Handle whose key is to be got
+ * @param [out] bufferDescriptor     Address and length giving sub-region of handle to be used as key.
+ *
+ * @returns: FSAL status
  */
 static void _handle_to_key(struct fsal_obj_handle *objectHandle,
                            struct gsh_buffdesc *bufferDescriptor)
@@ -258,6 +311,16 @@ static void _handle_to_key(struct fsal_obj_handle *objectHandle,
     bufferDescriptor->len = sizeof(struct FSALKey);
 }
 
+/**
+ * @brief Open a LizardFS file descriptor.
+ *
+ * @param [in] handle            LizardFS internal object handle
+ * @param [in] openflags         Mode for open
+ * @param [in] fd                LizardFS file descriptor to open
+ * @param [in] noAccessCheck     Whether the caller checked access or not
+ *
+ * @returns: FSAL status
+ */
 static fsal_status_t openFileDescriptor(struct FSHandle *handle,
                                         fsal_openflags_t openflags,
                                         struct FSFileDescriptor *fd,
@@ -293,6 +356,14 @@ static fsal_status_t openFileDescriptor(struct FSHandle *handle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
+/**
+ * @brief Close a LizardFS file descriptor.
+ *
+ * @param [in] handle            LizardFS internal object handle
+ * @param [in] fd                LizardFS file descriptor to open
+ *
+ * @returns: FSAL status
+ */
 static fsal_status_t closeFileDescriptor(struct FSHandle *handle,
                                          struct FSFileDescriptor *fd)
 {
@@ -310,6 +381,21 @@ static fsal_status_t closeFileDescriptor(struct FSHandle *handle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
+/**
+ * @brief Open a file using its handle.
+ *
+ * @param [in] objectHandle                  File handle to open
+ * @param [in] state                         state_t to use for this operation
+ * @param [in] openflags                     Mode for open
+ * @param [in] createmode                    Mode for create
+ * @param [in] verifier                      Verifier to use for exclusive create
+ * @param [in] attributes                    Attributes to set on created file
+ * @param [in,out] callerPermissionCheck     The caller must do a permission check
+ * @param [in] afterMknode                   The file is opened after performing
+ *                                           a makenode operation
+ *
+ * @returns: FSAL status
+ */
 static fsal_status_t openByHandle(struct fsal_obj_handle *objectHandle,
                                   struct state_t *state,
                                   fsal_openflags_t openflags,
@@ -428,6 +514,21 @@ undo_share:
     return status;
 }
 
+/**
+ * @brief Open a file using its name.
+ *
+ * @param [in] objectHandle                  File handle to open
+ * @param [in] state                         state_t to use for this operation
+ * @param [in] openflags                     Mode for open
+ * @param [in] name                          Name of the file
+ * @param [in] verifier                      Verifier to use for exclusive create
+ * @param [in] attributes                    Attributes to set on created file
+ * @param [in,out] callerPermissionCheck     The caller must do a permission check
+ * @param [in] afterMknode                   The file is opened after performing
+ *                                           a makenode operation
+ *
+ * @returns: FSAL status
+ */
 static fsal_status_t openByName(struct fsal_obj_handle *objectHandle,
                                 struct state_t *state,
                                 fsal_openflags_t openflags,
@@ -459,9 +560,33 @@ static fsal_status_t openByName(struct fsal_obj_handle *objectHandle,
     return status;
 }
 
-/*! \brief Open a file descriptor for read or write and possibly create
+/**
+ * @brief Open a file descriptor for read or write and possibly create.
+ *
+ * Extended API functions.
+ * With these new operations, the FSAL becomes responsible for managing share reservations.
+ * The FSAL is also granted more control over the state of a "file descriptor" and has more
+ * control of what a "file descriptor" even is. Ultimately, it is whatever the FSAL needs
+ * in order to manage the share reservations and lock state.
+
+ * The open2 method also allows atomic create/setattr/open (just like the NFS v4 OPEN operation).
+ * This function opens a file for read or write, possibly creating it. If the caller is passing
+ * a state, it must hold the state_lock exclusive.
+ *
+ * @param [in]  objectHandle                 File to open or parent directory
+ * @param [in]  state                        state_t to use for this operation
+ * @param [in]  openflags                    Mode for open
+ * @param [in]  createmode                   Mode for create
+ * @param [in]  name                         Name for file if being created or opened
+ * @param [in]  attributesToSet              Attributes to set on created file
+ * @param [in]  verifier                     Verifier to use for exclusive create
+ * @param [in,out] createdObject             Newly created object
+ * @param [in,out] attributes                Optional attributes for newly created object
+ * @param [in,out] callerPermissionCheck     The caller must do a permission check
  *
  * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _open2(struct fsal_obj_handle *objectHandle,
                             struct state_t *state,
@@ -569,6 +694,15 @@ fileerr:
     return status;
 }
 
+/**
+ * @brief Function to open an fsal_obj_handle's global file descriptor.
+ *
+ * @param[in]  objectHandle       File on which to operate
+ * @param[in]  openflags          Mode for open
+ * @param[out] fileDescriptor     File descriptor that is to be used
+ *
+ * @return FSAL status.
+ */
 static fsal_status_t openFunction(struct fsal_obj_handle *objectHandle,
                                   fsal_openflags_t openflags,
                                   struct fsal_fd *fileDescriptor)
@@ -579,6 +713,14 @@ static fsal_status_t openFunction(struct fsal_obj_handle *objectHandle,
                               (struct FSFileDescriptor *)fileDescriptor, true);
 }
 
+/**
+ * @brief Function to close an fsal_obj_handle's global file descriptor.
+ *
+ * @param[in] objectHandle       File on which to operate
+ * @param[in] fileDescriptor     File handle to close
+ *
+ * @return FSAL status.
+ */
 static fsal_status_t closeFunction(struct fsal_obj_handle *objectHandle,
                                    struct fsal_fd *fileDescriptor)
 {
@@ -588,6 +730,25 @@ static fsal_status_t closeFunction(struct fsal_obj_handle *objectHandle,
                                (struct FSFileDescriptor *)fileDescriptor);
 }
 
+/**
+ * @brief Find a usable file descriptor for a regular file.
+ *
+ * This function is a wrapper that initializes the needed variables before calling
+ * fsal_find_fd function passing the expected attributes.
+ *
+ * @param[in,out] fileDescriptor       Usable file descriptor found
+ * @param[in] objectHandle             File on which to operate
+ * @param[in] bypass                   If state doesn't indicate a share reservation, bypass any deny read
+ * @param[in] state                    state_t to use for this operation
+ * @param[in] openflags                Mode for open
+ * @param[out] hasLock                 Indicates that objectHandle->obj_lock is held read
+ * @param[out] closeFileDescriptor     Indicates that file descriptor must be closed
+ * @param[out] openForLocks            Indicates file is open for locks
+ *
+ * \see fsal_find_fd() function for more information
+ *
+ * @return FSAL status.
+ */
 static fsal_status_t findFileDescriptor(struct FSFileDescriptor *fileDescriptor,
                                         struct fsal_obj_handle *objectHandle,
                                         bool bypass, struct state_t *state,
@@ -617,9 +778,22 @@ static fsal_status_t findFileDescriptor(struct FSFileDescriptor *fileDescriptor,
 }
 
 /**
- * \brief Read data from a file
+ * @brief Read data from a file.
  *
- * \see fsal_api.h for more information
+ * This function reads data from the given file. The FSAL must be able to perform the read
+ * whether a state is presented or not.
+ *
+ * This function also is expected to handle properly bypassing or not share reservations.
+ * This is an (optionally) asynchronous call. When the I/O is complete, the done callback
+ * is called with the results.
+ *
+ * @param [in]     objectHandle     File on which to operate
+ * @param [in]     bypass           If state doesn't indicate a share reservation, bypass any deny read
+ * @param [in,out] doneCb           Callback to call when I/O is done
+ * @param [in,out] readArg          Info about read, passed back in callback
+ * @param [in,out] callerArg        Opaque arg from the caller for callback
+ *
+ * @returns: Nothing; results are in callback
  */
 static void _read2(struct fsal_obj_handle *objectHandle,
                    bool bypass, fsal_async_cb doneCb,
@@ -690,9 +864,19 @@ out:
     doneCb(objectHandle, status, readArg, callerArg);
 }
 
-/*! \brief Create a directory
+/** @brief Create a directory.
+ *
+ * Creation operations. This function creates a new directory.
+ *
+ * @param [in]     directoryHandle     Directory in which to create the directory
+ * @param [in]     name                Name of directory to create
+ * @param [in]     attributesToSet     Attributes to set on newly created object
+ * @param [out]    createdObject       Newly created object
+ * @param [in,out] attributes          Optional attributes for newly created object
  *
  * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
                             const char *name,
@@ -757,9 +941,16 @@ static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Create a new link
+/**
+ * @brief Create a new link.
  *
- * \see fsal_api.h for more information
+ * This function creates a new name for an existing object.
+ *
+ * @param [in] objectHandle             Object to be linked to
+ * @param [in] destinationDirHandle     Directory in which to create the link
+ * @param [in] name                     Name for link
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _link(struct fsal_obj_handle *objectHandle,
                            struct fsal_obj_handle *destinationDirHandle,
@@ -790,9 +981,18 @@ static fsal_status_t _link(struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Rename a file
+/**
+ * @brief Rename a file.
  *
- * \see fsal_api.h for more information
+ * This function renames a file (technically it changes the name of one link,
+ * which may be the only link to the file.)
+ *
+ * @param [in] oldParentHandle     Source directory
+ * @param [in] oldName             Original name
+ * @param [in] newParentHandle     Destination directory
+ * @param [in] newName             New name
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _rename(struct fsal_obj_handle *objectHandle,
                              struct fsal_obj_handle *oldParentHandle,
@@ -822,11 +1022,18 @@ static fsal_status_t _rename(struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Remove a name from a directory
+/**
+ * @brief Remove a name from a directory.
  *
- * \see fsal_api.h for more information
+ * This function removes a name from a directory and possibly deletes the file so named.
+ *
+ * @param [in] directoryHandle     The directory from which to remove the name
+ * @param [in] objectHandle        The object being removed
+ * @param [in] name                The name to remove
+ *
+ * @returns: FSAL status
  */
-static fsal_status_t _unlink(struct fsal_obj_handle *parentDirHandle,
+static fsal_status_t _unlink(struct fsal_obj_handle *directoryHandle,
                              struct fsal_obj_handle *objectHandle,
                              const char *name)
 {
@@ -835,7 +1042,7 @@ static fsal_status_t _unlink(struct fsal_obj_handle *parentDirHandle,
     int rc;
 
     export = container_of(op_ctx->fsal_export, struct FSExport, export);
-    directory = container_of(parentDirHandle, struct FSHandle, fileHandle);
+    directory = container_of(directoryHandle, struct FSHandle, fileHandle);
 
     LogFullDebug(COMPONENT_FSAL, "export = %" PRIu16 " parent_inode = %"
                  PRIu32 " name = %s type = %s", export->export.export_id,
@@ -858,9 +1065,15 @@ static fsal_status_t _unlink(struct fsal_obj_handle *parentDirHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Close a file
+/**
+ * @brief Close a file.
  *
- * \see fsal_api.h for more information
+ * This function closes a file. This should return ERR_FSAL_NOT_OPENED if the global
+ * FD for this obj was not open.
+ *
+ * @param [in] objectHandle     File to close
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _close(struct fsal_obj_handle *objectHandle)
 {
@@ -883,9 +1096,25 @@ static fsal_status_t _close(struct fsal_obj_handle *objectHandle)
     return status;
 }
 
-/*! \brief Write data to a file
+/**
+ * @brief Write data to a file.
  *
- * \see fsal_api.h for more information
+ * This function writes data to a file. The FSAL must be able to perform the write
+ * whether a state is presented or not. This function also is expected to handle
+ * properly bypassing or not share reservations. Even with bypass == true, it will
+ * enforce a mandatory (NFSv4) deny_write if an appropriate state is not passed).
+
+ * The FSAL is expected to enforce sync if necessary. This is an (optionally)
+ * asynchronous call. When the I/O is complete, the done_cb callback is called.
+ *
+ * @param [in]     objectHandle     File on which to operate
+ * @param [in]     bypass           If state doesn't indicate a share reservation,
+ *                                  bypass any non-mandatory deny write
+ * @param [in,out] doneCb           Callback to call when I/O is done
+ * @param [in,out] writeArg         Info about write, passed back in callback
+ * @param [in,out] callerArg        Opaque arg from the caller for callback
+ *
+ * @returns: Nothing; results are in callback
  */
 static void _write2(struct fsal_obj_handle *objectHandle,
                     bool bypass, fsal_async_cb doneCb,
@@ -961,9 +1190,19 @@ out:
     doneCb(objectHandle, status, writeArg, callerArg);
 }
 
-/*! \brief Commit written data
+/**
+ * @brief Commit written data.
  *
- * \see fsal_api.h for more information
+ * This function flushes possibly buffered data to a file. This method differs
+ * from commit due to the need to interact with share reservations and the fact
+ * that the FSAL manages the state of "file descriptors". The FSAL must be able
+ * to perform this operation without being passed a specific state.
+ *
+ * @param [in] objectHandle     File on which to operate
+ * @param [in] offset           Start of range to commit
+ * @param [in] length           Length of range to commit
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _commit2(struct fsal_obj_handle *objectHandle,
                               off_t offset, size_t length)
@@ -1015,9 +1254,22 @@ static fsal_status_t _commit2(struct fsal_obj_handle *objectHandle,
     return status;
 }
 
-/*! \brief Set attributes on an object
+/**
+ * @brief Set attributes on an object.
  *
- * \see fsal_api.h for more information
+ * This function sets attributes on an object. Which attributes are set is determined
+ * by attrib_set->mask. The FSAL must manage bypass or not of share reservations, and
+ * a state may be passed.
+
+ * The caller is expected to invoke fsal_release_attrs to release any resources held
+ * by the set attributes. The FSAL layer MAY have added an inherited ACL.
+ *
+ * @param [in] objectHandle     File on which to operate
+ * @param [in] bypass           If state doesn't indicate a share reservation, bypass any non-mandatory deny write
+ * @param [in] state            state_t to use for this operation
+ * @param [in] attributes       Attributes to set
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _setattr2(struct fsal_obj_handle *objectHandle,
                                bool bypass, struct state_t *state,
@@ -1127,9 +1379,17 @@ out:
     return status;
 }
 
-/*! \brief Manage closing a file when a state is no longer needed.
+/**
+ * @brief Manage closing a file when a state is no longer needed.
  *
- * \see fsal_api.h for more information
+ * When the upper layers are ready to dispense with a state, this method is called
+ * to allow the FSAL to close any file descriptors or release any other resources
+ * associated with the state. A call to free_state should be assumed to follow soon.
+ *
+ * @param [in] objectHandle     File on which to operate
+ * @param [in] state            state_t to use for this operation
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _close2(struct fsal_obj_handle *objectHandle,
                              struct state_t *state)
@@ -1156,9 +1416,21 @@ static fsal_status_t _close2(struct fsal_obj_handle *objectHandle,
     return closeFileDescriptor(handle, &handle->fileDescriptor);
 }
 
-/*! \brief Create a symbolic link
+/**
+ * @brief Create a symbolic link.
+ *
+ * This function creates a new symbolic link.
+ *
+ * @param [in] directoryHandle      Directory in which to create the object
+ * @param [in] name                 Name of object to create
+ * @param [in] symbolicLinkPath     Content of symbolic link
+ * @param [in] attributesToSet      Attributes to set on newly created object
+ * @param [out] createdObject       Newly created object
+ * @param [in,out] attributes       Optional attributes for newly created object
  *
  * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
                               const char *name,
@@ -1216,6 +1488,24 @@ static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
+/**
+ * @brief Perform a lock operation.
+ *
+ * This function performs a lock operation (lock, unlock, test) on a file.
+ * This method assumes the FSAL is able to support lock owners, though it
+ * need not support asynchronous blocking locks. Passing the lock state
+ * allows the FSAL to associate information with a specific lock owner
+ * for each file (which may include use of a "file descriptor".
+ *
+ * @param [in]  objectHandle        File on which to operate
+ * @param [in]  state               state_t to use for this operation
+ * @param [in]  owner               Lock owner
+ * @param [in]  lockOperation       Operation to perform
+ * @param [in]  requestedLock       Lock to take/release/test
+ * @param [out] conflictingLock     Conflicting lock
+ *
+ * @returns: FSAL status
+ */
 fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
                         struct state_t *state,
                         void *owner, fsal_lock_op_t lockOperation,
@@ -1368,9 +1658,20 @@ err:
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Re-open a file that may be already opened
+/**
+ * @brief Re-open a file that may be already opened.
  *
- * \see fsal_api.h for more information
+ * This function supports changing the access mode of a share reservation and
+ * thus should only be called with a share state. The st_lock must be held.
+ *
+ * This MAY be used to open a file the first time if there is no need for open
+ * by name or create semantics. One example would be 9P lopen.
+ *
+ * @param [in] objectHandle     File on which to operate
+ * @param [in] state            state_t to use for this operation
+ * @param [in] openflags        Mode for re-open
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _reopen2(struct fsal_obj_handle *objectHandle,
                               struct state_t *state,
@@ -1428,9 +1729,21 @@ static fsal_status_t _reopen2(struct fsal_obj_handle *objectHandle,
     return status;
 }
 
-/*! \brief Create a special file
+/**
+ * @brief Create a special file.
+ *
+ * Create a special file. This function creates a new special file.
+ *
+ * @param [in] directoryHandle     Directory in which to create the object
+ * @param [in] name                Name of object to create
+ * @param [in] nodeType            Type of special file to create
+ * @param [in] attributesToSet     Attributes to set on newly created object
+ * @param [in] createdObject       Newly created object
+ * @param [in] attributes          Optional attributes for newly created object
  *
  * \see fsal_api.h for more information
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
                              const char *name,
@@ -1516,9 +1829,24 @@ static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Read the content of a link
+/**
+ * @brief Read the content of a link.
  *
- * \see fsal_api.h for more information
+ * File object operations.
+ * This function reads the content of a symbolic link. The FSAL will allocate a
+ * buffer and store its address and the link length in the link_content
+ * gsh_buffdesc. The caller must free this buffer with gsh_free.
+ *
+ * The symlink content passed back must be null terminated and the length
+ * indicated in the buffer description must include the terminator.
+ *
+ * @param [in]  objectHandle     Link to read
+ * @param [out] linkContent      Buffdesc to which the FSAL will store the address
+ *                               of the buffer holding the link and the link length
+ * @param [out] refresh          true if the content are to be retrieved from the
+ *                               underlying filesystem rather than cache
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _readlink(struct fsal_obj_handle *objectHandle,
                                struct gsh_buffdesc *linkContent,
@@ -1553,9 +1881,16 @@ static fsal_status_t _readlink(struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Return open status of a state.
+/**
+ * @brief Return open status of a state.
  *
- * \see fsal_api.h for more information
+ * This function returns open flags representing the current open status
+ * for a state. The st_lock must be held.
+ *
+ * @param [in] objectHandle     File owning state
+ * @param [in] state            File state to interrogate
+ *
+ * @returns: Flags representing current open status
  */
 static fsal_openflags_t _status2(struct fsal_obj_handle *objectHandle,
                                  struct state_t *state)
@@ -1567,9 +1902,20 @@ static fsal_openflags_t _status2(struct fsal_obj_handle *objectHandle,
     return fileDescriptor->openFlags;
 }
 
-/*! \brief Merge a duplicate handle with an original handle
+/**
+ * @brief Merge a duplicate handle with an original handle.
  *
- * \see fsal_api.h for more information
+ * This function is used if an upper layer detects that a duplicate object
+ * handle has been created. It allows the FSAL to merge anything from the
+ * duplicate back into the original.
+ *
+ * The caller must release the object (the caller may have to close files
+ * if the merge is unsuccessful).
+ *
+ * @param [in] originalHandle     Original handle
+ * @param [in] toMergeHandle      Handle to merge into original
+ *
+ * @returns: FSAL status
  */
 static fsal_status_t _merge(struct fsal_obj_handle *originalHandle,
                             struct fsal_obj_handle *toMergeHandle)
@@ -1593,15 +1939,16 @@ static fsal_status_t _merge(struct fsal_obj_handle *originalHandle,
     return status;
 }
 
-/*! \brief Get Extended Attribute.
+/**
+ * @brief Get extended attribute.
  *
- *  This function gets an extended attribute of an object.
+ * This function gets an extended attribute of an object.
  *
- *  \param [in]     objectHandle       Input object to query
- *  \param [in]     xattributeName     Input extended attribute name
- *  \param [out]    xattributeValue    Output extended attribute value
+ * @param [in]  objectHandle        Input object to query
+ * @param [in]  xattributeName      Input extended attribute name
+ * @param [out] xattributeValue     Output extended attribute value
  *
- *  \returns: FSAL status
+ * @returns: FSAL status
  */
 static fsal_status_t _getxattrs(struct fsal_obj_handle *objectHandle,
                                 xattrkey4 *xattributeName,
@@ -1634,16 +1981,17 @@ static fsal_status_t _getxattrs(struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief Set Extended Attribute.
+/**
+ * @brief Set extended attribute.
  *
- *  This function gets an extended attribute of an object.
+ * This function sets an extended attribute of an object.
  *
- *  \param [in]     objectHandle        Input object to set
- *  \param [in]     option              Input extended attribute type
- *  \param [in]     xattributeName      Input extended attribute name to set
- *  \param [in]     xattributeValue     Input extended attribute value to set
+ * @param [in] objectHandle        Input object to set
+ * @param [in] option              Input extended attribute type
+ * @param [in] xattributeName      Input extended attribute name to set
+ * @param [in] xattributeValue     Input extended attribute value to set
  *
- *  \returns: FSAL status
+ * @returns: FSAL status
  */
 static fsal_status_t _setxattrs(struct fsal_obj_handle *objectHandle,
                                 setxattr_option4 option,
@@ -1669,19 +2017,20 @@ static fsal_status_t _setxattrs(struct fsal_obj_handle *objectHandle,
     return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-/*! \brief List Extended Attributes.
+/**
+ * @brief List extended attributes.
  *
- *  This function lists the extended attributes of an object.
+ * This function lists the extended attributes of an object.
  *
- *  \param [in]     objectHandle        Input object to list
- *  \param [in]     maximumNameSize     Input maximum number of bytes for names
- *  \param [in,out] cookie              In/out cookie
- *  \param [out]    eof                 Output eof set if no more extended attributes
- *  \param [out]    xattributesNames    Output list of extended attribute names this
+ * @param [in]     objectHandle         Input object to list
+ * @param [in]     maximumNameSize      Input maximum number of bytes for names
+ * @param [in,out] cookie               In/out cookie
+ * @param [out]    eof                  Output eof set if no more extended attributes
+ * @param [out]    xattributesNames     Output list of extended attribute names this
  *                                      buffer size is double the size of maximumNameSize
  *                                      to allow for component4 overhead
  *
- *  \returns: FSAL status
+ * @returns: FSAL status
  */
 static fsal_status_t _listxattrs(struct fsal_obj_handle *objectHandle,
                                  count4 maximumNameSize,
@@ -1738,14 +2087,15 @@ static fsal_status_t _listxattrs(struct fsal_obj_handle *objectHandle,
     return status;
 }
 
-/*! \brief Remove Extended Attribute.
+/**
+ * @brief Remove extended attribute.
  *
- *  This function remove an extended attribute of an object.
+ * This function removes an extended attribute of an object.
  *
- *  \param [in] objectHandle       Input object to set
- *  \param [in] xattributeName     Input xattr name to remove
+ * @param [in] objectHandle       Input object to set
+ * @param [in] xattributeName     Input xattr name to remove
  *
- *  \returns: FSAL status
+ * @returns: FSAL status
  */
 static fsal_status_t _removexattrs(struct fsal_obj_handle *objectHandle,
                                    xattrkey4 *xattributeName)
@@ -1800,6 +2150,18 @@ void initializeFilesystemOperations(struct fsal_obj_ops *ops)
     ops->removexattrs = _removexattrs;
 }
 
+/**
+ * @brief Allocate a new file handle.
+ *
+ * This function constructs a new LizardFS FSAL object handle and attaches
+ * it to the export. After this call the attributes have been filled
+ * in and the handdle is up-to-date and usable.
+ *
+ * @param[in] attribute     stat attributes for the handle
+ * @param[in] export        The export on which the object lives
+ *
+ * @returns: FSHandle instance created
+ */
 struct FSHandle *allocateNewHandle(const struct stat *attribute,
                                    struct FSExport *export)
 {
@@ -1821,6 +2183,11 @@ struct FSHandle *allocateNewHandle(const struct stat *attribute,
     return result;
 }
 
+/**
+ * @brief Release all resources for a handle.
+ *
+ * @param[in] object     Handle to release
+ */
 void deleteHandle(struct FSHandle *object)
 {
     fsal_obj_handle_fini(&object->fileHandle);
