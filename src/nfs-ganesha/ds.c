@@ -80,12 +80,9 @@ static void _dsh_release(struct fsal_ds_handle *const dataServerHandle)
     export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
                           struct FSExport, export);
 
-<<<<<<< HEAD
-=======
     dataServer = container_of(dataServerHandle, struct DataServerHandle,
                               dsHandle);
 
->>>>>>> 1ce8dfee (refactor(nfs-ganesha): Refactor remaining code)
     assert(export->fileinfoCache);
 
     if (dataServer->cacheHandle != NULL) {
