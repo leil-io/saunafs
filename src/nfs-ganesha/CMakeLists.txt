@@ -23,6 +23,11 @@ include_directories(${CMAKE_SOURCE_DIR}/external/${NTIRPC_DIR_NAME}/ntirpc)
 
 add_library(fsallizardfs MODULE ${NFS_GANESHA_PLUGIN_MAIN} ${NFS_GANESHA_PLUGIN_SOURCES})
 
+target_include_directories(fsallizardfs PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+        )
+
 target_link_libraries(fsallizardfs lizardfs-client_pic)
 
 # LizardFS FSAL (libfsallizardfs.so) will be installed at ${LIZARDFS_ROOT}/lib/ganesha
