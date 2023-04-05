@@ -20,7 +20,7 @@
 #include <stdbool.h>
 #include <uuid/uuid.h>
 
-#include "lizardfs/lizardfs_c_api.h"
+#include "mount/client/lizardfs_c_api.h"
 #include "fileinfo_cache.h"
 
 /*
