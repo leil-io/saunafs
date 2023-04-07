@@ -19,6 +19,7 @@
 
 #ifdef LINUX
 #include <sys/sysmacros.h> /* for makedev(3) */
+#include <linux/falloc.h>
 #endif
 #include <libgen.h>		/* used for 'dirname' */
 #include <pthread.h>
@@ -1265,7 +1266,8 @@ static fsal_status_t _commit2(struct fsal_obj_handle *objectHandle,
  * by the set attributes. The FSAL layer MAY have added an inherited ACL.
  *
  * @param [in] objectHandle     File on which to operate
- * @param [in] bypass           If state doesn't indicate a share reservation, bypass any non-mandatory deny write
+ * @param [in] bypass           If state doesn't indicate a share reservation,
+ *                              bypass any non-mandatory deny write
  * @param [in] state            state_t to use for this operation
  * @param [in] attributes       Attributes to set
  *
@@ -1940,6 +1942,94 @@ static fsal_status_t _merge(struct fsal_obj_handle *originalHandle,
 }
 
 /**
+ * @brief Reserve/Deallocate space in a region of a file.
+ *
+ * @param [in] objectHandle     File to which bytes should be allocated
+ * @param [in] state            Open stateid under which to do the allocation
+ * @param [in] offset           Offset at which to begin the allocation
+ * @param [in] length           Length of the data to be allocated
+ * @param [in] allocate         Should space be allocated or deallocated?
+ *
+ * @returns: FSAL status
+ */
+static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
+                                struct state_t *state, uint64_t offset,
+                                uint64_t length, bool allocate)
+
+{
+    struct FSExport *export;
+    struct FSHandle *handle;
+    struct FSFileDescriptor fileDescriptor;
+
+    fsal_status_t status;
+    bool hasLock = false;
+    bool closeFd = false;
+
+    export = container_of(op_ctx->fsal_export, struct FSExport, export);
+    handle = container_of(objectHandle, struct FSHandle, fileHandle);
+
+    status = findFileDescriptor(&fileDescriptor, objectHandle, false, state,
+                                FSAL_O_WRITE, &hasLock, &closeFd, false);
+
+    if (FSAL_IS_ERROR(status)) {
+        goto out;
+    }
+
+    int rc;
+    struct stat st;
+    memset(&st, 0, sizeof(st));
+
+    st.st_mode = allocate ? 0 : FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE;
+
+    if (allocate) {
+        // Get stat to obtain the current size
+        liz_attr_reply_t currentStats;
+        rc = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
+                        &currentStats);
+
+        if (rc < 0) {
+            status = fsalLastError();
+            goto out;
+        }
+
+        if (offset + length > currentStats.attr.st_size) {
+            st.st_size = offset + length;
+
+            liz_attr_reply_t reply;
+            rc = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+                            &st, LIZ_SET_ATTR_SIZE, &reply);
+
+            if (rc < 0) {
+                status = fsalLastError();
+                goto out;
+            }
+
+            rc = fs_fsync(export->fsInstance, &op_ctx->creds,
+                          fileDescriptor.fileDescriptor);
+
+            if (rc < 0) {
+                status = fsalLastError();
+            }
+        }
+    }
+    else if (allocate == false) { // Deallocate
+        // Write the current interval with zeros using fs_write (WIP)
+        //fs_write()
+    }
+
+out:
+    if (closeFd) {
+        closeFileDescriptor(handle, &fileDescriptor);
+    }
+
+    if (hasLock) {
+        PTHREAD_RWLOCK_unlock(&objectHandle->obj_lock);
+    }
+
+    return status;
+}
+
+/**
  * @brief Get extended attribute.
  *
  * This function gets an extended attribute of an object.
@@ -2144,6 +2234,7 @@ void initializeFilesystemOperations(struct fsal_obj_ops *ops)
     ops->readlink = _readlink;
     ops->status2 = _status2;
     ops->merge = _merge;
+    ops->fallocate = _fallocate;
     ops->getxattrs = _getxattrs;
     ops->setxattrs = _setxattrs;
     ops->listxattrs = _listxattrs;
