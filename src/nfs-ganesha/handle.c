@@ -1975,27 +1975,25 @@ static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
         goto out;
     }
 
-    int rc;
     struct stat st;
     memset(&st, 0, sizeof(st));
 
     st.st_mode = allocate ? 0 : FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE;
 
-    if (allocate) {
-        // Get stat to obtain the current size
-        liz_attr_reply_t currentStats;
-        rc = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
+    // Get stat to obtain the current size
+    liz_attr_reply_t currentStats, reply;
+    int rc = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
                         &currentStats);
 
-        if (rc < 0) {
-            status = fsalLastError();
-            goto out;
-        }
+    if (rc < 0) {
+        status = fsalLastError();
+        goto out;
+    }
 
+    if (allocate) {
         if (offset + length > currentStats.attr.st_size) {
             st.st_size = offset + length;
 
-            liz_attr_reply_t reply;
             rc = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
                             &st, LIZ_SET_ATTR_SIZE, &reply);
 
@@ -2013,8 +2011,40 @@ static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
         }
     }
     else if (allocate == false) { // Deallocate
-        // Write the current interval with zeros using fs_write (WIP)
-        //fs_write()
+        // Initialize the zero-buffer
+        void *buffer = malloc(length);
+
+        memset(buffer, 0, length);
+
+        // Write the interval [offset..offset + length] with zeros using fs_write
+        ssize_t bytes = fs_write(export->fsInstance, &op_ctx->creds,
+                                 fileDescriptor.fileDescriptor, offset,
+                                 length, buffer);
+
+        free(buffer);
+
+        if (bytes < 0) {
+            status = fsalLastError();
+            goto out;
+        }
+
+        // Set the original size because deallocation must not change file size
+        st.st_size = currentStats.attr.st_size;
+
+        rc = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+                        &st, LIZ_SET_ATTR_SIZE, &reply);
+
+        if (rc < 0) {
+            status = fsalLastError();
+            goto out;
+        }
+
+        rc = fs_fsync(export->fsInstance, &op_ctx->creds,
+                      fileDescriptor.fileDescriptor);
+
+        if (rc < 0) {
+            status = fsalLastError();
+        }
     }
 
 out:
