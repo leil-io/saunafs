@@ -37,10 +37,6 @@
 #define MFSBLOCKSIZE 65536
 #endif
 
-#ifndef MFSCHUNKSIZE
-#define MFSCHUNKSIZE 65536 * 1024
-#endif
-
 #define SPECIAL_INODE_BASE 0xFFFFFFF0U
 #define SPECIAL_INODE_ROOT 0x01U
 #define MAX_REGULAR_INODE  (SPECIAL_INODE_BASE - 0x01U)
@@ -142,7 +138,6 @@ struct FSALKey {
  * It contains information related with the public structure of the
  * filesystem and its operations.
  */
-
 struct FSHandle {
     struct fsal_obj_handle fileHandle; /// Public structure for filesystem objects.
     struct FSFileDescriptor fileDescriptor; /// File descriptor instance
