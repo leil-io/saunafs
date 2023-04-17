@@ -127,9 +127,8 @@ static nfsstat4 _layoutreturn(struct fsal_obj_handle *objectHandle,
                               XDR *xdrStream,
                               const struct fsal_layoutreturn_arg *arguments)
 {
-    // Unused variables
-    (void ) objectHandle;
-    (void ) xdrStream;
+	(void) objectHandle;
+	(void) xdrStream;
 
     if (arguments->lo_type != LAYOUT4_NFSV4_1_FILES) {
         LogDebug(COMPONENT_PNFS, "Unsupported layout type: %x",
@@ -164,8 +163,7 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
                               const struct fsal_layoutcommit_arg *arguments,
                               struct fsal_layoutcommit_res *output)
 {
-    // Unused variable
-    (void ) xdrStream;
+	(void) xdrStream;
 
     struct FSExport *export;
     struct FSHandle *handle;
@@ -173,7 +171,6 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
 
     // FIXME(haze): Does this function make sense for our implementation ?
 
-    /* Sanity check on type */
     if (arguments->type != LAYOUT4_NFSV4_1_FILES) {
         LogCrit(COMPONENT_PNFS, "Unsupported layout type: %x", arguments->type);
         return NFS4ERR_UNKNOWN_LAYOUTTYPE;

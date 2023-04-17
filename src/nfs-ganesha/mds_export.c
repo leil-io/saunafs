@@ -66,8 +66,7 @@ static int ascendingIpCompare(const void *chunkserverA,
  */
 static int isChunkserverDisconnected(const void *chunkserver, void *unused)
 {
-    // Unused variable
-    (void ) unused;
+	(void) unused;
 
     return ((const liz_chunkserver_info_t *)chunkserver)->version ==
             kDisconnectedChunkServerVersion;
@@ -528,11 +527,10 @@ static nfsstat4 _getdevicelist(struct fsal_export *exportHandle,
                                bool (*cb)(void *opaque, const uint64_t id),
                                struct fsal_getdevicelist_res *res)
 {
-    // Unused variables to avoid compiler warnings
-    (void ) exportHandle;
-    (void ) type;
-    (void ) opaque;
-    (void ) cb;
+	(void) exportHandle;
+	(void) type;
+	(void) opaque;
+	(void) cb;
 
     res->eof = true;
     return NFS4_OK;
@@ -555,8 +553,7 @@ static void _fs_layouttypes(struct fsal_export *exportHandle,
                             int32_t *count,
                             const layouttype4 **types)
 {
-    // Unused variables to avoid compiler warnings
-    (void ) exportHandle;
+	(void) exportHandle;
 
     static const layouttype4 supportedLayoutType = LAYOUT4_NFSV4_1_FILES;
     *types = &supportedLayoutType;
@@ -580,8 +577,7 @@ static void _fs_layouttypes(struct fsal_export *exportHandle,
  */
 static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle)
 {
-    // Unused variable to avoid compiler warnings
-    (void ) exportHandle;
+	(void) exportHandle;
 
     return MFSCHUNKSIZE;
 }
@@ -599,8 +595,7 @@ static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle)
  */
 static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle)
 {
-    // Unused variables to avoid compiler warnings
-    (void ) exportHandle;
+	(void) exportHandle;
 
     return 1;
 }
@@ -619,8 +614,7 @@ static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle)
  */
 static size_t _fs_loc_body_size(struct fsal_export *exportHandle)
 {
-    // Unused variables to avoid compiler warnings
-    (void ) exportHandle;
+	(void) exportHandle;
 
 	return 0x100;  // typical value in NFS FSAL plugins
 }
@@ -639,8 +633,7 @@ static size_t _fs_loc_body_size(struct fsal_export *exportHandle)
  */
 static size_t _fs_da_addr_size(struct fsal_module *FSALModule)
 {
-    // Unused variables to avoid compiler warnings
-    (void ) FSALModule;
+	(void) FSALModule;
 
     // one stripe index + number of addresses +
     // LZFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes

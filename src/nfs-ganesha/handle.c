@@ -272,8 +272,7 @@ static fsal_status_t _handle_to_wire(const struct fsal_obj_handle *objectHandle,
                                      uint32_t outputType,
                                      struct gsh_buffdesc *bufferDescriptor)
 {
-    // Unused variable
-    (void ) outputType;
+	(void) outputType;
 
     struct FSHandle *handle;
     handle = container_of(objectHandle, struct FSHandle, fileHandle);
@@ -1536,7 +1535,6 @@ fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
                  PRIu64 " ", lockOperation, requestedLock->lock_type,
                  requestedLock->lock_start, requestedLock->lock_length);
 
-    // Sanity checks
     if (objectHandle == NULL) {
         LogCrit(COMPONENT_FSAL, "objectHandle arg is NULL.");
         return fsalstat(ERR_FSAL_FAULT, 0);
@@ -1858,7 +1856,6 @@ static fsal_status_t _readlink(struct fsal_obj_handle *objectHandle,
     struct FSHandle *handle;
     char result[LIZARDFS_MAX_READLINK_LENGTH];
 
-    // Sanity check
     if (objectHandle->type != SYMBOLIC_LINK)
         return fsalstat(ERR_FSAL_FAULT, 0);
 

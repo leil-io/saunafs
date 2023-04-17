@@ -55,41 +55,41 @@
  */
 static void release(struct fsal_export *exportHandle)
 {
-    struct FSExport *export;
-    export = container_of(exportHandle, struct FSExport, export);
+	struct FSExport *export;
+	export = container_of(exportHandle, struct FSExport, export);
 
-    deleteHandle(export->rootHandle);
-    export->rootHandle = NULL;
+	deleteHandle(export->rootHandle);
+	export->rootHandle = NULL;
 
-    fsal_detach_export(export->export.fsal, &export->export.exports);
-    free_export_ops(&export->export);
+	fsal_detach_export(export->export.fsal, &export->export.exports);
+	free_export_ops(&export->export);
 
-    if (export->fileinfoCache) {
-	    resetFileInfoCacheParameters(export->fileinfoCache, 0, 0);
+	if (export->fileinfoCache) {
+		resetFileInfoCacheParameters(export->fileinfoCache, 0, 0);
 
-        while (1) {
-            FileInfoEntry_t *cache_handle;
-	        fileinfo_t *file_handle;
+		while (1) {
+			FileInfoEntry_t *cache_handle;
+			fileinfo_t *file_handle;
 
-            cache_handle = liz_fileinfo_cache_pop_expired(export->fileinfoCache);
-            if (!cache_handle) {
-                break;
-            }
+			cache_handle = popExpiredFileInfoCache(export->fileinfoCache);
+			if (!cache_handle) {
+				break;
+			}
 
-            file_handle = liz_extract_fileinfo(cache_handle);
-            liz_release(export->fsInstance, file_handle);
-	        fileInfoEntryFree(cache_handle);
-        }
+			file_handle = extractFileInfo(cache_handle);
+			liz_release(export->fsInstance, file_handle);
+			fileInfoEntryFree(cache_handle);
+		}
 
-	    destroyFileInfoCache(export->fileinfoCache);
-        export->fileinfoCache = NULL;
-    }
+		destroyFileInfoCache(export->fileinfoCache);
+		export->fileinfoCache = NULL;
+	}
 
-    liz_destroy(export->fsInstance);
-    export->fsInstance = NULL;
+	liz_destroy(export->fsInstance);
+	export->fsInstance = NULL;
 
-    gsh_free((char *)export->initialParameters.subfolder);
-    gsh_free(export);
+	gsh_free((char *)export->initialParameters.subfolder);
+	gsh_free(export);
 }
 
 /**
@@ -266,12 +266,11 @@ struct state_t *allocate_state(struct fsal_export *export,
  */
 void free_state(struct fsal_export *export, struct state_t *state)
 {
-    // Unused variable
-    (void ) export;
+	(void) export;
 
-    struct FSFileDescriptorState *fdState;
-    fdState = container_of(state, struct FSFileDescriptorState, state);
-    gsh_free(fdState);
+	struct FSFileDescriptorState *fdState;
+	fdState = container_of(state, struct FSFileDescriptorState, state);
+	gsh_free(fdState);
 }
 
 /**
@@ -298,36 +297,35 @@ static fsal_status_t wire_to_host(struct fsal_export *export,
                                   struct gsh_buffdesc *bufferDescriptor,
                                   int flags)
 {
-    // Unused variables
-    (void ) protocol;
-    (void ) export;
+	(void) protocol;
+	(void) export;
 
-    if (!bufferDescriptor || !bufferDescriptor->addr)
-        return fsalstat(ERR_FSAL_FAULT, 0);
+	if (!bufferDescriptor || !bufferDescriptor->addr)
+		return fsalstat(ERR_FSAL_FAULT, 0);
 
-    liz_inode_t *inode = (liz_inode_t *)bufferDescriptor->addr;
+	liz_inode_t *inode = (liz_inode_t *)bufferDescriptor->addr;
 
-    if (flags & FH_FSAL_BIG_ENDIAN) {
+	if (flags & FH_FSAL_BIG_ENDIAN) {
 #if (BYTE_ORDER != BIG_ENDIAN)
-        assert(sizeof(liz_inode_t) == 4);
-        *inode = bswap_32(*inode);
+		assert(sizeof(liz_inode_t) == 4);
+		*inode = bswap_32(*inode);
 #endif
-    }
-    else {
+	}
+	else {
 #if (BYTE_ORDER == BIG_ENDIAN)
-        assert(sizeof(liz_inode_t) == 4);
-        *inode = bswap_32(*inode);
+		assert(sizeof(liz_inode_t) == 4);
+		*inode = bswap_32(*inode);
 #endif
-    }
+	}
 
-    if (bufferDescriptor->len != sizeof(liz_inode_t)) {
-        LogMajor(COMPONENT_FSAL,
-                 "Size mismatch for handle. Should be %zu, got %zu",
-                 sizeof(liz_inode_t), bufferDescriptor->len);
-        return fsalstat(ERR_FSAL_SERVERFAULT, 0);
-    }
+	if (bufferDescriptor->len != sizeof(liz_inode_t)) {
+		LogMajor(COMPONENT_FSAL,
+				 "Size mismatch for handle. Should be %zu, got %zu",
+				 sizeof(liz_inode_t), bufferDescriptor->len);
+		return fsalstat(ERR_FSAL_SERVERFAULT, 0);
+	}
 
-    return fsalstat(ERR_FSAL_NO_ERROR, 0);
+	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
 /**

@@ -57,14 +57,9 @@ static uint64_t get_time_ms() {
 }
 
 static int cache_entry_cmp_function(const struct avltree_node *a,
-                                    const struct avltree_node *b)
-{
-    FileInfoEntry_t *a_entry = avltree_container_of(a,
-                                                    FileInfoEntry_t,
-													tree_hook);
-    FileInfoEntry_t *b_entry = avltree_container_of(b,
-                                                    FileInfoEntry_t,
-													tree_hook);
+									const struct avltree_node *b) {
+	FileInfoEntry_t *a_entry = avltree_container_of(a, FileInfoEntry_t, tree_hook);
+	FileInfoEntry_t *b_entry = avltree_container_of(b, FileInfoEntry_t, tree_hook);
 
 	if (a_entry->inode < b_entry->inode) {
 		return -1;
@@ -84,9 +79,7 @@ static int cache_entry_cmp_function(const struct avltree_node *a,
 	return 0;
 }
 
-FileInfoCache_t *createFileInfoCache(unsigned max_entries,
-                                     int min_timeout_ms)
-{
+FileInfoCache_t *createFileInfoCache(unsigned max_entries, int min_timeout_ms) {
 	FileInfoCache_t *cache;
 
 	cache = gsh_calloc(1, sizeof(FileInfoCache_t));
@@ -94,25 +87,22 @@ FileInfoCache_t *createFileInfoCache(unsigned max_entries,
 	cache->min_timeout_ms = min_timeout_ms;
 	PTHREAD_MUTEX_init(&cache->lock, NULL);
 
-    glist_init(&cache->lru_list);
+	glist_init(&cache->lru_list);
 	glist_init(&cache->used_list);
 	avltree_init(&cache->entry_lookup, &cache_entry_cmp_function, 0);
 
 	return cache;
 }
 
-void resetFileInfoCacheParameters(FileInfoCache_t *cache,
-                                  unsigned max_entries,
-                                  int min_timeout_ms)
-{
+void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned max_entries,
+								  int min_timeout_ms) {
 	PTHREAD_MUTEX_lock(&cache->lock);
 	cache->max_entries = max_entries;
 	cache->min_timeout_ms = min_timeout_ms;
 	PTHREAD_MUTEX_unlock(&cache->lock);
 }
 
-void destroyFileInfoCache(FileInfoCache_t *cache)
-{
+void destroyFileInfoCache(FileInfoCache_t *cache) {
 	FileInfoEntry_t *entry;
 
 	if (!cache) {
@@ -134,9 +124,7 @@ void destroyFileInfoCache(FileInfoCache_t *cache)
 	gsh_free(cache);
 }
 
-FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache,
-                                      liz_inode_t inode)
-{
+FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, liz_inode_t inode) {
 	FileInfoEntry_t key, *entry;
 	struct avltree_node *node;
 
@@ -152,14 +140,14 @@ FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache,
 		glist_del(&entry->list_hook);
 		glist_add(&cache->used_list, &entry->list_hook);
 		avltree_remove(node, &cache->entry_lookup);
-    }
-    else {
+	}
+	else {
 		entry = gsh_calloc(1, sizeof(FileInfoEntry_t));
 		glist_add(&cache->used_list, &entry->list_hook);
 		cache->entry_count++;
 	}
 
-    entry->is_used = true;
+	entry->is_used = true;
 	entry->inode = inode;
 	entry->timestamp = get_time_ms();
 
@@ -168,23 +156,19 @@ FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache,
 	return entry;
 }
 
-void releaseFileInfoCache(FileInfoCache_t *cache,
-                          FileInfoEntry_t *entry)
-{
+void releaseFileInfoCache(FileInfoCache_t *cache, FileInfoEntry_t *entry) {
 	PTHREAD_MUTEX_lock(&cache->lock);
 	assert(entry->is_used);
 	entry->is_used = false;
 	entry->timestamp = get_time_ms();
 
-    glist_del(&entry->list_hook);
+	glist_del(&entry->list_hook);
 	glist_add_tail(&cache->lru_list, &entry->list_hook);
 	avltree_insert(&entry->tree_hook, &cache->entry_lookup);
 	PTHREAD_MUTEX_unlock(&cache->lock);
 }
 
-void eraseFileInfoCache(FileInfoCache_t *cache,
-                        FileInfoEntry_t *entry)
-{
+void eraseFileInfoCache(FileInfoCache_t *cache, FileInfoEntry_t *entry) {
 	PTHREAD_MUTEX_lock(&cache->lock);
 	assert(entry->is_used);
 	glist_del(&entry->list_hook);
@@ -193,14 +177,13 @@ void eraseFileInfoCache(FileInfoCache_t *cache,
 	gsh_free(entry);
 }
 
-FileInfoEntry_t *liz_fileinfo_cache_pop_expired(FileInfoCache_t *cache)
-{
+FileInfoEntry_t *popExpiredFileInfoCache(FileInfoCache_t *cache) {
 	PTHREAD_MUTEX_lock(&cache->lock);
 
 	FileInfoEntry_t *entry =
 	    glist_first_entry(&cache->lru_list, FileInfoEntry_t, list_hook);
 
-    if (!entry) {
+	if (!entry) {
 		PTHREAD_MUTEX_unlock(&cache->lock);
 		return NULL;
 	}
@@ -213,8 +196,8 @@ FileInfoEntry_t *liz_fileinfo_cache_pop_expired(FileInfoCache_t *cache)
 		glist_del(&entry->list_hook);
 		avltree_remove(&entry->tree_hook, &cache->entry_lookup);
 		cache->entry_count--;
-    }
-    else {
+	}
+	else {
 		entry = NULL;
 	}
 
@@ -222,18 +205,15 @@ FileInfoEntry_t *liz_fileinfo_cache_pop_expired(FileInfoCache_t *cache)
 	return entry;
 }
 
-void fileInfoEntryFree(FileInfoEntry_t *entry)
-{
+void fileInfoEntryFree(FileInfoEntry_t *entry) {
 	assert(!entry->is_used);
 	gsh_free(entry);
 }
 
-fileinfo_t *liz_extract_fileinfo(FileInfoEntry_t *entry)
-{
+fileinfo_t *extractFileInfo(FileInfoEntry_t *entry) {
 	return entry->fileinfo;
 }
 
-void liz_attach_fileinfo(FileInfoEntry_t *entry, fileinfo_t *fileinfo)
-{
+void attachFileInfo(FileInfoEntry_t *entry, fileinfo_t *fileinfo) {
 	entry->fileinfo = fileinfo;
 }

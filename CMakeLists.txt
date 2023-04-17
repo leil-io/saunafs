@@ -37,6 +37,7 @@ option(ENABLE_REQUEST_LOG       "Enable logging request times"                  
 option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"           OFF)
 option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              OFF)
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
+option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                         ON)
 
 
 find_program(CCACHE_FOUND ccache)
@@ -302,8 +303,6 @@ else()
 endif()
 
 set(CHARTS_CSV_CHARTID_BASE 90000)
-
-set(ENABLE_NFS_ACL_SUPPORT ON CACHE BOOL "Enable nfs-ganesha ACL support") # Configurable by user
 
 # Create config.h file
 configure_file(config.h.in config.h)

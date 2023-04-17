@@ -713,12 +713,12 @@ int liz_statfs(liz_t *instance, liz_stat_t *buf) {
 }
 
 int liz_setxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name,
-                 const uint8_t *value, size_t size,
-                 enum liz_setxattr_mode mode) {
+			 const uint8_t *value, size_t size,
+			 enum liz_setxattr_mode mode) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-    client.setxattr(context, ino, name, std::vector<uint8_t>(value, value + size), mode, ec);
+	client.setxattr(context, ino, name, std::vector<uint8_t>(value, value + size), mode, ec);
 	gLastErrorCode = ec.value();
 	return ec ? -1 : 0;
 }
