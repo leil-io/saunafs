@@ -19,16 +19,16 @@ MAXIMUM_PARALLEL_JOBS=16
 PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
 
 test_error_cleanup() {
-  # Umount Ganesha mountpoints
-  for x in 1 2 97 99; do
-      sudo umount -l $TEMP_DIR/mnt/nfs$x
-  done
-  # Umount LizardFS mountpoint
-  if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
-      sudo umount -l ${TEMP_DIR}/mnt/mfs0
-  fi
-  # Kill Ganesha daemon
-  sudo pkill -9 ganesha.nfsd
+	# Umount Ganesha mountpoints
+	for x in 1 2 97 99; do
+		sudo umount -l $TEMP_DIR/mnt/nfs$x
+	done
+	# Umount LizardFS mountpoint
+	if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+		sudo umount -l ${TEMP_DIR}/mnt/mfs0
+	fi
+	# Kill Ganesha daemon
+	sudo pkill -9 ganesha.nfsd
 }
 
 cd ${info[mount0]}
@@ -40,11 +40,11 @@ mkdir ganesha
 # Create PID file for Ganesha
 PID_FILE=/var/run/ganesha/ganesha.pid
 if [ ! -f ${PID_FILE} ]; then
-  echo "ganesha.pid doesn't exists, creating it...";
-        sudo mkdir -p /var/run/ganesha;
-        sudo touch ${PID_FILE};
+	echo "ganesha.pid doesn't exists, creating it...";
+	sudo mkdir -p /var/run/ganesha;
+	sudo touch ${PID_FILE};
 else
-        echo "ganesha.pid already exists";
+	echo "ganesha.pid already exists";
 fi
 
 # Copy Ganesha and libntirpc source code
@@ -165,6 +165,7 @@ file-validate $TEMP_DIR/mnt/nfs1/test1.bin
 file-validate $TEMP_DIR/mnt/nfs2/test2.bin
 file-validate $TEMP_DIR/mnt/nfs99/export1/test1.bin
 file-validate $TEMP_DIR/mnt/nfs99/export2/test2.bin
+
 # Files on export97 are "metadata only", so file validation should fail
 assert_failure file-validate $TEMP_DIR/mnt/nfs97/export1/test1.bin
 assert_failure file-validate $TEMP_DIR/mnt/nfs97/export2/test2.bin

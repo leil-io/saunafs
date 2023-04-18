@@ -1,5 +1,5 @@
 /*
-   Copyright 2022 LizardFS sp. z o.o.
+   2017 Skytechnology LizardFS sp. z o.o.
 
    This file is part of LizardFS.
 
@@ -45,14 +45,13 @@ static void clearFileinfoCache(struct FSExport *export, int count) {
 
 	for (int i = 0; i < count; ++i) {
 		FileInfoEntry_t *cacheHandle;
-		fileinfo_t *fileHandle;
-
 		cacheHandle = popExpiredFileInfoCache(export->fileinfoCache);
+
 		if (cacheHandle == NULL) {
 			break;
 		}
 
-		fileHandle = extractFileInfo(cacheHandle);
+		fileinfo_t *fileHandle = extractFileInfo(cacheHandle);
 		liz_release(export->fsInstance, fileHandle);
 		fileInfoEntryFree(cacheHandle);
 	}
@@ -155,11 +154,11 @@ static nfsstat4 openfile(struct FSExport *export,
  * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
-                          const stateid4 *stateid,
-                          const offset4 offset,
-                          const count4 requestedLength,
-                          void *const buffer,
-                          count4 *const suppliedLength,
+						  const stateid4 *stateid,
+						  const offset4 offset,
+						  const count4 requestedLength,
+						  void *const buffer,
+						  count4 *const suppliedLength,
 						  bool *const eof) {
 	(void) stateid;
 
@@ -218,13 +217,13 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
  * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
-                           const stateid4 *stateid,
-                           const offset4 offset,
-                           const count4 writeLength,
-                           const void *buffer,
-                           const stable_how4 stability,
-                           count4 *const writtenLength,
-                           verifier4 *const writeVerifier,
+						   const stateid4 *stateid,
+						   const offset4 offset,
+						   const count4 writeLength,
+						   const void *buffer,
+						   const stable_how4 stability,
+						   count4 *const writtenLength,
+						   verifier4 *const writeVerifier,
 						   stable_how4 *const stabilityGot) {
 	(void) stateid;
 	(void) writeVerifier;
@@ -283,8 +282,8 @@ static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
  * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
-                            const offset4 offset,
-                            const count4 count,
+							const offset4 offset,
+							const count4 count,
 							verifier4 *const writeVerifier) {
 	struct FSExport *export;
 	struct DataServerHandle *dataServer;
@@ -342,12 +341,12 @@ static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
  * @returns: An NFSv4.2 status code.
  */
 static nfsstat4 _dsh_read_plus(struct fsal_ds_handle *const dataServerHandle,
-                               const stateid4 *stateid,
-                               const offset4 offset,
-                               const count4 requestedLength,
-                               void *const buffer,
-                               const count4 suppliedLength,
-                               bool *const eof,
+							   const stateid4 *stateid,
+							   const offset4 offset,
+							   const count4 requestedLength,
+							   void *const buffer,
+							   const count4 suppliedLength,
+							   bool *const eof,
 							   struct io_info *info) {
 	(void) dataServerHandle;
 	(void) stateid;
@@ -375,8 +374,8 @@ static nfsstat4 _dsh_read_plus(struct fsal_ds_handle *const dataServerHandle,
  * @returns: NFSv4.1 error codes.
  */
 static nfsstat4 _make_ds_handle(struct fsal_pnfs_ds *const pnfsDataServer,
-                                const struct gsh_buffdesc *const bufferDescriptor,
-                                struct fsal_ds_handle **const handle,
+								const struct gsh_buffdesc *const bufferDescriptor,
+								struct fsal_ds_handle **const handle,
 								int flags) {
 	(void) pnfsDataServer;
 
@@ -439,8 +438,7 @@ static nfsstat4 _ds_permissions(struct fsal_pnfs_ds *const pnfsDataServer,
  *
  * @returns: Nothing, it just initializes Data Server operations vector
  */
-void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops)
-{
+void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops) {
 	memcpy(ops, &def_pnfs_ds_ops, sizeof(struct fsal_pnfs_ds_ops));
 	ops->make_ds_handle = _make_ds_handle;
 	ops->dsh_release = _dsh_release;

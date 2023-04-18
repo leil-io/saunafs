@@ -12,13 +12,7 @@
 #ifndef LZFS_FSAL_TYPES
 #define LZFS_FSAL_TYPES
 
-#include <sys/stat.h>
-#include "fsal.h"
 #include "fsal_api.h"
-#include "fsal_convert.h"
-#include "fsal_handle_syscalls.h"
-#include <stdbool.h>
-#include <uuid/uuid.h>
 
 #include "mount/client/lizardfs_c_api.h"
 #include "fileinfo_cache.h"
@@ -64,10 +58,10 @@ typedef liz_fileinfo_t fileinfo_t;
  * operations vector and the parameters of the filesystem info.
  */
 struct FSModule {
-    struct fsal_module module;
-    struct fsal_obj_ops operations;
-    fsal_staticfsinfo_t filesystemInfo;
-    bool onlyOneUser;
+	struct fsal_module module;
+	struct fsal_obj_ops operations;
+	fsal_staticfsinfo_t filesystemInfo;
+	bool onlyOneUser;
 };
 
 extern struct FSModule LizardFS;
@@ -85,18 +79,18 @@ struct FSHandle;
  * to the master server, the cache used and the pNFS support.
  */
 struct FSExport {
-    struct fsal_export export; /// Export object
-    struct FSHandle *rootHandle; /// root handle of export
+	struct fsal_export export; /// Export object
+	struct FSHandle *rootHandle; /// root handle of export
 
-    liz_t *fsInstance; /// Filesystem instance
-    liz_init_params_t initialParameters; /// Initial parameters
-    FileInfoCache_t *fileinfoCache; /// Cache of export
+	liz_t *fsInstance; /// Filesystem instance
+	liz_init_params_t initialParameters; /// Initial parameters
+	FileInfoCache_t *fileinfoCache; /// Cache of export
 
-    bool isMDSEnabled; /// pNFS Metadata Server enabled
-    bool isDSEnabled;  /// pNFS Data Server enabled
+	bool isMDSEnabled; /// pNFS Metadata Server enabled
+	bool isDSEnabled;  /// pNFS Data Server enabled
 
-    uint32_t cacheTimeout; /// Timeout for entries at cache
-    uint32_t cacheMaximumSize; /// Maximum size of cache
+	uint32_t cacheTimeout; /// Timeout for entries at cache
+	uint32_t cacheMaximumSize; /// Maximum size of cache
 };
 
 /**
@@ -108,8 +102,8 @@ struct FSExport {
  * file descriptor and its flags associated like open and share mode.
  */
 struct FSFileDescriptor {
-    fsal_openflags_t openFlags; /// The open and share mode
-    struct liz_fileinfo *fileDescriptor; /// File descriptor instance
+	fsal_openflags_t openFlags; /// The open and share mode
+	struct liz_fileinfo *fileDescriptor; /// File descriptor instance
 };
 
 /**
@@ -118,14 +112,14 @@ struct FSFileDescriptor {
  * @brief Associates a single NFSv4 state structure with a file descriptor.
  */
 struct FSFileDescriptorState {
-    struct state_t state; /// Structure representing a single NFSv4 state
-    struct FSFileDescriptor fileDescriptor; /// File descriptor instance
+	struct state_t state; /// Structure representing a single NFSv4 state
+	struct FSFileDescriptor fileDescriptor; /// File descriptor instance
 };
 
 struct FSALKey {
-    uint16_t moduleId; /// module id
-    uint16_t exportId; /// export id
-    liz_inode_t inode; /// inode
+	uint16_t moduleId; /// module id
+	uint16_t exportId; /// export id
+	liz_inode_t inode; /// inode
 };
 
 /**
@@ -139,22 +133,22 @@ struct FSALKey {
  * filesystem and its operations.
  */
 struct FSHandle {
-    struct fsal_obj_handle fileHandle; /// Public structure for filesystem objects.
-    struct FSFileDescriptor fileDescriptor; /// File descriptor instance
-    liz_inode_t inode; /// inode of file
-    struct FSALKey uniqueKey; /// Key of the handle
-    struct FSExport *export; /// Export to which the handle belongs
-    struct fsal_share share; /// The ref counted share reservation state
+	struct fsal_obj_handle fileHandle; /// Public structure for filesystem objects.
+	struct FSFileDescriptor fileDescriptor; /// File descriptor instance
+	liz_inode_t inode; /// inode of file
+	struct FSALKey uniqueKey; /// Key of the handle
+	struct FSExport *export; /// Export to which the handle belongs
+	struct fsal_share share; /// The ref counted share reservation state
 };
 
 struct DataServerWire {
-    uint32_t inode; /// inode
+	uint32_t inode; /// inode
 };
 
 struct DataServerHandle {
-    struct fsal_ds_handle dsHandle; /// Public structure for DS file handles
-    uint32_t inode; /// inode
-    FileInfoEntry_t *cacheHandle; /// Cache entry for inode
+	struct fsal_ds_handle dsHandle; /// Public structure for DS file handles
+	uint32_t inode; /// inode
+	FileInfoEntry_t *cacheHandle; /// Cache entry for inode
 };
 
 #endif // LZFS_FSAL_TYPES

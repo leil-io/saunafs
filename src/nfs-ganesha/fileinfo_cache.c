@@ -1,5 +1,5 @@
 /*
-   Copyright 2022 LizardFS sp. z o.o.
+   Copyright 2017 Skytechnology sp. z o.o.
 
    This file is part of LizardFS.
 
@@ -22,8 +22,6 @@
 #include <time.h>
 #include <abstract_mem.h>
 #include <avltree.h>
-#include <common_utils.h>
-#include <gsh_list.h>
 
 struct FileInfoEntry {
 	struct glist_head list_hook;
@@ -109,14 +107,12 @@ void destroyFileInfoCache(FileInfoCache_t *cache) {
 		return;
 	}
 
-    while ((entry = glist_first_entry(&cache->used_list,
-                                      FileInfoEntry_t, list_hook))) {
+	while ((entry = glist_first_entry(&cache->used_list, FileInfoEntry_t, list_hook))) {
 		glist_del(&entry->list_hook);
 		gsh_free(entry);
 	}
 
-    while ((entry = glist_first_entry(&cache->lru_list,
-                                      FileInfoEntry_t, list_hook))) {
+	while ((entry = glist_first_entry(&cache->lru_list, FileInfoEntry_t, list_hook))) {
 		glist_del(&entry->list_hook);
 		gsh_free(entry);
 	}
@@ -192,7 +188,7 @@ FileInfoEntry_t *popExpiredFileInfoCache(FileInfoCache_t *cache) {
 	int timeout = is_full ? 0 : cache->min_timeout_ms;
 	uint64_t current_time = get_time_ms();
 
-    if ((current_time - entry->timestamp) >= timeout) {
+	if ((current_time - entry->timestamp) >= timeout) {
 		glist_del(&entry->list_hook);
 		avltree_remove(&entry->tree_hook, &cache->entry_lookup);
 		cache->entry_count--;

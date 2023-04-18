@@ -10,9 +10,6 @@
 #ifndef LZFS_FSAL_METHODS
 #define LZFS_FSAL_METHODS
 
-#include "fsal_handle_syscalls.h"
-#include "fsal_api.h"
-#include "FSAL/fsal_commonlib.h"
 #include "FSAL/fsal_localfs.h"
 #include "FSAL/access_check.h"
 
@@ -43,16 +40,16 @@ void restoreGaneshaCredentials(const struct fsal_module *fsal_module);
 /// Methods for allocating/deleting handles
 
 struct FSHandle *allocateNewHandle(const struct stat *attr,
-                                   struct FSExport *export);
+								   struct FSExport *export);
 
 void deleteHandle(struct FSHandle *object);
 
 // Methods for support ACL
 fsal_status_t getACL(struct FSExport *export, uint32_t inode,
-                     uint32_t owner, fsal_acl_t **fsal_acl);
+					 uint32_t owner, fsal_acl_t **fsal_acl);
 
 fsal_status_t setACL(struct FSExport *export, uint32_t inode,
-                     const fsal_acl_t *fsal_acl, unsigned int mode);
+					 const fsal_acl_t *fsal_acl, unsigned int mode);
 
 // Methods for handling errors
 fsal_status_t lizardfsToFsalError(liz_err_t err);

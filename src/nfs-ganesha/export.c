@@ -1,5 +1,5 @@
 /*
-   Copyright 2022 LizardFS sp. z o.o.
+   Copyright 2017 Skytechnology sp. z o.o.
 
    This file is part of LizardFS.
 
@@ -16,27 +16,10 @@
    along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "fsal.h"
-#include <libgen.h>		/* used for 'dirname' */
-#include <pthread.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/statvfs.h>
-#include <os/mntent.h>
-#include <os/quota.h>
-#include <dlfcn.h>
-#include "gsh_list.h"
 #include "fsal_convert.h"
-#include "config_parsing.h"
 #include "FSAL/fsal_commonlib.h"
 #include "FSAL/fsal_config.h"
-#include "FSAL/fsal_localfs.h"
-#include "fsal_handle_syscalls.h"
 #include "nfs_exports.h"
-#include "export_mgr.h"
-#include "gsh_config.h"
-
-#include "lzfs_fsal_types.h"
 #include "lzfs_fsal_methods.h"
 #include "context_wrap.h"
 
@@ -53,8 +36,7 @@
  *
  * @param[in] exportHandle     The export to release
  */
-static void release(struct fsal_export *exportHandle)
-{
+static void release(struct fsal_export *exportHandle) {
 	struct FSExport *export;
 	export = container_of(exportHandle, struct FSExport, export);
 
@@ -110,76 +92,75 @@ static void release(struct fsal_export *exportHandle)
  * @returns: FSAL status
  */
 fsal_status_t lookup_path(struct fsal_export *exportHandle,
-                          const char *path, struct fsal_obj_handle **handle,
-                          struct fsal_attrlist *attributes)
-{
-    static const char *rootDirPath = "/";
+						  const char *path, struct fsal_obj_handle **handle,
+						  struct fsal_attrlist *attributes) {
+	static const char *rootDirPath = "/";
 
-    struct FSExport *export;
-    struct FSHandle *objectHandle;
-    const char *realPath;
+	struct FSExport *export;
+	struct FSHandle *objectHandle;
+	const char *realPath;
 
-    LogFullDebug(COMPONENT_FSAL, "export_id=%" PRIu16 " path=%s",
-                 exportHandle->export_id, path);
+	LogFullDebug(COMPONENT_FSAL, "export_id=%" PRIu16 " path=%s",
+				 exportHandle->export_id, path);
 
-    export = container_of(exportHandle, struct FSExport, export);
+	export = container_of(exportHandle, struct FSExport, export);
 
-    *handle = NULL;
+	*handle = NULL;
 
-    // set the real path to the path without the prefix from ctx_export->fullpath
-    if (*path != '/') {
-        realPath = strchr(path, ':');
-        if (realPath == NULL) {
-            return fsalstat(ERR_FSAL_INVAL, 0);
-        }
-        ++realPath;
-        if (*realPath != '/') {
-            return fsalstat(ERR_FSAL_INVAL, 0);
-        }
-    }
-    else {
-        realPath = path;
-    }
+	// set the real path to the path without the prefix from ctx_export->fullpath
+	if (*path != '/') {
+		realPath = strchr(path, ':');
+		if (realPath == NULL) {
+			return fsalstat(ERR_FSAL_INVAL, 0);
+		}
+		++realPath;
+		if (*realPath != '/') {
+			return fsalstat(ERR_FSAL_INVAL, 0);
+		}
+	}
+	else {
+		realPath = path;
+	}
 
-    if (strstr(realPath, CTX_FULLPATH(op_ctx)) != realPath) {
-        return fsalstat(ERR_FSAL_SERVERFAULT, 0);
-    }
+	if (strstr(realPath, CTX_FULLPATH(op_ctx)) != realPath) {
+		return fsalstat(ERR_FSAL_SERVERFAULT, 0);
+	}
 
-    realPath += strlen(CTX_FULLPATH(op_ctx));
-    if (*realPath == '\0') {
-        realPath = rootDirPath;
-    }
+	realPath += strlen(CTX_FULLPATH(op_ctx));
+	if (*realPath == '\0') {
+		realPath = rootDirPath;
+	}
 
-    LogFullDebug(COMPONENT_FSAL, "real path = %s", realPath);
+	LogFullDebug(COMPONENT_FSAL, "real path = %s", realPath);
 
-    // special case the root
-    if (strcmp(realPath, "/") == 0) {
-        assert(export->rootHandle);
-        *handle = &export->rootHandle->fileHandle;
+	// special case the root
+	if (strcmp(realPath, "/") == 0) {
+		assert(export->rootHandle);
+		*handle = &export->rootHandle->fileHandle;
 
-        if (attributes == NULL) {
-            return fsalstat(ERR_FSAL_NO_ERROR, 0);
-        }
-    }
+		if (attributes == NULL) {
+			return fsalstat(ERR_FSAL_NO_ERROR, 0);
+		}
+	}
 
-    liz_entry_t entry;
-    int rc = fs_lookup(export->fsInstance, &op_ctx->creds,
-                       SPECIAL_INODE_ROOT, realPath, &entry);
+	liz_entry_t entry;
+	int rc = fs_lookup(export->fsInstance, &op_ctx->creds,
+					   SPECIAL_INODE_ROOT, realPath, &entry);
 
-    if (rc < 0) {
-        return fsalLastError();
-    }
+	if (rc < 0) {
+		return fsalLastError();
+	}
 
-    if (attributes != NULL) {
-        posix2fsal_attributes_all(&entry.attr, attributes);
-    }
+	if (attributes != NULL) {
+		posix2fsal_attributes_all(&entry.attr, attributes);
+	}
 
-    if (*handle == NULL) {
-        objectHandle = allocateNewHandle(&entry.attr, export);
-        *handle = &objectHandle->fileHandle;
-    }
+	if (*handle == NULL) {
+		objectHandle = allocateNewHandle(&entry.attr, export);
+		*handle = &objectHandle->fileHandle;
+	}
 
-    return fsalstat(ERR_FSAL_NO_ERROR, 0);
+	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
 /**
@@ -195,35 +176,33 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle,
  * @returns: FSAL status.
  */
 static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
-                                      struct fsal_obj_handle *objectHandle,
-                                      fsal_dynamicfsinfo_t *info)
-{
-    //Unused variable
-    (void ) objectHandle;
+									  struct fsal_obj_handle *objectHandle,
+									  fsal_dynamicfsinfo_t *info) {
+	(void) objectHandle;
 
-    struct FSExport *export;
-    export = container_of(exportHandle, struct FSExport, export);
+	struct FSExport *export;
+	export = container_of(exportHandle, struct FSExport, export);
 
-    liz_stat_t statfsEntry;
-    int rc = liz_statfs(export->fsInstance, &statfsEntry);
+	liz_stat_t statfsEntry;
+	int rc = liz_statfs(export->fsInstance, &statfsEntry);
 
-    if (rc < 0) {
-        return fsalLastError();
-    }
+	if (rc < 0) {
+		return fsalLastError();
+	}
 
-    memset(info, 0, sizeof(fsal_dynamicfsinfo_t));
-    info->total_bytes = statfsEntry.total_space;
-    info->free_bytes  = statfsEntry.avail_space;
-    info->avail_bytes = statfsEntry.avail_space;
+	memset(info, 0, sizeof(fsal_dynamicfsinfo_t));
+	info->total_bytes = statfsEntry.total_space;
+	info->free_bytes  = statfsEntry.avail_space;
+	info->avail_bytes = statfsEntry.avail_space;
 
-    info->total_files = MAX_REGULAR_INODE;
-    info->free_files  = MAX_REGULAR_INODE - statfsEntry.inodes;
-    info->avail_files = MAX_REGULAR_INODE - statfsEntry.inodes;
+	info->total_files = MAX_REGULAR_INODE;
+	info->free_files  = MAX_REGULAR_INODE - statfsEntry.inodes;
+	info->avail_files = MAX_REGULAR_INODE - statfsEntry.inodes;
 
-    info->time_delta.tv_sec  = 0;
-    info->time_delta.tv_nsec = FSAL_DEFAULT_TIME_DELTA_NSEC;
+	info->time_delta.tv_sec  = 0;
+	info->time_delta.tv_nsec = FSAL_DEFAULT_TIME_DELTA_NSEC;
 
-    return fsalstat(ERR_FSAL_NO_ERROR, 0);
+	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
 /**
@@ -239,21 +218,20 @@ static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
  * @returns: a state structure.
  */
 struct state_t *allocate_state(struct fsal_export *export,
-                               enum state_type stateType,
-                               struct state_t *relatedState)
-{
-    struct state_t *state;
-    struct FSFileDescriptor *fileDescriptor;
+							   enum state_type stateType,
+							   struct state_t *relatedState) {
+	struct state_t *state;
+	struct FSFileDescriptor *fileDescriptor;
 
-    state = init_state(gsh_calloc(1, sizeof(struct FSFileDescriptorState)),
-                       export, stateType, relatedState);
+	state = init_state(gsh_calloc(1, sizeof(struct FSFileDescriptorState)),
+					   export, stateType, relatedState);
 
-    fileDescriptor = &container_of(state, struct FSFileDescriptorState,
-                                   state)->fileDescriptor;
+	fileDescriptor = &container_of(state, struct FSFileDescriptorState,
+								   state)->fileDescriptor;
 
-    fileDescriptor->fileDescriptor = NULL;
-    fileDescriptor->openFlags = FSAL_O_CLOSED;
-    return state;
+	fileDescriptor->fileDescriptor = NULL;
+	fileDescriptor->openFlags = FSAL_O_CLOSED;
+	return state;
 }
 
 /**
@@ -264,8 +242,7 @@ struct state_t *allocate_state(struct fsal_export *export,
  *
  * @returns: NULL on failure otherwise a state structure.
  */
-void free_state(struct fsal_export *export, struct state_t *state)
-{
+void free_state(struct fsal_export *export, struct state_t *state) {
 	(void) export;
 
 	struct FSFileDescriptorState *fdState;
@@ -293,10 +270,9 @@ void free_state(struct fsal_export *export, struct state_t *state)
  * @returns: FSAL type.
  */
 static fsal_status_t wire_to_host(struct fsal_export *export,
-                                  fsal_digesttype_t protocol,
-                                  struct gsh_buffdesc *bufferDescriptor,
-                                  int flags)
-{
+								  fsal_digesttype_t protocol,
+								  struct gsh_buffdesc *bufferDescriptor,
+								  int flags) {
 	(void) protocol;
 	(void) export;
 
@@ -345,38 +321,36 @@ static fsal_status_t wire_to_host(struct fsal_export *export,
  * @returns: FSAL status
  */
 fsal_status_t create_handle(struct fsal_export *exportHandle,
-                            struct gsh_buffdesc *bufferDescriptor,
-                            struct fsal_obj_handle **publicHandle,
-                            struct fsal_attrlist *attributes)
-{
-    struct FSExport *export;
-    struct FSHandle *handle = NULL;
-    liz_inode_t *inode;
-    int rc;
+							struct gsh_buffdesc *bufferDescriptor,
+							struct fsal_obj_handle **publicHandle,
+							struct fsal_attrlist *attributes) {
+	struct FSExport *export;
+	struct FSHandle *handle = NULL;
+	liz_inode_t *inode;
 
-    export = container_of(exportHandle, struct FSExport, export);
-    inode = (liz_inode_t *)bufferDescriptor->addr;
+	export = container_of(exportHandle, struct FSExport, export);
+	inode = (liz_inode_t *)bufferDescriptor->addr;
 
-    *publicHandle = NULL;
-    if (bufferDescriptor->len != sizeof(liz_inode_t)) {
-        return fsalstat(ERR_FSAL_INVAL, 0);
-    }
+	*publicHandle = NULL;
+	if (bufferDescriptor->len != sizeof(liz_inode_t)) {
+		return fsalstat(ERR_FSAL_INVAL, 0);
+	}
 
-    liz_attr_reply_t result;
-    rc = fs_getattr(export->fsInstance, &op_ctx->creds, *inode, &result);
+	liz_attr_reply_t result;
+	int rc = fs_getattr(export->fsInstance, &op_ctx->creds, *inode, &result);
 
-    if (rc < 0) {
-        return fsalLastError();
-    }
+	if (rc < 0) {
+		return fsalLastError();
+	}
 
-    handle = allocateNewHandle(&result.attr, export);
+	handle = allocateNewHandle(&result.attr, export);
 
-    if (attributes != NULL) {
-        posix2fsal_attributes_all(&result.attr, attributes);
-    }
+	if (attributes != NULL) {
+		posix2fsal_attributes_all(&result.attr, attributes);
+	}
 
-    *publicHandle = &handle->fileHandle;
-    return fsalstat(ERR_FSAL_NO_ERROR, 0);
+	*publicHandle = &handle->fileHandle;
+	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
 /**
@@ -389,9 +363,8 @@ fsal_status_t create_handle(struct fsal_export *exportHandle,
  *
  * @returns: supported ACL types.
  */
-static fsal_aclsupp_t fs_acl_support(struct fsal_export *export)
-{
-    return fsal_acl_support(&export->fsal->fs_info);
+static fsal_aclsupp_t fs_acl_support(struct fsal_export *export) {
+	return fsal_acl_support(&export->fsal->fs_info);
 }
 
 /**
@@ -405,17 +378,16 @@ static fsal_aclsupp_t fs_acl_support(struct fsal_export *export)
  *
  * @returns: supported attributes.
  */
-static attrmask_t fs_supported_attrs(struct fsal_export *export)
-{
-    attrmask_t supported_mask;
-    supported_mask = fsal_supported_attrs(&export->fsal->fs_info);
+static attrmask_t fs_supported_attrs(struct fsal_export *export) {
+	attrmask_t supported_mask;
+	supported_mask = fsal_supported_attrs(&export->fsal->fs_info);
 
-    // Fixup supported_mask to indicate if ACL is actually supported for this export
-    if (NFSv4_ACL_SUPPORT)
-        supported_mask |=  ATTR_ACL;
-    else
-        supported_mask &= ~ATTR_ACL;
-    return supported_mask;
+	// Fixup supported_mask to indicate if ACL is actually supported for this export
+	if (NFSv4_ACL_SUPPORT)
+		supported_mask |=  ATTR_ACL;
+	else
+		supported_mask &= ~ATTR_ACL;
+	return supported_mask;
 }
 
 /**
@@ -426,15 +398,14 @@ static attrmask_t fs_supported_attrs(struct fsal_export *export)
  *
  * @param[in,out] ops     Operations vector
  */
-void initializeExportOperations(struct export_ops *ops)
-{
-    ops->release = release;
-    ops->lookup_path = lookup_path;
-    ops->wire_to_host = wire_to_host;
-    ops->create_handle = create_handle;
-    ops->get_fs_dynamic_info = get_dynamic_info;
-    ops->fs_supported_attrs = fs_supported_attrs;
-    ops->fs_acl_support = fs_acl_support;
-    ops->alloc_state = allocate_state;
-    ops->free_state = free_state;
+void initializeExportOperations(struct export_ops *ops) {
+	ops->release = release;
+	ops->lookup_path = lookup_path;
+	ops->wire_to_host = wire_to_host;
+	ops->create_handle = create_handle;
+	ops->get_fs_dynamic_info = get_dynamic_info;
+	ops->fs_supported_attrs = fs_supported_attrs;
+	ops->fs_acl_support = fs_acl_support;
+	ops->alloc_state = allocate_state;
+	ops->free_state = free_state;
 }

@@ -8,28 +8,28 @@
 
 timeout_set 5 minutes
 
-CHUNKSERVERS=1 \
-        USE_RAMDISK=YES \
-        MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-        CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
-        setup_local_empty_lizardfs info
+CHUNKSERVERS=5 \
+	USE_RAMDISK=YES \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
+	setup_local_empty_lizardfs info
 
 MINIMUM_PARALLEL_JOBS=4
 MAXIMUM_PARALLEL_JOBS=16
 PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
 
 test_error_cleanup() {
-  cd ${TEMP_DIR}
-  # Umount Ganesha mountpoint
-  if mountpoint -q ${TEMP_DIR}/mnt/ganesha; then
-      sudo umount -l ${TEMP_DIR}/mnt/ganesha
-  fi
-  # Umount LizardFS mountpoint
-  if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
-      sudo umount -l ${TEMP_DIR}/mnt/mfs0
-  fi
-  # Kill Ganesha daemon
-  sudo pkill -9 ganesha.nfsd
+	cd ${TEMP_DIR}
+	# Umount Ganesha mountpoint
+	if mountpoint -q ${TEMP_DIR}/mnt/ganesha; then
+		sudo umount -l ${TEMP_DIR}/mnt/ganesha
+	fi
+	# Umount LizardFS mountpoint
+	if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
+		sudo umount -l ${TEMP_DIR}/mnt/mfs0
+	fi
+	# Kill Ganesha daemon
+	sudo pkill -9 ganesha.nfsd
 }
 
 mkdir -p ${TEMP_DIR}/mnt/ganesha
@@ -45,8 +45,8 @@ GANESHA_BS="$((1<<20))"
 # Create some directories at data
 cd ${info[mount0]}/data
 for i in $(seq 1 ${MAX_PATH_DEPH}); do
-        mkdir -p dir${i}
-        cd dir${i}
+	mkdir -p dir${i}
+	cd dir${i}
 done
 
 # Create a file at data
@@ -57,11 +57,11 @@ INODE=$(stat -c %i ./file)
 # Create PID file for Ganesha
 PID_FILE=/var/run/ganesha/ganesha.pid
 if [ ! -f ${PID_FILE} ]; then
-  echo "ganesha.pid doesn't exists, creating it...";
-        sudo mkdir -p /var/run/ganesha;
-        sudo touch ${PID_FILE};
+	echo "ganesha.pid doesn't exists, creating it...";
+	sudo mkdir -p /var/run/ganesha;
+	sudo touch ${PID_FILE};
 else
-        echo "ganesha.pid already exists";
+	echo "ganesha.pid already exists";
 fi
 
 cd ${info[mount0]}
@@ -89,34 +89,34 @@ cp ${fsal_lizardfs} ${info[mount0]}/lib/ganesha
 
 cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
 NFS_KRB5 {
-        Active_krb5=false;
+	Active_krb5=false;
 }
 NFSV4 {
-  Grace_Period = 5;
+	Grace_Period = 5;
 }
 EXPORT
 {
-        Attr_Expiration_Time = 0;
-        Export_Id = 99;
-        Path = /data;
-        Pseudo = /data;
-        Access_Type = RW;
-        FSAL {
-                Name = LizardFS;
-                hostname = localhost;
-                port = ${lizardfs_info_[matocl]};
-                # How often to retry to connect
-                io_retries = 5;
-                cache_expiration_time_ms = 2500;
-        }
-        Protocols = 4;
-        CLIENT {
-                Clients = localhost;
-        }
+	Attr_Expiration_Time = 0;
+	Export_Id = 99;
+	Path = /data;
+	Pseudo = /data;
+	Access_Type = RW;
+	FSAL {
+		Name = LizardFS;
+		hostname = localhost;
+		port = ${lizardfs_info_[matocl]};
+		# How often to retry to connect
+		io_retries = 5;
+		cache_expiration_time_ms = 2500;
+	}
+	Protocols = 4;
+	CLIENT {
+		Clients = localhost;
+	}
 }
 LizardFS {
-        PNFS_DS = true;
-        PNFS_MDS = true;
+	PNFS_DS = true;
+	PNFS_MDS = true;
 }
 EOF
 
@@ -157,22 +157,20 @@ index 8c837a8..7060cca 100644
 EOF
 
 sudo -i -u lizardfstest bash << EOF
- cd "${TEMP_DIR}/mnt/ganesha"
- chmod o+w "$(pwd)"
- if test -d "${TEMP_DIR}/mnt/ganesha/cthon04"; then
-    rm -rf "${TEMP_DIR}/mnt/ganesha/cthon04"
- fi
- git clone --no-checkout git://git.linux-nfs.org/projects/steved/cthon04.git
- cd cthon04
- git reset --hard HEAD
- git apply --ignore-whitespace "${TEMP_DIR}/mnt/ganesha/cthon04.patch"
-# sudo chown -R lizardfstest:lizardfstest $TEMP_DIR/mnt/ganesha/cthon04
- make all
-# git status
- export NFSTESTDIR=${TEMP_DIR}/mnt/ganesha/cthon_test
- ./runtests -b -n
- ./runtests -l -n
- ./runtests -s -n
+	cd "${TEMP_DIR}/mnt/ganesha"
+	chmod o+w "$(pwd)"
+	if test -d "${TEMP_DIR}/mnt/ganesha/cthon04"; then
+		rm -rf "${TEMP_DIR:?}/mnt/ganesha/cthon04"
+	fi
+	git clone --no-checkout git://git.linux-nfs.org/projects/steved/cthon04.git
+	cd cthon04
+	git reset --hard HEAD
+	git apply --ignore-whitespace "${TEMP_DIR}/mnt/ganesha/cthon04.patch"
+	make all
+	export NFSTESTDIR=${TEMP_DIR}/mnt/ganesha/cthon_test
+	./runtests -b -n
+	./runtests -l -n
+	./runtests -s -n
 EOF
 
 cd ${TEMP_DIR}/mnt/ganesha
@@ -184,8 +182,8 @@ rmdir ./dir_on_ganesha
 test ! -d ./dir_on_ganesha
 
 for i in $(seq ${MAX_FILES}); do
-  touch ./file.${i};
-  test -f ./file.${i};
+	touch ./file.${i};
+	test -f ./file.${i};
 done
 
 ### Check getattr / stat / syscall

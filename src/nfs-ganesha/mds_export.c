@@ -1,5 +1,5 @@
 /*
-   Copyright 2022 LizardFS sp. z o.o.
+   Copyright 2017 Skytechnology sp. z o.o.
 
    This file is part of LizardFS.
 
@@ -16,11 +16,6 @@
    along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "fsal.h"
-#include "fsal_api.h"
-#include "fsal_types.h"
-#include "fsal_up.h"
-#include "FSAL/fsal_commonlib.h"
 #include "gsh_config.h"
 #include "pnfs_utils.h"
 
@@ -43,15 +38,13 @@
  * @retval value > 0: chunkserverA's ip is greater than chunkserverB's ip
  * @retval     0    : Both chunkservers have the same ip
  */
-static int ascendingIpCompare(const void *chunkserverA,
-                              const void *chunkserverB)
-{
-    uint32_t ipFromChunkserverA = ((const liz_chunkserver_info_t *)
-                                   chunkserverA)->ip;
-    uint32_t ipFromChunkserverB = ((const liz_chunkserver_info_t *)
-                                   chunkserverB)->ip;
+static int ascendingIpCompare(const void *chunkserverA, const void *chunkserverB) {
+	uint32_t ipFromChunkserverA = ((const liz_chunkserver_info_t *)
+								   chunkserverA)->ip;
+	uint32_t ipFromChunkserverB = ((const liz_chunkserver_info_t *)
+								   chunkserverB)->ip;
 
-    return ipFromChunkserverA - ipFromChunkserverB;
+	return ipFromChunkserverA - ipFromChunkserverB;
 }
 
 /**
@@ -64,12 +57,11 @@ static int ascendingIpCompare(const void *chunkserverA,
  * @retval 0: chunkserver is connected
  * @retval 1: chunkserver is disconnected
  */
-static int isChunkserverDisconnected(const void *chunkserver, void *unused)
-{
+static int isChunkserverDisconnected(const void *chunkserver, void *unused) {
 	(void) unused;
 
-    return ((const liz_chunkserver_info_t *)chunkserver)->version ==
-            kDisconnectedChunkServerVersion;
+	return ((const liz_chunkserver_info_t *)chunkserver)->version ==
+			kDisconnectedChunkServerVersion;
 }
 
 /**
@@ -85,14 +77,13 @@ static int isChunkserverDisconnected(const void *chunkserver, void *unused)
  * @retval 0: chunkserver and its predecessor doesn't have the same ip
  * @retval 1: chunkserver and its predecessor have the same ip
  */
-static int adjacentChunkserversWithSameIp(const void *chunkserver, void *base)
-{
-    if (chunkserver == base) {
-        return 0;
-    }
+static int adjacentChunkserversWithSameIp(const void *chunkserver, void *base) {
+	if (chunkserver == base) {
+		return 0;
+	}
 
-    return ((const liz_chunkserver_info_t *)chunkserver)->ip ==
-           ((const liz_chunkserver_info_t *)chunkserver - 1)->ip;
+	return ((const liz_chunkserver_info_t *)chunkserver)->ip ==
+			((const liz_chunkserver_info_t *)chunkserver - 1)->ip;
 }
 
 /**
@@ -107,21 +98,19 @@ static int adjacentChunkserversWithSameIp(const void *chunkserver, void *base)
  * @returns: Number of removed elements.
  */
 static size_t remove_if(void *data, size_t size, size_t itemSize,
-                        int (*predicate)(const void *chunkserver, void *targetData),
-                        void *targetData)
-{
-    size_t j = 0;
+						int (*predicate)(const void *chunkserver, void *targetData),
+						void *targetData) {
+	size_t j = 0;
 
-    for (size_t i = 0; i < size; ++i) {
-        if (!predicate((uint8_t *)data + i * itemSize, targetData))
-        {
-            memcpy((uint8_t *)data + i * itemSize,
-                   (uint8_t *)data + j * itemSize,
-                   itemSize);
-            j++;
-        }
-    }
-    return j;
+	for (size_t i = 0; i < size; ++i) {
+		if (!predicate((uint8_t *)data + i * itemSize, targetData)) {
+			memcpy((uint8_t *)data + i * itemSize,
+				   (uint8_t *)data + j * itemSize,
+				   itemSize);
+			j++;
+		}
+	}
+	return j;
 }
 
 /**
@@ -134,24 +123,23 @@ static size_t remove_if(void *data, size_t size, size_t itemSize,
  * @returns: Nothing. The elements of the collection are rearranged after
  *                    finishing the execution of the method.
  */
-static void shuffle(void *data, size_t size, size_t itemSize)
-{
-    uint8_t temp[itemSize];
+static void shuffle(void *data, size_t size, size_t itemSize) {
+	uint8_t temp[itemSize];
 
-    if (size == 0) {
-        return;
-    }
+	if (size == 0) {
+		return;
+	}
 
-    for (size_t i = 0; i < size - 1; ++i) {
-        size_t j = i + rand() % (size - i);
+	for (size_t i = 0; i < size - 1; ++i) {
+		size_t j = i + rand() % (size - i);
 
-        memcpy(temp, (uint8_t *)data + i * itemSize, itemSize);
+		memcpy(temp, (uint8_t *)data + i * itemSize, itemSize);
 
-        memcpy((uint8_t *)data + i * itemSize,
-               (uint8_t *)data + j * itemSize, itemSize);
+		memcpy((uint8_t *)data + i * itemSize,
+			   (uint8_t *)data + j * itemSize, itemSize);
 
-        memcpy((uint8_t *)data + j * itemSize, temp, itemSize);
-    }
+		memcpy((uint8_t *)data + j * itemSize, temp, itemSize);
+	}
 }
 
 /**
@@ -163,44 +151,43 @@ static void shuffle(void *data, size_t size, size_t itemSize)
  * @returns: Randomized chunkservers list.
  */
 static liz_chunkserver_info_t *randomizedChunkserverList(
-        struct FSExport *export, uint32_t *chunkserverCount)
-{
-    liz_chunkserver_info_t *chunkserverInfo = NULL;
+		struct FSExport *export, uint32_t *chunkserverCount) {
+	liz_chunkserver_info_t *chunkserverInfo = NULL;
 
-    chunkserverInfo = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT *
-                                  sizeof(liz_chunkserver_info_t));
+	chunkserverInfo = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT *
+								 sizeof(liz_chunkserver_info_t));
 
-    int rc = liz_get_chunkservers_info(export->fsInstance, chunkserverInfo,
-                                       LZFS_BIGGEST_STRIPE_COUNT,
-                                       chunkserverCount);
+	int rc = liz_get_chunkservers_info(export->fsInstance, chunkserverInfo,
+									   LZFS_BIGGEST_STRIPE_COUNT,
+									   chunkserverCount);
 	if (rc < 0) {
-        *chunkserverCount = 0;
-        gsh_free(chunkserverInfo);
-        return NULL;
-    }
+		*chunkserverCount = 0;
+		gsh_free(chunkserverInfo);
+		return NULL;
+	}
 
-    // Free labels, we don't need them.
-    liz_destroy_chunkservers_info(chunkserverInfo);
+	// Free labels, we don't need them.
+	liz_destroy_chunkservers_info(chunkserverInfo);
 
-    // remove disconnected
-    *chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
-                                  sizeof(liz_chunkserver_info_t),
-                                  isChunkserverDisconnected, NULL);
+	// remove disconnected
+	*chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
+								  sizeof(liz_chunkserver_info_t),
+								  isChunkserverDisconnected, NULL);
 
-    // sorting chunkservers based on its ip attribute
-    qsort(chunkserverInfo, *chunkserverCount,
-          sizeof(liz_chunkserver_info_t), ascendingIpCompare);
+	// sorting chunkservers based on its ip attribute
+	qsort(chunkserverInfo, *chunkserverCount,
+		  sizeof(liz_chunkserver_info_t), ascendingIpCompare);
 
-    // remove entries with the same ip
-    *chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
-                                  sizeof(liz_chunkserver_info_t),
-                                  adjacentChunkserversWithSameIp,
-                                  chunkserverInfo);
+	// remove entries with the same ip
+	*chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
+								  sizeof(liz_chunkserver_info_t),
+								  adjacentChunkserversWithSameIp,
+								  chunkserverInfo);
 
-    // randomize
-    shuffle(chunkserverInfo, *chunkserverCount, sizeof(liz_chunkserver_info_t));
+	// randomize
+	shuffle(chunkserverInfo, *chunkserverCount, sizeof(liz_chunkserver_info_t));
 
-    return chunkserverInfo;
+	return chunkserverInfo;
 }
 
 /**
@@ -215,73 +202,69 @@ static liz_chunkserver_info_t *randomizedChunkserverList(
  * @retval  -1: Failing operation
  */
 static int fillChunkDataServerList(XDR *da_addr_body,
-                                   liz_chunk_info_t *chunkInfo,
-                                   liz_chunkserver_info_t *chunkserverInfo,
-                                   uint32_t chunkCount,
-                                   uint32_t stripeCount,
-                                   uint32_t chunkserverCount,
-                                   uint32_t *chunkserverIndex)
-{
-    fsal_multipath_member_t host[LZFS_EXPECTED_BACKUP_DS_COUNT];
+								   liz_chunk_info_t *chunkInfo,
+								   liz_chunkserver_info_t *chunkserverInfo,
+								   uint32_t chunkCount,
+								   uint32_t stripeCount,
+								   uint32_t chunkserverCount,
+								   uint32_t *chunkserverIndex) {
+	fsal_multipath_member_t host[LZFS_EXPECTED_BACKUP_DS_COUNT];
 
-    uint32_t size = MIN(chunkCount, stripeCount);
+	uint32_t size = MIN(chunkCount, stripeCount);
 
-    const int upperBound = LZFS_EXPECTED_BACKUP_DS_COUNT;
+	const int upperBound = LZFS_EXPECTED_BACKUP_DS_COUNT;
 
-    for (uint32_t chunkIndex = 0; chunkIndex < size; ++chunkIndex)
-    {
-            liz_chunk_info_t *chunk = &chunkInfo[chunkIndex];
-            int serverCount = 0;
+	for (uint32_t chunkIndex = 0; chunkIndex < size; ++chunkIndex) {
+		liz_chunk_info_t *chunk = &chunkInfo[chunkIndex];
+		int serverCount = 0;
 
-            memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
+		memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
 
-            // prefer std chunk part type
-            for (size_t i = 0; i < chunk->parts_size &&
-                 serverCount < upperBound; ++i)
-            {
-                    if (chunk->parts[i].part_type_id != LZFS_STD_CHUNK_PART_TYPE) {
-                        continue;
-                    }
+		// prefer std chunk part type
+		for (size_t i = 0; i < chunk->parts_size &&
+			 serverCount < upperBound; ++i) {
+			if (chunk->parts[i].part_type_id != LZFS_STD_CHUNK_PART_TYPE) {
+				continue;
+			}
 
-                    host[serverCount].proto = TCP_PROTO_NUMBER;
-                    host[serverCount].addr = chunk->parts[i].addr;
-                    host[serverCount].port = NFS_PORT;
-                    ++serverCount;
-            }
+			host[serverCount].proto = TCP_PROTO_NUMBER;
+			host[serverCount].addr = chunk->parts[i].addr;
+			host[serverCount].port = NFS_PORT;
+			++serverCount;
+		}
 
-            for (size_t i = 0; i < chunk->parts_size
-                 && serverCount < upperBound; ++i)
-            {
-                    if (chunk->parts[i].part_type_id == LZFS_STD_CHUNK_PART_TYPE) {
-                        continue;
-                    }
+		for (size_t i = 0; i < chunk->parts_size
+			 && serverCount < upperBound; ++i) {
+			if (chunk->parts[i].part_type_id == LZFS_STD_CHUNK_PART_TYPE) {
+				continue;
+			}
 
-                    host[serverCount].proto = TCP_PROTO_NUMBER;
-                    host[serverCount].addr = chunk->parts[i].addr;
-                    host[serverCount].port = NFS_PORT;
-                    ++serverCount;
-            }
+			host[serverCount].proto = TCP_PROTO_NUMBER;
+			host[serverCount].addr = chunk->parts[i].addr;
+			host[serverCount].port = NFS_PORT;
+			++serverCount;
+		}
 
-            // fill unused entries with the servers from randomized chunkserver list
-            while (serverCount < upperBound) {
-                host[serverCount].proto = TCP_PROTO_NUMBER;
-                host[serverCount].addr = chunkserverInfo[*chunkserverIndex].ip;
-                host[serverCount].port = NFS_PORT;
+		// fill unused entries with the servers from randomized chunkserver list
+		while (serverCount < upperBound) {
+			host[serverCount].proto = TCP_PROTO_NUMBER;
+			host[serverCount].addr = chunkserverInfo[*chunkserverIndex].ip;
+			host[serverCount].port = NFS_PORT;
 
-                ++serverCount;
-                *chunkserverIndex = (*chunkserverIndex + 1) % chunkserverCount;
-            }
+			++serverCount;
+			*chunkserverIndex = (*chunkserverIndex + 1) % chunkserverCount;
+		}
 
-            // encode ds entry
-            nfsstat4 nfs_status = FSAL_encode_v4_multipath(da_addr_body,
-                                                           serverCount, host);
+		// encode ds entry
+		nfsstat4 nfs_status = FSAL_encode_v4_multipath(da_addr_body,
+													   serverCount, host);
 
-            if (nfs_status != NFS4_OK) {
-                return -1;
-            }
-    }
+		if (nfs_status != NFS4_OK) {
+			return -1;
+		}
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -300,45 +283,41 @@ static int fillChunkDataServerList(XDR *da_addr_body,
  * @retval  -1: Failing operation
  */
 static int fillUnusedDataServerList(XDR *xdrStream,
-                                    liz_chunkserver_info_t *chunkserverInfo,
-                                    uint32_t chunkCount,
-                                    uint32_t stripeCount,
-                                    uint32_t chunkserverCount,
-                                    uint32_t *chunkserverIndex)
-{
-    fsal_multipath_member_t host[LZFS_EXPECTED_BACKUP_DS_COUNT];
+									liz_chunkserver_info_t *chunkserverInfo,
+									uint32_t chunkCount,
+									uint32_t stripeCount,
+									uint32_t chunkserverCount,
+									uint32_t *chunkserverIndex) {
+	fsal_multipath_member_t host[LZFS_EXPECTED_BACKUP_DS_COUNT];
 
-    uint32_t size = MIN(chunkCount, stripeCount);
+	uint32_t size = MIN(chunkCount, stripeCount);
 
-    const int upperBound = LZFS_EXPECTED_BACKUP_DS_COUNT;
+	const int upperBound = LZFS_EXPECTED_BACKUP_DS_COUNT;
 
-    for (uint32_t chunkIndex = size; chunkIndex < stripeCount; ++chunkIndex)
-    {
-            int serverCount = 0, index;
+	for (uint32_t chunkIndex = size; chunkIndex < stripeCount; ++chunkIndex) {
+		int serverCount = 0, index;
 
-            memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
+		memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
 
-            while (serverCount < LZFS_EXPECTED_BACKUP_DS_COUNT) {
-                index = (*chunkserverIndex + serverCount) % chunkserverCount;
+		while (serverCount < LZFS_EXPECTED_BACKUP_DS_COUNT) {
+			index = (*chunkserverIndex + serverCount) % chunkserverCount;
 
-                host[serverCount].proto = TCP_PROTO_NUMBER;
-                host[serverCount].addr = chunkserverInfo[index].ip;
-                host[serverCount].port = NFS_PORT;
+			host[serverCount].proto = TCP_PROTO_NUMBER;
+			host[serverCount].addr = chunkserverInfo[index].ip;
+			host[serverCount].port = NFS_PORT;
 
-                ++serverCount;
-            }
+			++serverCount;
+		}
 
-            *chunkserverIndex = (*chunkserverIndex + 1) % chunkserverCount;
+		*chunkserverIndex = (*chunkserverIndex + 1) % chunkserverCount;
 
-            nfsstat4 nfs_status = FSAL_encode_v4_multipath(xdrStream,
-                                                           serverCount, host);
+		nfsstat4 status = FSAL_encode_v4_multipath(xdrStream, serverCount, host);
+		if (status != NFS4_OK) {
+			return -1;
+		}
+	}
 
-            if (nfs_status != NFS4_OK) {
-                return -1;
-            }
-    }
-
-    return 0;
+	return 0;
 }
 
 /**
@@ -377,127 +356,124 @@ static int fillUnusedDataServerList(XDR *xdrStream,
  * @returns: Valid error codes in RFC 5661, p. 365.
  */
 static nfsstat4 _getdeviceinfo(struct fsal_module *FSALModule,
-                               XDR *xdrStream,
-                               const layouttype4 type,
-                               const struct pnfs_deviceid *deviceid)
-{
-    struct fsal_export *exportHandle;
-    struct FSExport *export = NULL;
+							   XDR *xdrStream,
+							   const layouttype4 type,
+							   const struct pnfs_deviceid *deviceid) {
+	struct fsal_export *exportHandle;
+	struct FSExport *export = NULL;
 
-    liz_chunk_info_t *chunkInfo = NULL;
-    liz_chunkserver_info_t *chunkserverInfo = NULL;
+	liz_chunk_info_t *chunkInfo = NULL;
+	liz_chunkserver_info_t *chunkserverInfo = NULL;
 
-    uint32_t chunkCount, chunkserverCount;
-    uint32_t stripeCount, chunkserverIndex;
+	uint32_t chunkCount, chunkserverCount;
+	uint32_t stripeCount, chunkserverIndex;
 
-    struct glist_head *glist, *glistn;
+	struct glist_head *glist, *glistn;
 
-    if (type != LAYOUT4_NFSV4_1_FILES) {
-        LogCrit(COMPONENT_PNFS, "Unsupported layout type: %x", type);
-        return NFS4ERR_UNKNOWN_LAYOUTTYPE;
-    }
+	if (type != LAYOUT4_NFSV4_1_FILES) {
+		LogCrit(COMPONENT_PNFS, "Unsupported layout type: %x", type);
+		return NFS4ERR_UNKNOWN_LAYOUTTYPE;
+	}
 
-    uint16_t export_id = deviceid->device_id2;
+	uint16_t export_id = deviceid->device_id2;
 
-    glist_for_each_safe(glist, glistn, &FSALModule->exports) {
-        exportHandle = glist_entry(glist, struct fsal_export, exports);
+	glist_for_each_safe(glist, glistn, &FSALModule->exports) {
+		exportHandle = glist_entry(glist, struct fsal_export, exports);
 
-        if (exportHandle->export_id == export_id) {
-            export = container_of(exportHandle, struct FSExport, export);
-            break;
-        }
-    }
+		if (exportHandle->export_id == export_id) {
+			export = container_of(exportHandle, struct FSExport, export);
+			break;
+		}
+	}
 
-    if (!export) {
-        LogCrit(COMPONENT_PNFS, "Couldn't find export with id: %"
-                PRIu16, export_id);
+	if (!export) {
+		LogCrit(COMPONENT_PNFS, "Couldn't find export with id: %"
+				PRIu16, export_id);
 
-        return NFS4ERR_SERVERFAULT;
-    }
+		return NFS4ERR_SERVERFAULT;
+	}
 
-    // get the chunk list for file
-    chunkInfo = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT * sizeof(liz_chunk_info_t));
+	// get the chunk list for file
+	chunkInfo = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT * sizeof(liz_chunk_info_t));
 
-    int rc = fs_get_chunks_info(export->fsInstance, &op_ctx->creds,
-                                deviceid->devid, 0, chunkInfo,
-                                LZFS_BIGGEST_STRIPE_COUNT, &chunkCount);
+	int rc = fs_get_chunks_info(export->fsInstance, &op_ctx->creds,
+								deviceid->devid, 0, chunkInfo,
+								LZFS_BIGGEST_STRIPE_COUNT, &chunkCount);
 
-    if (rc < 0) {
-        LogCrit(COMPONENT_PNFS,
-                "Failed to get LizardFS layout for export = %"
-                PRIu16 " inode = %" PRIu64, export_id, deviceid->devid);
+	if (rc < 0) {
+		LogCrit(COMPONENT_PNFS,
+				"Failed to get LizardFS layout for export = %"
+				PRIu16 " inode = %" PRIu64, export_id, deviceid->devid);
 
-        goto generic_err;
-    }
+		goto generic_err;
+	}
 
-    chunkserverInfo = randomizedChunkserverList(export, &chunkserverCount);
+	chunkserverInfo = randomizedChunkserverList(export, &chunkserverCount);
 
-    if (chunkserverInfo == NULL || chunkserverCount == 0) {
-        LogCrit(COMPONENT_PNFS,
-                "Failed to get LizardFS layout for export = %" PRIu16
-                " inode = %" PRIu64, export_id, deviceid->devid);
+	if (chunkserverInfo == NULL || chunkserverCount == 0) {
+		LogCrit(COMPONENT_PNFS,
+				"Failed to get LizardFS layout for export = %" PRIu16
+				" inode = %" PRIu64, export_id, deviceid->devid);
 
-        goto generic_err;
-    }
+		goto generic_err;
+	}
 
-    chunkserverIndex = 0;
+	chunkserverIndex = 0;
+	stripeCount = MIN(chunkCount + chunkserverCount, LZFS_BIGGEST_STRIPE_COUNT);
 
-    stripeCount = MIN(chunkCount + chunkserverCount,
-                      LZFS_BIGGEST_STRIPE_COUNT);
+	if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
+		goto encode_err;
+	}
 
-    if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
-        goto encode_err;
-    }
+	for (uint32_t chunkIndex = 0; chunkIndex < stripeCount; ++chunkIndex) {
+		if (!inline_xdr_u_int32_t(xdrStream, &chunkIndex)) {
+			goto encode_err;
+		}
+	}
 
-    for (uint32_t chunkIndex = 0; chunkIndex < stripeCount; ++chunkIndex) {
-        if (!inline_xdr_u_int32_t(xdrStream, &chunkIndex)) {
-            goto encode_err;
-        }
-    }
+	if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
+		goto encode_err;
+	}
 
-    if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
-        goto encode_err;
-    }
+	rc = fillChunkDataServerList(xdrStream, chunkInfo, chunkserverInfo,
+								 chunkCount, stripeCount, chunkserverCount,
+								 &chunkserverIndex);
 
-    rc = fillChunkDataServerList(xdrStream, chunkInfo, chunkserverInfo,
-                                 chunkCount, stripeCount, chunkserverCount,
-                                 &chunkserverIndex);
+	if (rc < 0) {
+		goto encode_err;
+	}
 
-    if (rc < 0) {
-        goto encode_err;
-    }
+	rc = fillUnusedDataServerList(xdrStream, chunkserverInfo, chunkCount,
+								  stripeCount, chunkserverCount,
+								  &chunkserverIndex);
 
-    rc = fillUnusedDataServerList(xdrStream, chunkserverInfo, chunkCount,
-                                  stripeCount, chunkserverCount,
-                                  &chunkserverIndex);
+	if (rc < 0) {
+		goto encode_err;
+	}
 
-    if (rc < 0) {
-        goto encode_err;
-    }
+	liz_destroy_chunks_info(chunkInfo);
 
-    liz_destroy_chunks_info(chunkInfo);
+	gsh_free(chunkInfo);
+	gsh_free(chunkserverInfo);
 
-    gsh_free(chunkInfo);
-    gsh_free(chunkserverInfo);
-
-    return NFS4_OK;
+	return NFS4_OK;
 
 encode_err:
-    LogCrit(COMPONENT_PNFS,
-            "Failed to encode device information for export = %" PRIu16
-            " inode = %" PRIu64, export_id, deviceid->devid);
+	LogCrit(COMPONENT_PNFS,
+			"Failed to encode device information for export = %" PRIu16
+			" inode = %" PRIu64, export_id, deviceid->devid);
 
 generic_err:
-    if (chunkInfo) {
-        liz_destroy_chunks_info(chunkInfo);
-        gsh_free(chunkInfo);
-    }
+	if (chunkInfo) {
+		liz_destroy_chunks_info(chunkInfo);
+		gsh_free(chunkInfo);
+	}
 
-    if (chunkserverInfo) {
-        gsh_free(chunkserverInfo);
-    }
+	if (chunkserverInfo) {
+		gsh_free(chunkserverInfo);
+	}
 
-    return NFS4ERR_SERVERFAULT;
+	return NFS4ERR_SERVERFAULT;
 }
 
 /**
@@ -523,17 +499,16 @@ generic_err:
  * @returns: Valid error codes in RFC 5661, p. 365-6.
  */
 static nfsstat4 _getdevicelist(struct fsal_export *exportHandle,
-                               layouttype4 type, void *opaque,
-                               bool (*cb)(void *opaque, const uint64_t id),
-                               struct fsal_getdevicelist_res *res)
-{
+							   layouttype4 type, void *opaque,
+							   bool (*cb)(void *opaque, const uint64_t id),
+							   struct fsal_getdevicelist_res *res) {
 	(void) exportHandle;
 	(void) type;
 	(void) opaque;
 	(void) cb;
 
-    res->eof = true;
-    return NFS4_OK;
+	res->eof = true;
+	return NFS4_OK;
 }
 
 /**
@@ -550,14 +525,13 @@ static nfsstat4 _getdevicelist(struct fsal_export *exportHandle,
  * @returns: Nothing
  */
 static void _fs_layouttypes(struct fsal_export *exportHandle,
-                            int32_t *count,
-                            const layouttype4 **types)
-{
+							int32_t *count,
+							const layouttype4 **types) {
 	(void) exportHandle;
 
-    static const layouttype4 supportedLayoutType = LAYOUT4_NFSV4_1_FILES;
-    *types = &supportedLayoutType;
-    *count = 1;
+	static const layouttype4 supportedLayoutType = LAYOUT4_NFSV4_1_FILES;
+	*types = &supportedLayoutType;
+	*count = 1;
 }
 
 /**
@@ -575,11 +549,10 @@ static void _fs_layouttypes(struct fsal_export *exportHandle,
  *
  * @returns: The preferred layout block size.
  */
-static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle)
-{
+static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle) {
 	(void) exportHandle;
 
-    return MFSCHUNKSIZE;
+	return MFSCHUNKSIZE;
 }
 
 /**
@@ -593,11 +566,10 @@ static uint32_t _fs_layout_blocksize(struct fsal_export *exportHandle)
  *
  * @returns: The Maximum number of layout segments in a compound layoutget.
  */
-static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle)
-{
+static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle) {
 	(void) exportHandle;
 
-    return 1;
+	return 1;
 }
 
 /**
@@ -612,8 +584,7 @@ static uint32_t _fs_maximum_segments(struct fsal_export *exportHandle)
  *
  * @returns: Max size of the buffer needed for a loc_body.
  */
-static size_t _fs_loc_body_size(struct fsal_export *exportHandle)
-{
+static size_t _fs_loc_body_size(struct fsal_export *exportHandle) {
 	(void) exportHandle;
 
 	return 0x100;  // typical value in NFS FSAL plugins
@@ -631,16 +602,15 @@ static size_t _fs_loc_body_size(struct fsal_export *exportHandle)
  *
  * @returns: Max size of the buffer needed for a da_addr_body.
  */
-static size_t _fs_da_addr_size(struct fsal_module *FSALModule)
-{
+static size_t _fs_da_addr_size(struct fsal_module *FSALModule) {
 	(void) FSALModule;
 
-    // one stripe index + number of addresses +
-    // LZFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes
-    // 37 bytes (we use 40 for safety) we add 32 bytes of overhead
-    // (includes stripe count and DS count)
-    return LZFS_BIGGEST_STRIPE_COUNT *
-            (4 + (4 + LZFS_EXPECTED_BACKUP_DS_COUNT * 40)) + 32;
+	// one stripe index + number of addresses +
+	// LZFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes
+	// 37 bytes (we use 40 for safety) we add 32 bytes of overhead
+	// (includes stripe count and DS count)
+	return LZFS_BIGGEST_STRIPE_COUNT *
+			(4 + (4 + LZFS_EXPECTED_BACKUP_DS_COUNT * 40)) + 32;
 }
 
 /**
@@ -648,16 +618,14 @@ static size_t _fs_da_addr_size(struct fsal_module *FSALModule)
  *
  * @param[in] ops      Export operations vector
  *
- * @returns: Nothing. After running the methods, the operations vectors
- *           is initialized.
+ * @returns: Nothing. After running the methods, the operations vectors is initialized.
  */
-void initializePnfsExportOperations(struct export_ops *ops)
-{
-    ops->getdevicelist = _getdevicelist;
-    ops->fs_layouttypes = _fs_layouttypes;
-    ops->fs_layout_blocksize = _fs_layout_blocksize;
-    ops->fs_maximum_segments = _fs_maximum_segments;
-    ops->fs_loc_body_size = _fs_loc_body_size;
+void initializePnfsExportOperations(struct export_ops *ops) {
+	ops->getdevicelist = _getdevicelist;
+	ops->fs_layouttypes = _fs_layouttypes;
+	ops->fs_layout_blocksize = _fs_layout_blocksize;
+	ops->fs_maximum_segments = _fs_maximum_segments;
+	ops->fs_loc_body_size = _fs_loc_body_size;
 }
 
 /**
@@ -668,8 +636,7 @@ void initializePnfsExportOperations(struct export_ops *ops)
  * @returns: Nothing. After running the methods, the operations vectors
  *           is initialized with the pNFS related operations.
  */
-void initializePnfsOperations(struct fsal_ops *ops)
-{
-    ops->getdeviceinfo = _getdeviceinfo;
-    ops->fs_da_addr_size = _fs_da_addr_size;
+void initializePnfsOperations(struct fsal_ops *ops) {
+	ops->getdeviceinfo = _getdeviceinfo;
+	ops->fs_da_addr_size = _fs_da_addr_size;
 }
