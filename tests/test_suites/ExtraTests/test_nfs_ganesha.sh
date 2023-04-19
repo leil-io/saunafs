@@ -1,9 +1,10 @@
 #
-# To run this test you need to add following
-# line to /etc/sudoers.d/lizardfstest
+# To run this test you need to add the following lines to /etc/sudoers.d/lizardfstest:
 #
-# lizardfstest ALL = NOPASSWD: ALL
+# lizardfstest ALL = NOPASSWD: /bin/mount, /bin/umount, /bin/pkill, /bin/mkdir, /bin/touch
+# lizardfstest ALL = NOPASSWD: /tmp/LizardFS-autotests/mnt/mfs0/bin/ganesha.nfsd
 #
+# The path for the Ganesha daemon should match the installation folder inside the test.
 #
 
 timeout_set 5 minutes
