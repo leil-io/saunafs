@@ -22,14 +22,12 @@ liz_context_t *createFSALContext(liz_t *instance, struct user_cred *cred);
 void initializeExportOperations(struct export_ops *ops);
 void initializeFilesystemOperations(struct fsal_obj_ops *ops);
 
-static inline int rootFileDescriptor(struct fsal_filesystem *fs)
-{
-    return (long) fs->private_data;
+static inline int rootFileDescriptor(struct fsal_filesystem *fs) {
+	return (long) fs->private_data;
 }
 
-static inline int rootFileDescriptorFromExport(struct fsal_export *exp_hdl)
-{
-    return rootFileDescriptor(exp_hdl->root_fs);
+static inline int rootFileDescriptorFromExport(struct fsal_export *exp_hdl) {
+	return rootFileDescriptor(exp_hdl->root_fs);
 }
 
 bool setCredentials(const struct user_cred *creds,
@@ -40,16 +38,16 @@ void restoreGaneshaCredentials(const struct fsal_module *fsal_module);
 /// Methods for allocating/deleting handles
 
 struct FSHandle *allocateNewHandle(const struct stat *attr,
-								   struct FSExport *export);
+                                   struct FSExport *export);
 
 void deleteHandle(struct FSHandle *object);
 
 // Methods for support ACL
 fsal_status_t getACL(struct FSExport *export, uint32_t inode,
-					 uint32_t owner, fsal_acl_t **fsal_acl);
+                     uint32_t owner, fsal_acl_t **fsal_acl);
 
 fsal_status_t setACL(struct FSExport *export, uint32_t inode,
-					 const fsal_acl_t *fsal_acl, unsigned int mode);
+                     const fsal_acl_t *fsal_acl, unsigned int mode);
 
 // Methods for handling errors
 fsal_status_t lizardfsToFsalError(liz_err_t err);

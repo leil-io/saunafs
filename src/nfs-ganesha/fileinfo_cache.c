@@ -55,7 +55,7 @@ static uint64_t get_time_ms() {
 }
 
 static int cache_entry_cmp_function(const struct avltree_node *a,
-									const struct avltree_node *b) {
+                                    const struct avltree_node *b) {
 	FileInfoEntry_t *a_entry = avltree_container_of(a, FileInfoEntry_t, tree_hook);
 	FileInfoEntry_t *b_entry = avltree_container_of(b, FileInfoEntry_t, tree_hook);
 
@@ -93,7 +93,7 @@ FileInfoCache_t *createFileInfoCache(unsigned max_entries, int min_timeout_ms) {
 }
 
 void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned max_entries,
-								  int min_timeout_ms) {
+                                  int min_timeout_ms) {
 	PTHREAD_MUTEX_lock(&cache->lock);
 	cache->max_entries = max_entries;
 	cache->min_timeout_ms = min_timeout_ms;

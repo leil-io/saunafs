@@ -74,7 +74,7 @@ static void _dsh_release(struct fsal_ds_handle *const dataServerHandle) {
 	struct DataServerHandle *dataServer;
 
 	export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-						  struct FSExport, export);
+	                      struct FSExport, export);
 
 	dataServer = container_of(dataServerHandle, struct DataServerHandle, dsHandle);
 
@@ -99,7 +99,7 @@ static void _dsh_release(struct fsal_ds_handle *const dataServerHandle) {
  * @returns: nfsstat4 status returned after opening the file
  */
 static nfsstat4 openfile(struct FSExport *export,
-						 struct DataServerHandle *dataServer) {
+                         struct DataServerHandle *dataServer) {
 	if (export == NULL)
 		return NFS4ERR_IO;
 
@@ -154,12 +154,12 @@ static nfsstat4 openfile(struct FSExport *export,
  * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
-						  const stateid4 *stateid,
-						  const offset4 offset,
-						  const count4 requestedLength,
-						  void *const buffer,
-						  count4 *const suppliedLength,
-						  bool *const eof) {
+                          const stateid4 *stateid,
+                          const offset4 offset,
+                          const count4 requestedLength,
+                          void *const buffer,
+                          count4 *const suppliedLength,
+                          bool *const eof) {
 	(void) stateid;
 
 	struct FSExport *export;
@@ -167,15 +167,14 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
 	fileinfo_t *fileHandle;
 
 	export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-						  struct FSExport, export);
+	                      struct FSExport, export);
 
-	dataServer = container_of(dataServerHandle, struct DataServerHandle,
-							  dsHandle);
+	dataServer = container_of(dataServerHandle, struct DataServerHandle, dsHandle);
 
 	LogFullDebug(COMPONENT_FSAL,
-				 "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
-				 " size=%" PRIu32, export->export.export_id,
-				 dataServer->inode, offset, requestedLength);
+	             "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
+	             " size=%" PRIu32, export->export.export_id,
+	             dataServer->inode, offset, requestedLength);
 
 	nfsstat4 nfsStatus = openfile(export, dataServer);
 
@@ -184,8 +183,8 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
 	}
 
 	fileHandle = extractFileInfo(dataServer->cacheHandle);
-	ssize_t bytes = fs_read(export->fsInstance, NULL, fileHandle,
-							offset, requestedLength, buffer);
+	ssize_t bytes = fs_read(export->fsInstance, NULL, fileHandle, offset,
+	                        requestedLength, buffer);
 
 	if (bytes < 0) {
 		return Nfs4LastError();
@@ -217,14 +216,14 @@ static nfsstat4 _dsh_read(struct fsal_ds_handle *const dataServerHandle,
  * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
-						   const stateid4 *stateid,
-						   const offset4 offset,
-						   const count4 writeLength,
-						   const void *buffer,
-						   const stable_how4 stability,
-						   count4 *const writtenLength,
-						   verifier4 *const writeVerifier,
-						   stable_how4 *const stabilityGot) {
+                           const stateid4 *stateid,
+                           const offset4 offset,
+                           const count4 writeLength,
+                           const void *buffer,
+                           const stable_how4 stability,
+                           count4 *const writtenLength,
+                           verifier4 *const writeVerifier,
+                           stable_how4 *const stabilityGot) {
 	(void) stateid;
 	(void) writeVerifier;
 
@@ -235,14 +234,14 @@ static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
 	int rc = 0;
 
 	export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-						  struct FSExport, export);
+	                      struct FSExport, export);
 
 	dataServer = container_of(dataServerHandle, struct DataServerHandle, dsHandle);
 
 	LogFullDebug(COMPONENT_FSAL,
-				 "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
-				 " size=%" PRIu32, export->export.export_id,
-				 dataServer->inode, offset, writeLength);
+	             "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
+	             " size=%" PRIu32, export->export.export_id,
+	             dataServer->inode, offset, writeLength);
 
 	nfsstat4 nfsStatus = openfile(export, dataServer);
 	if (nfsStatus != NFS4_OK) {
@@ -251,7 +250,7 @@ static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
 
 	fileHandle = extractFileInfo(dataServer->cacheHandle);
 	ssize_t bytes = fs_write(export->fsInstance, NULL, fileHandle,
-							 offset, writeLength, buffer);
+	                         offset, writeLength, buffer);
 
 	if (bytes < 0) {
 		return Nfs4LastError();
@@ -282,9 +281,9 @@ static nfsstat4 _dsh_write(struct fsal_ds_handle *const dataServerHandle,
  * @returns: An NFSv4.1 status code.
  */
 static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
-							const offset4 offset,
-							const count4 count,
-							verifier4 *const writeVerifier) {
+                            const offset4 offset,
+                            const count4 count,
+                            verifier4 *const writeVerifier) {
 	struct FSExport *export;
 	struct DataServerHandle *dataServer;
 	fileinfo_t *fileHandle;
@@ -292,15 +291,15 @@ static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
 	memset(writeVerifier, 0, NFS4_VERIFIER_SIZE);
 
 	export = container_of(op_ctx->ctx_pnfs_ds->mds_fsal_export,
-						  struct FSExport, export);
+	                      struct FSExport, export);
 
 	dataServer = container_of(dataServerHandle, struct DataServerHandle,
-							  dsHandle);
+	                          dsHandle);
 
 	LogFullDebug(COMPONENT_FSAL,
-				 "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
-				 " size=%" PRIu32, export->export.export_id,
-				 dataServer->inode, offset, count);
+	             "export=%" PRIu16 " inode=%" PRIu32 " offset=%" PRIu64
+	             " size=%" PRIu32, export->export.export_id,
+	             dataServer->inode, offset, count);
 
 	nfsstat4 nfsStatus = openfile(export, dataServer);
 
@@ -315,7 +314,7 @@ static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
 
 	if (rc < 0) {
 		LogMajor(COMPONENT_PNFS, "ds_commit() failed  '%s'",
-				 liz_error_string(liz_last_err()));
+		         liz_error_string(liz_last_err()));
 		return NFS4ERR_INVAL;
 	}
 
@@ -341,13 +340,13 @@ static nfsstat4 _dsh_commit(struct fsal_ds_handle *const dataServerHandle,
  * @returns: An NFSv4.2 status code.
  */
 static nfsstat4 _dsh_read_plus(struct fsal_ds_handle *const dataServerHandle,
-							   const stateid4 *stateid,
-							   const offset4 offset,
-							   const count4 requestedLength,
-							   void *const buffer,
-							   const count4 suppliedLength,
-							   bool *const eof,
-							   struct io_info *info) {
+                               const stateid4 *stateid,
+                               const offset4 offset,
+                               const count4 requestedLength,
+                               void *const buffer,
+                               const count4 suppliedLength,
+                               bool *const eof,
+                               struct io_info *info) {
 	(void) dataServerHandle;
 	(void) stateid;
 	(void) offset;
@@ -374,9 +373,9 @@ static nfsstat4 _dsh_read_plus(struct fsal_ds_handle *const dataServerHandle,
  * @returns: NFSv4.1 error codes.
  */
 static nfsstat4 _make_ds_handle(struct fsal_pnfs_ds *const pnfsDataServer,
-								const struct gsh_buffdesc *const bufferDescriptor,
-								struct fsal_ds_handle **const handle,
-								int flags) {
+                                const struct gsh_buffdesc *const bufferDescriptor,
+                                struct fsal_ds_handle **const handle,
+                                int flags) {
 	(void) pnfsDataServer;
 
 	struct DataServerWire *dataServerWire;

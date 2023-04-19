@@ -20,7 +20,7 @@
 #include "lzfs_fsal_methods.h"
 
 int fs_lookup(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
-			  const char *path, struct liz_entry *entry) {
+              const char *path, struct liz_entry *entry) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -33,8 +33,8 @@ int fs_lookup(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
 }
 
 int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
-			  const char *path, mode_t mode, dev_t rdev,
-			  struct liz_entry *entry) {
+              const char *path, mode_t mode, dev_t rdev,
+              struct liz_entry *entry) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -47,7 +47,7 @@ int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
 }
 
 fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
-					liz_inode_t inode, int flags) {
+                    liz_inode_t inode, int flags) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -60,8 +60,8 @@ fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
 }
 
 ssize_t fs_read(liz_t *instance, struct user_cred *cred,
-				fileinfo_t *fileinfo, off_t offset,
-				size_t size, char *buffer) {
+                fileinfo_t *fileinfo, off_t offset,
+                size_t size, char *buffer) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -74,7 +74,7 @@ ssize_t fs_read(liz_t *instance, struct user_cred *cred,
 }
 
 ssize_t fs_write(liz_t *instance, struct user_cred *cred, fileinfo_t *fileinfo,
-				 off_t offset, size_t size, const char *buffer) {
+                 off_t offset, size_t size, const char *buffer) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -99,7 +99,7 @@ int fs_flush(liz_t *instance, struct user_cred *cred, fileinfo_t *fileinfo) {
 }
 
 int fs_getattr(liz_t *instance, struct user_cred *cred,
-			   liz_inode_t inode, struct liz_attr_reply *reply) {
+               liz_inode_t inode, struct liz_attr_reply *reply) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -112,7 +112,7 @@ int fs_getattr(liz_t *instance, struct user_cred *cred,
 }
 
 fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
-					   liz_inode_t inode) {
+                       liz_inode_t inode) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -125,23 +125,23 @@ fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_readdir(liz_t *instance, struct user_cred *cred,
-			   struct liz_fileinfo *fileinfo, off_t offset,
-			   size_t max_entries, struct liz_direntry *buf,
-			   size_t *num_entries) {
+               struct liz_fileinfo *fileinfo, off_t offset,
+               size_t max_entries, struct liz_direntry *buf,
+               size_t *num_entries) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
 		return -1;
 	}
 	int rc = liz_readdir(instance, ctx, fileinfo, offset, max_entries, buf,
-						 num_entries);
+	                     num_entries);
 
 	liz_destroy_context(ctx);
 	return rc;
 }
 
 int fs_mkdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
-			 const char *name, mode_t mode, struct liz_entry *out_entry) {
+             const char *name, mode_t mode, struct liz_entry *out_entry) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -154,7 +154,7 @@ int fs_mkdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
 }
 
 int fs_rmdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
-			 const char *name) {
+             const char *name) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -167,7 +167,7 @@ int fs_rmdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
 }
 
 int fs_unlink(liz_t *instance, struct user_cred *cred,
-			  liz_inode_t parent, const char *name) {
+              liz_inode_t parent, const char *name) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -181,7 +181,7 @@ int fs_unlink(liz_t *instance, struct user_cred *cred,
 
 int fs_setattr(liz_t *instance, struct user_cred *cred,
                liz_inode_t inode, struct stat *stbuf, int to_set,
-			   struct liz_attr_reply *reply) {
+               struct liz_attr_reply *reply) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -194,7 +194,7 @@ int fs_setattr(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_fsync(liz_t *instance, struct user_cred *cred,
-			 struct liz_fileinfo *fileinfo) {
+             struct liz_fileinfo *fileinfo) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -207,8 +207,8 @@ int fs_fsync(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_rename(liz_t *instance, struct user_cred *cred,
-			  liz_inode_t parent, const char *name,
-			  liz_inode_t new_parent, const char *new_name) {
+              liz_inode_t parent, const char *name,
+              liz_inode_t new_parent, const char *new_name) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -221,8 +221,8 @@ int fs_rename(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_symlink(liz_t *instance, struct user_cred *cred, const char *link,
-			   liz_inode_t parent, const char *name,
-			   struct liz_entry *entry) {
+               liz_inode_t parent, const char *name,
+               struct liz_entry *entry) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -235,7 +235,7 @@ int fs_symlink(liz_t *instance, struct user_cred *cred, const char *link,
 }
 
 int fs_readlink(liz_t *instance, struct user_cred *cred,
-				liz_inode_t inode, char *buf, size_t size) {
+                liz_inode_t inode, char *buf, size_t size) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -248,8 +248,8 @@ int fs_readlink(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_link(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
-			liz_inode_t parent, const char *name,
-			struct liz_entry *entry) {
+            liz_inode_t parent, const char *name,
+            struct liz_entry *entry) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -262,23 +262,23 @@ int fs_link(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
 }
 
 int fs_get_chunks_info(liz_t *instance, struct user_cred *cred,
-					   liz_inode_t inode, uint32_t chunk_index,
-					   liz_chunk_info_t *buffer, uint32_t buffer_size,
-					   uint32_t *reply_size) {
+                       liz_inode_t inode, uint32_t chunk_index,
+                       liz_chunk_info_t *buffer, uint32_t buffer_size,
+                       uint32_t *reply_size) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
 		return -1;
 	}
 	int rc = liz_get_chunks_info(instance, ctx, inode, chunk_index, buffer,
-								 buffer_size, reply_size);
+	                             buffer_size, reply_size);
 
 	liz_destroy_context(ctx);
 	return rc;
 }
 
 int fs_setacl(liz_t *instance, struct user_cred *cred,
-			  liz_inode_t inode, liz_acl_t *acl) {
+              liz_inode_t inode, liz_acl_t *acl) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -291,7 +291,7 @@ int fs_setacl(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_getacl(liz_t *instance, struct user_cred *cred,
-			  liz_inode_t inode, liz_acl_t **acl) {
+              liz_inode_t inode, liz_acl_t **acl) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -304,7 +304,7 @@ int fs_getacl(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_setlk(liz_t *instance, struct user_cred *cred,
-			 fileinfo_t *fileinfo, const liz_lock_info_t *lock) {
+             fileinfo_t *fileinfo, const liz_lock_info_t *lock) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -317,7 +317,7 @@ int fs_setlk(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_getlk(liz_t *instance, struct user_cred *cred,
-			 fileinfo_t *fileinfo, liz_lock_info_t *lock) {
+             fileinfo_t *fileinfo, liz_lock_info_t *lock) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -329,8 +329,8 @@ int fs_getlk(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_getxattr(liz_t *instance, struct user_cred *cred,
-				liz_inode_t ino, const char *name, size_t size,
-				size_t *out_size, uint8_t *buf) {
+                liz_inode_t ino, const char *name, size_t size,
+                size_t *out_size, uint8_t *buf) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -343,8 +343,8 @@ int fs_getxattr(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_setxattr(liz_t *instance, struct user_cred *cred,
-				liz_inode_t ino, const char *name,
-				const uint8_t *value, size_t size, int flags) {
+                liz_inode_t ino, const char *name,
+                const uint8_t *value, size_t size, int flags) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -357,8 +357,8 @@ int fs_setxattr(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_listxattr(liz_t *instance, struct user_cred *cred,
-				 liz_inode_t ino, size_t size,
-				 size_t *out_size, char *buf) {
+                 liz_inode_t ino, size_t size,
+                 size_t *out_size, char *buf) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {
@@ -371,7 +371,7 @@ int fs_listxattr(liz_t *instance, struct user_cred *cred,
 }
 
 int fs_removexattr(liz_t *instance, struct user_cred *cred,
-				   liz_inode_t ino, const char *name) {
+                   liz_inode_t ino, const char *name) {
 	liz_context_t *ctx = createFSALContext(instance, cred);
 
 	if (ctx == NULL) {

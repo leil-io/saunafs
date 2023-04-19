@@ -195,7 +195,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m64")
 endif()
 
-# find out which platform we are building on
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LINUX ON)
   set(UNIX ON)

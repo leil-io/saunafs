@@ -92,8 +92,8 @@ static void release(struct fsal_export *exportHandle) {
  * @returns: FSAL status
  */
 fsal_status_t lookup_path(struct fsal_export *exportHandle,
-						  const char *path, struct fsal_obj_handle **handle,
-						  struct fsal_attrlist *attributes) {
+                          const char *path, struct fsal_obj_handle **handle,
+                          struct fsal_attrlist *attributes) {
 	static const char *rootDirPath = "/";
 
 	struct FSExport *export;
@@ -101,7 +101,7 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle,
 	const char *realPath;
 
 	LogFullDebug(COMPONENT_FSAL, "export_id=%" PRIu16 " path=%s",
-				 exportHandle->export_id, path);
+	             exportHandle->export_id, path);
 
 	export = container_of(exportHandle, struct FSExport, export);
 
@@ -145,7 +145,7 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle,
 
 	liz_entry_t entry;
 	int rc = fs_lookup(export->fsInstance, &op_ctx->creds,
-					   SPECIAL_INODE_ROOT, realPath, &entry);
+	                   SPECIAL_INODE_ROOT, realPath, &entry);
 
 	if (rc < 0) {
 		return fsalLastError();
@@ -176,8 +176,8 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle,
  * @returns: FSAL status.
  */
 static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
-									  struct fsal_obj_handle *objectHandle,
-									  fsal_dynamicfsinfo_t *info) {
+                                      struct fsal_obj_handle *objectHandle,
+                                      fsal_dynamicfsinfo_t *info) {
 	(void) objectHandle;
 
 	struct FSExport *export;
@@ -218,16 +218,16 @@ static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
  * @returns: a state structure.
  */
 struct state_t *allocate_state(struct fsal_export *export,
-							   enum state_type stateType,
-							   struct state_t *relatedState) {
+                               enum state_type stateType,
+                               struct state_t *relatedState) {
 	struct state_t *state;
 	struct FSFileDescriptor *fileDescriptor;
 
 	state = init_state(gsh_calloc(1, sizeof(struct FSFileDescriptorState)),
-					   export, stateType, relatedState);
+	                   export, stateType, relatedState);
 
 	fileDescriptor = &container_of(state, struct FSFileDescriptorState,
-								   state)->fileDescriptor;
+	                               state)->fileDescriptor;
 
 	fileDescriptor->fileDescriptor = NULL;
 	fileDescriptor->openFlags = FSAL_O_CLOSED;
@@ -270,9 +270,9 @@ void free_state(struct fsal_export *export, struct state_t *state) {
  * @returns: FSAL type.
  */
 static fsal_status_t wire_to_host(struct fsal_export *export,
-								  fsal_digesttype_t protocol,
-								  struct gsh_buffdesc *bufferDescriptor,
-								  int flags) {
+                                  fsal_digesttype_t protocol,
+                                  struct gsh_buffdesc *bufferDescriptor,
+                                  int flags) {
 	(void) protocol;
 	(void) export;
 
@@ -296,8 +296,8 @@ static fsal_status_t wire_to_host(struct fsal_export *export,
 
 	if (bufferDescriptor->len != sizeof(liz_inode_t)) {
 		LogMajor(COMPONENT_FSAL,
-				 "Size mismatch for handle. Should be %zu, got %zu",
-				 sizeof(liz_inode_t), bufferDescriptor->len);
+		         "Size mismatch for handle. Should be %zu, got %zu",
+		         sizeof(liz_inode_t), bufferDescriptor->len);
 		return fsalstat(ERR_FSAL_SERVERFAULT, 0);
 	}
 
@@ -321,9 +321,9 @@ static fsal_status_t wire_to_host(struct fsal_export *export,
  * @returns: FSAL status
  */
 fsal_status_t create_handle(struct fsal_export *exportHandle,
-							struct gsh_buffdesc *bufferDescriptor,
-							struct fsal_obj_handle **publicHandle,
-							struct fsal_attrlist *attributes) {
+                            struct gsh_buffdesc *bufferDescriptor,
+                            struct fsal_obj_handle **publicHandle,
+                            struct fsal_attrlist *attributes) {
 	struct FSExport *export;
 	struct FSHandle *handle = NULL;
 	liz_inode_t *inode;

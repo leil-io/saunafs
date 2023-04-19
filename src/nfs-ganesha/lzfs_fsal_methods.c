@@ -9,9 +9,9 @@ liz_context_t *createFSALContext(liz_t *instance, struct user_cred *cred) {
 	}
 
 	uid_t uid = (cred->caller_uid == op_ctx->export_perms.anonymous_uid)
-			? 0 : cred->caller_uid;
+	        ? 0 : cred->caller_uid;
 	gid_t gid = (cred->caller_gid == op_ctx->export_perms.anonymous_gid)
-			? 0 : cred->caller_gid;
+	        ? 0 : cred->caller_gid;
 
 	liz_context_t *ctx = liz_create_user_context(uid, gid, 0, 0);
 	if (!ctx) {
@@ -34,9 +34,9 @@ liz_context_t *createFSALContext(liz_t *instance, struct user_cred *cred) {
 }
 
 bool setCredentials(const struct user_cred *creds,
-					const struct fsal_module *fsal_module) {
+                    const struct fsal_module *fsal_module) {
 	bool onlyOneUser = container_of(fsal_module, struct FSModule,
-									module)->onlyOneUser;
+	                                module)->onlyOneUser;
 
 	if (onlyOneUser)
 		return fsal_set_credentials_only_one_user(creds);
@@ -47,7 +47,7 @@ bool setCredentials(const struct user_cred *creds,
 
 void restoreGaneshaCredentials(const struct fsal_module *fsal_module) {
 	bool onlyOneUser = container_of(fsal_module, struct FSModule,
-									module)->onlyOneUser;
+	                                module)->onlyOneUser;
 
 	if (!onlyOneUser) {
 		fsal_restore_ganesha_credentials();

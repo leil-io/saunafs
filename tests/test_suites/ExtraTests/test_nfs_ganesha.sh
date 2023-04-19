@@ -157,20 +157,20 @@ index 8c837a8..7060cca 100644
 EOF
 
 sudo -i -u lizardfstest bash << EOF
-	cd "${TEMP_DIR}/mnt/ganesha"
-	chmod o+w "$(pwd)"
-	if test -d "${TEMP_DIR}/mnt/ganesha/cthon04"; then
-		rm -rf "${TEMP_DIR:?}/mnt/ganesha/cthon04"
-	fi
-	git clone --no-checkout git://git.linux-nfs.org/projects/steved/cthon04.git
-	cd cthon04
-	git reset --hard HEAD
-	git apply --ignore-whitespace "${TEMP_DIR}/mnt/ganesha/cthon04.patch"
-	make all
-	export NFSTESTDIR=${TEMP_DIR}/mnt/ganesha/cthon_test
-	./runtests -b -n
-	./runtests -l -n
-	./runtests -s -n
+ cd "${TEMP_DIR}/mnt/ganesha"
+ chmod o+w "$(pwd)"
+ if test -d "${TEMP_DIR}/mnt/ganesha/cthon04"; then
+	rm -rf "${TEMP_DIR:?}/mnt/ganesha/cthon04"
+ fi
+ git clone --no-checkout git://git.linux-nfs.org/projects/steved/cthon04.git
+ cd cthon04
+ git reset --hard HEAD
+ git apply --ignore-whitespace "${TEMP_DIR}/mnt/ganesha/cthon04.patch"
+ make all
+ export NFSTESTDIR=${TEMP_DIR}/mnt/ganesha/cthon_test
+ ./runtests -b -n
+ ./runtests -l -n
+ ./runtests -s -n
 EOF
 
 cd ${TEMP_DIR}/mnt/ganesha

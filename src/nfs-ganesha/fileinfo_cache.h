@@ -43,7 +43,7 @@ FileInfoCache_t *createFileInfoCache(unsigned max_entries, int min_timeout_ms);
  * \param min_timeout_ms entries will not be removed until at least min_timeout_ms ms has passed
  */
 void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned max_entries,
-								  int min_timeout_ms);
+                                  int min_timeout_ms);
 
 /*!
  * \brief Destroy fileinfo cache

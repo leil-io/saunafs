@@ -28,7 +28,7 @@
  * @returns: Converted LizardFS ACL
  */
 liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
-									 unsigned int mode) {
+                                     unsigned int mode) {
 	liz_acl_t *nativeACL = NULL;
 
 	if (!fsalACL || (!fsalACL->aces && fsalACL->naces > 0)) {
@@ -44,7 +44,7 @@ liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
 		fsal_ace_t *fsalACE = fsalACL->aces + i;
 
 		if (!(IS_FSAL_ACE_ALLOW(*fsalACE) ||
-			  IS_FSAL_ACE_DENY(*fsalACE))) {
+		      IS_FSAL_ACE_DENY(*fsalACE))) {
 			continue;
 		}
 
@@ -74,8 +74,8 @@ liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
 				break;
 			default:
 				LogFullDebug(COMPONENT_FSAL,
-							 "Invalid FSAL ACE special id type (%d)",
-							 (int)GET_FSAL_ACE_USER(*fsalACE));
+				             "Invalid FSAL ACE special id type (%d)",
+				             (int)GET_FSAL_ACE_USER(*fsalACE));
 				continue;
 			}
 		}
@@ -121,7 +121,7 @@ fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
 		fsalACE->type  = nativeACE.type;
 		fsalACE->flag  = nativeACE.flags & 0xFF;
 		fsalACE->iflag = (nativeACE.flags & LIZ_ACL_SPECIAL_WHO) ?
-						 FSAL_ACE_IFLAG_SPECIAL_ID : 0;
+		            FSAL_ACE_IFLAG_SPECIAL_ID : 0;
 		fsalACE->perm = nativeACE.mask;
 
 		if (IS_FSAL_ACE_GROUP_ID(*fsalACE)) {
@@ -145,8 +145,8 @@ fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
 			default:
 				fsalACE->who.uid = FSAL_ACE_NORMAL_WHO;
 				LogWarn(COMPONENT_FSAL,
-						"Invalid LizardFS ACE special id type (%u)",
-						(unsigned int)nativeACE.id);
+				        "Invalid LizardFS ACE special id type (%u)",
+				        (unsigned int)nativeACE.id);
 			}
 		}
 	}
@@ -168,7 +168,7 @@ fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
  * @returns: FSAL status.
  */
 fsal_status_t getACL(struct FSExport *export, uint32_t inode,
-					 uint32_t ownerId, fsal_acl_t **fsalACL) {
+                     uint32_t ownerId, fsal_acl_t **fsalACL) {
 	if (*fsalACL) {
 		nfs4_acl_release_entry(*fsalACL);
 		*fsalACL = NULL;
@@ -179,9 +179,9 @@ fsal_status_t getACL(struct FSExport *export, uint32_t inode,
 
 	if (rc < 0) {
 		LogFullDebug(COMPONENT_FSAL,
-					 "getacl status = %s export=%" PRIu16 " inode=%" PRIu32,
-					 liz_error_string(liz_last_err()),
-					 export->export.export_id, inode);
+		             "getacl status = %s export=%" PRIu16 " inode=%" PRIu32,
+		             liz_error_string(liz_last_err()),
+		             export->export.export_id, inode);
 
 		return fsalLastError();
 	}
@@ -193,9 +193,9 @@ fsal_status_t getACL(struct FSExport *export, uint32_t inode,
 
 	if (*fsalACL == NULL) {
 		LogFullDebug(COMPONENT_FSAL,
-					 "Failed to convert lzfs acl to nfs4 acl, export=%"
-					 PRIu16 " inode=%" PRIu32,
-					 export->export.export_id, inode);
+		             "Failed to convert lzfs acl to nfs4 acl, export=%"
+		             PRIu16 " inode=%" PRIu32,
+		             export->export.export_id, inode);
 		return fsalstat(ERR_FSAL_FAULT, 0);
 	}
 
@@ -215,7 +215,7 @@ fsal_status_t getACL(struct FSExport *export, uint32_t inode,
  * @returns: FSAL status.
  */
 fsal_status_t setACL(struct FSExport *export, uint32_t inode,
-					 const fsal_acl_t *fsalACL, unsigned int mode) {
+                     const fsal_acl_t *fsalACL, unsigned int mode) {
 	if (!fsalACL) {
 		return fsalstat(ERR_FSAL_NO_ERROR, 0);
 	}
