@@ -313,7 +313,7 @@ const char *liz_error_string(liz_err_t lizardfs_error_code);
 /*!
  * \brief Destroy a context for LizardFS operations
  */
-void liz_destroy_context(liz_context_t *ctx);
+void liz_destroy_context(liz_context_t **ctx);
 
 /*!
  * \brief Initialize init params to defaults

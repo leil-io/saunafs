@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 	liz_err_t liz_err = LIZARDFS_STATUS_OK;
 	int i, r;
 	liz_t *liz;
-	liz_context_t *ctx;
+	liz_context_t *ctx __attribute__((cleanup(liz_destroy_context)));
 	liz_init_params_t params;
 	liz_chunkserver_info_t servers[65536];
 	struct liz_lock_info lock_info;
@@ -196,7 +196,6 @@ release_fileinfo:
 destroy_connection:
 	liz_destroy(liz);
 destroy_context:
-	liz_destroy_context(ctx);
 
 	printf("Program status: %s\n", liz_error_string(liz_err));
 	return liz_error_conv(liz_err);

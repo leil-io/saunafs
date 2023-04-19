@@ -160,8 +160,8 @@ liz_context_t *liz_create_user_context(uid_t uid, gid_t gid, pid_t pid, mode_t u
 	}
 }
 
-void liz_destroy_context(liz_context_t *ctx) {
-	Client::Context *client_ctx = (Client::Context *)ctx;
+void liz_destroy_context(liz_context_t **ctx) {
+	Client::Context *client_ctx = (Client::Context *) *ctx;
 	delete client_ctx;
 }
 

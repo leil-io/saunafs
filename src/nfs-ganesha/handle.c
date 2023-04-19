@@ -124,14 +124,13 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	directory = container_of(dirHandle, struct FSHandle, fileHandle);
 
-	liz_context_t *context;
+	liz_context_t *context __attribute__((cleanup(liz_destroy_context)));
 	context = createFSALContext(export->fsInstance, &op_ctx->creds);
 
 	struct liz_fileinfo *fileDescriptor;
 	fileDescriptor = liz_opendir(export->fsInstance, context, directory->inode);
 
 	if (!fileDescriptor) {
-		liz_destroy_context(context);
 		return fsalLastError();
 	}
 
@@ -146,7 +145,6 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
 		                 direntryOffset, batchSize, buffer, &entries);
 
 		if (rc < 0) {
-			liz_destroy_context(context);
 			return fsalLastError();
 		}
 
@@ -178,7 +176,6 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
 	}
 
 	rc = liz_releasedir(export->fsInstance, fileDescriptor);
-	liz_destroy_context(context);
 
 	if (rc < 0) {
 		return fsalLastError();
