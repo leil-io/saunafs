@@ -11,8 +11,6 @@
 #define LZFS_FSAL_METHODS
 
 #include "FSAL/fsal_localfs.h"
-#include "FSAL/access_check.h"
-
 #include "lzfs_fsal_types.h"
 
 /// FSAL methods

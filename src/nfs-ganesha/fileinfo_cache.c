@@ -56,8 +56,10 @@ static uint64_t get_time_ms() {
 
 static int cache_entry_cmp_function(const struct avltree_node *a,
                                     const struct avltree_node *b) {
-	FileInfoEntry_t *a_entry = avltree_container_of(a, FileInfoEntry_t, tree_hook);
-	FileInfoEntry_t *b_entry = avltree_container_of(b, FileInfoEntry_t, tree_hook);
+	FileInfoEntry_t *a_entry = avltree_container_of(a, FileInfoEntry_t,
+	                                                tree_hook);
+	FileInfoEntry_t *b_entry = avltree_container_of(b, FileInfoEntry_t,
+	                                                tree_hook);
 
 	if (a_entry->inode < b_entry->inode) {
 		return -1;
@@ -107,12 +109,14 @@ void destroyFileInfoCache(FileInfoCache_t *cache) {
 		return;
 	}
 
-	while ((entry = glist_first_entry(&cache->used_list, FileInfoEntry_t, list_hook))) {
+	while ((entry = glist_first_entry(&cache->used_list, FileInfoEntry_t,
+	                                  list_hook))) {
 		glist_del(&entry->list_hook);
 		gsh_free(entry);
 	}
 
-	while ((entry = glist_first_entry(&cache->lru_list, FileInfoEntry_t, list_hook))) {
+	while ((entry = glist_first_entry(&cache->lru_list, FileInfoEntry_t,
+	                                  list_hook))) {
 		glist_del(&entry->list_hook);
 		gsh_free(entry);
 	}

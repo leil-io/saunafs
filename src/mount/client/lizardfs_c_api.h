@@ -272,7 +272,8 @@ typedef struct liz_lock_interrupt_info {
  * \param info lock info to be remembered somewhere
  * \param priv private data potentially needed by caller
  */
-typedef int (*liz_lock_register_interrupt_t)(struct liz_lock_interrupt_info *info, void *priv);
+typedef int (*liz_lock_register_interrupt_t)(struct liz_lock_interrupt_info *info,
+                                             void *priv);
 
 /*!
  * \brief Create a context for LizardFS operations
@@ -286,7 +287,8 @@ typedef int (*liz_lock_register_interrupt_t)(struct liz_lock_interrupt_info *inf
  *  and should not be used with other instances.
  */
 liz_context_t *liz_create_context();
-liz_context_t *liz_create_user_context(uid_t uid, gid_t gid, pid_t pid, mode_t umask);
+liz_context_t *liz_create_user_context(uid_t uid, gid_t gid, pid_t pid,
+                                       mode_t umask);
 
 /*!
  * \brief Set lock owner inside a fileinfo structure
@@ -322,7 +324,8 @@ void liz_destroy_context(liz_context_t **ctx);
  * \param mountpoint a human-readable name for 'mountpoint' created by a connection
  */
 void liz_set_default_init_params(struct liz_init_params *params,
-		const char *host, const char *port, const char *mountpoint);
+                                 const char *host, const char *port,
+                                 const char *mountpoint);
 
 /*!
  * \brief Initialize a connection with master server
@@ -351,7 +354,8 @@ liz_t *liz_init_with_params(struct liz_init_params *params);
  * \param gid_num length of gids array
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_update_groups(liz_t *instance, liz_context_t *ctx, gid_t *gids, int gid_num);
+int liz_update_groups(liz_t *instance, liz_context_t *ctx, gid_t *gids,
+                      int gid_num);
 
 /*! \brief Find inode in parent directory by name
  * \param instance instance returned from liz_init
@@ -361,8 +365,8 @@ int liz_update_groups(liz_t *instance, liz_context_t *ctx, gid_t *gids, int gid_
  * \param entry structure to be filled with lookup result
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_lookup(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path,
-	       struct liz_entry *entry);
+int liz_lookup(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+               const char *path, struct liz_entry *entry);
 
 /*! \brief Create a file with given parent and name
  * \param instance instance returned from liz_init
@@ -374,8 +378,8 @@ int liz_lookup(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const ch
  * \param entry filled upon successful creation
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_mknod(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path,
-	      mode_t mode, dev_t rdev, struct liz_entry *entry);
+int liz_mknod(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+              const char *path, mode_t mode, dev_t rdev, struct liz_entry *entry);
 
 /*! \brief Create a link with given parent and name
  * \param instance instance returned from liz_init
@@ -386,8 +390,8 @@ int liz_mknod(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const cha
  * \param entry filled upon successful creation
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_link(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz_inode_t parent,
-	      const char *name, struct liz_entry *entry);
+int liz_link(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+             liz_inode_t parent, const char *name, struct liz_entry *entry);
 
 /*! \brief Create a symlink with given parent and name
  * \param instance instance returned from liz_init
@@ -398,8 +402,8 @@ int liz_link(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz_inode_t
  * \param entry filled upon successful creation
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_symlink(liz_t *instance, liz_context_t *ctx, const char *link, liz_inode_t parent,
-	      const char *name, struct liz_entry *entry);
+int liz_symlink(liz_t *instance, liz_context_t *ctx, const char *link,
+                liz_inode_t parent, const char *name, struct liz_entry *entry);
 
 /*! \brief Open a file by inode
  * \param instance instance returned from liz_init
@@ -409,7 +413,8 @@ int liz_symlink(liz_t *instance, liz_context_t *ctx, const char *link, liz_inode
  * \return fileinfo descriptor of an open file,
  *  if failed - nullptr and sets last error code (check with liz_last_err())
  */
-liz_fileinfo_t *liz_open(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, int flags);
+liz_fileinfo_t *liz_open(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                         int flags);
 
 /*! \brief Read bytes from open file
  * \param instance instance returned from liz_init
@@ -421,10 +426,11 @@ liz_fileinfo_t *liz_open(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
  * \return number of bytes read on success,
  *  -1 if failed and sets last error code (check with liz_last_err())
  */
-ssize_t liz_read(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo, off_t offset,
-	         size_t size, char *buffer);
-ssize_t liz_readv(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo, off_t offset,
-	          size_t size, const struct iovec *iov, int iovcnt);
+ssize_t liz_read(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
+                 off_t offset, size_t size, char *buffer);
+
+ssize_t liz_readv(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
+                  off_t offset, size_t size, const struct iovec *iov, int iovcnt);
 
 /*! \brief Write bytes to open file
  * \param instance instance returned from liz_init
@@ -437,7 +443,7 @@ ssize_t liz_readv(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
  *  -1 if failed and sets last error code (check with liz_last_err())
  */
 ssize_t liz_write(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
-	          off_t offset, size_t size, const char *buffer);
+                  off_t offset, size_t size, const char *buffer);
 
 /*! \brief Release a previously open file
  * \param instance instance returned from liz_init
@@ -462,7 +468,7 @@ int liz_flush(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo);
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
 int liz_getattr(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
-	        struct liz_attr_reply *reply);
+                struct liz_attr_reply *reply);
 
 /*! \brief End a connection with master server
  * \param instance instance returned from liz_init
@@ -476,7 +482,8 @@ void liz_destroy(liz_t *instance);
  * \return fileinfo descriptor on success, nullptr if failed,
  *         sets last error code (check with liz_last_err())
  */
-struct liz_fileinfo *liz_opendir(liz_t *instance, liz_context_t *ctx, liz_inode_t inode);
+struct liz_fileinfo *liz_opendir(liz_t *instance, liz_context_t *ctx,
+                                 liz_inode_t inode);
 
 /*! \brief Read directory entries
  * \param instance instance returned from liz_init
@@ -487,8 +494,9 @@ struct liz_fileinfo *liz_opendir(liz_t *instance, liz_context_t *ctx, liz_inode_
  * \param num_entries upon success set to number of entries returned in buf
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_readdir(liz_t *instance, liz_context_t *ctx, struct liz_fileinfo *fileinfo, off_t offset,
-	                         size_t max_entries, struct liz_direntry *buf, size_t *num_entries);
+int liz_readdir(liz_t *instance, liz_context_t *ctx, struct liz_fileinfo *fileinfo,
+                off_t offset, size_t max_entries, struct liz_direntry *buf,
+                size_t *num_entries);
 
 /*! \brief Destroy dir entries placed in an array
  * \param buf buf argument to previous successful call to liz_readdir
@@ -512,7 +520,8 @@ int liz_releasedir(liz_t *instance, struct liz_fileinfo *fileinfo);
  * \param size allocated buf size
  * \return true link size on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_readlink(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *buf, size_t size);
+int liz_readlink(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                 char *buf, size_t size);
 
 /*! \brief Get reserved file inodes and names
  * \param instance instance returned from liz_init
@@ -525,8 +534,9 @@ int liz_readlink(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *b
  * \post liz_free_namedinode_entries(out_entries, result) must be called
  *       if (returned 0 && num_entries > 0) to dispose of returned entries
  */
-int liz_readreserved(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint32_t max_entries,
-                     liz_namedinode_entry_t *out_entries, uint32_t *num_entries);
+int liz_readreserved(liz_t *instance, liz_context_t *ctx, uint32_t offset,
+                     uint32_t max_entries, liz_namedinode_entry_t *out_entries,
+                     uint32_t *num_entries);
 
 /*! \brief Get trash file inodes and names
  * \param instance instance returned from liz_init
@@ -539,14 +549,16 @@ int liz_readreserved(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint3
  * \post liz_free_namedinode_entry(out_entries, result) must be called
  *       if (returned 0 && num_entries > 0) to dispose of returned entries
  */
-int liz_readtrash(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint32_t max_entries,
-                  liz_namedinode_entry_t *out_entries, uint32_t *num_entries);
+int liz_readtrash(liz_t *instance, liz_context_t *ctx, uint32_t offset,
+                  uint32_t max_entries, liz_namedinode_entry_t *out_entries,
+                  uint32_t *num_entries);
 
 /*! \brief Destroy named inode entries placed in an array
  * \param entries out_entries argument to previous call to either liz_readreserved or liz_readtrash
  * \param num_entries positive number of entries returned by the respective call
  */
-void liz_free_namedinode_entries(struct liz_namedinode_entry *entries, uint32_t num_entries);
+void liz_free_namedinode_entries(struct liz_namedinode_entry *entries,
+                                 uint32_t num_entries);
 
 /*! \brief Create a directory
  * \param instance instance returned from liz_init
@@ -557,8 +569,8 @@ void liz_free_namedinode_entries(struct liz_namedinode_entry *entries, uint32_t 
  * \param out_entry entry to be filled with new directory data
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_mkdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *name,
-		mode_t mode, struct liz_entry *out_entry);
+int liz_mkdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+              const char *name, mode_t mode, struct liz_entry *out_entry);
 
 /*! \brief Remove a directory
  * \param instance instance returned from liz_init
@@ -567,7 +579,8 @@ int liz_mkdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const cha
  * \param name directory name
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_rmdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *name);
+int liz_rmdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+              const char *name);
 
 /*! \brief Make a snapshot of a file
  * \param instance instance returned from liz_init
@@ -579,8 +592,9 @@ int liz_rmdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const cha
  * \param job_id id of makesnapshot task, can be used to cancel it, can be NULL
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_makesnapshot(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz_inode_t dst_parent,
-	             const char *dst_name, int can_overwrite, uint32_t *job_id);
+int liz_makesnapshot(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                     liz_inode_t dst_parent, const char *dst_name,
+                     int can_overwrite, uint32_t *job_id);
 
 /*! \brief Get file goal
  * \param instance instance returned from liz_init
@@ -589,7 +603,8 @@ int liz_makesnapshot(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz
  * \param goal_name buffer to be filled with goal, must be at least LIZARDFS_MAX_GOAL_NAME long
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_getgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *goal_name);
+int liz_getgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                char *goal_name);
 
 /*! \brief Set file goal
  * \param instance instance returned from liz_init
@@ -600,8 +615,8 @@ int liz_getgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *go
  * \param job_id id of setgoal task, can be used to cancel it, can be NULL
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_setgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, const char *goal_name,
-	        int is_recursive);
+int liz_setgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                const char *goal_name, int is_recursive);
 
 /*! \brief Unlink a file
  * \param instance instance returned from liz_init
@@ -610,7 +625,8 @@ int liz_setgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, const ch
  * \param name file name
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_unlink(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *name);
+int liz_unlink(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+               const char *name);
 
 /*! \brief Restore file from trash
  * \param instance instance returned from liz_init
@@ -629,8 +645,8 @@ int liz_undel(liz_t *instance, liz_context_t *ctx, liz_inode_t inode);
  * \param reply returned value
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_setattr(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, struct stat *stbuf,
-	        int to_set, struct liz_attr_reply *reply);
+int liz_setattr(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                struct stat *stbuf, int to_set, struct liz_attr_reply *reply);
 
 /*! \brief Synchronize file data
  * \param instance instance returned from liz_init
@@ -649,8 +665,8 @@ int liz_fsync(liz_t *instance, liz_context_t *ctx, struct liz_fileinfo *fileinfo
  * \param new_name new name of a file to be moved
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_rename(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *name,
-	       liz_inode_t new_parent, const char *new_name);
+int liz_rename(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+               const char *name, liz_inode_t new_parent, const char *new_name);
 
 /*! \brief Retrieve file system statistics
  * \param instance instance returned from liz_init
@@ -669,8 +685,9 @@ int liz_statfs(liz_t *instance, liz_stat_t *buf);
  * \param mode one of enum liz_setxattr_mode values
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_setxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name,
-	         const uint8_t *value, size_t size, enum liz_setxattr_mode mode);
+int liz_setxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                 const char *name, const uint8_t *value, size_t size,
+                 enum liz_setxattr_mode mode);
 
 /*! \brief Get extended attribute of a file
  * \param instance instance returned from liz_init
@@ -682,8 +699,8 @@ int liz_setxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const cha
  * \param buf buffer to be filled with xattr value
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_getxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name,
-	         size_t size, size_t *out_size, uint8_t *buf);
+int liz_getxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                 const char *name, size_t size, size_t *out_size, uint8_t *buf);
 
 /*! \brief Get extended attributes list of a file
  * \param instance instance returned from liz_init
@@ -693,8 +710,8 @@ int liz_getxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const cha
  * \param buf buffer to be filled with listed attributes
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_listxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, size_t size,
-	          size_t *out_size, char *buf);
+int liz_listxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                  size_t size, size_t *out_size, char *buf);
 
 /*! \brief Remove extended attribute from a file
  * \param instance instance returned from liz_init
@@ -703,7 +720,8 @@ int liz_listxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, size_t s
  * \param name attribute name
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_removexattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name);
+int liz_removexattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                    const char *name);
 
 /*!
  * \brief Create acl
@@ -768,7 +786,8 @@ size_t liz_get_acl_size(const liz_acl_t *acl);
  * \param acl acl to be set
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, liz_acl_t *acl);
+int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+               liz_acl_t *acl);
 
 /*!
  * \brief Get acl from a file
@@ -780,7 +799,7 @@ int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, liz_acl_t *
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
 int liz_getacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
-	       liz_acl_t **acl);
+               liz_acl_t **acl);
 
 /*!
  * \brief Apply rich acl masks to aces
@@ -802,8 +821,8 @@ int liz_acl_apply_masks(liz_acl_t *acl, uint32_t owner);
  * \post retrieved chunks information should be freed with liz_destroy_chunks_info call
  */
 int liz_get_chunks_info(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
-	                    uint32_t chunk_index, liz_chunk_info_t *buffer, uint32_t buffer_size,
-	                    uint32_t *reply_size);
+                        uint32_t chunk_index, liz_chunk_info_t *buffer,
+                        uint32_t buffer_size, uint32_t *reply_size);
 
 /*! \brief Free data allocated in liz_get_chunks_info
  * \param buffer buffer used in a successful liz_get_chunks_info call
@@ -818,8 +837,8 @@ void liz_destroy_chunks_info(liz_chunk_info_t *buffer);
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  * \post retrieved chunkservers information should be freed with liz_destroy_chunkservers_info call
  */
-int liz_get_chunkservers_info(liz_t *instance, liz_chunkserver_info_t *servers, uint32_t size,
-	                 uint32_t *reply_size);
+int liz_get_chunkservers_info(liz_t *instance, liz_chunkserver_info_t *servers,
+                              uint32_t size, uint32_t *reply_size);
 
 /*! \brief Free data allocated in liz_get_chunkservers_info
  * \param buffer buffer used in a successful liz_get_chunkservers_info call
@@ -838,7 +857,8 @@ void liz_destroy_chunkservers_info(liz_chunkserver_info_t *buffer);
  *       in order to cancel a lock request
  */
 int liz_setlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
-	      const liz_lock_info_t *lock, liz_lock_register_interrupt_t handler, void *priv);
+              const liz_lock_info_t *lock, liz_lock_register_interrupt_t handler,
+              void *priv);
 
 /*! \brief Get lock information from a file (semantics based on POSIX getlk)
  * \param instance instance returned from liz_init
@@ -847,14 +867,16 @@ int liz_setlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
  * \param lock lock buffer to be filled with lock information
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_getlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo, liz_lock_info_t *lock);
+int liz_getlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
+              liz_lock_info_t *lock);
 
 /*! \brief Cancel a lock request
  * \param instance instance returned from liz_init
  * \param interrupt_info interrupt data saved by a function passed to setlk
  * \return 0 on success, -1 if failed, sets last error code (check with liz_last_err())
  */
-int liz_setlk_interrupt(liz_t *instance, const liz_lock_interrupt_info_t *interrupt_info);
+int liz_setlk_interrupt(liz_t *instance,
+                        const liz_lock_interrupt_info_t *interrupt_info);
 #ifdef __cplusplus
 } // extern "C"
 #endif

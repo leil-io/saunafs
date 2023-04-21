@@ -1,5 +1,5 @@
 /*
-   2017 Skytechnology LizardFS sp. z o.o.
+   Copyright 2017 Skytechnology sp. z o.o.
 
    This file is part of LizardFS.
 
@@ -18,13 +18,9 @@
 
 #include "fsal.h"
 #include "fsal_api.h"
-#include "fsal_convert.h"
 #include "fsal_types.h"
-#include "fsal_up.h"
-#include "FSAL/fsal_commonlib.h"
 #include "../FSAL/fsal_private.h"
 #include "nfs_exports.h"
-#include "pnfs_utils.h"
 
 #include "context_wrap.h"
 #include "lzfs_fsal_types.h"
@@ -421,7 +417,7 @@ static nfsstat4 _make_ds_handle(struct fsal_pnfs_ds *const pnfsDataServer,
  * @returns: NFSv4.1 error codes: NFS4_OK, NFS4ERR_ACCESS, NFS4ERR_WRONGSEC
  */
 static nfsstat4 _ds_permissions(struct fsal_pnfs_ds *const pnfsDataServer,
-								struct svc_req *request) {
+                                struct svc_req *request) {
 	(void) pnfsDataServer;
 	(void) request;
 
