@@ -14,8 +14,3 @@ cd richacl
 ./autogen.sh
 ./configure
 make check
-
-# Umount LizardFS mountpoint
-if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
-    sudo umount -l ${TEMP_DIR}/mnt/mfs0
-fi

@@ -303,6 +303,9 @@ endif()
 
 set(CHARTS_CSV_CHARTID_BASE 90000)
 
+# Internal capability required by some FSALs
+set(GSH_CAN_HOST_LOCAL_FS ${ENABLE_NFS_GANESHA})
+
 # Create config.h file
 configure_file(config.h.in config.h)
 include_directories(${CMAKE_BINARY_DIR}) # Here we have generated config.h
@@ -351,8 +354,6 @@ if(NOT MINGW)
     add_subdirectory(doc)
   endif()
   if(ENABLE_NFS_GANESHA)
-    # Internal capability required by some FSALs
-    option(GSH_CAN_HOST_LOCAL_FS "Ganesha supports hosting local filesystems" ON)
     add_subdirectory(src/nfs-ganesha)
   endif()
 endif()

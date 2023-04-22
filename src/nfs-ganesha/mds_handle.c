@@ -252,9 +252,6 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
  * @brief Initialize pNFS related operations
  *
  * @param[in] ops      FSAL object operations vector
- *
- * @returns: Nothing. After running this method, the operations vector
- *           is initialized with the pNFS related operations.
  */
 void initializeMetaDataServerOperations(struct fsal_obj_ops *ops) {
 	ops->layoutget = _layoutget;

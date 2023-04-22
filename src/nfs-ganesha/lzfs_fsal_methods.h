@@ -4,11 +4,9 @@
  * @date Tue Aug 9 14:25 2022
  *
  * @brief Declaration methods for the FSAL
- *
  */
 
-#ifndef LZFS_FSAL_METHODS
-#define LZFS_FSAL_METHODS
+#pragma once
 
 #include "FSAL/fsal_localfs.h"
 #include "lzfs_fsal_types.h"
@@ -58,5 +56,3 @@ void initializePnfsExportOperations(struct export_ops *ops);
 
 void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops);
 void initializeMetaDataServerOperations(struct fsal_obj_ops *ops);
-
-#endif  /* LZFS_FSAL_METHODS */

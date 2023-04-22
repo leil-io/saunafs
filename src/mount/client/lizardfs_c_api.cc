@@ -807,18 +807,18 @@ liz_acl_t *liz_create_acl() {
 }
 
 liz_acl_t *liz_create_acl_from_mode(unsigned int mode) {
-    try {
-        RichACL richacl = RichACL::createFromMode(mode, S_ISDIR(mode));
-        RichACL *acl = new RichACL;
-        // Updating the masks
-        acl->setFlags(richacl.getFlags());
-        acl->setOwnerMask(richacl.getOwnerMask());
-        acl->setGroupMask(richacl.getGroupMask());
-        acl->setOtherMask(richacl.getOtherMask());
-        return (liz_acl_t *)acl;
-    } catch (...) {
-        return nullptr;
-    }
+	try {
+		RichACL richacl = RichACL::createFromMode(mode, S_ISDIR(mode));
+		RichACL *acl = new RichACL;
+		// Updating the masks
+		acl->setFlags(richacl.getFlags());
+		acl->setOwnerMask(richacl.getOwnerMask());
+		acl->setGroupMask(richacl.getGroupMask());
+		acl->setOtherMask(richacl.getOtherMask());
+		return (liz_acl_t *)acl;
+	} catch (...) {
+		return nullptr;
+	}
 }
 
 void liz_destroy_acl(liz_acl_t *acl) {
@@ -879,7 +879,7 @@ int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
 	try {
-        RichACL &richacl = *(RichACL *)acl;
+		RichACL &richacl = *(RichACL *)acl;
 		client.setacl(context, ino, richacl, ec);
 		gLastErrorCode = ec.value();
 		return ec ? -1 : 0;

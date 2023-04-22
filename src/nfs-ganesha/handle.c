@@ -775,8 +775,6 @@ static fsal_status_t findFileDescriptor(struct FSFileDescriptor *fileDescriptor,
  * @param [in,out] doneCb           Callback to call when I/O is done
  * @param [in,out] readArg          Info about read, passed back in callback
  * @param [in,out] callerArg        Opaque arg from the caller for callback
- *
- * @returns: Nothing; results are in callback
  */
 static void _read2(struct fsal_obj_handle *objectHandle,
                    bool bypass, fsal_async_cb doneCb,
@@ -1095,8 +1093,6 @@ static fsal_status_t _close(struct fsal_obj_handle *objectHandle) {
  * @param [in,out] doneCb           Callback to call when I/O is done
  * @param [in,out] writeArg         Info about write, passed back in callback
  * @param [in,out] callerArg        Opaque arg from the caller for callback
- *
- * @returns: Nothing; results are in callback
  */
 static void _write2(struct fsal_obj_handle *objectHandle,
                     bool bypass, fsal_async_cb doneCb,

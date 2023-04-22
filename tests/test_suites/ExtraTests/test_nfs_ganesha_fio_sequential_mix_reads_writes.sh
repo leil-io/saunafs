@@ -26,15 +26,7 @@ PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PAR
 
 test_error_cleanup() {
 	cd ${TEMP_DIR}
-	# Umount Ganesha mountpoint
-	if mountpoint -q ${TEMP_DIR}/mnt/ganesha; then
-		sudo umount -l ${TEMP_DIR}/mnt/ganesha
-	fi
-	# Umount LizardFS mountpoint
-	if mountpoint -q ${TEMP_DIR}/mnt/mfs0; then
-		sudo umount -l ${TEMP_DIR}/mnt/mfs0
-	fi
-	# Kill Ganesha daemon
+	sudo umount -l ${TEMP_DIR}/mnt/ganesha
 	sudo pkill -9 ganesha.nfsd
 }
 

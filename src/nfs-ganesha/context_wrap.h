@@ -16,6 +16,8 @@
    along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include <fsal_types.h>
 
 #include "lzfs_fsal_types.h"

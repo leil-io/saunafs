@@ -32,8 +32,6 @@
  *
  * @param[in] export     export that store the cache
  * @param[in] count      number of instances to be removed
- *
- * @returns: Nothing
  */
 static void clearFileinfoCache(struct FSExport *export, int count) {
 	if (export == NULL)
@@ -62,8 +60,6 @@ static void clearFileinfoCache(struct FSExport *export, int count) {
  * should not be called directly.
  *
  * @param[in] dataServerHandle     Handle to release
- *
- * @returns: Nothing
  */
 static void _dsh_release(struct fsal_ds_handle *const dataServerHandle) {
 	struct FSExport *export;
@@ -430,8 +426,6 @@ static nfsstat4 _ds_permissions(struct fsal_pnfs_ds *const pnfsDataServer,
  * @brief Initialize FSAL specific values for pNFS Data Server.
  *
  * @param[in] ops     FSAL pNFS Data Server operations vector
- *
- * @returns: Nothing, it just initializes Data Server operations vector
  */
 void initializeDataServerOperations(struct fsal_pnfs_ds_ops *ops) {
 	memcpy(ops, &def_pnfs_ds_ops, sizeof(struct fsal_pnfs_ds_ops));

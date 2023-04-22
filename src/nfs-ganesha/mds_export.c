@@ -119,9 +119,6 @@ static size_t remove_if(void *data, size_t size, size_t itemSize,
  * @param[in,out] data       void* pointer to the collection
  * @param[in] size           Size of the collection
  * @param[in] itemSize       Size of each item of the collection
- *
- * @returns: Nothing. The elements of the collection are rearranged after
- *                    finishing the execution of the method.
  */
 static void shuffle(void *data, size_t size, size_t itemSize) {
 	uint8_t temp[itemSize];
@@ -521,8 +518,6 @@ static nfsstat4 _getdevicelist(struct fsal_export *exportHandle,
  * @param[out] types             Static array of layout types that must not be freed
  *                               or modified and must not be dereferenced after
  *                               export reference is relinquished
- *
- * @returns: Nothing
  */
 static void _fs_layouttypes(struct fsal_export *exportHandle,
                             int32_t *count,
@@ -617,8 +612,6 @@ static size_t _fs_da_addr_size(struct fsal_module *FSALModule) {
  * @brief Initialize pNFS export vector operations
  *
  * @param[in] ops      Export operations vector
- *
- * @returns: Nothing. After running the methods, the operations vectors is initialized.
  */
 void initializePnfsExportOperations(struct export_ops *ops) {
 	ops->getdevicelist = _getdevicelist;
@@ -632,9 +625,6 @@ void initializePnfsExportOperations(struct export_ops *ops) {
  * @brief Initialize pNFS related operations
  *
  * @param[in] ops      Export operations vector
- *
- * @returns: Nothing. After running the methods, the operations vectors
- *           is initialized with the pNFS related operations.
  */
 void initializePnfsOperations(struct fsal_ops *ops) {
 	ops->getdeviceinfo = _getdeviceinfo;

@@ -2571,10 +2571,10 @@ public:
 			}
 			else {
 				AttrReply attr_reply = LizardClient::getattr(ctx, ino);
-				RichACL generated_acl = RichACL::createFromMode(
-							attr_reply.attr.st_mode & 0777,
-							S_ISDIR(attr_reply.attr.st_mode));
-				value = richAclConverter::objectToRichACLXattr(generated_acl);
+				RichACL aclFromMode;
+				auto mode = attr_reply.attr.st_mode;
+				aclFromMode = RichACL::createFromMode(mode & 0777, S_ISDIR(mode));
+				value = richAclConverter::objectToRichACLXattr(aclFromMode);
 				valueLength = value.size();
 			}
 			return LIZARDFS_STATUS_OK;

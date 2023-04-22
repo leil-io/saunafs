@@ -9,8 +9,7 @@
  * for LizardFS FSAL.
  */
 
-#ifndef LZFS_FSAL_TYPES
-#define LZFS_FSAL_TYPES
+#pragma once
 
 #include "fsal_api.h"
 
@@ -150,5 +149,3 @@ struct DataServerHandle {
 	uint32_t inode; /// inode
 	FileInfoEntry_t *cacheHandle; /// Cache entry for inode
 };
-
-#endif // LZFS_FSAL_TYPES

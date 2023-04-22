@@ -16,6 +16,8 @@
    along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#pragma once
+
 #include "mount/client/lizardfs_c_api.h"
 
 #ifdef __cplusplus
