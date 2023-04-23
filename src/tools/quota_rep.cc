@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2016 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -36,9 +37,9 @@
 static void quota_rep_usage() {
 	fprintf(stderr,
 	        "summarize quotas for a user/group or all users and groups\n\n"
-	        "usage: \n lizardfs repquota [-nhH] (-u <uid>|-g <gid>)+ <mountpoint-root-path>\n"
-	        " lizardfs repquota [-nhH] -a <mountpoint-root-path>\n"
-	        " lizardfs repquota [-nhH] -d <directory-path>\n");
+	        "usage: \n saunafs repquota [-nhH] (-u <uid>|-g <gid>)+ <mountpoint-root-path>\n"
+	        " saunafs repquota [-nhH] -a <mountpoint-root-path>\n"
+	        " saunafs repquota [-nhH] -d <directory-path>\n");
 	print_numberformat_options();
 }
 
@@ -197,7 +198,7 @@ static int quota_rep(const std::string &path, std::vector<int> requested_uids,
 	}
 
 	try {
-		auto response = ServerConnection::sendAndReceive(fd, request, LIZ_MATOCL_FUSE_GET_QUOTA);
+		auto response = ServerConnection::sendAndReceive(fd, request, SAU_MATOCL_FUSE_GET_QUOTA);
 		std::vector<QuotaEntry> quota_entries;
 		std::vector<std::string> quota_info;
 		PacketVersion version;

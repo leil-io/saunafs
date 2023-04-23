@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -47,17 +48,17 @@
 #include "protocol/cstocs.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/massert.h"
-#include "protocol/MFSCommunication.h"
-#include "common/moosefs_vector.h"
+#include "protocol/SFSCommunication.h"
+#include "common/xaunafs_vector.h"
 #include "protocol/packet.h"
 #include "common/slogger.h"
 #include "common/sockets.h"
 #include "devtools/request_log.h"
 #include "devtools/TracePrinter.h"
 
-#define MaxPacketSize (100000 + MFSBLOCKSIZE)
+#define MaxPacketSize (100000 + SFSBLOCKSIZE)
 
 // connection timeout in seconds
 #define CSSERV_TIMEOUT 10
@@ -78,27 +79,27 @@ public:
 	virtual ~MessageSerializer() {}
 };
 
-class MooseFsMessageSerializer : public MessageSerializer {
+class XaunaFsMessageSerializer : public MessageSerializer {
 public:
 	void serializePrefixOfCstoclReadData(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint32_t offset, uint32_t size) {
 		// This prefix requires CRC (uint32_t) and data (size * uint8_t) to be appended
 		uint32_t extraSpace = sizeof(uint32_t) + size;
-		serializeMooseFsPacketPrefix(buffer, extraSpace, CSTOCL_READ_DATA, chunkId, offset, size);
+		serializeXaunaFsPacketPrefix(buffer, extraSpace, CSTOCL_READ_DATA, chunkId, offset, size);
 	}
 
 	void serializeCstoclReadStatus(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint8_t status) {
-		serializeMooseFsPacket(buffer, CSTOCL_READ_STATUS, chunkId, status);
+		serializeXaunaFsPacket(buffer, CSTOCL_READ_STATUS, chunkId, status);
 	}
 
 	void serializeCstoclWriteStatus(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint32_t writeId, uint8_t status) {
-		serializeMooseFsPacket(buffer, CSTOCL_WRITE_STATUS, chunkId, writeId, status);
+		serializeXaunaFsPacket(buffer, CSTOCL_WRITE_STATUS, chunkId, writeId, status);
 	}
 };
 
-class LizardFsMessageSerializer : public MessageSerializer {
+class SaunaFsMessageSerializer : public MessageSerializer {
 public:
 	void serializePrefixOfCstoclReadData(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint32_t offset, uint32_t size) {
@@ -117,13 +118,13 @@ public:
 };
 
 MessageSerializer* MessageSerializer::getSerializer(PacketHeader::Type type) {
-	sassert((type >= PacketHeader::kMinLizPacketType && type <= PacketHeader::kMaxLizPacketType)
+	sassert((type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType)
 			|| type <= PacketHeader::kMaxOldPacketType);
 	if (type <= PacketHeader::kMaxOldPacketType) {
-		static MooseFsMessageSerializer singleton;
+		static XaunaFsMessageSerializer singleton;
 		return &singleton;
 	} else {
-		static LizardFsMessageSerializer singleton;
+		static SaunaFsMessageSerializer singleton;
 		return &singleton;
 	}
 }
@@ -136,8 +137,13 @@ packetstruct* worker_create_detached_packet_with_output_buffer(
 	uint32_t sizeOfWholePacket = PacketHeader::kSize + header.length;
 	packetstruct* outPacket = new packetstruct();
 	passert(outPacket);
-	outPacket->outputBuffer.reset(new OutputBuffer(sizeOfWholePacket));
-	if (outPacket->outputBuffer->copyIntoBuffer(packetPrefix) != (ssize_t)packetPrefix.size()) {
+	outPacket->outputBuffer = getReadOutputBufferPool().get(sizeOfWholePacket);
+
+	if (outPacket->outputBuffer->copyIntoBuffer(packetPrefix) !=
+	    static_cast<ssize_t>(packetPrefix.size())) {
+		if (outPacket->outputBuffer) {
+			getReadOutputBufferPool().put(std::move(outPacket->outputBuffer));
+		}
 		delete outPacket;
 		return nullptr;
 	}
@@ -216,7 +222,7 @@ void worker_fwderror(csserventry *eptr) {
 	TRACETHIS();
 	sassert(eptr->messageSerializer != NULL);
 	std::vector<uint8_t> buffer;
-	uint8_t status = (eptr->state == CONNECTING ? LIZARDFS_ERROR_CANTCONNECT : LIZARDFS_ERROR_DISCONNECTED);
+	uint8_t status = (eptr->state == CONNECTING ? SAUNAFS_ERROR_CANTCONNECT : SAUNAFS_ERROR_DISCONNECTED);
 	eptr->messageSerializer->serializeCstoclWriteStatus(buffer, eptr->chunkid, 0, status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = WRITEFINISH;
@@ -230,18 +236,18 @@ int worker_initconnect(csserventry *eptr) {
 	// to get a connection from it
 	eptr->fwdsock = tcpsocket();
 	if (eptr->fwdsock < 0) {
-		lzfs_pretty_errlog(LOG_WARNING, "create socket, error");
+		safs_pretty_errlog(LOG_WARNING, "create socket, error");
 		return -1;
 	}
 	if (tcpnonblock(eptr->fwdsock) < 0) {
-		lzfs_pretty_errlog(LOG_WARNING, "set nonblock, error");
+		safs_pretty_errlog(LOG_WARNING, "set nonblock, error");
 		tcpclose(eptr->fwdsock);
 		eptr->fwdsock = -1;
 		return -1;
 	}
 	status = tcpnumconnect(eptr->fwdsock, eptr->fwdServer.ip, eptr->fwdServer.port);
 	if (status < 0) {
-		lzfs_pretty_errlog(LOG_WARNING, "connect failed, error");
+		safs_pretty_errlog(LOG_WARNING, "connect failed, error");
 		tcpclose(eptr->fwdsock);
 		eptr->fwdsock = -1;
 		return -1;
@@ -278,9 +284,9 @@ void worker_check_nextpacket(csserventry *eptr);
 void worker_delayed_close(uint8_t status, void *e) {
 	TRACETHIS();
 	csserventry *eptr = (csserventry*) e;
-	if (eptr->wjobid > 0 && eptr->wjobwriteid == 0 && status == LIZARDFS_STATUS_OK) { // this was job_open
+	if (eptr->wjobid > 0 && eptr->wjobwriteid == 0 && status == SAUNAFS_STATUS_OK) { // this was job_open
 		eptr->chunkisopen = 1;
-	} else if (eptr->rjobid > 0 && status == LIZARDFS_STATUS_OK) { //this could be job_open
+	} else if (eptr->rjobid > 0 && status == SAUNAFS_STATUS_OK) { //this could be job_open
 		eptr->chunkisopen = 1;
 	}
 	if (eptr->chunkisopen) {
@@ -298,7 +304,7 @@ void worker_read_finished(uint8_t status, void *e) {
 	TRACETHIS();
 	csserventry *eptr = (csserventry*) e;
 	eptr->rjobid = 0;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		eptr->todocnt--;
 		eptr->chunkisopen = 1;
 		if (eptr->todocnt == 0) {
@@ -340,7 +346,7 @@ void worker_read_continue(csserventry *eptr) {
 	}
 	if (eptr->size == 0) { // everything has been read
 		std::vector<uint8_t> buffer;
-		eptr->messageSerializer->serializeCstoclReadStatus(buffer, eptr->chunkid, LIZARDFS_STATUS_OK);
+		eptr->messageSerializer->serializeCstoclReadStatus(buffer, eptr->chunkid, SAUNAFS_STATUS_OK);
 		worker_create_attached_packet(eptr, buffer);
 		sassert(eptr->chunkisopen);
 		job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkid, eptr->chunkType);
@@ -349,11 +355,11 @@ void worker_read_continue(csserventry *eptr) {
 		LOG_AVG_STOP(eptr->readOperationTimer);
 	} else {
 		const uint32_t totalRequestSize = eptr->size;
-		const uint32_t thisPartOffset = eptr->offset % MFSBLOCKSIZE;
+		const uint32_t thisPartOffset = eptr->offset % SFSBLOCKSIZE;
 		const uint32_t thisPartSize = std::min<uint32_t>(
-				totalRequestSize, MFSBLOCKSIZE - thisPartOffset);
+				totalRequestSize, SFSBLOCKSIZE - thisPartOffset);
 		const uint16_t totalRequestBlocks =
-				(totalRequestSize + thisPartOffset + MFSBLOCKSIZE - 1) / MFSBLOCKSIZE;
+				(totalRequestSize + thisPartOffset + SFSBLOCKSIZE - 1) / SFSBLOCKSIZE;
 		std::vector<uint8_t> readDataPrefix;
 		eptr->messageSerializer->serializePrefixOfCstoclReadData(readDataPrefix,
 				eptr->chunkid, eptr->offset, thisPartSize);
@@ -404,9 +410,9 @@ void worker_read_init(csserventry *eptr, const uint8_t *data,
 	TRACETHIS2(type, length);
 
 	// Deserialize request
-	sassert(type == LIZ_CLTOCS_READ || type == CLTOCS_READ);
+	sassert(type == SAU_CLTOCS_READ || type == CLTOCS_READ);
 	try {
-		if (type == LIZ_CLTOCS_READ) {
+		if (type == SAU_CLTOCS_READ) {
 			PacketVersion v;
 			deserializePacketVersionNoHeader(data, length, v);
 			if (v == cltocs::read::kECChunks) {
@@ -427,7 +433,7 @@ void worker_read_init(csserventry *eptr, const uint8_t *data,
 				eptr->chunkType = legacy_type;
 			}
 		} else {
-			deserializeAllMooseFsPacketDataNoHeader(data, length,
+			deserializeAllXaunaFsPacketDataNoHeader(data, length,
 					eptr->chunkid,
 					eptr->version,
 					eptr->offset,
@@ -436,7 +442,7 @@ void worker_read_init(csserventry *eptr, const uint8_t *data,
 		}
 		eptr->messageSerializer = MessageSerializer::getSerializer(type);
 	} catch (IncorrectDeserializationException&) {
-		lzfs_pretty_syslog(LOG_NOTICE, "read_init: Cannot deserialize READ message (type:%"
+		safs_pretty_syslog(LOG_NOTICE, "read_init: Cannot deserialize READ message (type:%"
 				PRIX32 ", length:%" PRIu32 ")", type, length);
 		eptr->state = CLOSE;
 		return;
@@ -445,13 +451,13 @@ void worker_read_init(csserventry *eptr, const uint8_t *data,
 	std::vector<uint8_t> instantResponseBuffer;
 	if (eptr->size == 0) {
 		eptr->messageSerializer->serializeCstoclReadStatus(instantResponseBuffer,
-				eptr->chunkid, LIZARDFS_STATUS_OK);
-	} else if (eptr->size > MFSCHUNKSIZE) {
+				eptr->chunkid, SAUNAFS_STATUS_OK);
+	} else if (eptr->size > SFSCHUNKSIZE) {
 		eptr->messageSerializer->serializeCstoclReadStatus(instantResponseBuffer,
-				eptr->chunkid, LIZARDFS_ERROR_WRONGSIZE);
-	} else if (eptr->offset >= MFSCHUNKSIZE || eptr->offset + eptr->size > MFSCHUNKSIZE) {
+				eptr->chunkid, SAUNAFS_ERROR_WRONGSIZE);
+	} else if (eptr->offset >= SFSCHUNKSIZE || eptr->offset + eptr->size > SFSCHUNKSIZE) {
 		eptr->messageSerializer->serializeCstoclReadStatus(instantResponseBuffer,
-				eptr->chunkid, LIZARDFS_ERROR_WRONGOFFSET);
+				eptr->chunkid, SAUNAFS_ERROR_WRONGOFFSET);
 	}
 	if (!instantResponseBuffer.empty()) {
 		worker_create_attached_packet(eptr, instantResponseBuffer);
@@ -467,7 +473,7 @@ void worker_read_init(csserventry *eptr, const uint8_t *data,
 }
 
 void worker_prefetch(csserventry *eptr, const uint8_t *data, PacketHeader::Type type, PacketHeader::Length length) {
-	sassert(type == LIZ_CLTOCS_PREFETCH);
+	sassert(type == SAU_CLTOCS_PREFETCH);
 	PacketVersion v;
 	try {
 		deserializePacketVersionNoHeader(data, length, v);
@@ -489,15 +495,15 @@ void worker_prefetch(csserventry *eptr, const uint8_t *data, PacketHeader::Type 
 			eptr->chunkType = legacy_type;
 		}
 	} catch (IncorrectDeserializationException&) {
-		lzfs_pretty_syslog(LOG_NOTICE, "prefetch: Cannot deserialize PREFETCH message (type:%"
+		safs_pretty_syslog(LOG_NOTICE, "prefetch: Cannot deserialize PREFETCH message (type:%"
 				PRIX32 ", length:%" PRIu32 ")", type, length);
 		eptr->state = CLOSE;
 		return;
 	}
 	// Start prefetching in background, don't wait for it to complete
-	auto firstBlock = eptr->offset / MFSBLOCKSIZE;
+	auto firstBlock = eptr->offset / SFSBLOCKSIZE;
 	auto lastByte = eptr->offset + eptr->size - 1;
-	auto lastBlock = lastByte / MFSBLOCKSIZE;
+	auto lastBlock = lastByte / SFSBLOCKSIZE;
 	auto nrOfBlocks = lastBlock - firstBlock + 1;
 	job_prefetch(eptr->workerJobPool, eptr->chunkid, eptr->version, eptr->chunkType,
 			firstBlock, nrOfBlocks);
@@ -511,7 +517,7 @@ void worker_write_finished(uint8_t status, void *e) {
 	csserventry *eptr = (csserventry*) e;
 	eptr->wjobid = 0;
 	sassert(eptr->messageSerializer != NULL);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		std::vector<uint8_t> buffer;
 		eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
 				eptr->chunkid, eptr->wjobwriteid, status);
@@ -534,7 +540,7 @@ void worker_write_finished(uint8_t status, void *e) {
 			sassert(eptr->messageSerializer != NULL);
 			std::vector<uint8_t> buffer;
 			eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
-					eptr->chunkid, eptr->wjobwriteid, LIZARDFS_STATUS_OK);
+					eptr->chunkid, eptr->wjobwriteid, SAUNAFS_STATUS_OK);
 			worker_create_attached_packet(eptr, buffer);
 			eptr->partiallyCompletedWrites.erase(eptr->wjobwriteid);
 		} else {
@@ -562,12 +568,12 @@ void serializeCltocsWriteInit(std::vector<uint8_t>& buffer,
 			(legacy::ChunkPartType)chunkType, legacy_chain);
 	} else {
 		assert(slice_traits::isStandard(chunkType));
-		MooseFSVector<NetworkAddress> moose_chain;
-		moose_chain.reserve(chain.size());
+		XaunaFSVector<NetworkAddress> xauna_chain;
+		xauna_chain.reserve(chain.size());
 		for (const auto &entry : chain) {
-			moose_chain.push_back(entry.address);
+			xauna_chain.push_back(entry.address);
 		}
-		serializeMooseFsPacket(buffer, CLTOCS_WRITE, chunkId, chunkVersion, moose_chain);
+		serializeXaunaFsPacket(buffer, CLTOCS_WRITE, chunkId, chunkVersion, xauna_chain);
 	}
 }
 
@@ -576,9 +582,9 @@ void worker_write_init(csserventry *eptr,
 	TRACETHIS();
 	std::vector<ChunkTypeWithAddress> chain;
 
-	sassert(type == LIZ_CLTOCS_WRITE_INIT || type == CLTOCS_WRITE);
+	sassert(type == SAU_CLTOCS_WRITE_INIT || type == CLTOCS_WRITE);
 	try {
-		if (type == LIZ_CLTOCS_WRITE_INIT) {
+		if (type == SAU_CLTOCS_WRITE_INIT) {
 			PacketVersion v;
 			deserializePacketVersionNoHeader(data, length, v);
 			if (v == cltocs::writeInit::kECChunks) {
@@ -595,17 +601,17 @@ void worker_write_init(csserventry *eptr,
 				}
 			}
 		} else {
-			MooseFSVector<NetworkAddress> mooseFSChain;
-			deserializeAllMooseFsPacketDataNoHeader(data, length,
-				eptr->chunkid, eptr->version, mooseFSChain);
-			for (const auto &address : mooseFSChain) {
+			XaunaFSVector<NetworkAddress> xaunaFSChain;
+			deserializeAllXaunaFsPacketDataNoHeader(data, length,
+				eptr->chunkid, eptr->version, xaunaFSChain);
+			for (const auto &address : xaunaFSChain) {
 				chain.push_back(ChunkTypeWithAddress(address, slice_traits::standard::ChunkPartType(), kStdVersion));
 			}
 			eptr->chunkType = slice_traits::standard::ChunkPartType();
 		}
 		eptr->messageSerializer = MessageSerializer::getSerializer(type);
 	} catch (IncorrectDeserializationException& ex) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Received malformed WRITE_INIT message (length: %" PRIu32 ")", length);
+		safs_pretty_syslog(LOG_NOTICE, "Received malformed WRITE_INIT message (length: %" PRIu32 ")", length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -623,7 +629,7 @@ void worker_write_init(csserventry *eptr,
 		if (worker_initconnect(eptr) < 0) {
 			std::vector<uint8_t> buffer;
 			eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
-					eptr->chunkid, 0, LIZARDFS_ERROR_CANTCONNECT);
+					eptr->chunkid, 0, SAUNAFS_ERROR_CANTCONNECT);
 			worker_create_attached_packet(eptr, buffer);
 			eptr->state = WRITEFINISH;
 			return;
@@ -648,40 +654,40 @@ void worker_write_data(csserventry *eptr,
 	uint32_t crc;
 	const uint8_t* dataToWrite;
 
-	sassert(type == LIZ_CLTOCS_WRITE_DATA || type == CLTOCS_WRITE_DATA);
+	sassert(type == SAU_CLTOCS_WRITE_DATA || type == CLTOCS_WRITE_DATA);
 	try {
 		const MessageSerializer *serializer = MessageSerializer::getSerializer(type);
 		if (eptr->messageSerializer != serializer) {
-			lzfs_pretty_syslog(LOG_NOTICE, "Received WRITE_DATA message incompatible with WRITE_INIT");
+			safs_pretty_syslog(LOG_NOTICE, "Received WRITE_DATA message incompatible with WRITE_INIT");
 			eptr->state = CLOSE;
 			return;
 		}
-		if (type == LIZ_CLTOCS_WRITE_DATA) {
+		if (type == SAU_CLTOCS_WRITE_DATA) {
 			cltocs::writeData::deserializePrefix(data, length,
 					chunkId, writeId, blocknum, offset, size, crc);
 			dataToWrite = data + cltocs::writeData::kPrefixSize;
 		} else {
 			uint16_t offset16;
-			deserializeAllMooseFsPacketDataNoHeader(data, length,
+			deserializeAllXaunaFsPacketDataNoHeader(data, length,
 				chunkId, writeId, blocknum, offset16, size, crc, dataToWrite);
 			offset = offset16;
 			sassert(eptr->chunkType == slice_traits::standard::ChunkPartType());
 		}
 	} catch (IncorrectDeserializationException&) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Received malformed WRITE_DATA message (length: %" PRIu32 ")", length);
+		safs_pretty_syslog(LOG_NOTICE, "Received malformed WRITE_DATA message (length: %" PRIu32 ")", length);
 		eptr->state = CLOSE;
 		return;
 	}
 
-	uint8_t status = LIZARDFS_STATUS_OK;
+	uint8_t status = SAUNAFS_STATUS_OK;
 	uint32_t dataSize = data + length - dataToWrite;
 	if (dataSize != size) {
-		status = LIZARDFS_ERROR_WRONGSIZE;
+		status = SAUNAFS_ERROR_WRONGSIZE;
 	} else if (chunkId != eptr->chunkid) {
-		status = LIZARDFS_ERROR_WRONGCHUNKID;
+		status = SAUNAFS_ERROR_WRONGCHUNKID;
 	}
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		std::vector<uint8_t> buffer;
 		eptr->messageSerializer->serializeCstoclWriteStatus(buffer, chunkId, writeId, status);
 		worker_create_attached_packet(eptr, buffer);
@@ -705,34 +711,34 @@ void worker_write_status(csserventry *eptr,
 	uint32_t writeId;
 	uint8_t status;
 
-	sassert(type == LIZ_CSTOCL_WRITE_STATUS || type == CSTOCL_WRITE_STATUS);
+	sassert(type == SAU_CSTOCL_WRITE_STATUS || type == CSTOCL_WRITE_STATUS);
 	sassert(eptr->messageSerializer != NULL);
 	try {
 		const MessageSerializer *serializer = MessageSerializer::getSerializer(type);
 		if (eptr->messageSerializer != serializer) {
-			lzfs_pretty_syslog(LOG_NOTICE, "Received WRITE_DATA message incompatible with WRITE_INIT");
+			safs_pretty_syslog(LOG_NOTICE, "Received WRITE_DATA message incompatible with WRITE_INIT");
 			eptr->state = CLOSE;
 			return;
 		}
-		if (type == LIZ_CSTOCL_WRITE_STATUS) {
+		if (type == SAU_CSTOCL_WRITE_STATUS) {
 			std::vector<uint8_t> message(data, data + length);
 			cstocl::writeStatus::deserialize(message, chunkId, writeId, status);
 		} else {
-			deserializeAllMooseFsPacketDataNoHeader(data, length, chunkId, writeId, status);
+			deserializeAllXaunaFsPacketDataNoHeader(data, length, chunkId, writeId, status);
 			sassert(eptr->chunkType == slice_traits::standard::ChunkPartType());
 		}
 	} catch (IncorrectDeserializationException&) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Received malformed WRITE_STATUS message (length: %" PRIu32 ")", length);
+		safs_pretty_syslog(LOG_NOTICE, "Received malformed WRITE_STATUS message (length: %" PRIu32 ")", length);
 		eptr->state = CLOSE;
 		return;
 	}
 
 	if (eptr->chunkid != chunkId) {
-		status = LIZARDFS_ERROR_WRONGCHUNKID;
+		status = SAUNAFS_ERROR_WRONGCHUNKID;
 		writeId = 0;
 	}
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		std::vector<uint8_t> buffer;
 		eptr->messageSerializer->serializeCstoclWriteStatus(buffer, chunkId, writeId, status);
 		worker_create_attached_packet(eptr, buffer);
@@ -743,7 +749,7 @@ void worker_write_status(csserventry *eptr,
 	if (eptr->partiallyCompletedWrites.count(writeId) > 0) {
 		// found - means it was added by write_finished
 		std::vector<uint8_t> buffer;
-		eptr->messageSerializer->serializeCstoclWriteStatus(buffer, chunkId, writeId, LIZARDFS_STATUS_OK);
+		eptr->messageSerializer->serializeCstoclWriteStatus(buffer, chunkId, writeId, SAUNAFS_STATUS_OK);
 		worker_create_attached_packet(eptr, buffer);
 		eptr->partiallyCompletedWrites.erase(writeId);
 	} else {
@@ -758,12 +764,12 @@ void worker_write_end(csserventry *eptr, const uint8_t* data, uint32_t length) {
 	try {
 		cltocs::writeEnd::deserialize(data, length, chunkId);
 	} catch (IncorrectDeserializationException&) {
-		lzfs_pretty_syslog(LOG_NOTICE,"Received malformed WRITE_END message (length: %" PRIu32 ")", length);
+		safs_pretty_syslog(LOG_NOTICE,"Received malformed WRITE_END message (length: %" PRIu32 ")", length);
 		eptr->state = WRITEFINISH;
 		return;
 	}
 	if (chunkId != eptr->chunkid) {
-		lzfs_pretty_syslog(LOG_NOTICE,"Received malformed WRITE_END message "
+		safs_pretty_syslog(LOG_NOTICE,"Received malformed WRITE_END message "
 				"(got chunkId=%016" PRIX64 ", expected %016" PRIX64 ")",
 				chunkId, eptr->chunkid);
 		eptr->state = WRITEFINISH;
@@ -778,7 +784,7 @@ void worker_write_end(csserventry *eptr, const uint8_t* data, uint32_t length) {
 		 * eptr->outputhead != NULL -- there is a status being send
 		 */
 		// TODO(msulikowski) temporary syslog message. May be useful until this code is fully tested
-		lzfs_pretty_syslog(LOG_NOTICE, "Received WRITE_END message too early");
+		safs_pretty_syslog(LOG_NOTICE, "Received WRITE_END message too early");
 		eptr->state = WRITEFINISH;
 		return;
 	}
@@ -795,7 +801,7 @@ void worker_write_end(csserventry *eptr, const uint8_t* data, uint32_t length) {
 	eptr->state = IDLE;
 }
 
-void worker_liz_get_chunk_blocks_finished_legacy(uint8_t status, void *extra) {
+void worker_sau_get_chunk_blocks_finished_legacy(uint8_t status, void *extra) {
 	TRACETHIS();
 	csserventry *eptr = (csserventry*) extra;
 	eptr->getBlocksJobId = 0;
@@ -806,7 +812,7 @@ void worker_liz_get_chunk_blocks_finished_legacy(uint8_t status, void *extra) {
 	eptr->state = IDLE;
 }
 
-void worker_liz_get_chunk_blocks_finished(uint8_t status, void *extra) {
+void worker_sau_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	TRACETHIS();
 	csserventry *eptr = (csserventry*) extra;
 	eptr->getBlocksJobId = 0;
@@ -822,13 +828,13 @@ void worker_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	csserventry *eptr = (csserventry*) extra;
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
-	serializeMooseFsPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS,
+	serializeXaunaFsPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS,
 			eptr->chunkid, eptr->version, eptr->getBlocksJobResult, status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = IDLE;
 }
 
-void worker_liz_get_chunk_blocks(csserventry *eptr, const uint8_t *data, uint32_t length) {
+void worker_sau_get_chunk_blocks(csserventry *eptr, const uint8_t *data, uint32_t length) {
 	PacketVersion v;
 	deserializePacketVersionNoHeader(data, length, v);
 	if (v == cstocs::getChunkBlocks::kECChunks) {
@@ -836,7 +842,7 @@ void worker_liz_get_chunk_blocks(csserventry *eptr, const uint8_t *data, uint32_
 				eptr->chunkid, eptr->version, eptr->chunkType);
 
 		eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
-			worker_liz_get_chunk_blocks_finished, eptr, eptr->chunkid, eptr->version,
+			worker_sau_get_chunk_blocks_finished, eptr, eptr->chunkid, eptr->version,
 			eptr->chunkType, &(eptr->getBlocksJobResult));
 
 	} else {
@@ -846,7 +852,7 @@ void worker_liz_get_chunk_blocks(csserventry *eptr, const uint8_t *data, uint32_
 		eptr->chunkType = legacy_type;
 
 		eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
-			worker_liz_get_chunk_blocks_finished_legacy, eptr, eptr->chunkid, eptr->version,
+			worker_sau_get_chunk_blocks_finished_legacy, eptr, eptr->chunkid, eptr->version,
 			eptr->chunkType, &(eptr->getBlocksJobResult));
 	}
 	eptr->state = GET_BLOCK;
@@ -854,7 +860,7 @@ void worker_liz_get_chunk_blocks(csserventry *eptr, const uint8_t *data, uint32_
 
 void worker_get_chunk_blocks(csserventry *eptr, const uint8_t *data,
 		uint32_t length) {
-	deserializeAllMooseFsPacketDataNoHeader(data, length, eptr->chunkid, eptr->version);
+	deserializeAllXaunaFsPacketDataNoHeader(data, length, eptr->chunkid, eptr->version);
 	eptr->chunkType = slice_traits::standard::ChunkPartType();
 	eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
 			worker_get_chunk_blocks_finished, eptr, eptr->chunkid, eptr->version,
@@ -867,18 +873,18 @@ void worker_get_chunk_blocks(csserventry *eptr, const uint8_t *data,
 void worker_hdd_list_v2(csserventry *eptr, const uint8_t *data,
 		uint32_t length) {
 	TRACETHIS();
-	uint32_t l;
+	uint32_t size;
 	uint8_t *ptr;
 
 	(void) data;
 	if (length != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOCS_HDD_LIST_V2 - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOCS_HDD_LIST_V2 - wrong size (%" PRIu32 "/0)",length);
 		eptr->state = CLOSE;
 		return;
 	}
-	l = hdd_diskinfo_v2_size(); // lock
-	ptr = worker_create_attached_packet(eptr, CSTOCL_HDD_LIST_V2, l);
-	hdd_diskinfo_v2_data(ptr); // unlock
+	size = hddGetSerializedSizeOfAllDiskInfosV2(); // lock
+	ptr = worker_create_attached_packet(eptr, CSTOCL_HDD_LIST_V2, size);
+	hddSerializeAllDiskInfosV2(ptr); // unlock
 }
 
 void worker_chart(csserventry *eptr, const uint8_t *data, uint32_t length) {
@@ -888,7 +894,7 @@ void worker_chart(csserventry *eptr, const uint8_t *data, uint32_t length) {
 	uint32_t l;
 
 	if (length != 4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART - wrong size (%" PRIu32 "/4)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -915,7 +921,7 @@ void worker_chart_data(csserventry *eptr, const uint8_t *data, uint32_t length) 
 	uint32_t l;
 
 	if (length != 4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%" PRIu32 "/4)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -939,9 +945,9 @@ void worker_test_chunk(csserventry *eptr, const uint8_t *data, uint32_t length) 
 			cltocs::testChunk::deserialize(data, length, chunk.id, chunk.version, legacy_type);
 			chunk.type = legacy_type;
 		}
-		hdd_test_chunk(chunk);
+		hddAddChunkToTestQueue(chunk);
 	} catch (IncorrectDeserializationException &e) {
-		lzfs_pretty_syslog(LOG_NOTICE, "LIZ_CLTOCS_TEST_CHUNK - bad packet: %s (length: %" PRIu32 ")",
+		safs_pretty_syslog(LOG_NOTICE, "SAU_CLTOCS_TEST_CHUNK - bad packet: %s (length: %" PRIu32 ")",
 				e.what(), length);
 		eptr->state = CLOSE;
 		return;
@@ -997,21 +1003,21 @@ void worker_gotpacket(csserventry *eptr, uint32_t type, const uint8_t *data, uin
 			worker_ping(eptr, data, length);
 			break;
 		case CLTOCS_READ:
-		case LIZ_CLTOCS_READ:
+		case SAU_CLTOCS_READ:
 			worker_read_init(eptr, data, type, length);
 			break;
-		case LIZ_CLTOCS_PREFETCH:
+		case SAU_CLTOCS_PREFETCH:
 			worker_prefetch(eptr, data, type, length);
 			break;
 		case CLTOCS_WRITE:
-		case LIZ_CLTOCS_WRITE_INIT:
+		case SAU_CLTOCS_WRITE_INIT:
 			worker_write_init(eptr, data, type, length);
 			break;
 		case CSTOCS_GET_CHUNK_BLOCKS:
 			worker_get_chunk_blocks(eptr, data, length);
 			break;
-		case LIZ_CSTOCS_GET_CHUNK_BLOCKS:
-			worker_liz_get_chunk_blocks(eptr, data, length);
+		case SAU_CSTOCS_GET_CHUNK_BLOCKS:
+			worker_sau_get_chunk_blocks(eptr, data, length);
 			break;
 		case CLTOCS_HDD_LIST_V2:
 			worker_hdd_list_v2(eptr, data, length);
@@ -1022,58 +1028,58 @@ void worker_gotpacket(csserventry *eptr, uint32_t type, const uint8_t *data, uin
 		case CLTOAN_CHART_DATA:
 			worker_chart_data(eptr, data, length);
 			break;
-		case LIZ_CLTOCS_TEST_CHUNK:
+		case SAU_CLTOCS_TEST_CHUNK:
 			worker_test_chunk(eptr, data, length);
 			break;
 		default:
-			lzfs_pretty_syslog(LOG_NOTICE, "Got invalid message in IDLE state (type:%" PRIu32 ")",type);
+			safs_pretty_syslog(LOG_NOTICE, "Got invalid message in IDLE state (type:%" PRIu32 ")",type);
 			eptr->state = CLOSE;
 			break;
 		}
 	} else if (eptr->state == WRITELAST) {
 		switch (type) {
 		case CLTOCS_WRITE_DATA:
-		case LIZ_CLTOCS_WRITE_DATA:
+		case SAU_CLTOCS_WRITE_DATA:
 			worker_write_data(eptr, data, type, length);
 			break;
-		case LIZ_CLTOCS_WRITE_END:
+		case SAU_CLTOCS_WRITE_END:
 			worker_write_end(eptr, data, length);
 			break;
 		default:
-			lzfs_pretty_syslog(LOG_NOTICE, "Got invalid message in WRITELAST state (type:%" PRIu32 ")",type);
+			safs_pretty_syslog(LOG_NOTICE, "Got invalid message in WRITELAST state (type:%" PRIu32 ")",type);
 			eptr->state = CLOSE;
 			break;
 		}
 	} else if (eptr->state == WRITEFWD) {
 		switch (type) {
 		case CLTOCS_WRITE_DATA:
-		case LIZ_CLTOCS_WRITE_DATA:
+		case SAU_CLTOCS_WRITE_DATA:
 			worker_write_data(eptr, data, type, length);
 			break;
 		case CSTOCL_WRITE_STATUS:
-		case LIZ_CSTOCL_WRITE_STATUS:
+		case SAU_CSTOCL_WRITE_STATUS:
 			worker_write_status(eptr, data, type, length);
 			break;
-		case LIZ_CLTOCS_WRITE_END:
+		case SAU_CLTOCS_WRITE_END:
 			worker_write_end(eptr, data, length);
 			break;
 		default:
-			lzfs_pretty_syslog(LOG_NOTICE, "Got invalid message in WRITEFWD state (type:%" PRIu32 ")",type);
+			safs_pretty_syslog(LOG_NOTICE, "Got invalid message in WRITEFWD state (type:%" PRIu32 ")",type);
 			eptr->state = CLOSE;
 			break;
 		}
 	} else if (eptr->state == WRITEFINISH) {
 		switch (type) {
 		case CLTOCS_WRITE_DATA:
-		case LIZ_CLTOCS_WRITE_DATA:
-		case LIZ_CLTOCS_WRITE_END:
+		case SAU_CLTOCS_WRITE_DATA:
+		case SAU_CLTOCS_WRITE_END:
 			return;
 		default:
-			lzfs_pretty_syslog(LOG_NOTICE, "Got invalid message in WRITEFINISH state (type:%" PRIu32 ")",type);
+			safs_pretty_syslog(LOG_NOTICE, "Got invalid message in WRITEFINISH state (type:%" PRIu32 ")",type);
 			eptr->state = CLOSE;
 		}
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "Got invalid message (type:%" PRIu32 ")",type);
+		safs_pretty_syslog(LOG_NOTICE, "Got invalid message (type:%" PRIu32 ")",type);
 		eptr->state = CLOSE;
 	}
 }
@@ -1124,7 +1130,7 @@ void worker_fwdconnected(csserventry *eptr) {
 	int status;
 	status = tcpgetstatus(eptr->fwdsock);
 	if (status) {
-		lzfs_silent_errlog(LOG_WARNING, "connection failed, error");
+		safs_silent_errlog(LOG_WARNING, "connection failed, error");
 		worker_fwderror(eptr);
 		return;
 	}
@@ -1147,7 +1153,7 @@ void worker_fwdread(csserventry *eptr) {
 		}
 		if (i < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "(fwdread) read error");
+				safs_silent_errlog(LOG_NOTICE, "(fwdread) read error");
 				worker_fwderror(eptr);
 			}
 			return;
@@ -1161,7 +1167,7 @@ void worker_fwdread(csserventry *eptr) {
 		ptr = eptr->fwdhdrbuff + 4;
 		size = get32bit(&ptr);
 		if (size > MaxPacketSize) {
-			lzfs_pretty_syslog(LOG_WARNING,"(fwdread) packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
+			safs_pretty_syslog(LOG_WARNING,"(fwdread) packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
 			worker_fwderror(eptr);
 			return;
 		}
@@ -1184,7 +1190,7 @@ void worker_fwdread(csserventry *eptr) {
 			}
 			if (i < 0) {
 				if (errno != EAGAIN) {
-					lzfs_silent_errlog(LOG_NOTICE, "(fwdread) read error");
+					safs_silent_errlog(LOG_NOTICE, "(fwdread) read error");
 					worker_fwderror(eptr);
 				}
 				return;
@@ -1225,7 +1231,7 @@ void worker_fwdwrite(csserventry *eptr) {
 		}
 		if (i < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "(fwdwrite) write error");
+				safs_silent_errlog(LOG_NOTICE, "(fwdwrite) write error");
 				worker_fwderror(eptr);
 			}
 			return;
@@ -1256,7 +1262,7 @@ void worker_forward(csserventry *eptr) {
 		}
 		if (i < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "(forward) read error");
+				safs_silent_errlog(LOG_NOTICE, "(forward) read error");
 				eptr->state = CLOSE;
 			}
 			return;
@@ -1271,12 +1277,12 @@ void worker_forward(csserventry *eptr) {
 		try {
 			deserializePacketHeader(eptr->hdrbuff, sizeof(eptr->hdrbuff), header);
 		} catch (IncorrectDeserializationException&) {
-			lzfs_pretty_syslog(LOG_WARNING, "(forward) Received malformed network packet");
+			safs_pretty_syslog(LOG_WARNING, "(forward) Received malformed network packet");
 			eptr->state = CLOSE;
 			return;
 		}
 		if (header.length > MaxPacketSize) {
-			lzfs_pretty_syslog(LOG_WARNING,"(forward) packet too long (%" PRIu32 "/%u)",
+			safs_pretty_syslog(LOG_WARNING,"(forward) packet too long (%" PRIu32 "/%u)",
 					header.length, MaxPacketSize);
 			eptr->state = CLOSE;
 			return;
@@ -1291,8 +1297,8 @@ void worker_forward(csserventry *eptr) {
 		eptr->inputpacket.bytesleft = header.length;
 		eptr->inputpacket.startptr = eptr->inputpacket.packet + PacketHeader::kSize;
 		if (header.type == CLTOCS_WRITE_DATA
-				|| header.type == LIZ_CLTOCS_WRITE_DATA
-				|| header.type == LIZ_CLTOCS_WRITE_END) {
+				|| header.type == SAU_CLTOCS_WRITE_DATA
+				|| header.type == SAU_CLTOCS_WRITE_END) {
 			eptr->fwdbytesleft = 8;
 			eptr->fwdstartptr = eptr->inputpacket.packet;
 		}
@@ -1306,7 +1312,7 @@ void worker_forward(csserventry *eptr) {
 		}
 		if (i < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "(forward) read error");
+				safs_silent_errlog(LOG_NOTICE, "(forward) read error");
 				eptr->state = CLOSE;
 			}
 			return;
@@ -1327,7 +1333,7 @@ void worker_forward(csserventry *eptr) {
 		}
 		if (i < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "(forward) write error");
+				safs_silent_errlog(LOG_NOTICE, "(forward) write error");
 				worker_fwderror(eptr);
 			}
 			return;
@@ -1341,7 +1347,7 @@ void worker_forward(csserventry *eptr) {
 		try {
 			deserializePacketHeader(eptr->hdrbuff, sizeof(eptr->hdrbuff), header);
 		} catch (IncorrectDeserializationException&) {
-			lzfs_pretty_syslog(LOG_WARNING, "(forward) Received malformed network packet");
+			safs_pretty_syslog(LOG_WARNING, "(forward) Received malformed network packet");
 			eptr->state = CLOSE;
 			return;
 		}
@@ -1376,7 +1382,7 @@ void worker_read(csserventry *eptr) {
 		}
 		if (i < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "(read) read error");
+				safs_silent_errlog(LOG_NOTICE, "(read) read error");
 				eptr->state = CLOSE;
 			}
 			return;
@@ -1394,7 +1400,7 @@ void worker_read(csserventry *eptr) {
 
 		if (size > 0) {
 			if (size > MaxPacketSize) {
-				lzfs_pretty_syslog(LOG_WARNING,"(read) packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
+				safs_pretty_syslog(LOG_WARNING,"(read) packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
 				eptr->state = CLOSE;
 				return;
 			}
@@ -1419,7 +1425,7 @@ void worker_read(csserventry *eptr) {
 			}
 			if (i < 0) {
 				if (errno != EAGAIN) {
-					lzfs_silent_errlog(LOG_NOTICE, "(read) read error");
+					safs_silent_errlog(LOG_NOTICE, "(read) read error");
 					eptr->state = CLOSE;
 				}
 				return;
@@ -1468,7 +1474,7 @@ void worker_write(csserventry *eptr) {
 					"New bytes in pack->outputBuffer after sending some data");
 			stats_bytesout += (bytesInBufferBefore - bytesInBufferAfter);
 			if (ret == OutputBuffer::WRITE_ERROR) {
-				lzfs_silent_errlog(LOG_NOTICE, "(write) write error");
+				safs_silent_errlog(LOG_NOTICE, "(write) write error");
 				eptr->state = CLOSE;
 				return;
 			} else if (ret == OutputBuffer::WRITE_AGAIN) {
@@ -1483,7 +1489,7 @@ void worker_write(csserventry *eptr) {
 			}
 			if (i < 0) {
 				if (errno != EAGAIN) {
-					lzfs_silent_errlog(LOG_NOTICE, "(write) write error");
+					safs_silent_errlog(LOG_NOTICE, "(write) write error");
 					eptr->state = CLOSE;
 				}
 				return;
@@ -1496,6 +1502,9 @@ void worker_write(csserventry *eptr) {
 			}
 		}
 		// packet has been sent
+		if (pack->outputBuffer) {
+			getReadOutputBufferPool().put(std::move(pack->outputBuffer));
+		}
 		free(pack->packet);
 		eptr->outputhead = pack->next;
 		if (eptr->outputhead == NULL) {
@@ -1523,12 +1532,12 @@ void NetworkWorkerThread::operator()() {
 		int i = poll(pdesc.data(), pdesc.size(), 50);
 		if (i < 0) {
 			if (errno == EAGAIN) {
-				lzfs_pretty_syslog(LOG_WARNING, "poll returned EAGAIN");
+				safs_pretty_syslog(LOG_WARNING, "poll returned EAGAIN");
 				usleep(100000);
 				continue;
 			}
 			if (errno != EINTR) {
-				lzfs_pretty_syslog(LOG_WARNING, "poll error: %s", strerr(errno));
+				safs_pretty_syslog(LOG_WARNING, "poll error: %s", strerr(errno));
 				break;
 			}
 		} else {
@@ -1545,11 +1554,11 @@ void NetworkWorkerThread::operator()() {
 void NetworkWorkerThread::terminate() {
 	TRACETHIS();
 	job_pool_delete(bgJobPool_);
-	std::unique_lock<std::mutex> lock(csservheadLock);
+	std::unique_lock lock(csservheadLock);
 	while (!csservEntries.empty()) {
 		auto& entry = csservEntries.back();
 		if (entry.chunkisopen) {
-			hdd_close(entry.chunkid, entry.chunkType);
+			hddClose(entry.chunkid, entry.chunkType);
 		}
 		tcpclose(entry.sock);
 		if (entry.fwdsock >= 0) {
@@ -1589,7 +1598,7 @@ void NetworkWorkerThread::preparePollFds() {
 	pdesc.back().events = POLLIN;
 	sassert(JOB_FD_PDESC_POS == (pdesc.size() - 1));
 
-	std::unique_lock<std::mutex> lock(csservheadLock);
+	std::unique_lock lock(csservheadLock);
 	for (auto& entry : csservEntries) {
 		entry.pdescpos = -1;
 		entry.fwdpdescpos = -1;
@@ -1666,7 +1675,7 @@ void NetworkWorkerThread::servePoll() {
 	if (pdesc[JOB_FD_PDESC_POS].revents & POLLIN) {
 		job_pool_check_jobs(bgJobPool_);
 	}
-	std::unique_lock<std::mutex> lock(csservheadLock);
+	std::unique_lock lock(csservheadLock);
 	for (auto& entry : csservEntries) {
 		csserventry* eptr = &entry;
 		if (entry.pdescpos >= 0
@@ -1800,7 +1809,7 @@ void NetworkWorkerThread::addConnection(int newSocketFD) {
 	tcpnonblock(newSocketFD);
 	tcpnodelay(newSocketFD);
 
-	std::unique_lock<std::mutex> lock(csservheadLock);
+	std::unique_lock lock(csservheadLock);
 	csservEntries.emplace_front(newSocketFD, bgJobPool_);
 	csservEntries.front().activity = eventloop_time();
 

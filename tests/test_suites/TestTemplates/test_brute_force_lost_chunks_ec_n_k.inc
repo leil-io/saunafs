@@ -20,16 +20,16 @@ iteration() {
 	echo "Losing chunkservers: $lost_chunkservers"
 
 	for chunkserver in $lost_chunkservers; do
-		assert_eventually "lizardfs_chunkserver_daemon $chunkserver isalive" "100 seconds"
+		assert_eventually "saunafs_chunkserver_daemon $chunkserver isalive" "100 seconds"
 	done
 
 	for chunkserver in $lost_chunkservers; do
-		lizardfs_chunkserver_daemon $chunkserver stop &
+		saunafs_chunkserver_daemon $chunkserver stop &
 	done
 	wait
 
 	for chunkserver in $lost_chunkservers; do
-		assert_eventually "! lizardfs_chunkserver_daemon $chunkserver isalive" "100 seconds"
+		assert_eventually "! saunafs_chunkserver_daemon $chunkserver isalive" "100 seconds"
 	done
 
 	if ! file-validate $directory/file; then
@@ -37,7 +37,7 @@ iteration() {
 	fi
 
 	for chunkserver in $lost_chunkservers; do
-		lizardfs_chunkserver_daemon $chunkserver start &
+		saunafs_chunkserver_daemon $chunkserver start &
 	done
 	wait
 
@@ -78,16 +78,16 @@ echo "Testing EC(${n},${k}) with $cases cases."
 
 CHUNKSERVERS=$((n + k)) \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048" \
 	MASTER_CUSTOM_GOALS="8 ${goal}: \$ec(${n},${k})" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 
 directory="dir_${goal}"
 mkdir $directory
-lizardfs setgoal -r $goal $directory
+saunafs setgoal -r $goal $directory
 
 FILE_SIZE=64M BLOCK_SIZE=12345 file-generate $directory/file
 

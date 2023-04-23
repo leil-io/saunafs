@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -23,8 +25,8 @@
 
 #include "common/disk_info.h"
 #include "common/human_readable_format.h"
-#include "common/lizardfs_version.h"
-#include "common/moosefs_vector.h"
+#include "common/saunafs_version.h"
+#include "common/xaunafs_vector.h"
 #include "common/server_connection.h"
 #include "admin/list_chunkservers_command.h"
 
@@ -110,7 +112,7 @@ static void printPorcelainStats(const HddStatistics& stats) {
 			<< ' ' << stats.fsyncops;
 }
 
-static void printPorcelainMode(const ChunkserverListEntry& cs, const MooseFSVector<DiskInfo>& disks,
+static void printPorcelainMode(const ChunkserverListEntry& cs, const XaunaFSVector<DiskInfo>& disks,
 		bool verbose) {
 	for (const DiskInfo& disk : disks) {
 		std::cout << NetworkAddress(cs.servip, cs.servport).toString()
@@ -135,7 +137,7 @@ static void printPorcelainMode(const ChunkserverListEntry& cs, const MooseFSVect
 	}
 }
 
-static void printNormalMode(const ChunkserverListEntry& cs, const MooseFSVector<DiskInfo>& disks,
+static void printNormalMode(const ChunkserverListEntry& cs, const XaunaFSVector<DiskInfo>& disks,
 		bool verbose) {
 	for (const DiskInfo& disk : disks) {
 		std::string lastError;
@@ -181,7 +183,7 @@ std::string ListDisksCommand::name() const {
 	return "list-disks";
 }
 
-LizardFsProbeCommand::SupportedOptions ListDisksCommand::supportedOptions() const {
+SaunaFsProbeCommand::SupportedOptions ListDisksCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{kVerboseMode,   "Be a little more verbose and show operations statistics."},
@@ -204,11 +206,11 @@ void ListDisksCommand::run(const Options& options) const {
 			continue; // skip disconnected chunkservers -- these surely won't respond
 		}
 		std::vector<uint8_t> request, response;
-		serializeMooseFsPacket(request, CLTOCS_HDD_LIST_V2);
+		serializeXaunaFsPacket(request, CLTOCS_HDD_LIST_V2);
 		ServerConnection connection(NetworkAddress(cs.servip, cs.servport));
 		response = connection.sendAndReceive(request, CSTOCL_HDD_LIST_V2);
-		MooseFSVector<DiskInfo> disks;
-		deserializeAllMooseFsPacketDataNoHeader(response, disks);
+		XaunaFSVector<DiskInfo> disks;
+		deserializeAllXaunaFsPacketDataNoHeader(response, disks);
 		if (options.isSet(kPorcelainMode)) {
 			printPorcelainMode(cs, disks, options.isSet(kVerboseMode));
 		} else {

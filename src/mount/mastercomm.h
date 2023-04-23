@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -28,7 +30,7 @@
 #include "common/attributes.h"
 #include "common/chunk_type_with_address.h"
 #include "mount/group_cache.h"
-#include "mount/lizard_client.h"
+#include "mount/sauna_client.h"
 #include "protocol/packet.h"
 #include "protocol/lock_info.h"
 #include "protocol/directory_entry.h"
@@ -65,13 +67,13 @@ uint8_t fs_update_credentials(uint32_t key, const GroupCache::Groups &gids);
 void fs_release(uint32_t inode);
 
 uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
-uint8_t fs_lizreadchunk(std::vector<ChunkTypeWithAddress> &serverList, uint64_t &chunkId,
+uint8_t fs_saureadchunk(std::vector<ChunkTypeWithAddress> &serverList, uint64_t &chunkId,
 		uint32_t &chunkVersion, uint64_t &fileLength, uint32_t inode, uint32_t index);
 uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
-uint8_t fs_lizwritechunk(uint32_t inode, uint32_t chunkIndex, uint32_t &lockId,
+uint8_t fs_sauwritechunk(uint32_t inode, uint32_t chunkIndex, uint32_t &lockId,
 		uint64_t &fileLength, uint64_t &chunkId, uint32_t &chunkVersion,
 		std::vector<ChunkTypeWithAddress> &chunkservers);
-uint8_t fs_lizwriteend(uint64_t chunkId, uint32_t lockId, uint32_t inode, uint64_t length);
+uint8_t fs_sauwriteend(uint64_t chunkId, uint32_t lockId, uint32_t inode, uint64_t length);
 uint8_t fs_writeend(uint64_t chunkid, uint32_t inode, uint64_t length);
 
 uint8_t fs_getxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gid,uint8_t nleng,const uint8_t *name,uint8_t mode,const uint8_t **vbuff,uint32_t *vleng);
@@ -85,10 +87,10 @@ uint8_t fs_setacl(uint32_t inode, uint32_t uid, uint32_t gid, const RichACL& acl
 uint8_t fs_setacl(uint32_t inode, uint32_t uid, uint32_t gid, AclType type, const AccessControlList& acl);
 
 uint8_t fs_getreserved(const uint8_t **dbuff,uint32_t *dbuffsize);
-uint8_t fs_getreserved(LizardClient::NamedInodeOffset off, LizardClient::NamedInodeOffset max_entries,
+uint8_t fs_getreserved(SaunaClient::NamedInodeOffset off, SaunaClient::NamedInodeOffset max_entries,
 	               std::vector<NamedInodeEntry> &entries);
 uint8_t fs_gettrash(const uint8_t **dbuff,uint32_t *dbuffsize);
-uint8_t fs_gettrash(LizardClient::NamedInodeOffset off, LizardClient::NamedInodeOffset max_entries,
+uint8_t fs_gettrash(SaunaClient::NamedInodeOffset off, SaunaClient::NamedInodeOffset max_entries,
 	            std::vector<NamedInodeEntry> &entries);
 uint8_t fs_getdetachedattr(uint32_t inode, Attributes &attr);
 uint8_t fs_gettrashpath(uint32_t inode,const uint8_t **path);
@@ -96,13 +98,13 @@ uint8_t fs_settrashpath(uint32_t inode,const uint8_t *path);
 uint8_t fs_undel(uint32_t inode);
 uint8_t fs_purge(uint32_t inode);
 
-uint8_t fs_getlk(uint32_t inode, uint64_t owner, lzfs_locks::FlockWrapper &lock);
-uint8_t fs_setlk_send(uint32_t inode, uint64_t owner, uint32_t reqid, const lzfs_locks::FlockWrapper &lock);
+uint8_t fs_getlk(uint32_t inode, uint64_t owner, safs_locks::FlockWrapper &lock);
+uint8_t fs_setlk_send(uint32_t inode, uint64_t owner, uint32_t reqid, const safs_locks::FlockWrapper &lock);
 uint8_t fs_setlk_recv();
 uint8_t fs_flock_send(uint32_t inode, uint64_t owner, uint32_t reqid, uint16_t op);
 uint8_t fs_flock_recv();
-void fs_flock_interrupt(const lzfs_locks::InterruptData &data);
-void fs_setlk_interrupt(const lzfs_locks::InterruptData &data);
+void fs_flock_interrupt(const safs_locks::InterruptData &data);
+void fs_setlk_interrupt(const safs_locks::InterruptData &data);
 
 uint8_t fs_makesnapshot(uint32_t src_inode, uint32_t dst_parent, const std::string &dst_name,
 	                uint32_t uid, uint32_t gid, uint8_t can_overwrite, uint32_t &job_id);
@@ -117,7 +119,7 @@ uint8_t fs_getchunksinfo(uint32_t uid, uint32_t gid, uint32_t inode, uint32_t ch
 uint8_t fs_getchunkservers(std::vector<ChunkserverListEntry> &chunkservers);
 
 // called after fork
-int fs_init_master_connection(LizardClient::FsInitParams &params);
+int fs_init_master_connection(SaunaClient::FsInitParams &params);
 void fs_init_threads(uint32_t retries);
 void fs_term(void);
 

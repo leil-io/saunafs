@@ -13,7 +13,7 @@ void uRaftStatusConnection::init() {
 	auto self(shared_from_this());
 
 	boost::asio::async_write(socket_, boost::asio::buffer(data_),
-	[this, self](const boost::system::error_code & /*error*/, std::size_t /*length*/) {
+	[self](const boost::system::error_code & /*error*/, std::size_t /*length*/) {
 		//if (error) log();
 	});
 }

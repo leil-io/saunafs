@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -28,7 +30,7 @@
 
 static bool createPipe(int pipefds[2]) {
 	if (pipe(pipefds) != 0) {
-		lzfs_pretty_errlog(LOG_ERR, "pipe failed");
+		safs_pretty_errlog(LOG_ERR, "pipe failed");
 		return false;
 	}
 	return true;
@@ -81,13 +83,13 @@ void MetadataDumper::setUseMetarestore(bool useMetarestore) {
  *    dump when last metarestore failed or when we don't want to use metarestore for dumping
  *    at all.
  *    Master tries to fork and its child, (without execing) dumps metadata.
- *    If everything went well, the child prints "OK" (mocking mfsmetarestore's behaviour),
+ *    If everything went well, the child prints "OK" (mocking sfsmetarestore's behaviour),
  *    so that master tries to run metarestore the next time (or he won't - useMetarestore_
  *    isn't changed).
  *    execMetarestore() modifies dumpType to kForegroundDump for the child.
  * 3) dumpType == kBackgroundDump && metarestoreSucceeded_ && useMetarestore_: background dump
  *    when we want to use metarestore and it didn't fail last time.
- *    Master forks and executes mfsmetarestore, which checks checksums and prints "OK" or "ERR".
+ *    Master forks and executes sfsmetarestore, which checks checksums and prints "OK" or "ERR".
  *    In case of a syscall error, last metarestore is assumed to have failed
  *    (metarestoreSucceeded_ = false), so that the master dumps its metadata itself.
  *    execMetarestore() modifies dumpType to kForegroundDump for the child.
@@ -108,16 +110,16 @@ bool MetadataDumper::start(MetadataDumper::DumpType& dumpType, uint64_t checksum
 	changelogFilename += ".1";
 	if (useMetarestore_ && dumpingSucceeded_ && (access(changelogFilename.c_str(), F_OK) == -1)) {
 		if (errno == ENOENT || errno == EACCES) {
-			lzfs_pretty_syslog(LOG_ERR, "no current changelog, dump by master");
+			safs_pretty_syslog(LOG_ERR, "no current changelog, dump by master");
 		} else {
-			lzfs_pretty_errlog(LOG_ERR, "access error, dump by master");
+			safs_pretty_errlog(LOG_ERR, "access error, dump by master");
 		}
 		dumpingSucceeded_ = false;
 	}
 
 	// can't communicate with child? foreground dump
 	if (!createPipe(pipeFd)) {
-		lzfs_pretty_syslog(LOG_ERR, "couldn't communicate with child, foreground dump");
+		safs_pretty_syslog(LOG_ERR, "couldn't communicate with child, foreground dump");
 		dumpType = kForegroundDump;
 		dumpingSucceeded_ = false;
 		return false;
@@ -127,7 +129,7 @@ bool MetadataDumper::start(MetadataDumper::DumpType& dumpType, uint64_t checksum
 	switch (fork()) {
 		case -1:
 			// on fork error store metadata in foreground
-			lzfs_pretty_errlog(LOG_ERR, "fork failed");
+			safs_pretty_errlog(LOG_ERR, "fork failed");
 			dumpType = kForegroundDump;
 			close(pipeFd[0]); // ignore close errors
 			close(pipeFd[1]);
@@ -136,11 +138,11 @@ bool MetadataDumper::start(MetadataDumper::DumpType& dumpType, uint64_t checksum
 			close(pipeFd[0]); // ignore close error
 			if (dup2(pipeFd[1], STDOUT_FILENO)  == -1) {
 				// can't give the response
-				lzfs_pretty_errlog(LOG_ERR, "dup2 failed, dump by master");
+				safs_pretty_errlog(LOG_ERR, "dup2 failed, dump by master");
 				dumpingSucceeded_ = false;
 			}
 			if (useMetarestore_ && dumpingSucceeded_) {
-				// exec mfsmetarestore
+				// exec sfsmetarestore
 				std::string checksumStringified = std::to_string(checksum);
 				std::string storedMetaCopies = std::to_string(gStoredPreviousBackMetaCopies);
 				char* metarestoreArgs[] = {
@@ -158,13 +160,13 @@ bool MetadataDumper::start(MetadataDumper::DumpType& dumpType, uint64_t checksum
 					NULL};
 				// the default value of the commandline nice
 				if (nice(10) == -1) {
-					lzfs_pretty_errlog(LOG_WARNING, "dumping metadata: nice failed");
+					safs_pretty_errlog(LOG_WARNING, "dumping metadata: nice failed");
 				}
 				execv(metarestorePath_.c_str(), metarestoreArgs);
-				lzfs_pretty_syslog(LOG_WARNING, "exec %s failed: %s", metarestorePath_.c_str(), strerr(errno));
+				safs_pretty_syslog(LOG_WARNING, "exec %s failed: %s", metarestorePath_.c_str(), strerr(errno));
 			}
 			if (useMetarestore_ && !dumpingSucceeded_) {
-				lzfs_pretty_syslog(LOG_NOTICE, "something previously failed, dump by master");
+				safs_pretty_syslog(LOG_NOTICE, "something previously failed, dump by master");
 			}
 			dumpType = kForegroundDump; // child process stores metadata in its foreground
 			return true;
@@ -195,7 +197,7 @@ void MetadataDumper::pollServe(const std::vector<pollfd> &pdesc) {
 		char buffer[1024];
 		int ret = read(dumpingProcessFd_, buffer, sizeof(buffer) - 1);
 		if (ret == -1) {
-			lzfs_pretty_errlog(LOG_WARNING, "read from the process dumping metadata failed");
+			safs_pretty_errlog(LOG_WARNING, "read from the process dumping metadata failed");
 			dumpingFinished();
 		} else if (ret == 0) {
 			dumpingFinished();
@@ -204,7 +206,7 @@ void MetadataDumper::pollServe(const std::vector<pollfd> &pdesc) {
 			dumpingProcessOutputEmpty_ = false;
 			dumpingSucceeded_ = std::string(buffer) == "OK\n";
 			if (!dumpingSucceeded_) {
-				lzfs_pretty_syslog(LOG_WARNING, "metadata dumping failed: expected 'OK', received '%s'",
+				safs_pretty_syslog(LOG_WARNING, "metadata dumping failed: expected 'OK', received '%s'",
 						buffer);
 			}
 		}
@@ -218,12 +220,12 @@ void MetadataDumper::pollServe(const std::vector<pollfd> &pdesc) {
 
 void MetadataDumper::dumpingFinished() {
 	if (close(dumpingProcessFd_) == -1) {
-		lzfs_pretty_errlog(LOG_ERR, "pipe close failed");
+		safs_pretty_errlog(LOG_ERR, "pipe close failed");
 	}
 	dumpingProcessFd_ = -1;
 	dumpingProcessPollFdsPos_ = -1;
 	if (dumpingProcessOutputEmpty_) {
-		lzfs_pretty_syslog(LOG_WARNING, "the dumping process finished without producing output");
+		safs_pretty_syslog(LOG_WARNING, "the dumping process finished without producing output");
 	}
 }
 
@@ -237,13 +239,13 @@ void MetadataDumper::waitUntilFinished(SteadyDuration timeout) {
 		sassert(pfd.size() <= 1);
 		// on 0 `poll' returns immediately and that's fine
 		if (poll(pfd.data(), pfd.size(), stopwatch.remaining_ms()) == -1) {
-			lzfs_pretty_errlog(LOG_ERR, "poll error during waiting for dumping to finish");
+			safs_pretty_errlog(LOG_ERR, "poll error during waiting for dumping to finish");
 			break;
 		}
 		pollServe(pfd);
 	}
 	if (inProgress()) {
-		lzfs_pretty_syslog(LOG_ERR, "dumping didn't finish in specified timeout: %.2f s",
+		safs_pretty_syslog(LOG_ERR, "dumping didn't finish in specified timeout: %.2f s",
 				std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1>>>(
 					timeout).count());
 		// mark finish anyway

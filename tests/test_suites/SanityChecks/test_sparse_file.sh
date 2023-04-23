@@ -1,22 +1,22 @@
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 file=$(mktemp -p ${info[mount0]})
 
-off1=$((5 * LIZARDFS_BLOCK_SIZE))
-off2=$((2 * LIZARDFS_CHUNK_SIZE + 3 * LIZARDFS_BLOCK_SIZE))
+off1=$((5 * SAUNAFS_BLOCK_SIZE))
+off2=$((2 * SAUNAFS_CHUNK_SIZE + 3 * SAUNAFS_BLOCK_SIZE))
 for off in $off1 $off2; do
 	dd if=/dev/zero of=$file count=1 bs=1 seek=$off &>/dev/null
 
-	actual_length=$(mfs_dir_info length $file)
+	actual_length=$(sfs_dir_info length $file)
 	expected_length=$((off + 1))
 	if (( actual_length != expected_length )); then
 		test_add_failure "Wrong length for offset $off, expected $expected_length got $actual_length!"
 	fi
 done
 
-actual_size=$(mfs_dir_info size $file)
+actual_size=$(sfs_dir_info size $file)
 if (( $actual_size >= $actual_length )); then
 	test_add_failure "File is not sparse!"
 fi

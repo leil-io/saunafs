@@ -5,14 +5,14 @@ USE_RAMDISK=YES \
 	CHUNKSERVERS=4 \
 	DISK_PER_CHUNKSERVER=3 \
 	CHUNKSERVER_EXTRA_CONFIG="HDD_TEST_FREQ = 10000" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1`
 			`|CHUNKS_LOOP_MAX_CPU = 90`
 			`|ACCEPTABLE_DIFFERENCE = 1.0`
 			`|CHUNKS_WRITE_REP_LIMIT = 20`
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|OPERATIONS_DELAY_DISCONNECT = 0" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # This function prints all disks of given chunkserver
 # $1 - id of chunkserver
@@ -42,39 +42,39 @@ mark_disks() {
 }
 
 # Stop one of chunkservers
-lizardfs_chunkserver_daemon 3 stop
+saunafs_chunkserver_daemon 3 stop
 
 # Create 3 files with one chunk, 3 parts each
 cd "${info[mount0]}"
 for goal in 3 xor2; do
 	dir=dir_$goal
 	mkdir $dir
-	lizardfs setgoal $goal $dir
+	saunafs setgoal $goal $dir
 	for size in 10K 15K 50K 70K 100K 200K; do
 		FILE_SIZE=$size file-generate $dir/file_$size
 	done
 done
 
-# Check if there are at least 2 chunks on each disk
+# Check if there are at least 4 chunks on each disk
 for cs in {0..2}; do
 	for disk in {0..2}; do
-		assert_less_or_equal 2 "$(ls $RAMDISK_DIR/hdd_${cs}_${disk}/*/* | wc -l)"
+		assert_less_or_equal 4 "$(ls $RAMDISK_DIR/hdd_${cs}_${disk}/*/* | wc -l)"
 	done
 done
 
 # Mark one disk as to delete and reload config
 mark_disks 0 1
-lizardfs_chunkserver_daemon 0 reload
+saunafs_chunkserver_daemon 0 reload
 
 # Start last chunkserver
-lizardfs_chunkserver_daemon 3 start
+saunafs_chunkserver_daemon 3 start
 
 # Check if files from marked disk will be replicated and deleted
-assert_eventually_prints 0 "ls $RAMDISK_DIR/hdd_0_1/*/* | wc -l" "30 seconds"
+assert_eventually_prints 0 "find $RAMDISK_DIR/hdd_0_1 -name chunk_0 | wc -l" "30 seconds"
 
 # Check number of chunks for each file
 for file in */*; do
-	assert_equals 3 "$(lizardfs fileinfo $file | grep copy | wc -l)"
+	assert_equals 3 "$(saunafs fileinfo $file | grep copy | wc -l)"
 done
 
 # Unmark disk
@@ -84,14 +84,13 @@ mark_disks 0
 mark_disks 1 {0..2}
 
 # Reload config of both chunkservers
-lizardfs_chunkserver_daemon 0 reload
-lizardfs_chunkserver_daemon 1 reload
+saunafs_chunkserver_daemon 0 reload
+saunafs_chunkserver_daemon 1 reload
 
 # Check if all chunks were deleted from server 1
 assert_eventually_prints 0 "find_chunkserver_chunks 1 | wc -l" "60 seconds"
 
 # Check number of chunks for each file
 for file in */*; do
-	assert_equals 3 "$(lizardfs fileinfo $file | grep copy | wc -l)"
+	assert_equals 3 "$(saunafs fileinfo $file | grep copy | wc -l)"
 done
-

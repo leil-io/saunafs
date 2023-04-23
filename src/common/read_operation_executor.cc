@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -21,16 +22,16 @@
 
 #include "common/crc.h"
 #include "common/exceptions.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/massert.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "devtools/request_log.h"
 #include "protocol/cltocs.h"
 #include "protocol/cstocl.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
-static const uint32_t kMaxMessageLength = MFSBLOCKSIZE + 1024;
+static const uint32_t kMaxMessageLength = SFSBLOCKSIZE + 1024;
 
 ReadOperationExecutor::ReadOperationExecutor(
 		const ReadPlan::ReadOperation& readOperation,
@@ -66,7 +67,7 @@ void ReadOperationExecutor::sendReadRequest(const Timeout& timeout) {
 		cltocs::read::serialize(message, chunkId_, chunkVersion_, (legacy::ChunkPartType)chunkType_,
 			readOperation_.request_offset, readOperation_.request_size);
 	} else {
-		serializeMooseFsPacket(message, CLTOCS_READ,
+		serializeXaunaFsPacket(message, CLTOCS_READ,
 			chunkId_, chunkVersion_, readOperation_.request_offset,
 			readOperation_.request_size);
 	}
@@ -166,9 +167,9 @@ void ReadOperationExecutor::processHeaderReceived() {
 		ss << " sent by chunkserver too long (" << packetHeader_.length << " bytes)";
 		throw ChunkserverConnectionException(ss.str(), server_);
 	}
-	if (packetHeader_.type == LIZ_CSTOCL_READ_DATA || packetHeader_.type == CSTOCL_READ_DATA) {
+	if (packetHeader_.type == SAU_CSTOCL_READ_DATA || packetHeader_.type == CSTOCL_READ_DATA) {
 		setState(kReceivingReadDataMessage);
-	} else if (packetHeader_.type == LIZ_CSTOCL_READ_STATUS || packetHeader_.type == CSTOCL_READ_STATUS) {
+	} else if (packetHeader_.type == SAU_CSTOCL_READ_STATUS || packetHeader_.type == CSTOCL_READ_STATUS) {
 		setState(kReceivingReadStatusMessage);
 	} else {
 		std::stringstream ss;
@@ -188,7 +189,7 @@ void ReadOperationExecutor::processReadDataMessageReceived() {
 		cstocl::readData::deserializePrefix(messageBuffer_, readChunkId, readOffset, readSize,
 			currentlyReadBlockCrc_);
 	} else {
-		deserializeMooseFsPacketPrefixNoHeader(messageBuffer_.data(), messageBuffer_.size(),
+		deserializeXaunaFsPacketPrefixNoHeader(messageBuffer_.data(), messageBuffer_.size(),
 			readChunkId, readOffset, readSize, currentlyReadBlockCrc_);
 	}
 
@@ -198,13 +199,13 @@ void ReadOperationExecutor::processReadDataMessageReceived() {
 		ss << "(got: " << readChunkId << ", expected: " << chunkId_ << ")";
 		throw ChunkserverConnectionException(ss.str(), server_);
 	}
-	if (readSize != MFSBLOCKSIZE) {
+	if (readSize != SFSBLOCKSIZE) {
 		std::stringstream ss;
 		ss << "Malformed READ_DATA message from chunkserver, incorrect size ";
-		ss << "(got: " << readSize << ", expected: " << MFSBLOCKSIZE << ")";
+		ss << "(got: " << readSize << ", expected: " << SFSBLOCKSIZE << ")";
 		throw ChunkserverConnectionException(ss.str(), server_);
 	}
-	uint32_t expectedOffset = readOperation_.request_offset + dataBlocksCompleted_ * MFSBLOCKSIZE;
+	uint32_t expectedOffset = readOperation_.request_offset + dataBlocksCompleted_ * SFSBLOCKSIZE;
 	if (readOffset != expectedOffset) {
 		std::stringstream ss;
 		ss << "Malformed READ_DATA message from chunkserver, incorrect offset ";
@@ -223,29 +224,29 @@ void ReadOperationExecutor::processReadStatusMessageReceived() {
 	if (server_version_ >= kFirstXorVersion) {
 		cstocl::readStatus::deserialize(messageBuffer_, readChunkId, readStatus);
 	} else {
-		deserializeAllMooseFsPacketDataNoHeader(messageBuffer_.data(), messageBuffer_.size(),
+		deserializeAllXaunaFsPacketDataNoHeader(messageBuffer_.data(), messageBuffer_.size(),
 			readChunkId, readStatus);
 	}
 
 	if (readChunkId != chunkId_) {
 		std::stringstream ss;
-		ss << "Malformed LIZ_CSTOCL_READ_STATUS message from chunkserver, ";
+		ss << "Malformed SAU_CSTOCL_READ_STATUS message from chunkserver, ";
 		ss << "incorrect chunk ID ";
 		ss << "(got: " << readChunkId << ", expected: " << chunkId_ << ")";
 		throw ChunkserverConnectionException(ss.str(), server_);
 	}
 
-	if (readStatus == LIZARDFS_ERROR_CRC) {
+	if (readStatus == SAUNAFS_ERROR_CRC) {
 		throw ChunkCrcException("READ_DATA: corrupted data block (CRC mismatch)", server_, chunkType_);
 	}
 
-	if (readStatus != LIZARDFS_STATUS_OK) {
+	if (readStatus != SAUNAFS_STATUS_OK) {
 		std::stringstream ss;
-		ss << "Status '" << lizardfs_error_string(readStatus) << "' sent by chunkserver";
+		ss << "Status '" << saunafs_error_string(readStatus) << "' sent by chunkserver";
 		throw ChunkserverConnectionException(ss.str(), server_);
 	}
 
-	int totalDataBytesReceived = dataBlocksCompleted_ * MFSBLOCKSIZE;
+	int totalDataBytesReceived = dataBlocksCompleted_ * SFSBLOCKSIZE;
 	if (totalDataBytesReceived != readOperation_.request_size) {
 		throw ChunkserverConnectionException(
 				"READ_STATUS from chunkserver received too early", server_);
@@ -259,7 +260,7 @@ void ReadOperationExecutor::processDataBlockReceived() {
 	sassert(bytesLeft_ == 0);
 
 #ifdef ENABLE_CRC
-	if (currentlyReadBlockCrc_ != mycrc32(0, destination_ - MFSBLOCKSIZE, MFSBLOCKSIZE)) {
+	if (currentlyReadBlockCrc_ != mycrc32(0, destination_ - SFSBLOCKSIZE, SFSBLOCKSIZE)) {
 		throw ChunkCrcException("READ_DATA: corrupted data block (CRC mismatch)", server_, chunkType_);
 	}
 #endif
@@ -294,8 +295,8 @@ void ReadOperationExecutor::setState(ReadOperationState newState) {
 	case kReceivingDataBlock:
 		sassert(state_ == kReceivingReadDataMessage);
 		destination_ =
-		    dataBuffer_ + (readOperation_.buffer_offset + dataBlocksCompleted_ * MFSBLOCKSIZE);
-		bytesLeft_ = MFSBLOCKSIZE;
+		    dataBuffer_ + (readOperation_.buffer_offset + dataBlocksCompleted_ * SFSBLOCKSIZE);
+		bytesLeft_ = SFSBLOCKSIZE;
 		break;
 	case kFinished:
 		break;

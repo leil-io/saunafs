@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
@@ -21,7 +23,7 @@
 #include "common/platform.h"
 
 #include "common/attributes.h"
-#include "mount/lizard_client.h"
+#include "mount/sauna_client.h"
 
 enum {
 	OP_STATFS = 0,
@@ -106,10 +108,10 @@ private:
 	bool locked_;
 };
 
-namespace LizardClient {
+namespace SaunaClient {
 void stats_inc(uint8_t id);
 
 void attr_to_stat(uint32_t inode, const Attributes &attr, struct stat *stbuf);
 
 void makeattrstr(char *buff, uint32_t size, struct stat *stbuf);
-} // LizardClient
+} // SaunaClient

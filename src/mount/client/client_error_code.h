@@ -1,19 +1,21 @@
 /*
-   Copyright 2017 Skytechnology sp. z o.o..
 
-   This file is part of LizardFS.
+   Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   LizardFS is free software: you can redistribute it and/or modify
+   This file is part of SaunaFS.
+
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -22,7 +24,7 @@
 
 #include <system_error>
 
-namespace lizardfs {
+namespace saunafs {
 
 enum class error {
 	success = 0,
@@ -90,10 +92,10 @@ enum class error {
 
 namespace detail {
 
-class lizardfs_error_category : public std::error_category {
+class saunafs_error_category : public std::error_category {
 public:
 	const char *name() const noexcept override {
-		return "lizardfs";
+		return "saunafs";
 	}
 
 	std::string message(int ev) const override;
@@ -105,36 +107,36 @@ public:
 	}
 
 private:
-	static lizardfs_error_category instance_;
+	static saunafs_error_category instance_;
 };
 
 }  // detail
 
 inline std::error_condition make_error_condition(error e) {
 	return std::error_condition(static_cast<int>(e),
-	                            detail::lizardfs_error_category::get_instance());
+	                            detail::saunafs_error_category::get_instance());
 }
 
 inline std::error_code make_error_code(error e) {
 	return std::error_code(static_cast<int>(e),
-	                       detail::lizardfs_error_category::get_instance());
+	                       detail::saunafs_error_category::get_instance());
 }
 
 inline std::error_code make_error_code(int e) {
-	return std::error_code(e, detail::lizardfs_error_category::get_instance());
+	return std::error_code(e, detail::saunafs_error_category::get_instance());
 }
 
-}  // lizardfs
+}  // saunafs
 
 namespace std {
 
 template <>
-struct is_error_code_enum< ::lizardfs::error> {
+struct is_error_code_enum< ::saunafs::error> {
 	static const bool value = true;
 };
 
 template <>
-struct is_error_condition_enum< ::lizardfs::error> {
+struct is_error_condition_enum< ::saunafs::error> {
 	static const bool value = true;
 };
 

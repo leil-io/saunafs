@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -21,7 +23,7 @@
 #include "mount/client_common.h"
 #include "mount/special_inode.h"
 
-using namespace LizardClient;
+using namespace SaunaClient;
 
 namespace InodeMasterInfo {
 static BytesWritten write(const Context &ctx, const char */*buf*/, size_t size,
@@ -30,8 +32,8 @@ static BytesWritten write(const Context &ctx, const char */*buf*/, size_t size,
 	            (unsigned long int)inode_,
 	            (uint64_t)size,
 	            (uint64_t)off,
-	            lizardfs_error_string(LIZARDFS_ERROR_EACCES));
-	throw RequestException(LIZARDFS_ERROR_EACCES);
+	            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+	throw RequestException(SAUNAFS_ERROR_EACCES);
 }
 } // InodeMasterInfo
 
@@ -59,8 +61,8 @@ static BytesWritten write(const Context &ctx, const char */*buf*/, size_t size,
 	            (unsigned long int)inode_,
 	            (uint64_t)size,
 	            (uint64_t)off,
-	            lizardfs_error_string(LIZARDFS_ERROR_EACCES));
-	throw RequestException(LIZARDFS_ERROR_EACCES);
+	            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+	throw RequestException(SAUNAFS_ERROR_EACCES);
 }
 } // InodeOplog
 
@@ -71,8 +73,8 @@ static BytesWritten write(const Context &ctx, const char */*buf*/, size_t size,
 	            (unsigned long int)inode_,
 	            (uint64_t)size,
 	            (uint64_t)off,
-	            lizardfs_error_string(LIZARDFS_ERROR_EACCES));
-	throw RequestException(LIZARDFS_ERROR_EACCES);
+	            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+	throw RequestException(SAUNAFS_ERROR_EACCES);
 }
 } // InodeOphistory
 
@@ -101,6 +103,7 @@ static const std::array<std::function<BytesWritten
 	 &InodeOplog::write,            //0x1U
 	 &InodeOphistory::write,        //0x2U
 	 &InodeTweaks::write,           //0x3U
+	 nullptr,                       //0x4U
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
@@ -111,7 +114,6 @@ static const std::array<std::function<BytesWritten
 	 nullptr,                       //0xCU
 	 nullptr,                       //0xDU
 	 nullptr,                       //0xEU
-	 nullptr,                       //0xEU
 	 &InodeMasterInfo::write        //0xFU
 }};
 
@@ -119,9 +121,9 @@ BytesWritten special_write(Inode ino, const Context &ctx, const char *buf,
 	                           size_t size, off_t off, FileInfo *fi) {
 	auto func = funcs[ino - SPECIAL_INODE_BASE];
 	if (!func) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 			"Trying to call unimplemented 'write' function for special inode");
-		throw RequestException(LIZARDFS_ERROR_EINVAL);
+		throw RequestException(SAUNAFS_ERROR_EINVAL);
 	}
 	return func(ctx, buf, size, off, fi);
 }

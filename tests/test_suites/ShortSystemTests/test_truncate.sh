@@ -1,12 +1,12 @@
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 
-block_size=$LIZARDFS_BLOCK_SIZE
-chunk_size=$LIZARDFS_CHUNK_SIZE
+block_size=$SAUNAFS_BLOCK_SIZE
+chunk_size=$SAUNAFS_CHUNK_SIZE
 first_loop=yes
 
 for goal in 2 xor3; do
@@ -14,9 +14,9 @@ for goal in 2 xor3; do
 		# Empty the ramdisk to prevent running out of space in case of big chunks
 		find_all_chunks | xargs rm -f
 		for i in {0..2}; do
-			lizardfs_chunkserver_daemon $i restart
+			saunafs_chunkserver_daemon $i restart
 		done
-		lizardfs_wait_for_all_ready_chunkservers
+		saunafs_wait_for_all_ready_chunkservers
 	else
 		first_loop=no
 	fi
@@ -24,7 +24,7 @@ for goal in 2 xor3; do
 			$((chunk_size + 30)); do
 		echo "Testing size $filesize goal $goal"
 		mkdir -p tmp;
-		lizardfs setgoal $goal tmp
+		saunafs setgoal $goal tmp
 		# Generate file
 		FILE_SIZE=$filesize file-generate tmp/file
 		# Add 1000 bytes at the and of the file and remove them using truncate

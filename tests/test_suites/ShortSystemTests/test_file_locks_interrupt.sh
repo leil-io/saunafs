@@ -3,7 +3,7 @@ timeout_set 1 minutes
 USE_RAMDISK=YES \
 	MOUNT_EXTRA_CONFIG="enablefilelocks=1" \
 	MOUNTS=2 \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 mountpoint0="${info[mount0]}"
 mountpoint1="${info[mount1]}"

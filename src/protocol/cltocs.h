@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -26,14 +27,14 @@
 #include "common/network_address.h"
 #include "protocol/packet.h"
 
-LIZARDFS_DEFINE_PACKET_VERSION(cltocs, prefetch, kStandardAndXorChunks, 0)
-LIZARDFS_DEFINE_PACKET_VERSION(cltocs, prefetch, kECChunks, 1)
-LIZARDFS_DEFINE_PACKET_SERIALIZATION(
-		cltocs, prefetch, LIZ_CLTOCS_PREFETCH, kStandardAndXorChunks,
+SAUNAFS_DEFINE_PACKET_VERSION(cltocs, prefetch, kStandardAndXorChunks, 0)
+SAUNAFS_DEFINE_PACKET_VERSION(cltocs, prefetch, kECChunks, 1)
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(
+		cltocs, prefetch, SAU_CLTOCS_PREFETCH, kStandardAndXorChunks,
 		uint64_t, chunkId, uint32_t, chunkVersion, legacy::ChunkPartType, chunkType,
 		uint32_t, readOffset, uint32_t, readSize)
-LIZARDFS_DEFINE_PACKET_SERIALIZATION(
-		cltocs, prefetch, LIZ_CLTOCS_PREFETCH, kECChunks,
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(
+		cltocs, prefetch, SAU_CLTOCS_PREFETCH, kECChunks,
 		uint64_t, chunkId, uint32_t, chunkVersion, ChunkPartType, chunkType,
 		uint32_t, readOffset, uint32_t, readSize)
 
@@ -47,7 +48,7 @@ const PacketVersion kECChunks = 1;
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t chunkVersion, legacy::ChunkPartType chunkType,
 		uint32_t readOffset, uint32_t readSize) {
-	serializePacket(destination, LIZ_CLTOCS_READ, kStandardAndXorChunks,
+	serializePacket(destination, SAU_CLTOCS_READ, kStandardAndXorChunks,
 			chunkId, chunkVersion, chunkType, readOffset, readSize);
 }
 
@@ -62,7 +63,7 @@ inline void deserialize(const uint8_t* source, uint32_t sourceSize,
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t chunkVersion, ChunkPartType chunkType,
 		uint32_t readOffset, uint32_t readSize) {
-	serializePacket(destination, LIZ_CLTOCS_READ, kECChunks,
+	serializePacket(destination, SAU_CLTOCS_READ, kECChunks,
 			chunkId, chunkVersion, chunkType, readOffset, readSize);
 }
 
@@ -84,7 +85,7 @@ const PacketVersion kECChunks = 1;
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t chunkVersion, legacy::ChunkPartType chunkType,
 		const std::vector<NetworkAddress>& chain) {
-	serializePacket(destination, LIZ_CLTOCS_WRITE_INIT, kStandardAndXorChunks,
+	serializePacket(destination, SAU_CLTOCS_WRITE_INIT, kStandardAndXorChunks,
 			chunkId, chunkVersion, chunkType, chain);
 }
 
@@ -99,7 +100,7 @@ inline void deserialize(const uint8_t* source, uint32_t sourceSize,
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t chunkVersion, ChunkPartType chunkType,
 		const std::vector<ChunkTypeWithAddress>& chain) {
-	serializePacket(destination, LIZ_CLTOCS_WRITE_INIT, kECChunks,
+	serializePacket(destination, SAU_CLTOCS_WRITE_INIT, kECChunks,
 			chunkId, chunkVersion, chunkType, chain);
 }
 
@@ -118,7 +119,7 @@ namespace writeData {
 inline void serializePrefix(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t writeId,
 		uint16_t blockNumber, uint32_t offset, uint32_t size, uint32_t crc) {
-	serializePacketPrefix(destination, size, LIZ_CLTOCS_WRITE_DATA, 0,
+	serializePacketPrefix(destination, size, SAU_CLTOCS_WRITE_DATA, 0,
 			chunkId, writeId, blockNumber, offset, size, crc);
 }
 
@@ -139,7 +140,7 @@ static const uint32_t kPrefixSize = 4 + 8 + 4 + 2 + 4 + 4 + 4;
 namespace writeEnd {
 
 inline void serialize(std::vector<uint8_t>& destination, uint64_t chunkId) {
-	serializePacket(destination, LIZ_CLTOCS_WRITE_END, 0, chunkId);
+	serializePacket(destination, SAU_CLTOCS_WRITE_END, 0, chunkId);
 }
 
 inline void deserialize(const uint8_t* source, uint32_t sourceSize, uint64_t& chunkId) {
@@ -156,7 +157,7 @@ const PacketVersion kECChunks = 1;
 
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t chunkVersion, legacy::ChunkPartType chunkType) {
-	serializePacket(destination, LIZ_CLTOCS_TEST_CHUNK, kStandardAndXorChunks, chunkId, chunkVersion, chunkType);
+	serializePacket(destination, SAU_CLTOCS_TEST_CHUNK, kStandardAndXorChunks, chunkId, chunkVersion, chunkType);
 }
 
 inline void deserialize(const uint8_t* source, uint32_t sourceSize,
@@ -167,7 +168,7 @@ inline void deserialize(const uint8_t* source, uint32_t sourceSize,
 
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t chunkVersion, ChunkPartType chunkType) {
-	serializePacket(destination, LIZ_CLTOCS_TEST_CHUNK, kECChunks, chunkId, chunkVersion, chunkType);
+	serializePacket(destination, SAU_CLTOCS_TEST_CHUNK, kECChunks, chunkId, chunkVersion, chunkType);
 }
 
 inline void deserialize(const uint8_t* source, uint32_t sourceSize,

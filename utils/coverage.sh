@@ -9,7 +9,7 @@ usage() {
 		echo "Usage:"
 		echo "$appname prepare <build-dir>"
 		echo "    Prepares a CMake build directory to run tests with will generate"
-		echo "    a code coverage report. This is needed, because LizardFS tests are"
+		echo "    a code coverage report. This is needed, because SaunaFS tests are"
 		echo "    run with a different UID than the user who builds sources."
 		echo "$appname generate-html <build-dir> <out-dir>"
 		echo "    Generates a HTML code coverage report from the data collected during tests"

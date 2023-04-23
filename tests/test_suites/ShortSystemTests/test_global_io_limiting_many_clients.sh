@@ -16,8 +16,8 @@ CHUNKSERVERS=3 \
 	MOUNTS=$N \
 	USE_RAMDISK=YES \
 	MASTER_EXTRA_CONFIG="GLOBALIOLIMITS_FILENAME = $iolimits" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 truncate -s1M file

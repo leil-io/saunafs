@@ -28,7 +28,7 @@ def get_gtest_testlist(
     """Returns a list of (all minus excluded) tests in a given test_suite"""
 
     tests_list = os.popen(
-        workspace + "/install/lizardfs/bin/lizardfs-tests "
+        workspace + "/install/saunafs/bin/saunafs-tests "
         "--gtest_list_tests --gtest_filter=" + test_suite + "*"
     )
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         description="Filter tests for concurrent runs. All following arguments besides 'excluded_tests' are required."
     )
     parser.add_argument(
-        "-w", "--workspace", type=str, help="Path to lizardfs test directory"
+        "-w", "--workspace", type=str, help="Path to saunafs test directory"
     )
     parser.add_argument("-s", "--test_suite", type=str, help="Name of test_suite")
     parser.add_argument(

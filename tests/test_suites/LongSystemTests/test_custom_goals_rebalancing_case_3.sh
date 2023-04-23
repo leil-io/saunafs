@@ -15,20 +15,20 @@ CHUNKSERVERS=6 \
 			`|OPERATIONS_DELAY_DISCONNECT = 5`
 			`|ACCEPTABLE_DIFFERENCE = 0.005`
 			`|CHUNKS_REBALANCING_BETWEEN_LABELS = 1" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Create 300 chunks on eu servers and expect that three us servers are empty
 cd "${info[mount0]}"
 mkdir eu_files
-lizardfs setgoal eu_eu eu_files
+saunafs setgoal eu_eu eu_files
 FILE_SIZE=1M file-generate "${info[mount0]}"/eu_files/{1..150}
-assert_eventually_prints 3 "lizardfs_rebalancing_status | awk '/eu/ && \$2 > 0' | wc -l" "1 minute"
-assert_equals 3 $(lizardfs_rebalancing_status | awk '/us/ && $2 == 0' | wc -l)
+assert_eventually_prints 3 "saunafs_rebalancing_status | awk '/eu/ && \$2 > 0' | wc -l" "1 minute"
+assert_equals 3 $(saunafs_rebalancing_status | awk '/us/ && $2 == 0' | wc -l)
 
 # Change goal of all our files from eu_eu to 2. Expect chunks to be spread evenly across servers
-lizardfs setgoal -r 2 eu_files
-assert_eventually_prints "" "lizardfs_rebalancing_status | awk '\$2 < 40 || \$2 > 60'" "2 minutes"
+saunafs setgoal -r 2 eu_files
+assert_eventually_prints "" "saunafs_rebalancing_status | awk '\$2 < 40 || \$2 > 60'" "2 minutes"
 
 # Check the chunkservers load after 5 seconds to see if it is stable.
 sleep 5
-assert_awk_finds_no '$2 < 40 || $2 > 60' "$(lizardfs_rebalancing_status)"
+assert_awk_finds_no '$2 < 40 || $2 > 60' "$(saunafs_rebalancing_status)"

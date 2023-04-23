@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2017 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2017 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -93,15 +95,15 @@ static void metadataPollServe(const std::vector<pollfd> &pdesc) {
 	if (metadataDumpInProgress && !metadataDumper.inProgress()) {
 		if (metadataDumper.dumpSucceeded()) {
 			if (fs_commit_metadata_dump()) {
-				fs_broadcast_metadata_saved(LIZARDFS_STATUS_OK);
+				fs_broadcast_metadata_saved(SAUNAFS_STATUS_OK);
 			} else {
-				fs_broadcast_metadata_saved(LIZARDFS_ERROR_IO);
+				fs_broadcast_metadata_saved(SAUNAFS_ERROR_IO);
 			}
 		} else {
-			fs_broadcast_metadata_saved(LIZARDFS_ERROR_IO);
+			fs_broadcast_metadata_saved(SAUNAFS_ERROR_IO);
 			if (metadataDumper.useMetarestore()) {
 				// master should recalculate its checksum
-				lzfs_pretty_syslog(LOG_WARNING, "dumping metadata failed, recalculating checksum");
+				safs_pretty_syslog(LOG_WARNING, "dumping metadata failed, recalculating checksum");
 				fs_start_checksum_recalculation();
 			}
 			unlink(kMetadataTmpFilename);
@@ -120,11 +122,11 @@ void fs_term(void) {
 	bool metadataStored = false;
 	if (gMetadata != nullptr && gSaveMetadataAtExit) {
 		for (;;) {
-			metadataStored = (fs_storeall(MetadataDumper::kForegroundDump) == LIZARDFS_STATUS_OK);
+			metadataStored = (fs_storeall(MetadataDumper::kForegroundDump) == SAUNAFS_STATUS_OK);
 			if (metadataStored) {
 				break;
 			}
-			lzfs_pretty_syslog(LOG_ERR,"can't store metadata - try to make more space on your hdd or change privieleges - retrying after 10 seconds");
+			safs_pretty_syslog(LOG_ERR,"can't store metadata - try to make more space on your hdd or change privieleges - retrying after 10 seconds");
 			sleep(10);
 		}
 	}
@@ -132,7 +134,7 @@ void fs_term(void) {
 		// Remove the lock to say that the server has gently stopped and saved its metadata.
 		fs_unlock();
 	} else if (gMetadata != nullptr && !gSaveMetadataAtExit) {
-		// We will leave the lockfile present to indicate, that our metadata.mfs file should not be
+		// We will leave the lockfile present to indicate, that our metadata.sfs file should not be
 		// loaded (it is not up to date -- some changelogs need to be applied). Write a message
 		// which tells that the lockfile is not left because of a crash, but because we have been
 		// asked to stop without saving metadata. Include information about version of metadata
@@ -140,7 +142,7 @@ void fs_term(void) {
 		auto message = "quick_stop: " + std::to_string(gMetadata->metaversion) + "\n";
 		gMetadataLockfile->writeMessage(message);
 	} else {
-		// We will leave the lockfile present to indicate, that our metadata.mfs file should not be
+		// We will leave the lockfile present to indicate, that our metadata.sfs file should not be
 		// loaded (it is not up to date, because we didn't manage to download the most recent).
 		// Write a message which tells that the lockfile is not left because of a crash, but because
 		// we have been asked to stop before loading metadata. Don't overwrite 'quick_stop' though!
@@ -160,17 +162,17 @@ void fs_storeall(const char *fname) {
 	FILE *fd;
 	fd = fopen(fname,"w");
 	if (fd==NULL) {
-		lzfs_pretty_syslog(LOG_ERR, "can't open metadata file");
+		safs_pretty_syslog(LOG_ERR, "can't open metadata file");
 		return;
 	}
 	fs_store_fd(fd);
 
 	if (ferror(fd)!=0) {
-		lzfs_pretty_syslog(LOG_ERR, "can't write metadata");
+		safs_pretty_syslog(LOG_ERR, "can't write metadata");
 	} else if (fflush(fd) == EOF) {
-		lzfs_pretty_syslog(LOG_ERR, "can't fflush metadata");
+		safs_pretty_syslog(LOG_ERR, "can't fflush metadata");
 	} else if (fsync(fileno(fd)) == -1) {
-		lzfs_pretty_syslog(LOG_ERR, "can't fsync metadata");
+		safs_pretty_syslog(LOG_ERR, "can't fsync metadata");
 	}
 	fclose(fd);
 }
@@ -224,11 +226,11 @@ int fs_loadall(void) {
 
 	bool autoRecovery = fs_can_do_auto_recovery();
 	if (autoRecovery || (metadataserver::getPersonality() == metadataserver::Personality::kShadow)) {
-		lzfs_pretty_syslog_attempt(LOG_INFO, "%s - applying changelogs from %s",
+		safs_pretty_syslog_attempt(LOG_INFO, "%s - applying changelogs from %s",
 				(autoRecovery ? "AUTO_RECOVERY enabled" : "running in shadow mode"),
 				fs::getCurrentWorkingDirectoryNoThrow().c_str());
 		fs_load_changelogs();
-		lzfs_pretty_syslog(LOG_INFO, "all needed changelogs applied successfully");
+		safs_pretty_syslog(LOG_INFO, "all needed changelogs applied successfully");
 	}
 	return 0;
 }
@@ -242,7 +244,7 @@ void fs_cs_disconnected(void) {
  */
 void fs_become_master() {
 	if (!gMetadata) {
-		lzfs_pretty_syslog(LOG_ERR, "Attempted shadow->master transition without metadata - aborting");
+		safs_pretty_syslog(LOG_ERR, "Attempted shadow->master transition without metadata - aborting");
 		exit(1);
 	}
 	dcm_clear();
@@ -265,12 +267,12 @@ static void fs_read_goal_config_file() {
 			cfg_getstring("CUSTOM_GOALS_FILENAME", "");
 	if (goalConfigFile.empty()) {
 		// file is not specified
-		const char *defaultGoalConfigFile = ETC_PATH "/mfsgoals.cfg";
+		const char *defaultGoalConfigFile = ETC_PATH "/sfsgoals.cfg";
 		if (access(defaultGoalConfigFile, F_OK) == 0) {
 			// the default file exists - use it
 			goalConfigFile = defaultGoalConfigFile;
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 					"goal configuration file %s not found - using default goals; if you don't "
 					"want to define custom goals create an empty file %s to disable this warning",
 					defaultGoalConfigFile, defaultGoalConfigFile);
@@ -284,7 +286,7 @@ static void fs_read_goal_config_file() {
 	}
 	try {
 		fs_read_goals_from_stream(goalConfigStream);
-		lzfs_pretty_syslog(LOG_INFO,
+		safs_pretty_syslog(LOG_INFO,
 				"initialized goal definitions from file %s",
 				goalConfigFile.c_str());
 	} catch (Exception& ex) {
@@ -307,7 +309,7 @@ static void fs_read_config_file() {
 	gChecksumBackgroundUpdater.setSpeedLimit(
 			cfg_getint32("METADATA_CHECKSUM_RECALCULATION_SPEED", 100));
 	metadataDumper.setMetarestorePath(
-			cfg_get("MFSMETARESTORE_PATH", std::string(SBIN_PATH "/mfsmetarestore")));
+			cfg_get("SFSMETARESTORE_PATH", std::string(SBIN_PATH "/sfsmetarestore")));
 	metadataDumper.setUseMetarestore(cfg_getint32("MAGIC_PREFER_BACKGROUND_DUMP", 0));
 
 	// Set deprecated values first, then override them if newer version is found
@@ -316,7 +318,7 @@ static void fs_read_config_file() {
 	gOperationsDelayInit = cfg_getuint32("OPERATIONS_DELAY_INIT", gOperationsDelayInit);
 	gOperationsDelayDisconnect = cfg_getuint32("OPERATIONS_DELAY_DISCONNECT", gOperationsDelayDisconnect);
 	if (cfg_isdefined("REPLICATIONS_DELAY_INIT") || cfg_isdefined("REPLICATIONS_DELAY_DISCONNECT")) {
-		lzfs_pretty_syslog(LOG_WARNING, "REPLICATIONS_DELAY_INIT and REPLICATION_DELAY_DISCONNECT"
+		safs_pretty_syslog(LOG_WARNING, "REPLICATIONS_DELAY_INIT and REPLICATION_DELAY_DISCONNECT"
 		" entries are deprecated. Use OPERATIONS_DELAY_INIT and OPERATIONS_DELAY_DISCONNECT instead.");
 	}
 
@@ -330,12 +332,12 @@ void fs_reload(void) {
 	try {
 		fs_read_config_file();
 	} catch (Exception& ex) {
-		lzfs_pretty_syslog(LOG_WARNING, "Error in configuration: %s", ex.what());
+		safs_pretty_syslog(LOG_WARNING, "Error in configuration: %s", ex.what());
 	}
 }
 
 void fs_unload() {
-	lzfs_pretty_syslog(LOG_WARNING, "unloading filesystem at %" PRIu64, fs_getversion());
+	safs_pretty_syslog(LOG_WARNING, "unloading filesystem at %" PRIu64, fs_getversion());
 	restore_reset();
 	matoclserv_session_unload();
 	chunk_unload();
@@ -356,7 +358,7 @@ int fs_init(bool doLoad) {
 		} catch (const LockfileException& e) {
 			if (e.reason() == LockfileException::Reason::kStaleLock) {
 				throw LockfileException(
-						std::string(e.what()) + ", consider running `mfsmetarestore -a' to fix problems with your datadir.",
+						std::string(e.what()) + ", consider running `sfsmetarestore -a' to fix problems with your datadir.",
 						LockfileException::Reason::kStaleLock);
 			}
 			throw;

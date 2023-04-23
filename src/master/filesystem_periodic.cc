@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -25,7 +26,7 @@
 
 #include "common/cfg.h"
 #include "common/event_loop.h"
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 #  include "common/judy_map.h"
 #else
 #  include "common/flat_map.h"
@@ -72,7 +73,7 @@ enum NodeErrorFlag {
 	kAllNodeErrors    = 7
 };
 
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 	typedef judy_map<uint32_t, uint8_t> DefectiveNodesMap;
 #else
 	typedef flat_map<uint32_t, uint8_t> DefectiveNodesMap;
@@ -184,7 +185,7 @@ void fs_test_getdata(uint32_t &loopstart, uint32_t &loopend, uint32_t &files, ui
 				}
 
 				uint8_t vc;
-				if (chunk_get_fullcopies(chunkid, &vc) != LIZARDFS_STATUS_OK) {
+				if (chunk_get_fullcopies(chunkid, &vc) != SAUNAFS_STATUS_OK) {
 					report << "structure error - chunk " << chunkid
 					       << " not found (inode: " << file_node->id
 					       << " ; index: " << j << ")\n";
@@ -315,7 +316,7 @@ void fs_background_checksum_recalculation_a_bit() {
 		break;
 	case ChecksumRecalculatingStep::kDone:
 		gChecksumBackgroundUpdater.end();
-		matoclserv_broadcast_metadata_checksum_recalculated(LIZARDFS_STATUS_OK);
+		matoclserv_broadcast_metadata_checksum_recalculated(SAUNAFS_STATUS_OK);
 		return;
 	}
 	eventloop_make_next_poll_nonblocking();
@@ -387,7 +388,7 @@ void fs_process_file_test() {
 					}
 
 					if (chunk_get_fullcopies(chunkid, &vc) !=
-					    LIZARDFS_STATUS_OK) {
+					    SAUNAFS_STATUS_OK) {
 						node_error_flag |=
 						        static_cast<int>(kChunkUnavailable);
 						notfoundchunks++;
@@ -444,7 +445,7 @@ void fs_process_file_test() {
 				auto it = gDefectiveNodes.find(f->id);
 				if (it == gDefectiveNodes.end()) {
 					std::string name = get_node_info(f);
-					lzfs_pretty_syslog(LOG_ERR, "Chunks unavailable in %s",
+					safs_pretty_syslog(LOG_ERR, "Chunks unavailable in %s",
 					                   name.c_str());
 				}
 			}
@@ -455,7 +456,7 @@ void fs_process_file_test() {
 				auto it = gDefectiveNodes.find(f->id);
 				if (it == gDefectiveNodes.end()) {
 					std::string name = get_node_info(f);
-					lzfs_pretty_syslog(LOG_ERR, "Structure error in %s",
+					safs_pretty_syslog(LOG_ERR, "Structure error in %s",
 					                   name.c_str());
 				}
 			}
@@ -580,13 +581,13 @@ uint8_t fs_apply_emptytrash_deprecated(uint32_t ts, uint32_t freeinodes, uint32_
 	InodeInfo ii = fs_do_emptytrash_deprecated(ts);
 	gMetadata->metaversion++;
 	if ((freeinodes != ii.free) || (reservedinodes != ii.reserved)) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_apply_emptyreserved_deprecated(uint32_t /*ts*/,uint32_t /*freeinodes*/) {
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE

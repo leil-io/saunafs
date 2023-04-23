@@ -1,25 +1,25 @@
 timeout_set 45 seconds
 
 USE_RAMDISK=YES \
-	MFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 
 head -c 1024 /dev/zero > file_kb
 head -c $((64*1024*1024)) /dev/zero > file_chunk
 
-one_kb_file_size=$(mfs_dir_info size file_kb)
-one_chunk_file_size=$(mfs_dir_info size file_chunk)
+one_kb_file_size=$(sfs_dir_info size file_kb)
+one_chunk_file_size=$(sfs_dir_info size file_chunk)
 soft=$((2*one_kb_file_size))
 hard=$((3*one_kb_file_size))
 
 mkdir dir
 directory=$(readlink -m dir)
 
-lizardfs setquota -d $soft $hard 0 0 dir
-lizardfs setquota -d $soft $hard 0 0 dir
+saunafs setquota -d $soft $hard 0 0 dir
+saunafs setquota -d $soft $hard 0 0 dir
 
 verify_dir_quota "Directory $directory -- 0 $soft $hard 0 0 0" $directory
 
@@ -54,18 +54,18 @@ verify_dir_quota "Directory $directory -- 0 $soft $hard 0 0 0" $directory
 
 # check if snapshots are properly handled:
 head -c 1024 /dev/zero > dir/file_1
-lizardfs makesnapshot dir/file_1 dir/snapshot_1
+saunafs makesnapshot dir/file_1 dir/snapshot_1
 verify_dir_quota "Directory $directory -- $((2 * one_kb_file_size)) $soft $hard 2 0 0" $directory
 
 # BTW, check if '+' for soft limit is properly printed..
-lizardfs setquota -d $((soft-1)) $hard 0 0 dir
+saunafs setquota -d $((soft-1)) $hard 0 0 dir
 verify_dir_quota "Directory $directory +- $soft $((soft-1)) $hard 2 0 0" $directory
-lizardfs setquota -d $soft $hard 0 0 dir  # .. OK, come back to the previous limit
+saunafs setquota -d $soft $hard 0 0 dir  # .. OK, come back to the previous limit
 
 # snapshots continued..
-lizardfs makesnapshot dir/file_1 dir/snapshot_2
+saunafs makesnapshot dir/file_1 dir/snapshot_2
 verify_dir_quota "Directory $directory +- $hard $soft $hard 3 0 0" $directory
-expect_failure lizardfs makesnapshot dir/file_1 dir/snapshot_3
+expect_failure saunafs makesnapshot dir/file_1 dir/snapshot_3
 
 # verify that we can't create new chunks by 'splitting' a chunk shared by multiple files
 expect_failure dd if=/dev/zero of=dir/snapshot_2 bs=1k count=1 conv=notrunc

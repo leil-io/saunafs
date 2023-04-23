@@ -1,55 +1,57 @@
 /*
-   Copyright 2017 Skytechnology sp. z o.o..
 
-   This file is part of LizardFS.
+   Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   LizardFS is free software: you can redistribute it and/or modify
+   This file is part of SaunaFS.
+
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/platform.h"
 
-#include "client/lizard_client_c_linkage.h"
+#include "client/sauna_client_c_linkage.h"
 #include "common/richacl.h"
 
 #include <boost/intrusive/list.hpp>
 #include <mutex>
 
-namespace lizardfs {
+namespace saunafs {
 
 /*!
- * \brief An object-based wrapper for LizardClient namespace.
+ * \brief An object-based wrapper for SaunaClient namespace.
  *
- * Dynamic library hacks are required, because LizardClient namespace is designed to be a singleton.
+ * Dynamic library hacks are required, because SaunaClient namespace is designed to be a singleton.
  */
 
 class Client {
 public:
-	typedef LizardClient::FsInitParams FsInitParams;
-	typedef LizardClient::Inode Inode;
-	typedef LizardClient::JobId JobId;
-	typedef LizardClient::NamedInodeOffset NamedInodeOffset;
-	typedef LizardClient::AttrReply AttrReply;
+	typedef SaunaClient::FsInitParams FsInitParams;
+	typedef SaunaClient::Inode Inode;
+	typedef SaunaClient::JobId JobId;
+	typedef SaunaClient::NamedInodeOffset NamedInodeOffset;
+	typedef SaunaClient::AttrReply AttrReply;
 	typedef std::vector<uint8_t> XattrBuffer;
-	typedef LizardClient::DirEntry DirEntry;
-	typedef LizardClient::EntryParam EntryParam;
-	typedef LizardClient::Context Context;
+	typedef SaunaClient::DirEntry DirEntry;
+	typedef SaunaClient::EntryParam EntryParam;
+	typedef SaunaClient::Context Context;
 	typedef std::vector<DirEntry> ReadDirReply;
 	typedef ReadCache::Result ReadResult;
 	typedef std::vector<NamedInodeEntry> ReadReservedReply;
 	typedef std::vector<NamedInodeEntry> ReadTrashReply;
-	typedef lzfs_locks::FlockWrapper FlockWrapper;
+	typedef safs_locks::FlockWrapper FlockWrapper;
 
 	struct Stats {
 		uint64_t total_space;
@@ -59,7 +61,7 @@ public:
 		uint32_t inodes;
 	};
 
-	struct FileInfo : public LizardClient::FileInfo, public boost::intrusive::list_base_hook<> {
+	struct FileInfo : public SaunaClient::FileInfo, public boost::intrusive::list_base_hook<> {
 		FileInfo() {}
 		FileInfo(Inode inode, uint64_t opendirSessionID = 0)
 			: inode(inode)
@@ -242,12 +244,12 @@ public:
 	void getlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
 	           std::error_code &ec);
 	void setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
-	               std::function<int(const lzfs_locks::InterruptData &)> handler);
+	               std::function<int(const safs_locks::InterruptData &)> handler);
 	void setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
-	               std::function<int(const lzfs_locks::InterruptData &)> handler,
+	               std::function<int(const safs_locks::InterruptData &)> handler,
 	               std::error_code &ec);
-	void setlk_interrupt(const lzfs_locks::InterruptData &data);
-	void setlk_interrupt(const lzfs_locks::InterruptData &data, std::error_code &ec);
+	void setlk_interrupt(const safs_locks::InterruptData &data);
+	void setlk_interrupt(const safs_locks::InterruptData &data, std::error_code &ec);
 
 protected:
 	/*! \brief Initialize client with parameters */
@@ -255,91 +257,91 @@ protected:
 
 	void *linkLibrary();
 
-	typedef decltype(&lizardfs_fs_init) FsInitFunction;
-	typedef decltype(&lizardfs_fs_term) FsTermFunction;
-	typedef decltype(&lizardfs_lookup) LookupFunction;
-	typedef decltype(&lizardfs_mknod) MknodFunction;
-	typedef decltype(&lizardfs_link) LinkFunction;
-	typedef decltype(&lizardfs_symlink) SymlinkFunction;
-	typedef decltype(&lizardfs_mkdir) MkDirFunction;
-	typedef decltype(&lizardfs_rmdir) RmDirFunction;
-	typedef decltype(&lizardfs_readdir) ReadDirFunction;
-	typedef decltype(&lizardfs_readlink) ReadLinkFunction;
-	typedef decltype(&lizardfs_readreserved) ReadReservedFunction;
-	typedef decltype(&lizardfs_readtrash) ReadTrashFunction;
-	typedef decltype(&lizardfs_opendir) OpenDirFunction;
-	typedef decltype(&lizardfs_releasedir) ReleaseDirFunction;
-	typedef decltype(&lizardfs_unlink) UnlinkFunction;
-	typedef decltype(&lizardfs_undel) UndelFunction;
-	typedef decltype(&lizardfs_open) OpenFunction;
-	typedef decltype(&lizardfs_setattr) SetAttrFunction;
-	typedef decltype(&lizardfs_getattr) GetAttrFunction;
-	typedef decltype(&lizardfs_read) ReadFunction;
-	typedef decltype(&lizardfs_read_special_inode) ReadSpecialInodeFunction;
-	typedef decltype(&lizardfs_write) WriteFunction;
-	typedef decltype(&lizardfs_release) ReleaseFunction;
-	typedef decltype(&lizardfs_flush) FlushFunction;
-	typedef decltype(&lizardfs_isSpecialInode) IsSpecialInodeFunction;
-	typedef decltype(&lizardfs_update_groups) UpdateGroupsFunction;
-	typedef decltype(&lizardfs_makesnapshot) MakesnapshotFunction;
-	typedef decltype(&lizardfs_getgoal) GetGoalFunction;
-	typedef decltype(&lizardfs_setgoal) SetGoalFunction;
-	typedef decltype(&lizardfs_fsync) FsyncFunction;
-	typedef decltype(&lizardfs_rename) RenameFunction;
-	typedef decltype(&lizardfs_statfs) StatfsFunction;
-	typedef decltype(&lizardfs_setxattr) SetXattrFunction;
-	typedef decltype(&lizardfs_getxattr) GetXattrFunction;
-	typedef decltype(&lizardfs_listxattr) ListXattrFunction;
-	typedef decltype(&lizardfs_removexattr) RemoveXattrFunction;
-	typedef decltype(&lizardfs_getchunksinfo) GetChunksInfoFunction;
-	typedef decltype(&lizardfs_getchunkservers) GetChunkserversFunction;
-	typedef decltype(&lizardfs_getlk) GetlkFunction;
-	typedef decltype(&lizardfs_setlk_send) SetlkSendFunction;
-	typedef decltype(&lizardfs_setlk_recv) SetlkRecvFunction;
-	typedef decltype(&lizardfs_setlk_interrupt) SetlkInterruptFunction;
+	typedef decltype(&saunafs_fs_init) FsInitFunction;
+	typedef decltype(&saunafs_fs_term) FsTermFunction;
+	typedef decltype(&saunafs_lookup) LookupFunction;
+	typedef decltype(&saunafs_mknod) MknodFunction;
+	typedef decltype(&saunafs_link) LinkFunction;
+	typedef decltype(&saunafs_symlink) SymlinkFunction;
+	typedef decltype(&saunafs_mkdir) MkDirFunction;
+	typedef decltype(&saunafs_rmdir) RmDirFunction;
+	typedef decltype(&saunafs_readdir) ReadDirFunction;
+	typedef decltype(&saunafs_readlink) ReadLinkFunction;
+	typedef decltype(&saunafs_readreserved) ReadReservedFunction;
+	typedef decltype(&saunafs_readtrash) ReadTrashFunction;
+	typedef decltype(&saunafs_opendir) OpenDirFunction;
+	typedef decltype(&saunafs_releasedir) ReleaseDirFunction;
+	typedef decltype(&saunafs_unlink) UnlinkFunction;
+	typedef decltype(&saunafs_undel) UndelFunction;
+	typedef decltype(&saunafs_open) OpenFunction;
+	typedef decltype(&saunafs_setattr) SetAttrFunction;
+	typedef decltype(&saunafs_getattr) GetAttrFunction;
+	typedef decltype(&saunafs_read) ReadFunction;
+	typedef decltype(&saunafs_read_special_inode) ReadSpecialInodeFunction;
+	typedef decltype(&saunafs_write) WriteFunction;
+	typedef decltype(&saunafs_release) ReleaseFunction;
+	typedef decltype(&saunafs_flush) FlushFunction;
+	typedef decltype(&saunafs_isSpecialInode) IsSpecialInodeFunction;
+	typedef decltype(&saunafs_update_groups) UpdateGroupsFunction;
+	typedef decltype(&saunafs_makesnapshot) MakesnapshotFunction;
+	typedef decltype(&saunafs_getgoal) GetGoalFunction;
+	typedef decltype(&saunafs_setgoal) SetGoalFunction;
+	typedef decltype(&saunafs_fsync) FsyncFunction;
+	typedef decltype(&saunafs_rename) RenameFunction;
+	typedef decltype(&saunafs_statfs) StatfsFunction;
+	typedef decltype(&saunafs_setxattr) SetXattrFunction;
+	typedef decltype(&saunafs_getxattr) GetXattrFunction;
+	typedef decltype(&saunafs_listxattr) ListXattrFunction;
+	typedef decltype(&saunafs_removexattr) RemoveXattrFunction;
+	typedef decltype(&saunafs_getchunksinfo) GetChunksInfoFunction;
+	typedef decltype(&saunafs_getchunkservers) GetChunkserversFunction;
+	typedef decltype(&saunafs_getlk) GetlkFunction;
+	typedef decltype(&saunafs_setlk_send) SetlkSendFunction;
+	typedef decltype(&saunafs_setlk_recv) SetlkRecvFunction;
+	typedef decltype(&saunafs_setlk_interrupt) SetlkInterruptFunction;
 
-	FsInitFunction lizardfs_fs_init_;
-	FsTermFunction lizardfs_fs_term_;
-	LookupFunction lizardfs_lookup_;
-	MknodFunction lizardfs_mknod_;
-	MkDirFunction lizardfs_mkdir_;
-	LinkFunction lizardfs_link_;
-	SymlinkFunction lizardfs_symlink_;
-	RmDirFunction lizardfs_rmdir_;
-	ReadDirFunction lizardfs_readdir_;
-	ReadLinkFunction lizardfs_readlink_;
-	ReadReservedFunction lizardfs_readreserved_;
-	ReadTrashFunction lizardfs_readtrash_;
-	OpenDirFunction lizardfs_opendir_;
-	ReleaseDirFunction lizardfs_releasedir_;
-	UnlinkFunction lizardfs_unlink_;
-	UndelFunction lizardfs_undel_;
-	OpenFunction lizardfs_open_;
-	SetAttrFunction lizardfs_setattr_;
-	GetAttrFunction lizardfs_getattr_;
-	ReadFunction lizardfs_read_;
-	ReadSpecialInodeFunction lizardfs_read_special_inode_;
-	WriteFunction lizardfs_write_;
-	ReleaseFunction lizardfs_release_;
-	FlushFunction lizardfs_flush_;
-	IsSpecialInodeFunction lizardfs_isSpecialInode_;
-	UpdateGroupsFunction lizardfs_update_groups_;
-	MakesnapshotFunction lizardfs_makesnapshot_;
-	GetGoalFunction lizardfs_getgoal_;
-	SetGoalFunction lizardfs_setgoal_;
-	FsyncFunction lizardfs_fsync_;
-	RenameFunction lizardfs_rename_;
-	StatfsFunction lizardfs_statfs_;
-	SetXattrFunction lizardfs_setxattr_;
-	GetXattrFunction lizardfs_getxattr_;
-	ListXattrFunction lizardfs_listxattr_;
-	RemoveXattrFunction lizardfs_removexattr_;
-	GetChunksInfoFunction lizardfs_getchunksinfo_;
-	GetChunkserversFunction lizardfs_getchunkservers_;
-	GetlkFunction lizardfs_getlk_;
-	SetlkSendFunction lizardfs_setlk_send_;
-	SetlkRecvFunction lizardfs_setlk_recv_;
-	SetlkInterruptFunction lizardfs_setlk_interrupt_;
+	FsInitFunction saunafs_fs_init_;
+	FsTermFunction saunafs_fs_term_;
+	LookupFunction saunafs_lookup_;
+	MknodFunction saunafs_mknod_;
+	MkDirFunction saunafs_mkdir_;
+	LinkFunction saunafs_link_;
+	SymlinkFunction saunafs_symlink_;
+	RmDirFunction saunafs_rmdir_;
+	ReadDirFunction saunafs_readdir_;
+	ReadLinkFunction saunafs_readlink_;
+	ReadReservedFunction saunafs_readreserved_;
+	ReadTrashFunction saunafs_readtrash_;
+	OpenDirFunction saunafs_opendir_;
+	ReleaseDirFunction saunafs_releasedir_;
+	UnlinkFunction saunafs_unlink_;
+	UndelFunction saunafs_undel_;
+	OpenFunction saunafs_open_;
+	SetAttrFunction saunafs_setattr_;
+	GetAttrFunction saunafs_getattr_;
+	ReadFunction saunafs_read_;
+	ReadSpecialInodeFunction saunafs_read_special_inode_;
+	WriteFunction saunafs_write_;
+	ReleaseFunction saunafs_release_;
+	FlushFunction saunafs_flush_;
+	IsSpecialInodeFunction saunafs_isSpecialInode_;
+	UpdateGroupsFunction saunafs_update_groups_;
+	MakesnapshotFunction saunafs_makesnapshot_;
+	GetGoalFunction saunafs_getgoal_;
+	SetGoalFunction saunafs_setgoal_;
+	FsyncFunction saunafs_fsync_;
+	RenameFunction saunafs_rename_;
+	StatfsFunction saunafs_statfs_;
+	SetXattrFunction saunafs_setxattr_;
+	GetXattrFunction saunafs_getxattr_;
+	ListXattrFunction saunafs_listxattr_;
+	RemoveXattrFunction saunafs_removexattr_;
+	GetChunksInfoFunction saunafs_getchunksinfo_;
+	GetChunkserversFunction saunafs_getchunkservers_;
+	GetlkFunction saunafs_getlk_;
+	SetlkSendFunction saunafs_setlk_send_;
+	SetlkRecvFunction saunafs_setlk_recv_;
+	SetlkInterruptFunction saunafs_setlk_interrupt_;
 
 	void *dl_handle_;
 	FileInfoList fileinfos_;
@@ -349,7 +351,7 @@ protected:
 	static std::atomic<int> instance_count_;
 
 	static constexpr int kMaxXattrRequestSize = 65536;
-	static constexpr const char *kLibraryPath = LIB_PATH "/liblizardfsmount_shared.so";
+	static constexpr const char *kLibraryPath = LIB_PATH "/libsaunafsmount_shared.so";
 };
 
-} // namespace lizardfs
+} // namespace saunafs

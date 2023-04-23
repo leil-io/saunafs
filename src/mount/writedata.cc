@@ -1,19 +1,20 @@
 /*
- Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2017 Skytechnology sp. z o.o..
+ Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+ Copyright 2013-2017 Skytechnology sp. z o.o.
+ Copyright 2023      Leil Storage OÜ
 
- This file was part of MooseFS and is part of LizardFS.
 
- LizardFS is free software: you can redistribute it and/or modify
+ SaunaFS is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, version 3.
 
- LizardFS is distributed in the hope that it will be useful,
+ SaunaFS is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+ along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -42,7 +43,7 @@
 #include "common/goal.h"
 #include "common/massert.h"
 #include "common/message_receive_buffer.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/multi_buffer_writer.h"
 #include "common/pcqueue.h"
 #include "common/slice_traits.h"
@@ -57,7 +58,7 @@
 #include "mount/tweaks.h"
 #include "mount/write_cache_block.h"
 #include "protocol/cltocs.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
 #define IDLE_CONNECTION_TIMEOUT 6
 #define IDHASHSIZE 256
@@ -89,7 +90,7 @@ struct inodedata {
 	inodedata(uint32_t inode)
 			: inode(inode),
 			  maxfleng(0),
-			  status(LIZARDFS_STATUS_OK),
+			  status(SAUNAFS_STATUS_OK),
 			  flushwaiting(0),
 			  writewaiting(0),
 			  lcnt(0),
@@ -106,7 +107,7 @@ struct inodedata {
 		newDataInChainPipe[0] = newDataInChainPipe[1] = -1;
 #else
 		if (pipe(newDataInChainPipe) < 0) {
-			lzfs_pretty_syslog(LOG_WARNING, "creating pipe error: %s", strerr(errno));
+			safs_pretty_syslog(LOG_WARNING, "creating pipe error: %s", strerr(errno));
 			newDataInChainPipe[0] = -1;
 		}
 #endif
@@ -128,7 +129,7 @@ struct inodedata {
 		 */
 		if (workerWaitingForData && dataChain.size() == 1 && isDataChainPipeValid()) {
 			if (write(newDataInChainPipe[1], " ", 1) != 1) {
-				lzfs_pretty_syslog(LOG_ERR, "write pipe error: %s", strerr(errno));
+				safs_pretty_syslog(LOG_ERR, "write pipe error: %s", strerr(errno));
 			}
 			workerWaitingForData = false;
 		}
@@ -349,8 +350,8 @@ void write_job_delayed_end(inodedata* id, int status, int seconds, Glock &lock) 
 	LOG_AVG_TILL_END_OF_SCOPE0("write_job_delayed_end");
 	LOG_AVG_TILL_END_OF_SCOPE1("write_job_delayed_end#sec", seconds);
 	id->locator.reset();
-	if (status != LIZARDFS_STATUS_OK) {
-		lzfs_pretty_syslog(LOG_WARNING, "error writing file number %" PRIu32 ": %s", id->inode, lizardfs_error_string(status));
+	if (status != SAUNAFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_WARNING, "error writing file number %" PRIu32 ": %s", id->inode, saunafs_error_string(status));
 		id->status = status;
 	}
 	status = id->status;
@@ -358,7 +359,7 @@ void write_job_delayed_end(inodedata* id, int status, int seconds, Glock &lock) 
 		// Don't sleep if we have to write all the data immediately
 		seconds = 0;
 	}
-	if (!id->dataChain.empty() && status == LIZARDFS_STATUS_OK) { // still have some work to do
+	if (!id->dataChain.empty() && status == SAUNAFS_STATUS_OK) { // still have some work to do
 		id->trycnt = 0; // on good write reset try counter
 		write_delayed_enqueue(id, seconds, lock);
 	} else {        // no more work or error occurred
@@ -417,11 +418,11 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 	} else {
 		// No data, no unfinished jobs -- something wrong!
 		// This should never happen, so the status doesn't really matter
-		lzfs_pretty_syslog(LOG_WARNING, "got inode with no data to write!!!");
+		safs_pretty_syslog(LOG_WARNING, "got inode with no data to write!!!");
 		haveDataToWrite = false;
-		status = LIZARDFS_ERROR_EINVAL;
+		status = SAUNAFS_ERROR_EINVAL;
 	}
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		write_job_end(inodeData_, status, lock);
 		return;
 	}
@@ -465,16 +466,16 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 				// has to be flushed, because no more data will be added to it
 				canWait = false;
 			}
-			write_job_delayed_end(inodeData_, LIZARDFS_STATUS_OK, (canWait ? 1 : 0), lock);
+			write_job_delayed_end(inodeData_, SAUNAFS_STATUS_OK, (canWait ? 1 : 0), lock);
 		} catch (Exception& e) {
 			std::string errorString = e.what();
 			Glock lock(gMutex);
-			if (e.status() != LIZARDFS_ERROR_LOCKED) {
+			if (e.status() != SAUNAFS_ERROR_LOCKED) {
 				inodeData_->trycnt++;
 				errorString += " (try counter: " + std::to_string(inodeData->trycnt) + ")";
 			} else if (inodeData_->trycnt == 0) {
 				// Set to nonzero to inform writers, that this task needs to wait a bit
-				// Don't increase -- LIZARDFS_ERROR_LOCKED means that chunk is locked by a different client
+				// Don't increase -- SAUNAFS_ERROR_LOCKED means that chunk is locked by a different client
 				// and we have to wait until it is unlocked
 				inodeData_->trycnt = 1;
 			}
@@ -484,7 +485,7 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 			returnJournalToDataChain(writer.releaseJournal(), lock);
 			lock.unlock();
 
-			lzfs_pretty_syslog(LOG_WARNING, "write file error, inode: %" PRIu32 ", index: %" PRIu32 " - %s",
+			safs_pretty_syslog(LOG_WARNING, "write file error, inode: %" PRIu32 ", index: %" PRIu32 " - %s",
 					inodeData_->inode, chunkIndex_, errorString.c_str());
 			if (inodeData_->trycnt >= maxretries) {
 				// Convert error to an unrecoverable error
@@ -496,14 +497,14 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 		}
 	} catch (UnrecoverableWriteException& e) {
 		Glock lock(gMutex);
-		if (e.status() == LIZARDFS_ERROR_ENOENT) {
-			write_job_end(inodeData_, LIZARDFS_ERROR_EBADF, lock);
-		} else if (e.status() == LIZARDFS_ERROR_QUOTA) {
-			write_job_end(inodeData_, LIZARDFS_ERROR_QUOTA, lock);
-		} else if (e.status() == LIZARDFS_ERROR_NOSPACE || e.status() == LIZARDFS_ERROR_NOCHUNKSERVERS) {
-			write_job_end(inodeData_, LIZARDFS_ERROR_NOSPACE, lock);
+		if (e.status() == SAUNAFS_ERROR_ENOENT) {
+			write_job_end(inodeData_, SAUNAFS_ERROR_EBADF, lock);
+		} else if (e.status() == SAUNAFS_ERROR_QUOTA) {
+			write_job_end(inodeData_, SAUNAFS_ERROR_QUOTA, lock);
+		} else if (e.status() == SAUNAFS_ERROR_NOSPACE || e.status() == SAUNAFS_ERROR_NOCHUNKSERVERS) {
+			write_job_end(inodeData_, SAUNAFS_ERROR_NOSPACE, lock);
 		} else {
-			write_job_end(inodeData_, LIZARDFS_ERROR_IO, lock);
+			write_job_end(inodeData_, SAUNAFS_ERROR_IO, lock);
 		}
 	} catch (Exception& e) {
 		Glock lock(gMutex);
@@ -579,7 +580,7 @@ void InodeChunkWriter::processDataChain(ChunkWriter& writer) {
 		} else if (wholeOperationTimer.elapsed_s() >= maximumTime) {
 			throw RecoverableWriteException(
 					"Timeout after " + std::to_string(wholeOperationTimer.elapsed_ms()) + " ms",
-					LIZARDFS_ERROR_TIMEOUT);
+					SAUNAFS_ERROR_TIMEOUT);
 		}
 
 		// Let's sleep a bit shorter if we can't be woken up by the pipe to reduce the latency
@@ -617,7 +618,7 @@ bool InodeChunkWriter::haveAnyBlockInCurrentChunk(Glock&) {
 
 /*
  * Check if there is any data worth sending to the chunkserver.
- * We will avoid sending blocks of size different than MFSBLOCKSIZE.
+ * We will avoid sending blocks of size different than SFSBLOCKSIZE.
  * These can be taken only if we are close to run out of tasks to do.
  * glock: LOCKED
  */
@@ -635,7 +636,7 @@ bool InodeChunkWriter::haveBlockWorthWriting(uint32_t unfinishedOperationCount, 
 	} else {
 		// Always start full blocks; start partial blocks only if we have to flush the data
 		// or the block won't be expanded (only the last one can be) to a full block
-		return (block.size() == MFSBLOCKSIZE
+		return (block.size() == SFSBLOCKSIZE
 				|| inodeData_->requiresFlushing()
 				|| inodeData_->dataChain.size() > 1);
 	}
@@ -667,7 +668,7 @@ void* write_worker(void*) {
 void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 		uint32_t writewindowsize, uint32_t chunkserverTimeout_ms, uint32_t cachePerInodePercentage) {
 	uint64_t cachebytecount = uint64_t(cachesize) * 1024 * 1024;
-	uint64_t cacheblockcount = (cachebytecount / MFSBLOCKSIZE);
+	uint64_t cacheblockcount = (cachebytecount / SFSBLOCKSIZE);
 	uint32_t i;
 	pthread_attr_t thattr;
 
@@ -769,25 +770,25 @@ int write_block(inodedata *id, uint32_t chindx, uint16_t pos, uint32_t from, uin
 /* glock: UNLOCKED */
 int write_blocks(inodedata *id, uint64_t offset, uint32_t size, const uint8_t* data) {
 	LOG_AVG_TILL_END_OF_SCOPE0("write_blocks");
-	uint32_t chindx = offset >> MFSCHUNKBITS;
-	uint16_t pos = (offset & MFSCHUNKMASK) >> MFSBLOCKBITS;
-	uint32_t from = offset & MFSBLOCKMASK;
+	uint32_t chindx = offset >> SFSCHUNKBITS;
+	uint16_t pos = (offset & SFSCHUNKMASK) >> SFSBLOCKBITS;
+	uint32_t from = offset & SFSBLOCKMASK;
 	while (size > 0) {
-		if (size > MFSBLOCKSIZE - from) {
-			if (write_block(id, chindx, pos, from, MFSBLOCKSIZE, data) < 0) {
-				return LIZARDFS_ERROR_IO;
+		if (size > SFSBLOCKSIZE - from) {
+			if (write_block(id, chindx, pos, from, SFSBLOCKSIZE, data) < 0) {
+				return SAUNAFS_ERROR_IO;
 			}
-			size -= (MFSBLOCKSIZE - from);
-			data += (MFSBLOCKSIZE - from);
+			size -= (SFSBLOCKSIZE - from);
+			data += (SFSBLOCKSIZE - from);
 			from = 0;
 			pos++;
-			if (pos == MFSBLOCKSINCHUNK) {
+			if (pos == SFSBLOCKSINCHUNK) {
 				pos = 0;
 				chindx++;
 			}
 		} else {
 			if (write_block(id, chindx, pos, from, from + size, data) < 0) {
-				return LIZARDFS_ERROR_IO;
+				return SAUNAFS_ERROR_IO;
 			}
 			size = 0;
 		}
@@ -800,12 +801,12 @@ int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t* data) {
 	int status;
 	inodedata *id = (inodedata*) vid;
 	if (id == NULL) {
-		return LIZARDFS_ERROR_IO;
+		return SAUNAFS_ERROR_IO;
 	}
 
 	Glock lock(gMutex);
 	status = id->status;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		if (offset + size > id->maxfleng) {     // move fleng
 			id->maxfleng = offset + size;
 		}
@@ -817,7 +818,7 @@ int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t* data) {
 	}
 	lock.unlock();
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -860,7 +861,7 @@ void* write_data_new(uint32_t inode) {
 static int write_data_flush(void* vid, Glock& lock) {
 	inodedata* id = (inodedata*) vid;
 	if (id == NULL) {
-		return LIZARDFS_ERROR_IO;
+		return SAUNAFS_ERROR_IO;
 	}
 
 	write_data_flushwaiting_increase(id, lock);
@@ -910,7 +911,7 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	// 1. Flush writes but don't finish it completely - it'll be done at the end of truncate
 	inodedata* id = write_get_inodedata(inode, lock);
 	if (id == NULL) {
-		return LIZARDFS_ERROR_IO;
+		return SAUNAFS_ERROR_IO;
 	}
 	write_data_lcnt_increase(id, lock);
 	write_data_flushwaiting_increase(id, lock); // this will block any writing to this inode
@@ -932,30 +933,30 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	uint32_t retries = 0;
 	do {
 		status = fs_truncate(inode, opened, uid, gid, length, writeNeeded, attr, oldLength, lockId);
-		if (status != LIZARDFS_STATUS_OK) {
-			lzfs_pretty_syslog(LOG_INFO, "truncate file %" PRIu32 " to length %" PRIu64 ": %s (try %d/%d)",
-					inode, length, lizardfs_error_string(status), int(retries + 1), int(maxretries));
+		if (status != SAUNAFS_STATUS_OK) {
+			safs_pretty_syslog(LOG_INFO, "truncate file %" PRIu32 " to length %" PRIu64 ": %s (try %d/%d)",
+					inode, length, saunafs_error_string(status), int(retries + 1), int(maxretries));
 		}
 		if (retries >= maxretries) {
 			break;
 		}
-		if (status == LIZARDFS_ERROR_LOCKED) {
+		if (status == SAUNAFS_ERROR_LOCKED) {
 			sleep(1);
-		} else if (status == LIZARDFS_ERROR_CHUNKLOST || status == LIZARDFS_ERROR_NOTDONE) {
+		} else if (status == SAUNAFS_ERROR_CHUNKLOST || status == SAUNAFS_ERROR_NOTDONE) {
 			usleep(retrySleepTime_us);
 			retrySleepTime_us = std::min(2 * retrySleepTime_us, 60 * 1000000);
 			++retries;
 		}
-	} while (status == LIZARDFS_ERROR_LOCKED || status == LIZARDFS_ERROR_CHUNKLOST || status == LIZARDFS_ERROR_NOTDONE);
+	} while (status == SAUNAFS_ERROR_LOCKED || status == SAUNAFS_ERROR_CHUNKLOST || status == SAUNAFS_ERROR_NOTDONE);
 	lock.lock();
 	if (status != 0 || !writeNeeded) {
 		// Something failed or we have nothing to do more (master server managed to do the truncate)
 		write_data_flushwaiting_decrease(id, lock);
 		write_data_lcnt_decrease(id, lock);
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			return 0;
 		} else {
-			// status is now MFS status, so we cannot return any errno
+			// status is now SFS status, so we cannot return any errno
 			throw UnrecoverableWriteException("fs_truncate failed", status);
 		}
 	}
@@ -964,14 +965,14 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	// Let's calculate size of the region to be zeroed
 	uint64_t endOffset = std::min({
 		oldLength,                            // no further than to the end of the file
-		length + slice_traits::ec::kMaxDataCount * MFSBLOCKSIZE, // no more than the maximal stripe
-		(length + MFSCHUNKSIZE - 1) / MFSCHUNKSIZE * MFSCHUNKSIZE // no beyond the end of chunk
+		length + slice_traits::ec::kMaxDataCount * SFSBLOCKSIZE, // no more than the maximal stripe
+		(length + SFSCHUNKSIZE - 1) / SFSCHUNKSIZE * SFSCHUNKSIZE // no beyond the end of chunk
 	});
 
 	if (endOffset > length) {
 		// Something has to be written, so pass our lock to writing threads
 		sassert(id->dataChain.empty());
-		id->locator.reset(new TruncateWriteChunkLocator(inode, length / MFSCHUNKSIZE, lockId));
+		id->locator.reset(new TruncateWriteChunkLocator(inode, length / SFSCHUNKSIZE, lockId));
 
 		// And now pass block of zeros to writing threads
 		std::vector<uint8_t> zeros(endOffset - length, 0);
@@ -1001,8 +1002,8 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	write_data_flushwaiting_decrease(id, lock);
 	write_data_lcnt_decrease(id, lock);
 
-	if (status != LIZARDFS_STATUS_OK) {
-		// status is now MFS status, so we cannot return any errno
+	if (status != SAUNAFS_STATUS_OK) {
+		// status is now SFS status, so we cannot return any errno
 		throw UnrecoverableWriteException("fs_truncateend failed", status);
 	}
 	return 0;
@@ -1012,7 +1013,7 @@ int write_data_end(void* vid) {
 	Glock lock(gMutex);
 	inodedata* id = (inodedata*) vid;
 	if (id == NULL) {
-		return LIZARDFS_ERROR_IO;
+		return SAUNAFS_ERROR_IO;
 	}
 	int status = write_data_flush(id, lock);
 	write_data_lcnt_decrease(id, lock);

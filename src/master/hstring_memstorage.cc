@@ -9,7 +9,7 @@
 
 using namespace hstorage;
 
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 	std::set<char *> *MemStorage::debug_ptr_ = nullptr;
 #endif
 
@@ -31,7 +31,7 @@ void MemStorage::copy(Handle &handle, const Handle &other) {
 	}
 	handle.data() = encode(copied, hash(other));
 
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 	if (!debug_ptr_) {
 		debug_ptr_ = new std::set<char *>();
 	}
@@ -53,7 +53,7 @@ void MemStorage::bind(Handle &handle, const HString &str) {
 	memcpy(copied, str.c_str(), size);
 	handle.data() = encode(copied, str.hash());
 
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 	if (!debug_ptr_) {
 		debug_ptr_ = new std::set<char *>();
 	}
@@ -70,7 +70,7 @@ MemStorage::ValueType MemStorage::encode(const char *ptr, HashType hash) {
 }
 
 void MemStorage::unbind(Handle &handle) {
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 	char *ptr = c_str(handle);
 	if (ptr) {
 		if (!debug_ptr_) {

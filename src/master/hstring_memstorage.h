@@ -48,7 +48,7 @@ private:
 	static constexpr ValueType kShift = 64 - 8 * sizeof(HashType);
 	static constexpr ValueType kMask = ((static_cast<ValueType>(1) << kShift) - static_cast<ValueType>(1));
 
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 	static std::set<char *> *debug_ptr_; /*!< Set with unobfuscated pointers to stored strings.
 	                                            Just to make valgrind happy. */
 #endif

@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -21,7 +23,7 @@
 #include "common/platform.h"
 
 #include <inttypes.h>
-#include <mount/lizard_client_context.h>
+#include <mount/sauna_client_context.h>
 
 #ifndef __printflike
 #ifdef __GNUC__
@@ -32,7 +34,7 @@
 #endif /* __printflike */
 
 void oplog_printf(
-		const struct LizardClient::Context &ctx,const char *format,...) __printflike(2, 3);
+		const struct SaunaClient::Context &ctx,const char *format,...) __printflike(2, 3);
 void oplog_printf(const char *format,...) __printflike(1, 2);
 unsigned long oplog_newhandle(int hflag);
 void oplog_releasehandle(unsigned long fh);

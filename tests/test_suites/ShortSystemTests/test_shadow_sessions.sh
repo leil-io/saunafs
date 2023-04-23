@@ -5,18 +5,18 @@ MOUNTS=2 \
 	MASTERSERVERS=2 \
 	CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MOUNT_0_EXTRA_EXPORTS="ro,allcanchangequota" \
-	MOUNT_1_EXTRA_EXPORTS="rw,alldirs,allcanchangequota,maxtrashtime=1234567,mapall=lizardfstest_6:lizardfstest_4" \
-	setup_local_empty_lizardfs info
+	MOUNT_1_EXTRA_EXPORTS="rw,alldirs,allcanchangequota,maxtrashtime=1234567,mapall=saunafstest_6:saunafstest_4" \
+	setup_local_empty_saunafs info
 
 mkdir "${info[mount1]}/subdir"
 
-echo 'mfssubfolder=/subdir' >>"${info[mount1_cfg]}"
-lizardfs_mount_unmount 1
-lizardfs_mount_start 1
+echo 'sfssubfolder=/subdir' >>"${info[mount1_cfg]}"
+saunafs_mount_unmount 1
+saunafs_mount_start 1
 
-lizardfs_master_n 1 start
+saunafs_master_n 1 start
 
 cd "${info[mount1]}"
 for generator in $(metadata_get_all_generators |grep -v metadata_generate_uids_gids); do
@@ -26,7 +26,7 @@ metadata_validate_files
 
 # Check if using removed files works as expected:
 echo "ala ma kota" > removed_file
-lizardfs settrashtime 0 removed_file
+saunafs settrashtime 0 removed_file
 exec 11<> removed_file
 rm removed_file
 echo -n "u huhu" >&11
@@ -37,10 +37,10 @@ mount1meta=$(metadata_print "${info[mount1]}")
 mount0meta=$(metadata_print "${info[mount0]}")
 
 sleep 3
-lizardfs_master_daemon kill
-lizardfs_make_conf_for_master 1
-lizardfs_master_daemon reload
-lizardfs_wait_for_all_ready_chunkservers
+saunafs_master_daemon kill
+saunafs_make_conf_for_master 1
+saunafs_master_daemon reload
+saunafs_wait_for_all_ready_chunkservers
 
 # check restored filesystem
 assert_no_diff "$mount0meta" "$(metadata_print "${info[mount0]}")"
@@ -49,7 +49,7 @@ cd "${info[mount1]}"
 assert_no_diff "$mount1meta" "$(metadata_print)"
 assert_success touch newfile
 touch nowaythiswilleverwork
-assert_failure lizardfs settrashtime 12345678 nowaythiswilleverwork
+assert_failure saunafs settrashtime 12345678 nowaythiswilleverwork
 
 # Check if using removed files works as expected after promotion:
 echo -n " prrrrrr" >&11

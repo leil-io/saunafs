@@ -1,20 +1,20 @@
 timeout_set 90 seconds
 
-master_extra_config="MFSMETARESTORE_PATH = $TEMP_DIR/metarestore.sh"
+master_extra_config="SFSMETARESTORE_PATH = $TEMP_DIR/metarestore.sh"
 master_extra_config+="|MAGIC_PREFER_BACKGROUND_DUMP = 1"
 master_extra_config+="|BACK_META_KEEP_PREVIOUS = 5"
 
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER|enablefilelocks=1" \
-	MFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|enablefilelocks=1" \
+	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
 	MASTER_EXTRA_CONFIG=$master_extra_config \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # 'metaout_tmp' is used to ensure 'metaout' is complete when "created"
 cat > $TEMP_DIR/metarestore_ok.sh << END
 #!/usr/bin/env bash
-mfsmetarestore "\$@" | tee $TEMP_DIR/metaout_tmp
+sfsmetarestore "\$@" | tee $TEMP_DIR/metaout_tmp
 ret="\${PIPESTATUS[0]}"
 mv $TEMP_DIR/metaout_tmp $TEMP_DIR/metaout
 exit "\$ret"
@@ -22,7 +22,7 @@ END
 
 cat > $TEMP_DIR/metarestore_wrong_checksum.sh << END
 #!/usr/bin/env bash
-mfsmetarestore "\$@" -k 0 | tee $TEMP_DIR/metaout_tmp
+sfsmetarestore "\$@" -k 0 | tee $TEMP_DIR/metaout_tmp
 ret="\${PIPESTATUS[0]}"
 mv $TEMP_DIR/metaout_tmp $TEMP_DIR/metaout
 exit "\$ret"
@@ -47,10 +47,10 @@ chmod a+x $TEMP_DIR/metarestore.sh
 
 backup_copies=1
 function check_backup_copies() {
-	expect_equals $backup_copies $(ls "${info[master_data_path]}"/metadata.mfs.? | wc -l)
-	expect_file_exists "${info[master_data_path]}/metadata.mfs"
+	expect_equals $backup_copies $(ls "${info[master_data_path]}"/metadata.sfs.? | wc -l)
+	expect_file_exists "${info[master_data_path]}/metadata.sfs"
 	for (( i = 1 ; i <= backup_copies ; ++i )); do
-		expect_file_exists "${info[master_data_path]}/metadata.mfs.$i"
+		expect_file_exists "${info[master_data_path]}/metadata.sfs.$i"
 	done
 }
 
@@ -59,12 +59,12 @@ function check_backup_copies() {
 function check() {
 	cd "${info[master_data_path]}"
 	rm -f "$TEMP_DIR/metaout"
-	assert_file_exists "changelog.mfs"
-	assert_file_exists "metadata.mfs"
+	assert_file_exists "changelog.sfs"
+	assert_file_exists "metadata.sfs"
 	if [[ $2 == OK ]]; then
-		assert_success lizardfs_admin_master save-metadata
+		assert_success saunafs_admin_master save-metadata
 	else
-		assert_failure lizardfs_admin_master save-metadata
+		assert_failure saunafs_admin_master save-metadata
 	fi
 
 	# verify if metadata was or was not used
@@ -77,10 +77,10 @@ function check() {
 	if [[ $2 == OK ]]; then
 		# check if the dumped metadata is up to date,
 		# ie. if its version is equal to (1 + last entry in changelog.1)
-		assert_file_exists changelog.mfs.1
-		last_change=$(tail -1 changelog.mfs.1 | cut -d : -f 1)
+		assert_file_exists changelog.sfs.1
+		last_change=$(tail -1 changelog.sfs.1 | cut -d : -f 1)
 		assert_success test -n "$last_change"
-		assert_equals $((last_change+1)) "$(mfsmetadump metadata.mfs | awk 'NR==2{print $6}')"
+		assert_equals $((last_change+1)) "$(sfsmetadump metadata.sfs | awk 'NR==2{print $6}')"
 		if ((backup_copies < 5)); then
 			backup_copies=$((backup_copies + 1))
 		fi
@@ -92,13 +92,13 @@ function check() {
 cd "${info[mount0]}"
 
 FILE_SIZE=200B file-generate to_be_destroyed
-lizardfs filerepair to_be_destroyed
+saunafs filerepair to_be_destroyed
 check metarestore OK
 
 csid=$(find_first_chunkserver_with_chunks_matching 'chunk*')
-lizardfs_chunkserver_daemon $csid stop
-lizardfs_wait_for_ready_chunkservers 2
-lizardfs filerepair to_be_destroyed
+saunafs_chunkserver_daemon $csid stop
+saunafs_wait_for_ready_chunkservers 2
+saunafs filerepair to_be_destroyed
 check metarestore OK
 
 while read command; do
@@ -121,35 +121,35 @@ ln -s file symlink
 mv file file2
 ln -fs file2 symlink
 echo 'abc' > symlink
-lizardfs setquota -u $(id -u) 10GB 30GB 0 0 .
-lizardfs setquota -g $(id -g) 0 0 10k 20k .
+saunafs setquota -u $(id -u) 10GB 30GB 0 0 .
+saunafs setquota -g $(id -g) 0 0 10k 20k .
 touch file{00..99}
-lizardfs settrashtime 0 file1{0..4}
+saunafs settrashtime 0 file1{0..4}
 rm file1?
 mv file99 file999
-lizardfs setgoal 3 file999
-lizardfs setgoal 9 file03
+saunafs setgoal 3 file999
+saunafs setgoal 9 file03
 head -c 1M < /dev/urandom > random_file
-lizardfs settrashtime 3 random_file
+saunafs settrashtime 3 random_file
 truncate -s 100M random_file
 head -c 1M < /dev/urandom > random_file2
 truncate -s 100 random_file2
 truncate -s 1T sparse
 head -c 16M /dev/urandom | dd seek=1 bs=127M conv=notrunc of=sparse
 head -c 1M /dev/urandom >> sparse
-lizardfs makesnapshot sparse sparse2
+saunafs makesnapshot sparse sparse2
 head -c 16M /dev/urandom | dd seek=1 bs=127M conv=notrunc of=sparse2
 truncate -s 1000M sparse2
 truncate -s 100 sparse2
 truncate -s 0 sparse2
-lizardfs makesnapshot -o random_file random_file2
+saunafs makesnapshot -o random_file random_file2
 head -c 2M /dev/urandom | dd seek=1 bs=1M conv=notrunc of=random_file
 truncate -s 1000M sparse
 truncate -s 100 sparse
 truncate -s 0 sparse
 rm sparse
 setfacl -d -m group:fuse:rw- dir
-setfacl -d -m user:lizardfstest:rwx dir
+setfacl -d -m user:saunafstest:rwx dir
 setfacl -m group:fuse:rw- dir/file1
 setfacl -m group:adm:rwx dir/file1
 touch dir/aclfile
@@ -198,7 +198,7 @@ check master OK
 
 # 3. We don't want background dump
 sed -ie 's/MAGIC_PREFER_BACKGROUND_DUMP = 1/MAGIC_PREFER_BACKGROUND_DUMP = 0/' "${info[master_cfg]}"
-lizardfs_admin_master reload-config
+saunafs_admin_master reload-config
 
 cp $TEMP_DIR/metarestore_error_if_executed.sh $TEMP_DIR/metarestore.sh
 mkdir dir{11..22}

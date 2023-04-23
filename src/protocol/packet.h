@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -24,10 +26,10 @@
 #include <memory>
 #include <string>
 
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "common/serialization.h"
 
-// Legacy MooseFS packet format:
+// Legacy XaunaFS packet format:
 //
 // type
 // length of data
@@ -43,7 +45,7 @@
 // data
 
 /*
- * Header of all LizarsdFS network packets
+ * Header of all SaunaFS network packets
  */
 struct PacketHeader {
 public:
@@ -53,8 +55,8 @@ public:
 	static const uint32_t kSize = 8;
 	static const Type kMinOldPacketType = 0;
 	static const Type kMaxOldPacketType = 1000;
-	static const Type kMinLizPacketType = 1001;
-	static const Type kMaxLizPacketType = 2000;
+	static const Type kMinSauPacketType = 1001;
+	static const Type kMaxSauPacketType = 2000;
 
 	Type type;
 	Length length;
@@ -65,8 +67,8 @@ public:
 	PacketHeader() : type(0), length(0) {
 	}
 
-	bool isLizPacketType() const {
-		return kMinLizPacketType <= type && type <= kMaxLizPacketType;
+	bool isSauPacketType() const {
+		return kMinSauPacketType <= type && type <= kMaxSauPacketType;
 	}
 
 	bool isOldPacketType() const {
@@ -109,14 +111,14 @@ inline void deserialize(const uint8_t** source, uint32_t& bytesLeftInBuffer, Pac
 template <class... Data>
 inline void serializePacket(std::vector<uint8_t>& destination,
 		PacketHeader::Type type, PacketVersion version, const Data&... data) {
-	sassert(type >= PacketHeader::kMinLizPacketType && type <= PacketHeader::kMaxLizPacketType);
+	sassert(type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType);
 	uint32_t length = serializedSize(version, data...);
 	serialize(destination, PacketHeader(type, length), version, data...);
 }
 
 template <class... Data>
 inline std::vector<uint8_t> buildPacket(PacketHeader::Type type, PacketVersion version, const Data&... data) {
-	sassert(type >= PacketHeader::kMinLizPacketType && type <= PacketHeader::kMaxLizPacketType);
+	sassert(type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType);
 	uint32_t length = serializedSize(version, data...);
 	std::vector<uint8_t> buffer;
 	serialize(buffer, PacketHeader(type, length), version, data...);
@@ -130,16 +132,16 @@ inline std::vector<uint8_t> buildPacket(PacketHeader::Type type, PacketVersion v
 template <class... Data>
 inline void serializePacketPrefix(std::vector<uint8_t>& destination, uint32_t extraLength,
 		PacketHeader::Type type, PacketVersion version, const Data&... data) {
-	sassert(type >= PacketHeader::kMinLizPacketType && type <= PacketHeader::kMaxLizPacketType);
+	sassert(type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType);
 	uint32_t length = serializedSize(version, data...) + extraLength;
 	serialize(destination, PacketHeader(type, length), version, data...);
 }
 
 /*
- * Assembles a whole MooseFS packet (packet without version)
+ * Assembles a whole XaunaFS packet (packet without version)
  */
 template<class T, class... Data>
-inline void serializeMooseFsPacket(std::vector<uint8_t>& buffer,
+inline void serializeXaunaFsPacket(std::vector<uint8_t>& buffer,
 		const PacketHeader::Type& type,
 		const T& t,
 		const Data &...args) {
@@ -148,7 +150,7 @@ inline void serializeMooseFsPacket(std::vector<uint8_t>& buffer,
 	serialize(buffer, type, length, t, args...);
 }
 
-inline void serializeMooseFsPacket(std::vector<uint8_t>& buffer,
+inline void serializeXaunaFsPacket(std::vector<uint8_t>& buffer,
 		const PacketHeader::Type& type) {
 	sassert(type <= PacketHeader::kMaxOldPacketType);
 	uint32_t length = 0;
@@ -156,18 +158,18 @@ inline void serializeMooseFsPacket(std::vector<uint8_t>& buffer,
 }
 
 template<class... Data>
-inline std::vector<uint8_t> buildMooseFsPacket(const Data&... args) {
+inline std::vector<uint8_t> buildXaunaFsPacket(const Data&... args) {
 	std::vector<uint8_t> ret;
-	serializeMooseFsPacket(ret, args...);
+	serializeXaunaFsPacket(ret, args...);
 	return ret;
 }
 
 /*
- * Assembles initial segment of a MooseFS packet (without version),
+ * Assembles initial segment of a XaunaFS packet (without version),
  * sets bigger length in the header to accommodate data appended later.
  */
 template<class... Args>
-inline void serializeMooseFsPacketPrefix(std::vector<uint8_t>& buffer, uint32_t extraLength,
+inline void serializeXaunaFsPacketPrefix(std::vector<uint8_t>& buffer, uint32_t extraLength,
 		const PacketHeader::Type& type, const Args &...args) {
 	sassert(type <= PacketHeader::kMaxOldPacketType);
 	uint32_t length = serializedSize(args...) + extraLength;
@@ -181,7 +183,7 @@ inline void serializeMooseFsPacketPrefix(std::vector<uint8_t>& buffer, uint32_t 
  *
  * Some procedures have two versions:
  *   NoHeader   - version for headerless packet fragments
- *   SkipHeader - version for packets with full MooseFS header
+ *   SkipHeader - version for packets with full XaunaFS header
  *
  * If the function name contains All infix, it means that the function will throw
  * IncorrectDeserializationException when the buffer is too long
@@ -258,7 +260,7 @@ inline void deserializePacketDataSkipHeader(const std::vector<uint8_t>& source, 
 }
 
 template<class... Data>
-inline void deserializeAllMooseFsPacketDataNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
+inline void deserializeAllXaunaFsPacketDataNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
 		Data &...args) {
 	uint32_t bytesNotUsed = deserialize(source, bytesInBuffer, args...);
 	if (bytesNotUsed > 0) {
@@ -267,24 +269,24 @@ inline void deserializeAllMooseFsPacketDataNoHeader(const uint8_t* source, uint3
 }
 
 template<class... Data>
-inline void deserializeAllMooseFsPacketDataNoHeader(const std::vector<uint8_t>& source,
+inline void deserializeAllXaunaFsPacketDataNoHeader(const std::vector<uint8_t>& source,
 		Data &...args) {
-	deserializeAllMooseFsPacketDataNoHeader(source.data(), source.size(), args...);
+	deserializeAllXaunaFsPacketDataNoHeader(source.data(), source.size(), args...);
 }
 
 template<class... Data>
-inline void deserializeMooseFsPacketPrefixNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
+inline void deserializeXaunaFsPacketPrefixNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
 		Data &...args) {
 	deserialize(source, bytesInBuffer, args...);
 }
 
 template<class... Data>
-inline void deserializeMooseFsPacketPrefixNoHeader(const std::vector<uint8_t>& source,
+inline void deserializeXaunaFsPacketPrefixNoHeader(const std::vector<uint8_t>& source,
 		Data &...args) {
-	deserializeMooseFsPacketPrefixNoHeader(source.data(), source.size(), args...);
+	deserializeXaunaFsPacketPrefixNoHeader(source.data(), source.size(), args...);
 }
 
-// check whether a LizardFS packet has expected version
+// check whether a SaunaFS packet has expected version
 inline void verifyPacketVersionNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
 		PacketVersion expectedVersion) {
 	PacketVersion actualVersion;

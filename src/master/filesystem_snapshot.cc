@@ -1,19 +1,20 @@
 /*
    Copyright 2015-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -41,23 +42,23 @@ uint8_t fs_snapshot(const FsContext &context, uint32_t inode_src, uint32_t paren
 	FSNode *src_node = nullptr;
 	FSNode *dst_parent_node = nullptr;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent_dst, &dst_parent_node);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_R, inode_src,
 	                                        &src_node);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (src_node->type == FSNode::kDirectory) {
 		if (src_node == dst_parent_node ||
 		    fsnodes_isancestor(static_cast<FSNodeDirectory *>(src_node), dst_parent_node)) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 	}
 

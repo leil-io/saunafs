@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -45,7 +47,7 @@
 #include "common/loop_watchdog.h"
 #include "common/main.h"
 #include "common/massert.h"
-#include "common/moosefs_vector.h"
+#include "common/xaunafs_vector.h"
 #include "common/output_packet.h"
 #include "common/random.h"
 #include "common/slogger.h"
@@ -55,7 +57,7 @@
 #include "protocol/cstoma.h"
 #include "protocol/input_packet.h"
 #include "protocol/matocs.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
 
 #define MaxPacketSize 10000
@@ -154,16 +156,23 @@ void masterconn_create_attached_packet(masterconn *eptr, MessageBuffer serialize
 }
 
 template<class... Data>
-void masterconn_create_attached_moosefs_packet(masterconn *eptr,
+void masterconn_create_attached_xaunafs_packet(masterconn *eptr,
 		PacketHeader::Type type, const Data&... data) {
 	std::vector<uint8_t> buffer;
-	serializeMooseFsPacket(buffer, type, data...);
+	serializeXaunaFsPacket(buffer, type, data...);
 	masterconn_create_attached_packet(eptr, std::move(buffer));
 }
 
 void masterconn_sendregisterlabel(masterconn *eptr) {
 	if (eptr->mode == CONNECTED) {
 		masterconn_create_attached_packet(eptr, cstoma::registerLabel::build(gLabel));
+	}
+}
+
+void masterconn_send_metalogger_config(masterconn *eptr) {
+	if (eptr->mode == CONNECTED) {
+		masterconn_create_attached_packet(
+		    eptr, cstoma::registerConfig::build(cfg_yaml_string()));
 	}
 }
 
@@ -176,51 +185,58 @@ void masterconn_sendregister(masterconn *eptr) {
 
 	myip = mainNetworkThreadGetListenIp();
 	myport = mainNetworkThreadGetListenPort();
-	masterconn_create_attached_packet(eptr, cstoma::registerHost::build(myip, myport, Timeout_ms, LIZARDFS_VERSHEX));
+	masterconn_create_attached_packet(
+	    eptr, cstoma::registerHost::build(myip, myport, Timeout_ms,
+	                                      SAUNAFS_VERSHEX));
 
-	hdd_foreach_chunk_in_bulks([eptr](const std::vector<ChunkWithVersionAndType> &chunksBulk) {
-			masterconn_create_attached_packet(eptr, cstoma::registerChunks::build(chunksBulk));
-		});
+	hddForeachChunkInBulks(
+	    [eptr](const std::vector<ChunkWithVersionAndType> &chunksBulk) {
+		    masterconn_create_attached_packet(
+		        eptr, cstoma::registerChunks::build(chunksBulk));
+	    });
 
-	hdd_get_space(&usedspace,&totalspace,&chunkcount,&tdusedspace,&tdtotalspace,&tdchunkcount);
-	auto registerSpace = cstoma::registerSpace::build(
-			usedspace, totalspace, chunkcount, tdusedspace, tdtotalspace, tdchunkcount);
+	hddGetTotalSpace(&usedspace, &totalspace, &chunkcount, &tdusedspace,
+	                 &tdtotalspace, &tdchunkcount);
+	auto registerSpace =
+	    cstoma::registerSpace::build(usedspace, totalspace, chunkcount,
+	                                 tdusedspace, tdtotalspace, tdchunkcount);
 	masterconn_create_attached_packet(eptr, std::move(registerSpace));
 	masterconn_sendregisterlabel(eptr);
+	masterconn_send_metalogger_config(eptr);
 }
 
 void masterconn_check_hdd_reports() {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t errorcounter;
 	if (eptr->mode == CONNECTED) {
-		if (hdd_spacechanged()) {
+		if (hddGetAndResetSpaceChanged()) {
 			uint64_t usedspace,totalspace,tdusedspace,tdtotalspace;
 			uint32_t chunkcount,tdchunkcount;
-			hdd_get_space(&usedspace, &totalspace, &chunkcount, &tdusedspace, &tdtotalspace,
+			hddGetTotalSpace(&usedspace, &totalspace, &chunkcount, &tdusedspace, &tdtotalspace,
 					&tdchunkcount);
-			masterconn_create_attached_moosefs_packet(
+			masterconn_create_attached_xaunafs_packet(
 					eptr, CSTOMA_SPACE,
 					usedspace, totalspace, chunkcount, tdusedspace, tdtotalspace, tdchunkcount);
 		}
-		errorcounter = hdd_errorcounter();
+		errorcounter = hddGetAndResetErrorCounter();
 		while (errorcounter) {
-			masterconn_create_attached_moosefs_packet(eptr, CSTOMA_ERROR_OCCURRED);
+			masterconn_create_attached_xaunafs_packet(eptr, CSTOMA_ERROR_OCCURRED);
 			errorcounter--;
 		}
 
 		std::vector<ChunkWithType> chunks_with_type;
-		hdd_get_damaged_chunks(chunks_with_type, 1000);
+		hddGetDamagedChunks(chunks_with_type, 1000);
 		if (!chunks_with_type.empty()) {
 			masterconn_create_attached_packet(eptr, cstoma::chunkDamaged::build(chunks_with_type));
 		}
 
-		hdd_get_lost_chunks(chunks_with_type, 1000);
+		hddGetLostChunks(chunks_with_type, 1000);
 		if (!chunks_with_type.empty()) {
 			masterconn_create_attached_packet(eptr, cstoma::chunkLost::build(chunks_with_type));
 		}
 
 		std::vector<ChunkWithVersionAndType> chunks_with_version;
-		hdd_get_new_chunks(chunks_with_version, 1000);
+		hddGetNewChunks(chunks_with_version, 1000);
 		if (!chunks_with_version.empty()) {
 			masterconn_create_attached_packet(eptr, cstoma::chunkNew::build(chunks_with_version));
 		}
@@ -239,7 +255,7 @@ void masterconn_jobfinished(uint8_t status, void *packet) {
 	}
 }
 
-void masterconn_lizjobfinished(uint8_t status, void *packet) {
+void masterconn_saujobfinished(uint8_t status, void *packet) {
 	OutputPacket* outputPacket = static_cast<OutputPacket*>(packet);
 	masterconn *eptr = masterconnsingleton;
 	if (eptr->mode == CONNECTED) {
@@ -288,8 +304,8 @@ void masterconn_create(masterconn */*eptr*/, const std::vector<uint8_t> &data) {
 
 	matocs::createChunk::deserialize(data, chunkId, chunkType, chunkVersion);
 	OutputPacket *outputPacket = new OutputPacket;
-	cstoma::createChunk::serialize(outputPacket->packet, chunkId, chunkType, LIZARDFS_STATUS_OK);
-	job_create(jpool, masterconn_lizjobfinished, outputPacket, chunkId, chunkType, chunkVersion);
+	cstoma::createChunk::serialize(outputPacket->packet, chunkId, chunkType, SAUNAFS_STATUS_OK);
+	job_create(jpool, masterconn_saujobfinished, outputPacket, chunkId, chunkType, chunkVersion);
 }
 
 void masterconn_delete(masterconn */*eptr*/, const std::vector<uint8_t>& data) {
@@ -300,7 +316,7 @@ void masterconn_delete(masterconn */*eptr*/, const std::vector<uint8_t>& data) {
 	matocs::deleteChunk::deserialize(data, chunkId, chunkType, chunkVersion);
 	OutputPacket* outputPacket = new OutputPacket;
 	cstoma::deleteChunk::serialize(outputPacket->packet, chunkId, chunkType, 0);
-	job_delete(jpool, masterconn_lizjobfinished, outputPacket, chunkId, chunkVersion, chunkType);
+	job_delete(jpool, masterconn_saujobfinished, outputPacket, chunkId, chunkVersion, chunkType);
 }
 
 void masterconn_setversion(masterconn */*eptr*/, const std::vector<uint8_t>& data) {
@@ -312,7 +328,7 @@ void masterconn_setversion(masterconn */*eptr*/, const std::vector<uint8_t>& dat
 	matocs::setVersion::deserialize(data, chunkId, chunkType, chunkVersion, newVersion);
 	OutputPacket* outputPacket = new OutputPacket;
 	cstoma::setVersion::serialize(outputPacket->packet, chunkId, chunkType, 0);
-	job_version(jpool, masterconn_lizjobfinished, outputPacket, chunkId, chunkVersion, chunkType,
+	job_version(jpool, masterconn_saujobfinished, outputPacket, chunkId, chunkVersion, chunkType,
 			newVersion);
 }
 
@@ -325,7 +341,7 @@ void masterconn_duplicate(masterconn* /*eptr*/,const std::vector<uint8_t>& data)
 			oldChunkId, oldChunkVersion);
 	OutputPacket* outputPacket = new OutputPacket;
 	cstoma::duplicateChunk::serialize(outputPacket->packet, newChunkId, chunkType, 0);
-	job_duplicate(jpool, masterconn_lizjobfinished, outputPacket, oldChunkId,
+	job_duplicate(jpool, masterconn_saujobfinished, outputPacket, oldChunkId,
 			oldChunkVersion, oldChunkVersion, chunkType, newChunkId, newChunkVersion);
 }
 
@@ -339,7 +355,7 @@ void masterconn_truncate(masterconn */*eptr*/, const std::vector<uint8_t>& data)
 	matocs::truncateChunk::deserialize(data, chunkId, chunkType, chunkLength, newVersion, version);
 	OutputPacket* outputPacket = new OutputPacket;
 	cstoma::truncate::serialize(outputPacket->packet, chunkId, chunkType, 0);
-	job_truncate(jpool, masterconn_lizjobfinished, outputPacket, chunkId, chunkType, version,
+	job_truncate(jpool, masterconn_saujobfinished, outputPacket, chunkId, chunkType, version,
 			newVersion, chunkLength);
 }
 
@@ -353,7 +369,7 @@ void masterconn_duptrunc(masterconn* /*eptr*/, const std::vector<uint8_t>& data)
 			chunkType, chunkId, chunkVersion, newLength);
 	OutputPacket* outputPacket = new OutputPacket;
 	cstoma::duptruncChunk::serialize(outputPacket->packet, copyChunkId, chunkType, 0);
-	job_duptrunc(jpool, masterconn_lizjobfinished, outputPacket, chunkId,
+	job_duptrunc(jpool, masterconn_saujobfinished, outputPacket, chunkId,
 			chunkVersion, chunkVersion, chunkType, copyChunkId, copyChunkVersion, newLength);
 }
 
@@ -367,7 +383,7 @@ void masterconn_chunkop(masterconn *eptr,const uint8_t *data,uint32_t length) {
 	void *packet;
 
 	if (length!=8+4+8+4+4+4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOCS_CHUNKOP - wrong size (%" PRIu32 "/32)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MATOCS_CHUNKOP - wrong size (%" PRIu32 "/32)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -402,49 +418,16 @@ void masterconn_replicate(const std::vector<uint8_t>& data) {
 
 	OutputPacket* outputPacket = new OutputPacket;
 	cstoma::replicateChunk::serialize(outputPacket->packet,
-			chunkId, chunkType, LIZARDFS_STATUS_OK, chunkVersion);
-	lzfs_silent_syslog(LOG_DEBUG, "cs.matocs.replicate %" PRIu64, chunkId);
-	if (hdd_scans_in_progress()) {
-		// Folder scan in progress - replication is not possible
-		masterconn_lizjobfinished(LIZARDFS_ERROR_WAITING, outputPacket);
+			chunkId, chunkType, SAUNAFS_STATUS_OK, chunkVersion);
+	safs_silent_syslog(LOG_DEBUG, "cs.matocs.replicate %" PRIu64, chunkId);
+	if (hddScansInProgress()) {
+		// Disk scan in progress - replication is not possible
+		masterconn_saujobfinished(SAUNAFS_ERROR_WAITING, outputPacket);
 	} else {
-		job_replicate(jpool, masterconn_lizjobfinished, outputPacket,
+		job_replicate(jpool, masterconn_saujobfinished, outputPacket,
 				chunkId, chunkVersion, chunkType, sourcesBufferSize, sourcesBuffer);
 	}
 
-}
-
-void masterconn_legacy_replicate(masterconn *eptr,const uint8_t *data,uint32_t length) {
-	uint64_t chunkid;
-	uint32_t version;
-	uint32_t ip;
-	uint16_t port;
-	uint8_t *ptr;
-	void *packet;
-
-	if (length!=8+4+4+2 && (length<12+18 || length>12+18*100 || (length-12)%18!=0)) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOCS_REPLICATE - wrong size (%" PRIu32 "/18|12+n*18[n:1..100])",length);
-		eptr->mode = KILL;
-		return;
-	}
-	chunkid = get64bit(&data);
-	version = get32bit(&data);
-	lzfs_silent_syslog(LOG_DEBUG, "cs.matocs.replicate %" PRIu64, chunkid);
-	packet = masterconn_create_detached_packet(CSTOMA_REPLICATE,8+4+1);
-	ptr = masterconn_get_packet_data(packet);
-	put64bit(&ptr,chunkid);
-	put32bit(&ptr,version);
-
-	if (hdd_scans_in_progress()) {
-		masterconn_replicationfinished(LIZARDFS_ERROR_WAITING, packet);
-	} else if (length==8+4+4+2) {
-		ip = get32bit(&data);
-		port = get16bit(&data);
-//              syslog(LOG_NOTICE,"start job replication (%08" PRIX64 ":%04" PRIX32 ":%04" PRIX32 ":%02" PRIX16 ")",chunkid,version,ip,port);
-		job_legacy_replicate_simple(jpool,masterconn_replicationfinished,packet,chunkid,version,ip,port);
-	} else {
-		job_legacy_replicate(jpool,masterconn_replicationfinished,packet,chunkid,version,(length-12)/18,data);
-	}
 }
 
 void masterconn_gotpacket(masterconn *eptr, PacketHeader header, const MessageBuffer& message) try {
@@ -455,31 +438,28 @@ void masterconn_gotpacket(masterconn *eptr, PacketHeader header, const MessageBu
 			break;
 		case ANTOAN_BAD_COMMAND_SIZE: // for future use
 			break;
-		case LIZ_MATOCS_CREATE_CHUNK:
+		case SAU_MATOCS_CREATE_CHUNK:
 			masterconn_create(eptr, message);
 			break;
-		case LIZ_MATOCS_DELETE_CHUNK:
+		case SAU_MATOCS_DELETE_CHUNK:
 			masterconn_delete(eptr, message);
 			break;
-		case LIZ_MATOCS_SET_VERSION:
+		case SAU_MATOCS_SET_VERSION:
 			masterconn_setversion(eptr, message);
 			break;
-		case LIZ_MATOCS_DUPLICATE_CHUNK:
+		case SAU_MATOCS_DUPLICATE_CHUNK:
 			masterconn_duplicate(eptr, message);
 			break;
-		case MATOCS_REPLICATE:
-			masterconn_legacy_replicate(eptr, message.data(), message.size());
-			break;
-		case LIZ_MATOCS_REPLICATE_CHUNK:
+		case SAU_MATOCS_REPLICATE_CHUNK:
 			masterconn_replicate(message);
 			break;
 		case MATOCS_CHUNKOP:
 			masterconn_chunkop(eptr, message.data(), message.size());
 			break;
-		case LIZ_MATOCS_TRUNCATE:
+		case SAU_MATOCS_TRUNCATE:
 			masterconn_truncate(eptr, message);
 			break;
-		case LIZ_MATOCS_DUPTRUNC_CHUNK:
+		case SAU_MATOCS_DUPTRUNC_CHUNK:
 			masterconn_duptrunc(eptr, message);
 			break;
 //              case MATOCS_STRUCTURE_LOG:
@@ -489,11 +469,11 @@ void masterconn_gotpacket(masterconn *eptr, PacketHeader header, const MessageBu
 //                      masterconn_structure_log_rotate(eptr, message.data(), message.size());
 //                      break;
 		default:
-			lzfs_pretty_syslog(LOG_NOTICE,"got unknown message (type:%" PRIu32 ")", header.type);
+			safs_pretty_syslog(LOG_NOTICE,"got unknown message (type:%" PRIu32 ")", header.type);
 			eptr->mode = KILL;
 	}
 } catch (IncorrectDeserializationException& e) {
-	lzfs_pretty_syslog(LOG_NOTICE,
+	safs_pretty_syslog(LOG_NOTICE,
 			"chunkserver <-> master module: got inconsistent message "
 			"(type:%" PRIu32 ", length:%" PRIu32"), %s",
 			header.type, uint32_t(message.size()), e.what());
@@ -545,28 +525,28 @@ int masterconn_initconnect(masterconn *eptr) {
 				eptr->masterport = mport;
 				eptr->masteraddrvalid = 1;
 			} else {
-				lzfs_pretty_syslog(LOG_WARNING,"master connection module: localhost (%u.%u.%u.%u) can't be used for connecting with master (use ip address of network controller)",(mip>>24)&0xFF,(mip>>16)&0xFF,(mip>>8)&0xFF,mip&0xFF);
+				safs_pretty_syslog(LOG_WARNING,"master connection module: localhost (%u.%u.%u.%u) can't be used for connecting with master (use ip address of network controller)",(mip>>24)&0xFF,(mip>>16)&0xFF,(mip>>8)&0xFF,mip&0xFF);
 				return -1;
 			}
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,"master connection module: can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
+			safs_pretty_syslog(LOG_WARNING,"master connection module: can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
 			return -1;
 		}
 	}
 	eptr->sock=tcpsocket();
 	if (eptr->sock<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"master connection module: create socket error");
+		safs_pretty_errlog(LOG_WARNING,"master connection module: create socket error");
 		return -1;
 	}
 	if (tcpnonblock(eptr->sock)<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"master connection module: set nonblock error");
+		safs_pretty_errlog(LOG_WARNING,"master connection module: set nonblock error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		return -1;
 	}
 	if (eptr->bindip>0) {
 		if (tcpnumbind(eptr->sock,eptr->bindip,0)<0) {
-			lzfs_pretty_errlog(LOG_WARNING,"master connection module: can't bind socket to given ip");
+			safs_pretty_errlog(LOG_WARNING,"master connection module: can't bind socket to given ip");
 			tcpclose(eptr->sock);
 			eptr->sock = -1;
 			return -1;
@@ -574,18 +554,18 @@ int masterconn_initconnect(masterconn *eptr) {
 	}
 	status = tcpnumconnect(eptr->sock,eptr->masterip,eptr->masterport);
 	if (status<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"master connection module: connect failed");
+		safs_pretty_errlog(LOG_WARNING,"master connection module: connect failed");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		eptr->masteraddrvalid = 0;
 		return -1;
 	}
 	if (status==0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"connected to Master immediately");
+		safs_pretty_syslog(LOG_NOTICE,"connected to Master immediately");
 		masterconn_connected(eptr);
 	} else {
 		eptr->mode = CONNECTING;
-		lzfs_pretty_syslog_attempt(LOG_NOTICE,"connecting to Master");
+		safs_pretty_syslog_attempt(LOG_NOTICE,"connecting to Master");
 	}
 	return 0;
 }
@@ -595,13 +575,13 @@ void masterconn_connecttest(masterconn *eptr) {
 
 	status = tcpgetstatus(eptr->sock);
 	if (status) {
-		lzfs_silent_errlog(LOG_WARNING,"connection failed, error");
+		safs_silent_errlog(LOG_WARNING,"connection failed, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		eptr->mode = FREE;
 		eptr->masteraddrvalid = 0;
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,"connected to Master");
+		safs_pretty_syslog(LOG_NOTICE,"connected to Master");
 		masterconn_connected(eptr);
 	}
 }
@@ -617,12 +597,12 @@ void masterconn_read(masterconn *eptr) {
 		uint32_t bytesToRead = eptr->inputPacket.bytesToBeRead();
 		ssize_t ret = read(eptr->sock, eptr->inputPacket.pointerToBeReadInto(), bytesToRead);
 		if (ret == 0) {
-			lzfs_silent_syslog(LOG_NOTICE, "connection reset by Master");
+			safs_silent_syslog(LOG_NOTICE, "connection reset by Master");
 			eptr->mode = KILL;
 			return;
 		} else if (ret < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "read from Master error");
+				safs_silent_errlog(LOG_NOTICE, "read from Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -632,7 +612,7 @@ void masterconn_read(masterconn *eptr) {
 		try {
 			eptr->inputPacket.increaseBytesRead(ret);
 		} catch (InputPacketTooLongException& ex) {
-			lzfs_silent_syslog(LOG_WARNING, "reading from master: %s", ex.what());
+			safs_silent_syslog(LOG_WARNING, "reading from master: %s", ex.what());
 			eptr->mode = KILL;
 			return;
 		}
@@ -663,7 +643,7 @@ void masterconn_write(masterconn *eptr) {
 				pack.packet.size() - pack.bytesSent);
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"write to Master error");
+				safs_silent_errlog(LOG_NOTICE,"write to Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -716,7 +696,7 @@ void masterconn_send_status() {
 	masterconn *eptr = masterconnsingleton;
 
 	if (gEnableLoadFactor) {
-		uint8_t load_factor = hdd_get_load_factor();
+		uint8_t load_factor = hddGetLoadFactor();
 		if (eptr->mode == CONNECTED && load_factor != prev_factor) {
 			masterconn_create_attached_packet(eptr,
 				cstoma::status::build(load_factor));
@@ -757,7 +737,7 @@ void masterconn_serve(const std::vector<pollfd> &pdesc) {
 				eptr->mode = KILL;
 			}
 			if ((eptr->mode == CONNECTED) && eptr->lastwrite.elapsed_ms() > (Timeout_ms/3) && eptr->outputPackets.empty()) {
-				masterconn_create_attached_moosefs_packet(eptr, ANTOAN_NOP);
+				masterconn_create_attached_xaunafs_packet(eptr, ANTOAN_NOP);
 			}
 		}
 	}
@@ -792,7 +772,7 @@ bool masterconn_load_label() {
 	std::string oldLabel = gLabel;
 	gLabel = cfg_getstring("LABEL", MediaLabelManager::kWildcard);
 	if (!MediaLabelManager::isLabelValid(gLabel)) {
-		lzfs_pretty_syslog(LOG_WARNING,"invalid label '%s'", gLabel.c_str());
+		safs_pretty_syslog(LOG_WARNING,"invalid label '%s'", gLabel.c_str());
 		return false;
 	}
 	return gLabel != oldLabel;
@@ -806,7 +786,7 @@ void masterconn_reload(void) {
 	free(MasterPort);
 	free(BindHost);
 
-	MasterHost = cfg_getstr("MASTER_HOST","mfsmaster");
+	MasterHost = cfg_getstr("MASTER_HOST","sfsmaster");
 	MasterPort = cfg_getstr("MASTER_PORT","9420");
 	BindHost = cfg_getstr("BIND_HOST","*");
 
@@ -830,10 +810,10 @@ void masterconn_reload(void) {
 					eptr->mode = KILL;
 				}
 			} else {
-				lzfs_pretty_syslog(LOG_WARNING,"master connection module: localhost (%u.%u.%u.%u) can't be used for connecting with master (use ip address of network controller)",(mip>>24)&0xFF,(mip>>16)&0xFF,(mip>>8)&0xFF,mip&0xFF);
+				safs_pretty_syslog(LOG_WARNING,"master connection module: localhost (%u.%u.%u.%u) can't be used for connecting with master (use ip address of network controller)",(mip>>24)&0xFF,(mip>>16)&0xFF,(mip>>8)&0xFF,mip&0xFF);
 			}
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,"master connection module: can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
+			safs_pretty_syslog(LOG_WARNING,"master connection module: can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
 		}
 	} else {
 		eptr->masteraddrvalid=0;
@@ -846,6 +826,7 @@ void masterconn_reload(void) {
 	if (masterconn_load_label()) {
 		masterconn_sendregisterlabel(eptr);
 	}
+	masterconn_send_metalogger_config(eptr);
 
 	eventloop_timechange(reconnect_hook,TIMEMODE_RUN_LATE,ReconnectionDelay,0);
 }
@@ -855,7 +836,7 @@ int masterconn_init(void) {
 	masterconn *eptr;
 
 	ReconnectionDelay = cfg_getuint32("MASTER_RECONNECTION_DELAY",5);
-	MasterHost = cfg_getstr("MASTER_HOST","mfsmaster");
+	MasterHost = cfg_getstr("MASTER_HOST","sfsmaster");
 	MasterPort = cfg_getstr("MASTER_PORT","9420");
 	BindHost = cfg_getstr("BIND_HOST","*");
 	Timeout_ms = get_cfg_timeout();

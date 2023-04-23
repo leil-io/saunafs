@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -41,10 +43,10 @@
 #include "common/event_loop.h"
 #include "common/goal.h"
 #include "common/hashfn.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/output_packet.h"
 #include "common/random.h"
 #include "common/slice_traits.h"
@@ -59,7 +61,7 @@
 #include "protocol/cstoma.h"
 #include "protocol/input_packet.h"
 #include "protocol/matocs.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
 
 #define MaxPacketSize 500000000
@@ -374,7 +376,7 @@ std::vector<std::pair<matocsserventry *, ChunkPartType>> matocsserv_getservers_f
 	for (matocsserventry *eptr = matocsservhead; eptr != nullptr; eptr = eptr->next) {
 		if (eptr->mode != KILL && eptr->totalspace > 0 &&
 		    eptr->usedspace <= eptr->totalspace &&
-		    (eptr->totalspace - eptr->usedspace) >= MFSCHUNKSIZE) {
+		    (eptr->totalspace - eptr->usedspace) >= SFSCHUNKSIZE) {
 
 			// A good weight formula will do the following:
 			//   * Agree with the chunk balancing algorithm, i.e. avoid creating a distribution which
@@ -415,8 +417,8 @@ std::vector<std::pair<matocsserventry *, ChunkPartType>> matocsserv_getservers_f
 				[&slice](int i){
 			return slice_traits::isDataPart(ChunkPartType(slice.getType(), i));
 		}));
-		std::random_shuffle(shuffle.begin(), shuffle.begin() + data_count);
-		std::random_shuffle(shuffle.begin() + data_count, shuffle.begin() + slice.size());
+		std::shuffle(shuffle.begin(), shuffle.begin() + data_count, kRandomEngine);
+		std::shuffle(shuffle.begin() + data_count, shuffle.begin() + slice.size(), kRandomEngine);
 
 		uint32_t min_version = std::max({
 			slice_traits::isXor(slice) ? kFirstXorVersion : 0,
@@ -482,7 +484,8 @@ void matocsserv_getservers_lessrepl(const MediaLabel &label, uint32_t min_chunks
 			temporarily_unavailable++;
 		}
 	}
-	std::random_shuffle(servers.begin(), servers.end());
+
+	std::shuffle(servers.begin(), servers.end(), kRandomEngine);
 	std::sort(servers.begin(), servers.end(), matocsserventry::lessUsedAndLoaded);
 	if (gAvoidSameIpChunkservers) {
 		counting_sort(servers, [&ip_counter](matocsserventry *server) {
@@ -599,7 +602,7 @@ void matocsserv_got_chunk_checksum(matocsserventry *eptr,const uint8_t *data,uin
 	uint32_t version,checksum;
 	uint8_t status;
 	if (length!=8+4+1 && length!=8+4+4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOAN_CHUNK_CHECKSUM - wrong size (%" PRIu32 "/13|16)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOAN_CHUNK_CHECKSUM - wrong size (%" PRIu32 "/13|16)",length);
 		eptr->mode=KILL;
 		return ;
 	}
@@ -608,11 +611,11 @@ void matocsserv_got_chunk_checksum(matocsserventry *eptr,const uint8_t *data,uin
 	version = get32bit(&data);
 	if (length==8+4+1) {
 		status = get8bit(&data);
-		lzfs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " calculate checksum status: %s",
-		       eptr->servstrip, eptr->servport, chunkid, lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " calculate checksum status: %s",
+		       eptr->servstrip, eptr->servport, chunkid, saunafs_error_string(status));
 	} else {
 		checksum = get32bit(&data);
-		lzfs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " calculate checksum: %08" PRIX32,eptr->servstrip,eptr->servport,chunkid,checksum);
+		safs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " calculate checksum: %08" PRIX32,eptr->servstrip,eptr->servport,chunkid,checksum);
 	}
 	(void)version;
 }
@@ -624,7 +627,7 @@ int matocsserv_send_createchunk(matocsserventry *eptr, uint64_t chunkId, ChunkPa
 		if (eptr->version < kFirstXorVersion) {
 			// send old packet when chunkserver doesn't support xor chunks
 			sassert(slice_traits::isStandard(chunkType));
-			serializeMooseFsPacket(eptr->outputPackets.back().packet, MATOCS_CREATE, chunkId,
+			serializeXaunaFsPacket(eptr->outputPackets.back().packet, MATOCS_CREATE, chunkId,
 					chunkVersion);
 		} else if (eptr->version < kFirstECVersion) {
 			sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -644,7 +647,7 @@ void matocsserv_got_createchunk_status(matocsserventry *eptr, const std::vector<
 	uint8_t status;
 	if (eptr->version < kFirstXorVersion) {
 		// get old packet when chunkserver doesn't support xor chunks
-		deserializeAllMooseFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
 	}
 	else {
 		PacketVersion v;
@@ -659,8 +662,8 @@ void matocsserv_got_createchunk_status(matocsserventry *eptr, const std::vector<
 	}
 	chunk_got_create_status(eptr, chunkId, chunkType, status);
 	if (status != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " creation status: %s",
-				eptr->servstrip, eptr->servport, chunkId, lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " creation status: %s",
+				eptr->servstrip, eptr->servport, chunkId, saunafs_error_string(status));
 	}
 }
 
@@ -671,7 +674,7 @@ int matocsserv_send_deletechunk(matocsserventry *eptr, uint64_t chunkId, uint32_
 		if (eptr->version < kFirstXorVersion) {
 			// send old packet when chunkserver doesn't support xor chunks
 			sassert(chunkType == slice_traits::standard::ChunkPartType());
-			serializeMooseFsPacket(eptr->outputPackets.back().packet, MATOCS_DELETE,
+			serializeXaunaFsPacket(eptr->outputPackets.back().packet, MATOCS_DELETE,
 					chunkId, chunkVersion);
 		}
 		else if (eptr->version < kFirstECVersion) {
@@ -693,7 +696,7 @@ void matocsserv_got_deletechunk_status(matocsserventry *eptr, const std::vector<
 	uint8_t status;
 
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllMooseFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -709,36 +712,18 @@ void matocsserv_got_deletechunk_status(matocsserventry *eptr, const std::vector<
 	chunk_got_delete_status(eptr, chunkId, chunkType, status);
 	eptr->delcounter--;
 	if (status != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " deletion status: %s",
-				eptr->servstrip, eptr->servport, chunkId, lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " deletion status: %s",
+				eptr->servstrip, eptr->servport, chunkId, saunafs_error_string(status));
 	}
 }
 
-int matocsserv_send_replicatechunk(matocsserventry *eptr, uint64_t chunkid, uint32_t version, matocsserventry *srceptr) {
-	uint8_t *data;
-
-	if (matocsserv_replication_find(chunkid, version, slice_traits::standard::ChunkPartType(), eptr)) {
-		return -1;
-	}
-	if (eptr->mode != KILL && srceptr->mode != KILL) {
-		data = matocsserv_createpacket(eptr, MATOCS_REPLICATE, 8+4+4+2);
-		put64bit(&data, chunkid);
-		put32bit(&data, version);
-		put32bit(&data, srceptr->servip);
-		put16bit(&data, srceptr->servport);
-		matocsserv_replication_begin(chunkid, version, slice_traits::standard::ChunkPartType(), eptr, 1,
-				&srceptr);
-	}
-	return 0;
-}
-
-int matocsserv_send_liz_replicatechunk(matocsserventry *eptr, uint64_t chunkid, uint32_t version, ChunkPartType type,
+int matocsserv_send_sau_replicatechunk(matocsserventry *eptr, uint64_t chunkid, uint32_t version, ChunkPartType type,
 		const std::vector<matocsserventry*> &sourcePointers, const std::vector<ChunkPartType> &sourceTypes) {
 	if (matocsserv_replication_find(chunkid, version, type, eptr)) {
 		return -1;
 	}
 	if (sourcePointers.size() != sourceTypes.size()) {
-		lzfs_pretty_syslog(LOG_ERR, "Inconsistent arguments for liz_replicatechunk (%u != %u)",
+		safs_pretty_syslog(LOG_ERR, "Inconsistent arguments for sau_replicatechunk (%u != %u)",
 				static_cast<unsigned>(sourcePointers.size()),
 				static_cast<unsigned>(sourceTypes.size()));
 		return -1;
@@ -782,32 +767,27 @@ int matocsserv_send_liz_replicatechunk(matocsserventry *eptr, uint64_t chunkid, 
 }
 
 void matocsserv_got_replicatechunk_status(matocsserventry *eptr, const std::vector<uint8_t> &data,
-		 uint32_t packetType) {
+		 uint32_t /*packetType*/) {
 	uint64_t chunkId;
 	uint32_t chunkVersion;
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
 	uint8_t status;
 
-	if (packetType == LIZ_CSTOMA_REPLICATE_CHUNK) {
-		PacketVersion v;
-		deserializePacketVersionNoHeader(data, v);
-		if (v == cstoma::replicateChunk::kECChunks) {
-			cstoma::replicateChunk::deserialize(data, chunkId, chunkType, status, chunkVersion);
-		} else {
-			legacy::ChunkPartType legacy_type;
-			cstoma::replicateChunk::deserialize(data, chunkId, legacy_type, status, chunkVersion);
-			chunkType = legacy_type;
-		}
+	PacketVersion v;
+	deserializePacketVersionNoHeader(data, v);
+	if (v == cstoma::replicateChunk::kECChunks) {
+		cstoma::replicateChunk::deserialize(data, chunkId, chunkType, status, chunkVersion);
 	} else {
-		sassert(packetType == CSTOMA_REPLICATE);
-		deserializeAllMooseFsPacketDataNoHeader(data, chunkId, chunkVersion, status);
+		legacy::ChunkPartType legacy_type;
+		cstoma::replicateChunk::deserialize(data, chunkId, legacy_type, status, chunkVersion);
+		chunkType = legacy_type;
 	}
 
 	matocsserv_replication_end(chunkId, chunkVersion, chunkType, eptr);
 	chunk_got_replicate_status(eptr, chunkId, chunkVersion, chunkType, status);
-	if (status != 0 && status != LIZARDFS_ERROR_WAITING) {
-		lzfs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 " replication status: %s",
-				eptr->servstrip, eptr->servport, chunkId, lizardfs_error_string(status));
+	if (status != 0 && status != SAUNAFS_ERROR_WAITING) {
+		safs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 " replication status: %s",
+				eptr->servstrip, eptr->servport, chunkId, saunafs_error_string(status));
 	}
 }
 
@@ -818,7 +798,7 @@ int matocsserv_send_setchunkversion(matocsserventry *eptr, uint64_t chunkId, uin
 		if (eptr->version < kFirstXorVersion) {
 			// send old packet when chunkserver doesn't support xor chunks
 			sassert(chunkType == slice_traits::standard::ChunkPartType());
-			serializeMooseFsPacket(eptr->outputPackets.back().packet, MATOCS_SET_VERSION,
+			serializeXaunaFsPacket(eptr->outputPackets.back().packet, MATOCS_SET_VERSION,
 					chunkId, newVersion, chunkVersion);
 		} else if (eptr->version < kFirstECVersion) {
 			sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -839,7 +819,7 @@ void matocsserv_got_setchunkversion_status(matocsserventry *eptr,
 	uint8_t status;
 
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllMooseFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -854,8 +834,8 @@ void matocsserv_got_setchunkversion_status(matocsserventry *eptr,
 
 	chunk_got_setversion_status(eptr, chunkId, chunkType, status);
 	if (status != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 " set version status: %s",
-				eptr->servstrip, eptr->servport, chunkId, lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 " set version status: %s",
+				eptr->servstrip, eptr->servport, chunkId, saunafs_error_string(status));
 	}
 }
 
@@ -869,7 +849,7 @@ int matocsserv_send_duplicatechunk(matocsserventry* eptr, uint64_t newChunkId, u
 	if (eptr->version < kFirstXorVersion) {
 		sassert(slice_traits::isStandard(chunkType));
 		// Legacy support
-		serializeMooseFsPacket(outPacket.packet, MATOCS_DUPLICATE, newChunkId, newChunkVersion,
+		serializeXaunaFsPacket(outPacket.packet, MATOCS_DUPLICATE, newChunkId, newChunkVersion,
 				chunkId, chunkVersion);
 	} else if (eptr->version < kFirstECVersion) {
 		sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -888,7 +868,7 @@ void matocsserv_got_duplicatechunk_status(matocsserventry* eptr, const std::vect
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
 	uint8_t status;
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllMooseFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -903,9 +883,9 @@ void matocsserv_got_duplicatechunk_status(matocsserventry* eptr, const std::vect
 
 	chunk_got_duplicate_status(eptr, chunkId, chunkType, status);
 	if (status != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 ", type: %" PRIu8
+		safs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 ", type: %" PRIu8
 				" duplication status: %s", eptr->servstrip, eptr->servport,
-				chunkId, chunkType.getId(), lizardfs_error_string(status));
+				chunkId, chunkType.getId(), saunafs_error_string(status));
 	}
 }
 
@@ -918,7 +898,7 @@ void matocsserv_send_truncatechunk(matocsserventry* eptr, uint64_t chunkid, Chun
 	}
 	if (eptr->version < kFirstXorVersion) {
 		sassert(slice_traits::isStandard(chunkType));
-		// For MooseFS 1.6.27
+		// For XaunaFS 1.6.27
 		data = matocsserv_createpacket(eptr,MATOCS_TRUNCATE,8+4+4+4);
 		put64bit(&data,chunkid);
 		put32bit(&data,length);
@@ -941,7 +921,7 @@ void matocsserv_got_truncatechunk_status(matocsserventry *eptr, const uint8_t *d
 	uint64_t chunkid;
 	uint8_t status;
 	if (length!=8+1) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_TRUNCATE - wrong size (%" PRIu32 "/9)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOMA_TRUNCATE - wrong size (%" PRIu32 "/9)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -950,12 +930,12 @@ void matocsserv_got_truncatechunk_status(matocsserventry *eptr, const uint8_t *d
 	status = get8bit(&data);
 	chunk_got_truncate_status(eptr, chunkid, slice_traits::standard::ChunkPartType(), status);
 	if (status!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " truncate status: %s",
-		       eptr->servstrip, eptr->servport, chunkid, lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 " truncate status: %s",
+		       eptr->servstrip, eptr->servport, chunkid, saunafs_error_string(status));
 	}
 }
 
-void matocsserv_got_liz_truncatechunk_status(matocsserventry *eptr,
+void matocsserv_got_sau_truncatechunk_status(matocsserventry *eptr,
 		const std::vector<uint8_t>& data) {
 	uint64_t chunkId;
 	ChunkPartType chunkType;
@@ -973,9 +953,9 @@ void matocsserv_got_liz_truncatechunk_status(matocsserventry *eptr,
 
 	chunk_got_truncate_status(eptr, chunkId, chunkType, status);
 	if (status!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 ", type: %08" PRIX32
+		safs_pretty_syslog(LOG_NOTICE,"(%s:%" PRIu16 ") chunk: %016" PRIX64 ", type: %08" PRIX32
 				" truncate status: %s", eptr->servstrip, eptr->servport, chunkId,
-				chunkType.getId(), lizardfs_error_string(status));
+				chunkType.getId(), saunafs_error_string(status));
 	}
 }
 
@@ -989,7 +969,7 @@ int matocsserv_send_duptruncchunk(matocsserventry* eptr, uint64_t newChunkId, ui
 	if (eptr->version < kFirstXorVersion) {
 		sassert(slice_traits::isStandard(chunkType));
 		// Legacy support
-		serializeMooseFsPacket(outPacket.packet, MATOCS_DUPTRUNC, newChunkId, newChunkVersion,
+		serializeXaunaFsPacket(outPacket.packet, MATOCS_DUPTRUNC, newChunkId, newChunkVersion,
 				chunkId, chunkVersion, newChunkLength);
 	} else if (eptr->version < kFirstECVersion) {
 		sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -1008,7 +988,7 @@ void matocsserv_got_duptruncchunk_status(matocsserventry* eptr, const std::vecto
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
 	uint8_t status;
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllMooseFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -1023,9 +1003,9 @@ void matocsserv_got_duptruncchunk_status(matocsserventry* eptr, const std::vecto
 
 	chunk_got_duptrunc_status(eptr, chunkId, chunkType, status);
 	if (status != 0) {
-		lzfs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 ", type: %" PRIu8
+		safs_pretty_syslog(LOG_NOTICE, "(%s:%" PRIu16 ") chunk: %016" PRIX64 ", type: %" PRIu8
 				" duplication with truncate status: %s", eptr->servstrip, eptr->servport,
-				chunkId, chunkType.getId(), lizardfs_error_string(status));
+				chunkId, chunkType.getId(), saunafs_error_string(status));
 	}
 }
 
@@ -1036,7 +1016,7 @@ void matocsserv_register_host(matocsserventry *eptr, uint32_t version, uint32_t 
 	eptr->servport = servport;
 	eptr->timeout  = timeout;
 	if (eptr->timeout<10) {
-		lzfs_pretty_syslog(LOG_NOTICE, "CSTOMA_REGISTER communication timeout too small (%"
+		safs_pretty_syslog(LOG_NOTICE, "SAU_CSTOMA_REGISTER communication timeout too small (%"
 				PRIu32 " milliseconds - should be at least 10 milliseconds)", eptr->timeout);
 		eptr->mode=KILL;
 		return;
@@ -1049,18 +1029,18 @@ void matocsserv_register_host(matocsserventry *eptr, uint32_t version, uint32_t 
 	}
 	eptr->servstrip = matocsserv_makestrip(eptr->servip);
 	if (((eptr->servip)&0xFF000000) == 0x7F000000) {
-		lzfs_pretty_syslog(LOG_NOTICE, "chunkserver connected using localhost (IP: %s) - you can't use"
+		safs_pretty_syslog(LOG_NOTICE, "chunkserver connected using localhost (IP: %s) - you can't use"
 				" localhost for communication between chunkserver and master", eptr->servstrip);
 		eptr->mode=KILL;
 		return;
 	}
 	if (csdb_new_connection(eptr->servip,eptr->servport,eptr)<0) {
-		lzfs_pretty_syslog(LOG_WARNING,"chunk-server already connected !!!");
+		safs_pretty_syslog(LOG_WARNING,"chunk-server already connected !!!");
 		eptr->mode=KILL;
 		return;
 	}
 	eptr->csdb = csdb_find(eptr->servip, eptr->servport);
-	lzfs_pretty_syslog(LOG_NOTICE, "chunkserver register begin (packet version: 5) - ip: %s, port: %"
+	safs_pretty_syslog(LOG_NOTICE, "chunkserver register begin (packet version: 5) - ip: %s, port: %"
 			PRIu16, eptr->servstrip, eptr->servport);
 	return;
 }
@@ -1068,188 +1048,14 @@ void matocsserv_register_host(matocsserventry *eptr, uint32_t version, uint32_t 
 void register_space(matocsserventry* eptr) {
 	double us = (double)(eptr->usedspace)/(double)(1024*1024*1024);
 	double ts = (double)(eptr->totalspace)/(double)(1024*1024*1024);
-	lzfs_pretty_syslog(LOG_NOTICE, "chunkserver register end (packet version: 5) - ip: %s, port: %"
+	safs_pretty_syslog(LOG_NOTICE, "chunkserver register end (packet version: 5) - ip: %s, port: %"
 			PRIu16 ", usedspace: %" PRIu64 " (%.2f GiB), totalspace: %" PRIu64 " (%.2f GiB)",
 			eptr->servstrip, eptr->servport, eptr->usedspace, us, eptr->totalspace, ts);
 }
 
-void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint64_t chunkid;
-	uint32_t chunkversion;
-	uint32_t i,chunkcount;
-	uint8_t rversion;
-	double us,ts;
-
-	if (eptr->totalspace>0) {
-		lzfs_pretty_syslog(LOG_WARNING,"got register message from registered chunk-server !!!");
-		eptr->mode=KILL;
-		return;
-	}
-
-	if ((length&1)==0) {
-		if (length<22 || ((length-22)%12)!=0) {
-			lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (old ver.) - wrong size (%" PRIu32 "/22+N*12)",length);
-			eptr->mode=KILL;
-			return;
-		}
-		passert(data);
-		eptr->servip = get32bit(&data);
-		eptr->servport = get16bit(&data);
-		eptr->usedspace = get64bit(&data);
-		eptr->totalspace = get64bit(&data);
-		length-=22;
-		rversion=0;
-	} else {
-		passert(data);
-		rversion = get8bit(&data);
-		if (rversion<=4) {
-			lzfs_pretty_syslog(LOG_NOTICE,"register packet version: %u",rversion);
-		}
-		if (rversion==1) {
-			if (length<39 || ((length-39)%12)!=0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 1) - wrong size (%" PRIu32 "/39+N*12)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			eptr->servip = get32bit(&data);
-			eptr->servport = get16bit(&data);
-			eptr->usedspace = get64bit(&data);
-			eptr->totalspace = get64bit(&data);
-			eptr->todelusedspace = get64bit(&data);
-			eptr->todeltotalspace = get64bit(&data);
-			length-=39;
-		} else if (rversion==2) {
-			if (length<47 || ((length-47)%12)!=0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 2) - wrong size (%" PRIu32 "/47+N*12)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			eptr->servip = get32bit(&data);
-			eptr->servport = get16bit(&data);
-			eptr->usedspace = get64bit(&data);
-			eptr->totalspace = get64bit(&data);
-			eptr->chunkscount = get32bit(&data);
-			eptr->todelusedspace = get64bit(&data);
-			eptr->todeltotalspace = get64bit(&data);
-			eptr->todelchunkscount = get32bit(&data);
-			length-=47;
-		} else if (rversion==3) {
-			if (length<49 || ((length-49)%12)!=0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 3) - wrong size (%" PRIu32 "/49+N*12)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			eptr->servip = get32bit(&data);
-			eptr->servport = get16bit(&data);
-			eptr->timeout = 1000 * get16bit(&data);
-			eptr->usedspace = get64bit(&data);
-			eptr->totalspace = get64bit(&data);
-			eptr->chunkscount = get32bit(&data);
-			eptr->todelusedspace = get64bit(&data);
-			eptr->todeltotalspace = get64bit(&data);
-			eptr->todelchunkscount = get32bit(&data);
-			length-=49;
-		} else if (rversion==4) {
-			if (length<53 || ((length-53)%12)!=0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 4) - wrong size (%" PRIu32 "/53+N*12)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			eptr->version = get32bit(&data);
-			eptr->servip = get32bit(&data);
-			eptr->servport = get16bit(&data);
-			eptr->timeout = 1000 * get16bit(&data);
-			eptr->usedspace = get64bit(&data);
-			eptr->totalspace = get64bit(&data);
-			eptr->chunkscount = get32bit(&data);
-			eptr->todelusedspace = get64bit(&data);
-			eptr->todeltotalspace = get64bit(&data);
-			eptr->todelchunkscount = get32bit(&data);
-			length-=53;
-		} else if (rversion==50) {
-			if (length!=13) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:BEGIN) - wrong size (%" PRIu32 "/13)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			uint32_t version = get32bit(&data);
-			uint32_t servip = get32bit(&data);
-			uint16_t servport = get16bit(&data);
-			uint32_t timeout = 1000 * get16bit(&data);
-			return matocsserv_register_host(eptr, version, servip, servport, timeout);
-		} else if (rversion==51) {
-			if (((length-1)%12)!=0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:CHUNKS) - wrong size (%" PRIu32 "/1+N*12)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			chunkcount = (length-1)/12;
-			for (i=0 ; i<chunkcount ; i++) {
-				chunkid = get64bit(&data);
-				chunkversion = get32bit(&data);
-				chunk_server_has_chunk(eptr, chunkid, chunkversion,
-						slice_traits::standard::ChunkPartType());
-			}
-			return;
-		} else if (rversion==52) {
-			if (length!=41) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:END) - wrong size (%" PRIu32 "/41)",length);
-				eptr->mode=KILL;
-				return;
-			}
-			eptr->usedspace = get64bit(&data);
-			eptr->totalspace = get64bit(&data);
-			eptr->chunkscount = get32bit(&data);
-			eptr->todelusedspace = get64bit(&data);
-			eptr->todeltotalspace = get64bit(&data);
-			eptr->todelchunkscount = get32bit(&data);
-			return register_space(eptr);
-		} else {
-			lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER - wrong version (%" PRIu8 "/1..4)",rversion);
-			eptr->mode=KILL;
-			return;
-		}
-	}
-	if (rversion<=4) {
-		if (eptr->timeout<1000) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_REGISTER communication timeout too small (%" PRIu32
-						" milliseconds - should be at least 1 second)",eptr->timeout);
-				eptr->timeout = 1000;
-				return;
-		}
-		if (eptr->servip==0) {
-			tcpgetpeer(eptr->sock,&(eptr->servip),NULL);
-		}
-		if (eptr->servstrip) {
-			free(eptr->servstrip);
-		}
-		eptr->servstrip = matocsserv_makestrip(eptr->servip);
-		if (((eptr->servip)&0xFF000000) == 0x7F000000) {
-			lzfs_pretty_syslog(LOG_NOTICE,"chunkserver connected using localhost (IP: %s) - you can't use localhost for communication between chunkserver and master", eptr->servstrip);
-			eptr->mode=KILL;
-			return;
-		}
-		us = (double)(eptr->usedspace)/(double)(1024*1024*1024);
-		ts = (double)(eptr->totalspace)/(double)(1024*1024*1024);
-		lzfs_pretty_syslog(LOG_NOTICE,"chunkserver register - ip: %s, port: %" PRIu16 ", usedspace: %" PRIu64 " (%.2f GiB), totalspace: %" PRIu64 " (%.2f GiB)",eptr->servstrip,eptr->servport,eptr->usedspace,us,eptr->totalspace,ts);
-		if (csdb_new_connection(eptr->servip,eptr->servport,eptr)<0) {
-			lzfs_pretty_syslog(LOG_WARNING,"chunk-server already connected !!!");
-			eptr->mode=KILL;
-			return;
-		}
-		eptr->csdb = csdb_find(eptr->servip, eptr->servport);
-		chunkcount = length/(8+4);
-		for (i=0 ; i<chunkcount ; i++) {
-			chunkid = get64bit(&data);
-			chunkversion = get32bit(&data);
-			chunk_server_has_chunk(eptr, chunkid, chunkversion, slice_traits::standard::ChunkPartType());
-		}
-	}
-}
-
 void matocsserv_space(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
 	if (length!=16 && length!=32 && length!=40) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_SPACE - wrong size (%" PRIu32 "/16|32|40)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOMA_SPACE - wrong size (%" PRIu32 "/16|32|40)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -1268,7 +1074,7 @@ void matocsserv_space(matocsserventry *eptr,const uint8_t *data,uint32_t length)
 	}
 }
 
-void matocsserv_liz_register_host(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_register_host(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	uint32_t version;
 	uint32_t servip;
 	uint16_t servport;
@@ -1277,7 +1083,7 @@ void matocsserv_liz_register_host(matocsserventry *eptr, const std::vector<uint8
 	return matocsserv_register_host(eptr, version, servip, servport, timeout);
 }
 
-void matocsserv_liz_register_chunks(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_register_chunks(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	PacketVersion v;
 	deserializePacketVersionNoHeader(data, v);
 	if (v == cstoma::registerChunks::kECChunks) {
@@ -1301,29 +1107,29 @@ void matocsserv_liz_register_chunks(matocsserventry *eptr, const std::vector<uin
 	}
 }
 
-void matocsserv_liz_register_space(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_register_space(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	cstoma::registerSpace::deserialize(data, eptr->usedspace, eptr->totalspace, eptr->chunkscount,
 			eptr->todelusedspace, eptr->todeltotalspace, eptr->todelchunkscount);
 	return register_space(eptr);
 }
 
-void matocsserv_liz_register_label(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_register_label(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	std::string label;
 	cstoma::registerLabel::deserialize(data, label);
 	if (!MediaLabelManager::isLabelValid(label)) {
-		lzfs_pretty_syslog(LOG_NOTICE,"LIZ_CSTOMA_REGISTER_LABEL - wrong label '%s' of chunkserver "
+		safs_pretty_syslog(LOG_NOTICE,"SAU_CSTOMA_REGISTER_LABEL - wrong label '%s' of chunkserver "
 				"(ip: %s, port %" PRIu16 ")", label.c_str(), eptr->servstrip, eptr->servport);
 		eptr->mode = KILL;
 		return;
 	}
 	if (eptr->csdb == nullptr) {
-		lzfs_pretty_syslog(LOG_NOTICE,"LIZ_CSTOMA_REGISTER_LABEL - setting label is possible for registered connections only "
+		safs_pretty_syslog(LOG_NOTICE,"SAU_CSTOMA_REGISTER_LABEL - setting label is possible for registered connections only "
 		                  "(ip: %s, port %" PRIu16 ")", eptr->servstrip, eptr->servport);
 		eptr->mode = KILL;
 		return;
 	}
 	if (label != static_cast<std::string>(eptr->label)) {
-		lzfs_pretty_syslog(LOG_NOTICE, "chunkserver (ip: %s, port %" PRIu16 ") "
+		safs_pretty_syslog(LOG_NOTICE, "chunkserver (ip: %s, port %" PRIu16 ") "
 				"changed its label from '%s' to '%s'",
 				eptr->servstrip, eptr->servport, static_cast<std::string>(eptr->label).c_str(), label.c_str());
 		chunk_server_label_changed(eptr->label, MediaLabel(label));
@@ -1332,7 +1138,24 @@ void matocsserv_liz_register_label(matocsserventry *eptr, const std::vector<uint
 	}
 }
 
-void matocsserv_liz_status(matocsserventry *eptr, const std::vector<uint8_t> &data) {
+void matocsserv_sau_register_config(matocsserventry *eptr,
+                                    const std::vector<uint8_t>& data) {
+	std::string config;
+	cstoma::registerConfig::deserialize(data, config);
+	if (eptr->csdb == nullptr) {
+		safs_pretty_syslog(
+				LOG_NOTICE,
+				"SAU_CSTOMA_REGISTER_CONFIG - setting config is possible for registered connections only (ip: %s, port %" PRIu16 ")",
+				eptr->servstrip,
+				eptr->servport
+				);
+		eptr->mode = KILL;
+		return;
+	}
+	eptr->csdb->config = std::move(config);
+}
+
+void matocsserv_sau_status(matocsserventry *eptr, const std::vector<uint8_t> &data) {
 	uint8_t load_factor;
 	cstoma::status::deserialize(data, load_factor);
 	eptr->load_factor = load_factor;
@@ -1343,13 +1166,13 @@ void matocsserv_chunk_damaged(matocsserventry *eptr,const uint8_t *data,uint32_t
 	uint32_t i;
 
 	if (eptr->version >= kFirstXorVersion) {
-		lzfs_pretty_syslog(LOG_ERR, "Can't properly mark damaged chunks from chunkserver "
+		safs_pretty_syslog(LOG_ERR, "Can't properly mark damaged chunks from chunkserver "
 		"(%s:%" PRIu16 "). Please upgrade it to latest version.", eptr->servstrip, eptr->servport);
 		return;
 	}
 
 	if (length%8!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_CHUNK_DAMAGED - wrong size (%" PRIu32 "/N*8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOMA_CHUNK_DAMAGED - wrong size (%" PRIu32 "/N*8)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -1362,7 +1185,7 @@ void matocsserv_chunk_damaged(matocsserventry *eptr,const uint8_t *data,uint32_t
 	}
 }
 
-void matocsserv_liz_chunk_damaged(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_chunk_damaged(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	PacketVersion v;
 	deserializePacketVersionNoHeader(data, v);
 	if (v == cstoma::chunkDamaged::kECChunks) {
@@ -1385,13 +1208,13 @@ void matocsserv_chunks_lost(matocsserventry *eptr,const uint8_t *data,uint32_t l
 	uint32_t i;
 
 	if (eptr->version >= kFirstXorVersion) {
-		lzfs_pretty_syslog(LOG_ERR, "Can't properly mark lost chunks from chunkserver "
+		safs_pretty_syslog(LOG_ERR, "Can't properly mark lost chunks from chunkserver "
 		"(%s:%" PRIu16 "). Please upgrade it to latest version.", eptr->servstrip, eptr->servport);
 		return;
 	}
 
 	if (length%8!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_CHUNK_LOST - wrong size (%" PRIu32 "/N*8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOMA_CHUNK_LOST - wrong size (%" PRIu32 "/N*8)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -1404,7 +1227,7 @@ void matocsserv_chunks_lost(matocsserventry *eptr,const uint8_t *data,uint32_t l
 	}
 }
 
-void matocsserv_liz_chunks_lost(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_chunks_lost(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	PacketVersion v;
 	deserializePacketVersionNoHeader(data, v);
 	if (v == cstoma::chunkLost::kECChunks) {
@@ -1428,7 +1251,7 @@ void matocsserv_chunks_new(matocsserventry *eptr,const uint8_t *data,uint32_t le
 	uint32_t i;
 
 	if (length%12!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_CHUNK_NEW - wrong size (%" PRIu32 "/N*12)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOMA_CHUNK_NEW - wrong size (%" PRIu32 "/N*12)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -1443,7 +1266,7 @@ void matocsserv_chunks_new(matocsserventry *eptr,const uint8_t *data,uint32_t le
 	}
 }
 
-void matocsserv_liz_chunk_new(matocsserventry *eptr, const std::vector<uint8_t>& data) {
+void matocsserv_sau_chunk_new(matocsserventry *eptr, const std::vector<uint8_t>& data) {
 	PacketVersion v;
 	deserializePacketVersionNoHeader(data, v);
 	if (v == cstoma::chunkNew::kECChunks) {
@@ -1464,7 +1287,7 @@ void matocsserv_liz_chunk_new(matocsserventry *eptr, const std::vector<uint8_t>&
 void matocsserv_error_occurred(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
 	(void)data;
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CSTOMA_ERROR_OCCURRED - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CSTOMA_ERROR_OCCURRED - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -1480,9 +1303,6 @@ void matocsserv_gotpacket(matocsserventry *eptr, PacketHeader header, const Mess
 			case ANTOAN_UNKNOWN_COMMAND: // for future use
 				break;
 			case ANTOAN_BAD_COMMAND_SIZE: // for future use
-				break;
-			case CSTOMA_REGISTER:
-				matocsserv_register(eptr, data.data(), length);
 				break;
 			case CSTOMA_SPACE:
 				matocsserv_space(eptr, data.data(), length);
@@ -1503,67 +1323,69 @@ void matocsserv_gotpacket(matocsserventry *eptr, PacketHeader header, const Mess
 				matocsserv_got_chunk_checksum(eptr, data.data(), length);
 				break;
 			case CSTOMA_CREATE:
-			case LIZ_CSTOMA_CREATE_CHUNK:
+			case SAU_CSTOMA_CREATE_CHUNK:
 				matocsserv_got_createchunk_status(eptr, data);
 				break;
 			case CSTOMA_DELETE:
-			case LIZ_CSTOMA_DELETE_CHUNK:
+			case SAU_CSTOMA_DELETE_CHUNK:
 				matocsserv_got_deletechunk_status(eptr, data);
 				break;
-			case CSTOMA_REPLICATE:
-			case LIZ_CSTOMA_REPLICATE_CHUNK:
+			case SAU_CSTOMA_REPLICATE_CHUNK:
 				matocsserv_got_replicatechunk_status(eptr, data, header.type);
 				break;
 			case CSTOMA_DUPLICATE:
-			case LIZ_CSTOMA_DUPLICATE_CHUNK:
+			case SAU_CSTOMA_DUPLICATE_CHUNK:
 				matocsserv_got_duplicatechunk_status(eptr, data);
 				break;
 			case CSTOMA_SET_VERSION:
-			case LIZ_CSTOMA_SET_VERSION:
+			case SAU_CSTOMA_SET_VERSION:
 				matocsserv_got_setchunkversion_status(eptr, data);
 				break;
 			case CSTOMA_TRUNCATE:
 				matocsserv_got_truncatechunk_status(eptr, data.data(), length);
 				break;
-			case LIZ_CSTOMA_TRUNCATE:
-				matocsserv_got_liz_truncatechunk_status(eptr, data);
+			case SAU_CSTOMA_TRUNCATE:
+				matocsserv_got_sau_truncatechunk_status(eptr, data);
 				break;
 			case CSTOMA_DUPTRUNC:
-			case LIZ_CSTOMA_DUPTRUNC_CHUNK:
+			case SAU_CSTOMA_DUPTRUNC_CHUNK:
 				matocsserv_got_duptruncchunk_status(eptr, data);
 				break;
-			case LIZ_CSTOMA_CHUNK_DAMAGED:
-				matocsserv_liz_chunk_damaged(eptr, data);
+			case SAU_CSTOMA_CHUNK_DAMAGED:
+				matocsserv_sau_chunk_damaged(eptr, data);
 				break;
-			case LIZ_CSTOMA_CHUNK_LOST:
-				matocsserv_liz_chunks_lost(eptr, data);
+			case SAU_CSTOMA_CHUNK_LOST:
+				matocsserv_sau_chunks_lost(eptr, data);
 				break;
-			case LIZ_CSTOMA_CHUNK_NEW:
-				matocsserv_liz_chunk_new(eptr, data);
+			case SAU_CSTOMA_CHUNK_NEW:
+				matocsserv_sau_chunk_new(eptr, data);
 				break;
-			case LIZ_CSTOMA_REGISTER_HOST:
-				matocsserv_liz_register_host(eptr, data);
+			case SAU_CSTOMA_REGISTER_HOST:
+				matocsserv_sau_register_host(eptr, data);
 				break;
-			case LIZ_CSTOMA_REGISTER_CHUNKS:
-				matocsserv_liz_register_chunks(eptr, data);
+			case SAU_CSTOMA_REGISTER_CHUNKS:
+				matocsserv_sau_register_chunks(eptr, data);
 				break;
-			case LIZ_CSTOMA_REGISTER_SPACE:
-				matocsserv_liz_register_space(eptr, data);
+			case SAU_CSTOMA_REGISTER_SPACE:
+				matocsserv_sau_register_space(eptr, data);
 				break;
-			case LIZ_CSTOMA_REGISTER_LABEL:
-				matocsserv_liz_register_label(eptr, data);
+			case SAU_CSTOMA_REGISTER_LABEL:
+				matocsserv_sau_register_label(eptr, data);
 				break;
-			case LIZ_CSTOMA_STATUS:
-				matocsserv_liz_status(eptr, data);
+			case SAU_CSTOMA_REGISTER_CONFIG:
+				matocsserv_sau_register_config(eptr, data);
+				break;
+			case SAU_CSTOMA_STATUS:
+				matocsserv_sau_status(eptr, data);
 				break;
 			default:
-				lzfs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: got unknown message "
+				safs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: got unknown message "
 						"(type:%" PRIu32 ")", header.type);
 				eptr->mode=KILL;
 				break;
 		}
 	} catch (IncorrectDeserializationException& e) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 				"master <-> chunkservers module: got inconsistent message "
 				"(type:%" PRIu32 ", length:%" PRIu32"), %s", header.type, length, e.what());
 		eptr->mode = KILL;
@@ -1572,7 +1394,7 @@ void matocsserv_gotpacket(matocsserventry *eptr, PacketHeader header, const Mess
 
 void matocsserv_term(void) {
 	matocsserventry *eptr,*eaptr;
-	lzfs_pretty_syslog(LOG_INFO,"master <-> chunkservers module: closing %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_INFO,"master <-> chunkservers module: closing %s:%s",ListenHost,ListenPort);
 	tcpclose(lsock);
 
 	eptr = matocsservhead;
@@ -1598,13 +1420,13 @@ void matocsserv_read(matocsserventry *eptr) {
 		uint32_t bytesToRead = eptr->inputPacket.bytesToBeRead();
 		ssize_t ret = read(eptr->sock, eptr->inputPacket.pointerToBeReadInto(), bytesToRead);
 		if (ret == 0) {
-			lzfs_pretty_syslog(LOG_NOTICE, "connection with CS(%s) has been closed by peer",
+			safs_pretty_syslog(LOG_NOTICE, "connection with CS(%s) has been closed by peer",
 					eptr->servstrip);
 			eptr->mode = KILL;
 			return;
 		} else if (ret < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "read from CS(%s) error", eptr->servstrip);
+				safs_silent_errlog(LOG_NOTICE, "read from CS(%s) error", eptr->servstrip);
 				eptr->mode = KILL;
 			}
 			return;
@@ -1613,7 +1435,7 @@ void matocsserv_read(matocsserventry *eptr) {
 		try {
 			eptr->inputPacket.increaseBytesRead(ret);
 		} catch (InputPacketTooLongException& ex) {
-			lzfs_pretty_syslog(LOG_WARNING, "reading from CS(%s): %s", eptr->servstrip, ex.what());
+			safs_pretty_syslog(LOG_WARNING, "reading from CS(%s): %s", eptr->servstrip, ex.what());
 			eptr->mode = KILL;
 			return;
 		}
@@ -1643,7 +1465,7 @@ void matocsserv_write(matocsserventry *eptr) {
 				pack.packet.size() - pack.bytesSent);
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"write to CS(%s) error",eptr->servstrip);
+				safs_silent_errlog(LOG_NOTICE,"write to CS(%s) error",eptr->servstrip);
 				eptr->mode = KILL;
 			}
 			return;
@@ -1681,7 +1503,7 @@ void matocsserv_serve(const std::vector<pollfd> &pdesc) {
 	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN)) {
 		ns=tcpaccept(lsock);
 		if (ns<0) {
-			lzfs_silent_errlog(LOG_NOTICE,"master<->CS socket: accept error");
+			safs_silent_errlog(LOG_NOTICE,"master<->CS socket: accept error");
 		} else if (metadataserver::isMaster()) {
 			tcpnonblock(ns);
 			tcpnodelay(ns);
@@ -1746,7 +1568,7 @@ void matocsserv_serve(const std::vector<pollfd> &pdesc) {
 			double us,ts;
 			us = (double)(eptr->usedspace)/(double)(1024*1024*1024);
 			ts = (double)(eptr->totalspace)/(double)(1024*1024*1024);
-			lzfs_pretty_syslog(LOG_NOTICE,
+			safs_pretty_syslog(LOG_NOTICE,
 					"chunkserver disconnected - ip: %s, port: %" PRIu16
 					", usedspace: %" PRIu64 " (%.2f GiB), totalspace: %" PRIu64
 					" (%.2f GiB)", eptr->servstrip, eptr->servport, eptr->usedspace,
@@ -1781,13 +1603,13 @@ void matocsserv_reload(void) {
 	if (strcmp(oldListenHost,ListenHost)==0 && strcmp(oldListenPort,ListenPort)==0) {
 		free(oldListenHost);
 		free(oldListenPort);
-		lzfs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
+		safs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
 		return;
 	}
 
 	newlsock = tcpsocket();
 	if (newlsock<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"master <-> chunkservers module: socket address has changed, but can't create new socket");
+		safs_pretty_errlog(LOG_WARNING,"master <-> chunkservers module: socket address has changed, but can't create new socket");
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -1798,10 +1620,10 @@ void matocsserv_reload(void) {
 	tcpnodelay(newlsock);
 	tcpreuseaddr(newlsock);
 	if (tcpsetacceptfilter(newlsock)<0 && errno!=ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"master <-> chunkservers module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"master <-> chunkservers module: can't set accept filter");
 	}
 	if (tcpstrlisten(newlsock,ListenHost,ListenPort,100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,"master <-> chunkservers module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
+		safs_pretty_errlog(LOG_ERR,"master <-> chunkservers module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -1809,7 +1631,7 @@ void matocsserv_reload(void) {
 		tcpclose(newlsock);
 		return;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
 	free(oldListenHost);
 	free(oldListenPort);
 	tcpclose(lsock);
@@ -1827,20 +1649,20 @@ int matocsserv_init(void) {
 
 	lsock = tcpsocket();
 	if (lsock<0) {
-		lzfs_pretty_errlog(LOG_ERR,"master <-> chunkservers module: can't create socket");
+		safs_pretty_errlog(LOG_ERR,"master <-> chunkservers module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
 	tcpnodelay(lsock);
 	tcpreuseaddr(lsock);
 	if (tcpsetacceptfilter(lsock)<0 && errno!=ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"master <-> chunkservers module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"master <-> chunkservers module: can't set accept filter");
 	}
 	if (tcpstrlisten(lsock,ListenHost,ListenPort,100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,"master <-> chunkservers module: can't listen on %s:%s",ListenHost,ListenPort);
+		safs_pretty_errlog(LOG_ERR,"master <-> chunkservers module: can't listen on %s:%s",ListenHost,ListenPort);
 		return -1;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: listen on %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"master <-> chunkservers module: listen on %s:%s",ListenHost,ListenPort);
 
 	matocsserv_replication_init();
 	matocsservhead = NULL;

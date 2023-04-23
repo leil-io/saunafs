@@ -4,10 +4,10 @@ metaservers_nr=2
 MASTERSERVERS=$metaservers_nr \
 	CHUNKSERVERS=2 \
 	CHUNKSERVER_EXTRA_CONFIG="MASTER_RECONNECTION_DELAY = 1" \
-	MFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="MAGIC_AUTO_FILE_REPAIR = 1" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 MINIMUM_PARALLEL_JOBS=5
 MAXIMUM_PARALLEL_JOBS=16
@@ -19,8 +19,8 @@ assert_program_installed cmake
 master_kill_loop() {
 	# Start shadow masters
 	for ((shadow_id=1 ; shadow_id<metaservers_nr; ++shadow_id)); do
-		lizardfs_master_n $shadow_id start
-		assert_eventually "lizardfs_shadow_synchronized $shadow_id"
+		saunafs_master_n $shadow_id start
+		assert_eventually "saunafs_shadow_synchronized $shadow_id"
 	done
 
 	loop_nr=0
@@ -34,20 +34,20 @@ master_kill_loop() {
 		loop_nr=$((loop_nr + 1))
 
 		# Kill the previous master
-		assert_eventually "lizardfs_shadow_synchronized $new_master_id"
-		lizardfs_stop_master_without_saving_metadata
-		lizardfs_make_conf_for_shadow $prev_master_id
+		assert_eventually "saunafs_shadow_synchronized $new_master_id"
+		saunafs_stop_master_without_saving_metadata
+		saunafs_make_conf_for_shadow $prev_master_id
 
 		# Promote a next master
-		lizardfs_make_conf_for_master $new_master_id
-		lizardfs_master_daemon reload
+		saunafs_make_conf_for_master $new_master_id
+		saunafs_master_daemon reload
 
 		# Demote previous master to shadow
-		lizardfs_make_conf_for_shadow $prev_master_id
-		lizardfs_master_n $prev_master_id start
-		assert_eventually "lizardfs_shadow_synchronized $prev_master_id"
+		saunafs_make_conf_for_shadow $prev_master_id
+		saunafs_master_n $prev_master_id start
+		assert_eventually "saunafs_shadow_synchronized $prev_master_id"
 
-		lizardfs_wait_for_all_ready_chunkservers
+		saunafs_wait_for_all_ready_chunkservers
 	done
 }
 
@@ -55,9 +55,9 @@ master_kill_loop() {
 master_kill_loop &
 
 cd "${info[mount0]}"
-assert_success git clone https://github.com/lizardfs/lizardfs.git
-lizardfs setgoal -r 2 lizardfs
-mkdir lizardfs/build
-cd lizardfs/build
+assert_success git clone https://github.com/saunafs/saunafs.git
+saunafs setgoal -r 2 saunafs
+mkdir saunafs/build
+cd saunafs/build
 assert_success cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
 assert_success make -j${PARALLEL_JOBS} install

@@ -1,6 +1,7 @@
 CHUNKSERVERS=1 \
+	USE_RAMDISK=YES \
 	CHUNKSERVER_EXTRA_CONFIG="HDD_PUNCH_HOLES = 1" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 file=$(mktemp -p ${info[mount0]})
 hdd=$(cat "${info[chunkserver0_hdd]}")
@@ -24,13 +25,13 @@ fi
 dd if=/dev/urandom of=$file count=16 bs=1024 conv=fsync
 
 sleep 1
-chunk_file=$(find "$hdd" -name 'chunk_*.???')
+chunk_file=$(find "$hdd" -name "chunk_*${chunk_data_extension}")
 full_size=$(stat -c "%b" "$chunk_file")
 
 dd if=/dev/zero of=$file count=6 bs=1024 seek=3 conv=fsync
 
 sleep 1
-chunk_file=$(find "$hdd" -name 'chunk_*.???')
+chunk_file=$(find "$hdd" -name "chunk_*${chunk_data_extension}")
 sparse_size=$(stat -c "%b" "$chunk_file")
 
 if (( $sparse_size >= $full_size )); then

@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -67,7 +68,7 @@ static uint64_t fsnodes_checksum(FSNode *node, bool full_update = false) {
 			hashCombine(seed, static_cast<const FSNodeFile*>(node)->chunks[0]);
 		}
 		// last chunk's id
-		uint32_t lastchunk = (static_cast<const FSNodeFile*>(node)->length - 1) / MFSCHUNKSIZE;
+		uint32_t lastchunk = (static_cast<const FSNodeFile*>(node)->length - 1) / SFSCHUNKSIZE;
 		if (static_cast<const FSNodeFile*>(node)->length == 0 || lastchunk >= static_cast<const FSNodeFile*>(node)->chunks.size()) {
 			hashCombine(seed, static_cast<uint64_t>(0));
 		} else {
@@ -134,9 +135,9 @@ uint64_t fs_checksum(ChecksumMode mode) {
 uint8_t fs_start_checksum_recalculation() {
 	if (gChecksumBackgroundUpdater.start()) {
 		eventloop_make_next_poll_nonblocking();
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	} else {
-		return LIZARDFS_ERROR_TEMP_NOTPOSSIBLE;
+		return SAUNAFS_ERROR_TEMP_NOTPOSSIBLE;
 	}
 }
 #endif

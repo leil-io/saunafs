@@ -1,19 +1,22 @@
 /*
+
+
    Copyright 2016 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -38,7 +41,7 @@
  */
 class AccessControlList {
 public:
-	LIZARDFS_CREATE_EXCEPTION_CLASS(IncorrectStringRepresentationException, Exception);
+	SAUNAFS_CREATE_EXCEPTION_CLASS(IncorrectStringRepresentationException, Exception);
 
 	typedef uint8_t AccessMask;
 
@@ -87,9 +90,9 @@ public:
 	};
 #pragma pack(pop)
 
-	typedef flat_set<Entry, compact_vector<Entry, uint16_t>>::iterator iterator;
-	typedef flat_set<Entry, compact_vector<Entry, uint16_t>>::const_iterator const_iterator;
-	typedef flat_set<Entry, compact_vector<Entry, uint16_t>>::size_type size_type;
+	using iterator = flat_set<Entry, compact_vector<Entry, uint16_t>>::iterator;
+	using const_iterator =  flat_set<Entry, compact_vector<Entry, uint16_t>>::const_iterator;
+	using size_type = flat_set<Entry, compact_vector<Entry, uint16_t>>::size_type;
 
 	AccessControlList() : list_(), basic_permissions_(0xF000) {
 	}
@@ -379,7 +382,7 @@ public:
 		       (basic_permissions_ == other.basic_permissions_ && list_ < other.list_);
 	}
 
-	LIZARDFS_DEFINE_SERIALIZE_METHODS(basic_permissions_, list_);
+	SAUNAFS_DEFINE_SERIALIZE_METHODS(basic_permissions_, list_);
 
 protected:
 	uint8_t getOwnerRights() const {

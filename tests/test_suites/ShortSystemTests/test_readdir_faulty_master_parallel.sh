@@ -13,7 +13,7 @@ master_restarting_loop() {
 	local restarts=$1
 	for i in $(seq 1 $restarts); do
 		sleep ${MASTER_RESTART_DELAY_SECS}
-		expect_success lizardfs_master_daemon restart
+		expect_success saunafs_master_daemon restart
 	done
 }
 
@@ -44,7 +44,7 @@ thread() {
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
 	MOUNTS=3 \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 master_restarting_loop 1 &
 thread "${info[mount0]}/thread1" 200 "$THREAD1_FILE" &

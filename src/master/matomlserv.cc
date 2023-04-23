@@ -1,20 +1,22 @@
 
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -38,7 +40,7 @@
 #include "common/crc.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/metadata.h"
@@ -47,7 +49,7 @@
 #include "master/filesystem.h"
 #include "master/personality.h"
 #include "protocol/matoml.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/mltoma.h"
 
 #define MaxPacketSize 1500000
@@ -63,7 +65,7 @@ typedef struct packetstruct {
 	uint8_t *packet;
 } packetstruct;
 
-typedef struct matomlserventry {
+using matomlserventry = struct matomlserventry {
 	uint8_t mode;
 	int sock;
 	int32_t pdescpos;
@@ -82,8 +84,10 @@ typedef struct matomlserventry {
 
 	int metafd,chain1fd,chain2fd;
 
+	char* config;
+
 	struct matomlserventry *next;
-} matomlserventry;
+};
 
 static matomlserventry *matomlservhead=NULL;
 static int lsock;
@@ -248,6 +252,16 @@ std::vector<MetadataserverListEntry> matomlserv_shadows() {
 	return ret;
 }
 
+std::string get_metaloggers_config() {
+	std::map<std::string, std::string> configs;
+	for (matomlserventry *eptr = matomlservhead; eptr != nullptr; eptr = eptr->next) {
+		if (eptr->shadow) { continue; }
+		NetworkAddress addr(eptr->servip, eptr->servport);
+		configs[addr.toString()] = eptr->config;
+	}
+	return cfg_yaml_list("metaloggers", configs);
+}
+
 uint32_t matomlserv_shadows_count() {
 	uint32_t count = 0;
 	for (matomlserventry* eptr = matomlservhead; eptr; eptr=eptr->next) {
@@ -265,7 +279,7 @@ void matomlserv_status(void) {
 			return;
 		}
 	}
-	lzfs_pretty_syslog(LOG_WARNING,"no meta loggers connected !!!");
+	safs_pretty_syslog(LOG_WARNING,"no meta loggers connected !!!");
 }
 
 char* matomlserv_makestrip(uint32_t ip) {
@@ -336,7 +350,7 @@ void matomlserv_send_old_changes(matomlserventry *eptr,uint64_t version) {
 		return;
 	}
 	if (old_changes_head->minversion>version) {
-		lzfs_pretty_syslog(LOG_WARNING,"meta logger wants changes since version: %" PRIu64 ", but minimal version in storage is: %" PRIu64,version,old_changes_head->minversion);
+		safs_pretty_syslog(LOG_WARNING,"meta logger wants changes since version: %" PRIu64 ", but minimal version in storage is: %" PRIu64,version,old_changes_head->minversion);
 		// TODO(msulikowski) send a special message which will cause the shadow master to unload fs
 	}
 	for (oc=old_changes_head ; oc ; oc=oc->next) {
@@ -361,24 +375,24 @@ void matomlserv_send_old_changes(matomlserventry *eptr,uint64_t version) {
 
 void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	if (eptr->version>0) {
-		lzfs_pretty_syslog(LOG_WARNING,"got register message from registered metalogger !!!");
+		safs_pretty_syslog(LOG_WARNING,"got register message from registered metalogger !!!");
 		eptr->mode=KILL;
 		return;
 	}
 	if (length<1) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER - wrong size (%" PRIu32 ")",length);
 		eptr->mode=KILL;
 		return;
 	} else {
 		uint8_t rversion = get8bit(&data);
 		if (rversion < 1 || rversion > 4) {
-			lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER - wrong version (%" PRIu8 ")",rversion);
+			safs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER - wrong version (%" PRIu8 ")",rversion);
 			eptr->mode=KILL;
 			return;
 		}
 		static const uint32_t expected_length[] = {0, 7, 7+8, 7, 7+8};
 		if (length != expected_length[rversion]) {
-			lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER (ver %" PRIu8 ") - wrong size (%" PRIu32
+			safs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER (ver %" PRIu8 ") - wrong size (%" PRIu32
 					"/%" PRIu32 ")", rversion, length, expected_length[rversion]);
 			eptr->mode=KILL;
 			return;
@@ -387,10 +401,10 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 		eptr->timeout = get16bit(&data);
 		eptr->shadow = (rversion == 3 || rversion == 4);
 		if (eptr->shadow) {
-		// supported shadow master servers register using LIZ_MLTOMA_REGISTER_SHADOW packet
-			lzfs_pretty_syslog(LOG_NOTICE,
+		// supported shadow master servers register using SAU_MLTOMA_REGISTER_SHADOW packet
+			safs_pretty_syslog(LOG_NOTICE,
 					"MLTOMA_REGISTER (ver %" PRIu8 ") - rejected old shadow master (v%s) from %s",
-					rversion, lizardfsVersionToString(eptr->version).c_str(), eptr->servstrip);
+					rversion, saunafsVersionToString(eptr->version).c_str(), eptr->servstrip);
 			eptr->mode=KILL;
 			return;
 		}
@@ -399,7 +413,7 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 			matomlserv_send_old_changes(eptr,minversion);
 		}
 		if (eptr->timeout<10) {
-			lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER communication timeout too small (%" PRIu16 " seconds - should be at least 10 seconds)",eptr->timeout);
+			safs_pretty_syslog(LOG_NOTICE,"MLTOMA_REGISTER communication timeout too small (%" PRIu16 " seconds - should be at least 10 seconds)",eptr->timeout);
 			if (eptr->timeout<3) {
 				eptr->timeout=3;
 			}
@@ -415,18 +429,18 @@ void matomlserv_register_shadow(matomlserventry *eptr, const uint8_t *data, uint
 	eptr->version = version;
 	eptr->shadow = true;
 	if (eptr->timeout < 10) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 				"MLTOMA_REGISTER_SHADOW communication timeout too small (%" PRIu32 " milliseconds)"
 				" - should be at least 10 seconds; increasing to 10 seconds", timeout_ms);
 		if (eptr->timeout < 10) {
 			eptr->timeout = 10;
 		}
 	}
-	if (eptr->version < LIZARDFS_VERSHEX) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+	if (eptr->version < SAUNAFS_VERSHEX) {
+		safs_pretty_syslog(LOG_NOTICE,
 				"MLTOMA_REGISTER_SHADOW - rejected old client (v%s) from %s",
-				lizardfsVersionToString(eptr->version).c_str(), eptr->servstrip);
-		matomlserv_createpacket(eptr, matoml::registerShadow::build(uint8_t(LIZARDFS_ERROR_REGISTER)));
+				saunafsVersionToString(eptr->version).c_str(), eptr->servstrip);
+		matomlserv_createpacket(eptr, matoml::registerShadow::build(uint8_t(SAUNAFS_ERROR_REGISTER)));
 		return;
 	}
 
@@ -443,8 +457,17 @@ void matomlserv_register_shadow(matomlserventry *eptr, const uint8_t *data, uint
 		replyVersion = myMedatataVersion;
 	}
 
-	matomlserv_createpacket(eptr, matoml::registerShadow::build(LIZARDFS_VERSHEX, replyVersion));
+	matomlserv_createpacket(eptr, matoml::registerShadow::build(SAUNAFS_VERSHEX, replyVersion));
 	matomlserv_send_old_changes(eptr, replyVersion - 1); // this function expects lastlogversion
+}
+
+void matomlserv_register_config(matomlserventry *eptr, const uint8_t *data, uint32_t length) {
+	std::string config;
+	mltoma::dumpConfiguration::deserialize(data, length, config);
+	if(eptr->config) {
+		free(eptr->config);
+	}
+	eptr->config = strdup(config.c_str());
 }
 
 void matomlserv_matoclport(matomlserventry *eptr, const uint8_t *data, uint32_t length) {
@@ -453,17 +476,17 @@ void matomlserv_matoclport(matomlserventry *eptr, const uint8_t *data, uint32_t 
 
 void matomlserv_download_start(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	if (length!=1) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_START - wrong size (%" PRIu32 "/1)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_START - wrong size (%" PRIu32 "/1)",length);
 		eptr->mode=KILL;
 		return;
 	}
 	if (gExiting) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_START - ignoring in the exit phase");
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_START - ignoring in the exit phase");
 		return;
 	}
 	uint8_t filenum = get8bit(&data);
 
-	if ((filenum == DOWNLOAD_METADATA_MFS) || (filenum == DOWNLOAD_SESSIONS_MFS)) {
+	if ((filenum == DOWNLOAD_METADATA_SFS) || (filenum == DOWNLOAD_SESSIONS_SFS)) {
 		if (eptr->metafd>=0) {
 			close(eptr->metafd);
 			eptr->metafd=-1;
@@ -477,19 +500,19 @@ void matomlserv_download_start(matomlserventry *eptr,const uint8_t *data,uint32_
 			eptr->chain2fd=-1;
 		}
 	}
-	if (filenum == DOWNLOAD_METADATA_MFS) {
+	if (filenum == DOWNLOAD_METADATA_SFS) {
 		eptr->metafd = open(kMetadataFilename, O_RDONLY);
 		eptr->chain1fd = open(kChangelogFilename, O_RDONLY);
 		eptr->chain2fd = open((std::string(kChangelogFilename) + ".1").c_str(), O_RDONLY);
-	} else if (filenum == DOWNLOAD_SESSIONS_MFS) {
+	} else if (filenum == DOWNLOAD_SESSIONS_SFS) {
 		eptr->metafd = open(kSessionsFilename, O_RDONLY);
-	} else if (filenum == DOWNLOAD_CHANGELOG_MFS) {
+	} else if (filenum == DOWNLOAD_CHANGELOG_SFS) {
 		if (eptr->metafd>=0) {
 			close(eptr->metafd);
 		}
 		eptr->metafd = eptr->chain1fd;
 		eptr->chain1fd = -1;
-	} else if (filenum == DOWNLOAD_CHANGELOG_MFS_1) {
+	} else if (filenum == DOWNLOAD_CHANGELOG_SFS_1) {
 		if (eptr->metafd>=0) {
 			close(eptr->metafd);
 		}
@@ -524,16 +547,16 @@ void matomlserv_download_data(matomlserventry *eptr,const uint8_t *data,uint32_t
 	ssize_t ret;
 
 	if (length!=12) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_DATA - wrong size (%" PRIu32 "/12)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_DATA - wrong size (%" PRIu32 "/12)",length);
 		eptr->mode=KILL;
 		return;
 	}
 	if (gExiting) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_DATA - ignoring in the exit phase");
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_DATA - ignoring in the exit phase");
 		return;
 	}
 	if (eptr->metafd<0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_DATA - file not opened");
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_DATA - file not opened");
 		eptr->mode=KILL;
 		return;
 	}
@@ -544,7 +567,7 @@ void matomlserv_download_data(matomlserventry *eptr,const uint8_t *data,uint32_t
 	put32bit(&ptr,leng);
 	ret = pread(eptr->metafd,ptr+4,leng,offset);
 	if (ret!=(ssize_t)leng) {
-		lzfs_silent_errlog(LOG_NOTICE,"error reading metafile");
+		safs_silent_errlog(LOG_NOTICE,"error reading metafile");
 		eptr->mode=KILL;
 		return;
 	}
@@ -555,7 +578,7 @@ void matomlserv_download_data(matomlserventry *eptr,const uint8_t *data,uint32_t
 void matomlserv_download_end(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	(void)data;
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_END - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MLTOMA_DOWNLOAD_END - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -569,30 +592,30 @@ void matomlserv_changelog_apply_error(matomlserventry *eptr, const uint8_t *data
 	uint8_t recvStatus;
 	mltoma::changelogApplyError::deserialize(data, length, recvStatus);
 	if (gExiting) {
-		lzfs_pretty_syslog(LOG_NOTICE,"LIZ_MLTOMA_CHANGELOG_APPLY_ERROR - ignoring in the exit phase");
+		safs_pretty_syslog(LOG_NOTICE,"SAU_MLTOMA_CHANGELOG_APPLY_ERROR - ignoring in the exit phase");
 		return;
 	}
 
 	int32_t secondsSinceLastRequest = eventloop_time() - gLastMetadataSaveRequestTimestamp;
 	if (secondsSinceLastRequest >= int32_t(gMinMetadataSaveRequestPeriod_s)) {
 		gLastMetadataSaveRequestTimestamp = eventloop_time();
-		lzfs_silent_syslog(LOG_DEBUG, "master.mltoma_changelog_apply_error: do");
-		lzfs_pretty_syslog(LOG_INFO,
-				"LIZ_MLTOMA_CHANGELOG_APPLY_ERROR, status: %s - storing metadata",
-				lizardfs_error_string(recvStatus));
+		safs_silent_syslog(LOG_DEBUG, "master.mltoma_changelog_apply_error: do");
+		safs_pretty_syslog(LOG_INFO,
+				"SAU_MLTOMA_CHANGELOG_APPLY_ERROR, status: %s - storing metadata",
+				saunafs_error_string(recvStatus));
 		gShadowQueue.addRequest(eptr);
 		fs_storeall(MetadataDumper::kBackgroundDump);
-		if (recvStatus == LIZARDFS_ERROR_BADMETADATACHECKSUM) {
+		if (recvStatus == SAUNAFS_ERROR_BADMETADATACHECKSUM) {
 			fs_start_checksum_recalculation();
 		}
 	} else {
-		lzfs_silent_syslog(LOG_DEBUG, "master.mltoma_changelog_apply_error: delay");
-		lzfs_pretty_syslog(LOG_INFO,
-				"LIZ_MLTOMA_CHANGELOG_APPLY_ERROR, status: %s - "
+		safs_silent_syslog(LOG_DEBUG, "master.mltoma_changelog_apply_error: delay");
+		safs_pretty_syslog(LOG_INFO,
+				"SAU_MLTOMA_CHANGELOG_APPLY_ERROR, status: %s - "
 				"refusing to store metadata because only %" PRIi32 " seconds elapsed since the "
 				"previous request and METADATA_SAVE_REQUEST_MIN_PERIOD=%" PRIu32,
-				lizardfs_error_string(recvStatus), secondsSinceLastRequest, gMinMetadataSaveRequestPeriod_s);
-		matomlserv_createpacket(eptr, matoml::changelogApplyError::build(LIZARDFS_ERROR_DELAYED));
+				saunafs_error_string(recvStatus), secondsSinceLastRequest, gMinMetadataSaveRequestPeriod_s);
+		matomlserv_createpacket(eptr, matoml::changelogApplyError::build(SAUNAFS_ERROR_DELAYED));
 	}
 }
 
@@ -652,8 +675,11 @@ void matomlserv_gotpacket(matomlserventry *eptr,uint32_t type,const uint8_t *dat
 			case MLTOMA_REGISTER:
 				matomlserv_register(eptr,data,length);
 				break;
-			case LIZ_MLTOMA_REGISTER_SHADOW:
+			case SAU_MLTOMA_REGISTER_SHADOW:
 				matomlserv_register_shadow(eptr,data,length);
+				break;
+			case SAU_MLTOMA_DUMP_CONFIG:
+				matomlserv_register_config(eptr,data,length);
 				break;
 			case MLTOMA_DOWNLOAD_START:
 				matomlserv_download_start(eptr,data,length);
@@ -664,18 +690,18 @@ void matomlserv_gotpacket(matomlserventry *eptr,uint32_t type,const uint8_t *dat
 			case MLTOMA_DOWNLOAD_END:
 				matomlserv_download_end(eptr,data,length);
 				break;
-			case LIZ_MLTOMA_CHANGELOG_APPLY_ERROR:
+			case SAU_MLTOMA_CHANGELOG_APPLY_ERROR:
 				matomlserv_changelog_apply_error(eptr, data, length);
 				break;
-			case LIZ_MLTOMA_CLTOMA_PORT:
+			case SAU_MLTOMA_CLTOMA_PORT:
 				matomlserv_matoclport(eptr, data, length);
 				break;
 			default:
-				lzfs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: got unknown message (type:%" PRIu32 ")",type);
+				safs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: got unknown message (type:%" PRIu32 ")",type);
 				eptr->mode=KILL;
 		}
 	} catch (IncorrectDeserializationException& ex) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Packet 0x%" PRIX32 " - can't deserialize: %s", type, ex.what());
+		safs_pretty_syslog(LOG_NOTICE, "Packet 0x%" PRIX32 " - can't deserialize: %s", type, ex.what());
 		eptr->mode = KILL;
 	}
 }
@@ -683,7 +709,7 @@ void matomlserv_gotpacket(matomlserventry *eptr,uint32_t type,const uint8_t *dat
 void matomlserv_term(void) {
 	matomlserventry *eptr,*eaptr;
 	packetstruct *pptr,*paptr;
-	lzfs_pretty_syslog(LOG_INFO,"master <-> metaloggers module: closing %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_INFO,"master <-> metaloggers module: closing %s:%s",ListenHost,ListenPort);
 	tcpclose(lsock);
 
 	eptr = matomlservhead;
@@ -724,13 +750,13 @@ void matomlserv_read(matomlserventry *eptr) {
 	while (eptr->mode != KILL) {
 		i=read(eptr->sock,eptr->inputpacket.startptr,eptr->inputpacket.bytesleft);
 		if (i==0) {
-			lzfs_pretty_syslog(LOG_NOTICE,"connection with ML(%s) has been closed by peer",eptr->servstrip);
+			safs_pretty_syslog(LOG_NOTICE,"connection with ML(%s) has been closed by peer",eptr->servstrip);
 			eptr->mode = KILL;
 			return;
 		}
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"read from ML(%s) error",eptr->servstrip);
+				safs_silent_errlog(LOG_NOTICE,"read from ML(%s) error",eptr->servstrip);
 				eptr->mode = KILL;
 			}
 			return;
@@ -748,7 +774,7 @@ void matomlserv_read(matomlserventry *eptr) {
 
 			if (size>0) {
 				if (size>MaxPacketSize) {
-					lzfs_pretty_syslog(LOG_WARNING,"ML(%s) packet too long (%" PRIu32 "/%u)",eptr->servstrip,size,MaxPacketSize);
+					safs_pretty_syslog(LOG_WARNING,"ML(%s) packet too long (%" PRIu32 "/%u)",eptr->servstrip,size,MaxPacketSize);
 					eptr->mode = KILL;
 					return;
 				}
@@ -800,7 +826,7 @@ void matomlserv_write(matomlserventry *eptr) {
 		i=write(eptr->sock,pack->startptr,pack->bytesleft);
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"write to ML(%s) error",eptr->servstrip);
+				safs_silent_errlog(LOG_NOTICE,"write to ML(%s) error",eptr->servstrip);
 				eptr->mode = KILL;
 			}
 			return;
@@ -849,7 +875,7 @@ void matomlserv_serve(const std::vector<pollfd> &pdesc) {
 	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN)) {
 		ns=tcpaccept(lsock);
 		if (ns<0) {
-			lzfs_silent_errlog(LOG_NOTICE,"master<->ML socket: accept error");
+			safs_silent_errlog(LOG_NOTICE,"master<->ML socket: accept error");
 		} else if (metadataserver::isMaster()) {
 			tcpnonblock(ns);
 			tcpnodelay(ns);
@@ -878,6 +904,7 @@ void matomlserv_serve(const std::vector<pollfd> &pdesc) {
 			eptr->metafd=-1;
 			eptr->chain1fd=-1;
 			eptr->chain2fd=-1;
+			eptr->config=nullptr;
 		} else {
 			tcpclose(ns);
 		}
@@ -925,6 +952,9 @@ void matomlserv_serve(const std::vector<pollfd> &pdesc) {
 			if (eptr->servstrip) {
 				free(eptr->servstrip);
 			}
+			if (eptr->config) {
+				free(eptr->config);
+			}
 			*kptr = eptr->next;
 			free(eptr);
 		} else {
@@ -971,13 +1001,13 @@ void matomlserv_reload(void) {
 	if (strcmp(oldListenHost,ListenHost)==0 && strcmp(oldListenPort,ListenPort)==0) {
 		free(oldListenHost);
 		free(oldListenPort);
-		lzfs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
+		safs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
 		return;
 	}
 
 	newlsock = tcpsocket();
 	if (newlsock<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"master <-> metaloggers module: socket address has changed, but can't create new socket");
+		safs_pretty_errlog(LOG_WARNING,"master <-> metaloggers module: socket address has changed, but can't create new socket");
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -988,10 +1018,10 @@ void matomlserv_reload(void) {
 	tcpnodelay(newlsock);
 	tcpreuseaddr(newlsock);
 	if (tcpsetacceptfilter(newlsock)<0 && errno!=ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
 	}
 	if (tcpstrlisten(newlsock,ListenHost,ListenPort,100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,"master <-> metaloggers module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
+		safs_pretty_errlog(LOG_ERR,"master <-> metaloggers module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -999,7 +1029,7 @@ void matomlserv_reload(void) {
 		tcpclose(newlsock);
 		return;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
 	free(oldListenHost);
 	free(oldListenPort);
 	tcpclose(lsock);
@@ -1007,7 +1037,7 @@ void matomlserv_reload(void) {
 
 	ChangelogSecondsToRemember = cfg_getuint16("MATOML_LOG_PRESERVE_SECONDS",600);
 	if (ChangelogSecondsToRemember>3600) {
-		lzfs_pretty_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%" PRIu16 ") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
+		safs_pretty_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%" PRIu16 ") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
 		ChangelogSecondsToRemember=3600;
 	}
 }
@@ -1019,26 +1049,26 @@ int matomlserv_init(void) {
 
 	lsock = tcpsocket();
 	if (lsock<0) {
-		lzfs_pretty_errlog(LOG_ERR,"master <-> metaloggers module: can't create socket");
+		safs_pretty_errlog(LOG_ERR,"master <-> metaloggers module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
 	tcpnodelay(lsock);
 	tcpreuseaddr(lsock);
 	if (tcpsetacceptfilter(lsock)<0 && errno!=ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
 	}
 
 	if (tcpstrlisten(lsock,ListenHost,ListenPort,100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,"master <-> metaloggers module: can't listen on %s:%s",ListenHost,ListenPort);
+		safs_pretty_errlog(LOG_ERR,"master <-> metaloggers module: can't listen on %s:%s",ListenHost,ListenPort);
 		return -1;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: listen on %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"master <-> metaloggers module: listen on %s:%s",ListenHost,ListenPort);
 
 	matomlservhead = NULL;
 	ChangelogSecondsToRemember = cfg_getuint16("MATOML_LOG_PRESERVE_SECONDS",600);
 	if (ChangelogSecondsToRemember>3600) {
-		lzfs_pretty_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%" PRIu16 ") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
+		safs_pretty_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%" PRIu16 ") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
 		ChangelogSecondsToRemember=3600;
 	}
 	eventloop_wantexitregister(matomlserv_wantexit);

@@ -49,22 +49,36 @@ compile_commands.json
 /debian/*.substvars
 /debian/*.debhelper.log
 /debian/debhelper-build-stamp
-/debian/lizardfs-adm/
-/debian/lizardfs-cgi/
-/debian/lizardfs-cgiserv/
-/debian/lizardfs-chunkserver/
-/debian/lizardfs-client/
-/debian/lizardfs-client3/
-/debian/lizardfs-common/
-/debian/lizardfs-dbg/
-/debian/lizardfs-lib-client/
-/debian/lizardfs-master/
-/debian/lizardfs-metalogger/
-/debian/lizardfs-nfs-ganesha/
-/debian/lizardfs-uraft/
+/debian/saunafs-adm/
+/debian/saunafs-cgi/
+/debian/saunafs-cgiserv/
+/debian/saunafs-chunkserver/
+/debian/saunafs-client/
+/debian/saunafs-client3/
+/debian/saunafs-common/
+/debian/saunafs-dbg/
+/debian/saunafs-lib-client/
+/debian/saunafs-master/
+/debian/saunafs-metalogger/
+/debian/saunafs-nfs-ganesha/
+/debian/saunafs-uraft/
 /debian/tmp/
-/lizardfs-bundle-*
+/saunafs-bundle-*
 
 # Mypy #
 ########
 .mypy_cache
+
+# VSCode #
+##########
+.vscode
+
+# clangd #
+##########
+.cache
+
+# submodules #
+##########
+src/chunkserver/plugins/zonefs_disk
+tests/ci_build/run-smr-tests.sh
+tests/test_suites/SMRTests

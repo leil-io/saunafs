@@ -1,19 +1,21 @@
 /*
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -59,10 +61,10 @@ struct LockRange {
 	 *   kUnlock    - equivalent to Linux's F_UNLCK
 	 */
 	enum class Type : uint8_t {
-		kInvalid   = lzfs_locks::kInvalid,
-		kUnlock    = lzfs_locks::kUnlock,
-		kShared    = lzfs_locks::kShared,
-		kExclusive = lzfs_locks::kExclusive
+		kInvalid   = safs_locks::kInvalid,
+		kUnlock    = safs_locks::kUnlock,
+		kShared    = safs_locks::kShared,
+		kExclusive = safs_locks::kExclusive
 	};
 
 	typedef compact_vector<Owner> Owners;
@@ -297,14 +299,14 @@ public:
 	 * \param count number of locks to copy
 	 * \param data output vector with copied locks
 	 */
-	void copyActiveToVector(int64_t index, int64_t count, std::vector<lzfs_locks::Info> &data);
+	void copyActiveToVector(int64_t index, int64_t count, std::vector<safs_locks::Info> &data);
 
 	/*! \brief Copy pending locks to vector storage.
 	 * \param index index of first lock to copy
 	 * \param count number of locks to copy
 	 * \param data output vector with copied locks
 	 */
-	void copyPendingToVector(int64_t index, int64_t count, std::vector<lzfs_locks::Info> &data);
+	void copyPendingToVector(int64_t index, int64_t count, std::vector<safs_locks::Info> &data);
 
 	/*! \brief Copy active locks for specific inode to vector storage.
 	 * \param inode inode number
@@ -313,7 +315,7 @@ public:
 	 * \param data output vector with copied locks
 	 */
 	void copyActiveToVector(uint32_t inode, int64_t index, int64_t count,
-	                        std::vector<lzfs_locks::Info> &data);
+	                        std::vector<safs_locks::Info> &data);
 
 	/*! \brief Copy pending locks for specific inode to vector storage.
 	 * \param inode inode number
@@ -322,7 +324,7 @@ public:
 	 * \param data output vector with copied locks
 	 */
 	void copyPendingToVector(uint32_t inode, int64_t index, int64_t count,
-	                        std::vector<lzfs_locks::Info> &data);
+	                        std::vector<safs_locks::Info> &data);
 
 	/*! \brief Load class state from stream.
 	 * \param file pointer to FILE structure that specifies input stream

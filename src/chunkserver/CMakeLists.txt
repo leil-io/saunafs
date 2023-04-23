@@ -1,18 +1,27 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_definitions(-DLIZARDFS_MAX_FILES=10000)
-add_definitions(-DAPPNAME=mfschunkserver -DAPP_EXAMPLES_SUBDIR="${CHUNKSERVER_EXAMPLES_SUBDIR}")
+add_definitions(-DSAUNAFS_MAX_FILES=10000)
+add_definitions(-DAPPNAME=sfschunkserver -DAPP_EXAMPLES_SUBDIR="${CHUNKSERVER_EXAMPLES_SUBDIR}")
+
+# Boost libraries used for plugins
+find_package(Boost REQUIRED COMPONENTS filesystem system)
+include_directories(${Boost_INCLUDE_DIRS})
+
+add_subdirectory(chunkserver-common)
+add_subdirectory(plugins)
 
 collect_sources(CHUNKSERVER)
 add_library(chunkserver ${CHUNKSERVER_SOURCES})
-target_link_libraries(chunkserver lzfsprotocol mfscommon ${ADDITIONAL_LIBS})
+target_link_libraries(chunkserver chunkserver-common safsprotocol sfscommon
+    ${Boost_LIBRARIES}
+    ${ADDITIONAL_LIBS})
 create_unittest(chunkserver ${CHUNKSERVER_TESTS})
-link_unittest(chunkserver chunkserver mfscommon)
+link_unittest(chunkserver chunkserver sfscommon)
 
-add_executable(mfschunkserver ${MAIN_SRC})
-target_link_libraries(mfschunkserver chunkserver ${PAM_LIBRARIES})
+add_executable(sfschunkserver ${MAIN_SRC})
+target_link_libraries(sfschunkserver chunkserver ${PAM_LIBRARIES})
 
 if(SYSTEMD_FOUND)
-  target_link_libraries(mfschunkserver ${SYSTEMD_LIBRARIES})
+  target_link_libraries(sfschunkserver ${SYSTEMD_LIBRARIES})
 endif()
 
-install(TARGETS mfschunkserver RUNTIME DESTINATION ${SBIN_SUBDIR})
+install(TARGETS sfschunkserver RUNTIME DESTINATION ${SBIN_SUBDIR})

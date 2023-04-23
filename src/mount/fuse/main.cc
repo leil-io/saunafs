@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2018
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2018 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -28,11 +29,11 @@
 
 #include "common/crc.h"
 #include "common/md5.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/sockets.h"
 #include "mount/fuse/daemonize.h"
-#include "mount/fuse/mfs_fuse.h"
-#include "mount/fuse/mfs_meta_fuse.h"
+#include "mount/fuse/sfs_fuse.h"
+#include "mount/fuse/sfs_meta_fuse.h"
 #include "mount/fuse/mount_config.h"
 #include "mount/g_io_limiters.h"
 #include "mount/mastercomm.h"
@@ -41,88 +42,78 @@
 #include "mount/stats.h"
 #include "mount/symlinkcache.h"
 #include "mount/writedata.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
 
-static void mfs_fsinit(void *userdata, struct fuse_conn_info *conn);
+static void sfs_fsinit(void *userdata, struct fuse_conn_info *conn);
 
-static struct fuse_lowlevel_ops mfs_meta_oper;
+static struct fuse_lowlevel_ops sfs_meta_oper;
 
-static struct fuse_lowlevel_ops mfs_oper;
+static struct fuse_lowlevel_ops sfs_oper;
 
 static void init_fuse_lowlevel_ops() {
-	mfs_meta_oper.init = mfs_fsinit;
-	mfs_meta_oper.statfs = mfs_meta_statfs;
-	mfs_meta_oper.lookup = mfs_meta_lookup;
-	mfs_meta_oper.getattr = mfs_meta_getattr;
-	mfs_meta_oper.setattr = mfs_meta_setattr;
-	mfs_meta_oper.unlink = mfs_meta_unlink;
-	mfs_meta_oper.rename = mfs_meta_rename;
-	mfs_meta_oper.opendir = mfs_meta_opendir;
-	mfs_meta_oper.readdir = mfs_meta_readdir;
-	mfs_meta_oper.releasedir = mfs_meta_releasedir;
-	mfs_meta_oper.open = mfs_meta_open;
-	mfs_meta_oper.release = mfs_meta_release;
-	mfs_meta_oper.read = mfs_meta_read;
-	mfs_meta_oper.write = mfs_meta_write;
+	sfs_meta_oper.init = sfs_fsinit;
+	sfs_meta_oper.statfs = sfs_meta_statfs;
+	sfs_meta_oper.lookup = sfs_meta_lookup;
+	sfs_meta_oper.getattr = sfs_meta_getattr;
+	sfs_meta_oper.setattr = sfs_meta_setattr;
+	sfs_meta_oper.unlink = sfs_meta_unlink;
+	sfs_meta_oper.rename = sfs_meta_rename;
+	sfs_meta_oper.opendir = sfs_meta_opendir;
+	sfs_meta_oper.readdir = sfs_meta_readdir;
+	sfs_meta_oper.releasedir = sfs_meta_releasedir;
+	sfs_meta_oper.open = sfs_meta_open;
+	sfs_meta_oper.release = sfs_meta_release;
+	sfs_meta_oper.read = sfs_meta_read;
+	sfs_meta_oper.write = sfs_meta_write;
 
-	mfs_oper.init = mfs_fsinit;
-	mfs_oper.statfs = mfs_statfs;
-	mfs_oper.lookup = mfs_lookup;
-	mfs_oper.getattr = mfs_getattr;
-	mfs_oper.setattr = mfs_setattr;
-	mfs_oper.mknod = mfs_mknod;
-	mfs_oper.unlink = mfs_unlink;
-	mfs_oper.mkdir = mfs_mkdir;
-	mfs_oper.rmdir = mfs_rmdir;
-	mfs_oper.symlink = mfs_symlink;
-	mfs_oper.readlink = mfs_readlink;
-	mfs_oper.rename = mfs_rename;
-	mfs_oper.link = mfs_link;
-	mfs_oper.opendir = mfs_opendir;
-	mfs_oper.readdir = mfs_readdir;
-	mfs_oper.releasedir = mfs_releasedir;
-	mfs_oper.create = mfs_create;
-	mfs_oper.open = mfs_open;
-	mfs_oper.release = mfs_release;
-	mfs_oper.flush = mfs_flush;
-	mfs_oper.fsync = mfs_fsync;
-	mfs_oper.read = mfs_read;
-	mfs_oper.write = mfs_write;
-	mfs_oper.access = mfs_access;
-	mfs_oper.getxattr = mfs_getxattr;
-	mfs_oper.setxattr = mfs_setxattr;
-	mfs_oper.listxattr = mfs_listxattr;
-	mfs_oper.removexattr = mfs_removexattr;
-#if FUSE_VERSION >= 26
+	sfs_oper.init = sfs_fsinit;
+	sfs_oper.statfs = sfs_statfs;
+	sfs_oper.lookup = sfs_lookup;
+	sfs_oper.getattr = sfs_getattr;
+	sfs_oper.setattr = sfs_setattr;
+	sfs_oper.mknod = sfs_mknod;
+	sfs_oper.unlink = sfs_unlink;
+	sfs_oper.mkdir = sfs_mkdir;
+	sfs_oper.rmdir = sfs_rmdir;
+	sfs_oper.symlink = sfs_symlink;
+	sfs_oper.readlink = sfs_readlink;
+	sfs_oper.rename = sfs_rename;
+	sfs_oper.link = sfs_link;
+	sfs_oper.opendir = sfs_opendir;
+	sfs_oper.readdir = sfs_readdir;
+	sfs_oper.releasedir = sfs_releasedir;
+	sfs_oper.create = sfs_create;
+	sfs_oper.open = sfs_open;
+	sfs_oper.release = sfs_release;
+	sfs_oper.flush = sfs_flush;
+	sfs_oper.fsync = sfs_fsync;
+	sfs_oper.read = sfs_read;
+	sfs_oper.write = sfs_write;
+	sfs_oper.access = sfs_access;
+	sfs_oper.getxattr = sfs_getxattr;
+	sfs_oper.setxattr = sfs_setxattr;
+	sfs_oper.listxattr = sfs_listxattr;
+	sfs_oper.removexattr = sfs_removexattr;
 	if (gMountOptions.filelocks) {
-		mfs_oper.getlk = lzfs_getlk;
-		mfs_oper.setlk = lzfs_setlk;
+		sfs_oper.getlk = safs_getlk;
+		sfs_oper.setlk = safs_setlk;
+		sfs_oper.flock = safs_flock;
 	}
-#endif
-#if FUSE_VERSION >= 29
-	if (gMountOptions.filelocks) {
-		mfs_oper.flock = lzfs_flock;
-	}
-#endif
 }
 
-static void mfs_fsinit(void *userdata, struct fuse_conn_info *conn) {
+static void sfs_fsinit(void *userdata, struct fuse_conn_info *conn) {
 	(void)userdata;
 	(void)conn;
 
-#if FUSE_VERSION >= 28
 	conn->want |= FUSE_CAP_DONT_MASK;
-#endif
 
-#if FUSE_VERSION >= 30
 	fuse_conn_info_opts *conn_opts = (fuse_conn_info_opts *)userdata;
 	fuse_apply_conn_info_opts(conn_opts, conn);
 	conn->want |= FUSE_CAP_POSIX_ACL;
 	conn->want &= ~FUSE_CAP_ATOMIC_O_TRUNC;
-#endif
 
 	daemonize_return_status(0);
 }
@@ -148,7 +139,6 @@ static bool setup_password(std::vector<uint8_t> &md5pass) {
 	return true;
 }
 
-#if FUSE_VERSION >= 30
 int fuse_mnt_check_empty(const char *mnt, mode_t rootmode, off_t rootsize) {
 	int isempty = 1;
 
@@ -175,18 +165,12 @@ int fuse_mnt_check_empty(const char *mnt, mode_t rootmode, off_t rootsize) {
 
 	return 0;
 }
-#endif
 
-#if FUSE_VERSION >= 30
 static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 			struct fuse_conn_info_opts *conn_opts) try {
 	const char *mountpoint = fuse_opts->mountpoint;
 	bool multithread = !fuse_opts->singlethread;
 	bool foreground = fuse_opts->foreground;
-#else
-static int mainloop(struct fuse_args *args, const char *mountpoint, bool multithread,
-			bool foreground) try {
-#endif
 
 	if (!foreground) {
 		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY, LOG_DAEMON);
@@ -197,9 +181,9 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY, LOG_USER);
 #endif
 	}
-	lzfs::add_log_syslog();
+	safs::add_log_syslog();
 	if (!foreground)
-		lzfs::add_log_stderr(lzfs::log_level::debug);
+		safs::add_log_stderr(safs::log_level::debug);
 
 	struct rlimit rls;
 	rls.rlim_cur = gMountOptions.nofile;
@@ -207,7 +191,7 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 	setrlimit(RLIMIT_NOFILE, &rls);
 
 	setpriority(PRIO_PROCESS, getpid(), gMountOptions.nice);
-#ifdef MFS_USE_MEMLOCK
+#ifdef SFS_USE_MEMLOCK
 	if (gMountOptions.memlock) {
 		rls.rlim_cur = RLIM_INFINITY;
 		rls.rlim_max = RLIM_INFINITY;
@@ -216,9 +200,9 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 	}
 #endif
 
-#ifdef MFS_USE_MEMLOCK
+#ifdef SFS_USE_MEMLOCK
 	if (gMountOptions.memlock &&  !mlockall(MCL_CURRENT | MCL_FUTURE))
-		lzfs_pretty_syslog(LOG_NOTICE, "process memory was "
+		safs_pretty_syslog(LOG_NOTICE, "process memory was "
 				"successfully locked in RAM");
 #endif
 
@@ -226,7 +210,7 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 	if (!setup_password(md5pass)) {
 		return 1;
 	}
-	LizardClient::FsInitParams params(gMountOptions.bindhost ?
+	SaunaClient::FsInitParams params(gMountOptions.bindhost ?
 			gMountOptions.bindhost : "", gMountOptions.masterhost,
 			gMountOptions.masterport, mountpoint);
 	params.verbose = true;
@@ -245,6 +229,8 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 	params.total_read_timeout_ms = gMountOptions.chunkservertotalreadto;
 	params.cache_expiration_time_ms = gMountOptions.cacheexpirationtime;
 	params.readahead_max_window_size_kB = gMountOptions.readaheadmaxwindowsize;
+	params.read_workers = gMountOptions.readworkers;
+	params.max_readahead_requests = gMountOptions.maxreadaheadrequests;
 	params.prefetch_xor_stripes = gMountOptions.prefetchxorstripes;
 	params.bandwidth_overuse = gMountOptions.bandwidthoveruse;
 	params.write_cache_size = gMountOptions.writecachesize;
@@ -265,7 +251,7 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 	params.debug_mode = gMountOptions.debug;
 
 	if (!gMountOptions.meta) {
-		LizardClient::fs_init(params);
+		SaunaClient::fs_init(params);
 	} else {
 		masterproxy_init();
 		symlink_cache_init();
@@ -279,46 +265,18 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 		fs_init_threads(params.io_retries);
 	}
 
-#if FUSE_VERSION < 30
-	struct fuse_chan *ch = fuse_mount(mountpoint, args);
-	if (!ch) {
-		fprintf(stderr, "error in fuse_mount\n");
-		if (!gMountOptions.meta) {
-			LizardClient::fs_term();
-		} else {
-			masterproxy_term();
-			fs_term();
-			symlink_cache_term();
-		}
-		return 1;
-	}
-#endif
-
-#if FUSE_VERSION >= 30
 	struct fuse_session *se;
 	if (gMountOptions.meta) {
-		mfs_meta_init(gMountOptions.debug, gMountOptions.entrycacheto, gMountOptions.attrcacheto);
-		se = fuse_session_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void *)conn_opts);
+		sfs_meta_init(gMountOptions.debug, gMountOptions.entrycacheto, gMountOptions.attrcacheto);
+		se = fuse_session_new(args, &sfs_meta_oper, sizeof(sfs_meta_oper), (void *)conn_opts);
 	} else {
-		se = fuse_session_new(args, &mfs_oper, sizeof(mfs_oper), (void *)conn_opts);
+		se = fuse_session_new(args, &sfs_oper, sizeof(sfs_oper), (void *)conn_opts);
 	}
 	if (!se) {
 		fprintf(stderr, "error in fuse_session_new\n");
-#else
-	struct fuse_session *se;
-	if (gMountOptions.meta) {
-		mfs_meta_init(gMountOptions.debug, gMountOptions.entrycacheto, gMountOptions.attrcacheto);
-		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), NULL);
-	} else {
-		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), NULL);
-	}
-	if (!se) {
-		fuse_unmount(mountpoint, ch);
-		fprintf(stderr, "error in fuse_lowlevel_new\n");
-#endif
 		usleep(100000);  // time for print other error messages by FUSE
 		if (!gMountOptions.meta) {
-			LizardClient::fs_term();
+			SaunaClient::fs_term();
 		} else {
 			masterproxy_term();
 			fs_term();
@@ -330,11 +288,8 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 	if (fuse_set_signal_handlers(se)) {
 		fprintf(stderr, "error in fuse_set_signal_handlers\n");
 		fuse_session_destroy(se);
-#if FUSE_VERSION < 30
-		fuse_unmount(mountpoint, ch);
-#endif
 		if (!gMountOptions.meta) {
-			LizardClient::fs_term();
+			SaunaClient::fs_term();
 		} else {
 			masterproxy_term();
 			fs_term();
@@ -343,13 +298,12 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 		return 1;
 	}
 
-#if FUSE_VERSION >= 30
 	if (fuse_session_mount(se, mountpoint)) {
 		fprintf(stderr, "error in fuse_session_mount\n");
 		fuse_remove_signal_handlers(se);
 		fuse_session_destroy(se);
 		if (!gMountOptions.meta) {
-			LizardClient::fs_term();
+			SaunaClient::fs_term();
 		} else {
 			masterproxy_term();
 			fs_term();
@@ -357,9 +311,6 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 		}
 		return 1;
 	}
-#else
-	fuse_session_add_chan(se, ch);
-#endif
 
 	if (!gMountOptions.debug && !foreground) {
 		setsid();
@@ -376,26 +327,15 @@ static int mainloop(struct fuse_args *args, const char *mountpoint, bool multith
 
 	int err;
 	if (multithread) {
-#if FUSE_VERSION >= 30
 		err = fuse_session_loop_mt(se, fuse_opts->clone_fd);
-#else
-		err = fuse_session_loop_mt(se);
-#endif
 	} else {
 		err = fuse_session_loop(se);
 	}
 	fuse_remove_signal_handlers(se);
-#if FUSE_VERSION >= 30
 	fuse_session_unmount(se);
-#else
-	fuse_session_remove_chan(ch);
-#endif
 	fuse_session_destroy(se);
-#if FUSE_VERSION < 30
-	fuse_unmount(mountpoint, ch);
-#endif
 	if (!gMountOptions.meta) {
-		LizardClient::fs_term();
+		SaunaClient::fs_term();
 	} else {
 		masterproxy_term();
 		fs_term();
@@ -448,7 +388,7 @@ static void make_fsname(struct fuse_args *args) {
 	char fsnamearg[256];
 	int libver = fuse_version();
 	unsigned int (*strncpy_commas)(char*, unsigned int, char*) = libver >= 28 ? strncpy_escape_commas : strncpy_remove_commas;
-	const char *fmt = libver >= 27 ? "-osubtype=mfs%s,fsname=" : "-ofsname=mfs%s#";
+	const char *fmt = libver >= 27 ? "-osubtype=sfs%s,fsname=" : "-ofsname=sfs%s#";
 	l = snprintf(fsnamearg, 256, fmt, (gMountOptions.meta) ? "meta" : "");
 	l += strncpy_commas(fsnamearg + l, 256 - l, gMountOptions.masterhost);
 
@@ -569,32 +509,30 @@ int main(int argc, char *argv[]) try {
 	if (read_masterhost_if_present(&args))
 		exit(1);
 
-	if (fuse_opt_parse(&args, &defaultargs, gMfsOptsStage1, mfs_opt_proc_stage1))
+	if (fuse_opt_parse(&args, &defaultargs, gSfsOptsStage1, sfs_opt_proc_stage1))
 		exit(1);
 
 	if (!gCustomCfg)
-		mfs_opt_parse_cfg_file(DEFAULT_MFSMOUNT_CONFIG_PATH, 1, &defaultargs);
+		sfs_opt_parse_cfg_file(DEFAULT_SFSMOUNT_CONFIG_PATH, 1, &defaultargs);
 
-	if (fuse_opt_parse(&defaultargs, &gMountOptions, gMfsOptsStage2, mfs_opt_proc_stage2))
+	if (fuse_opt_parse(&defaultargs, &gMountOptions, gSfsOptsStage2, sfs_opt_proc_stage2))
 		exit(1);
 
-	if (fuse_opt_parse(&args, &gMountOptions, gMfsOptsStage2, mfs_opt_proc_stage2))
+	if (fuse_opt_parse(&args, &gMountOptions, gSfsOptsStage2, sfs_opt_proc_stage2))
 		exit(1);
 
-#if FUSE_VERSION >= 30
 	struct fuse_conn_info_opts *conn_opts;
 	conn_opts = fuse_parse_conn_info_opts(&args);
 	if (!conn_opts) {
 		exit(1);
 	}
-#endif
 
 	init_fuse_lowlevel_ops();
 
 	if (gMountOptions.cachemode && gMountOptions.cachefiles) {
 		fprintf(stderr,
-			"mfscachemode and mfscachefiles options are exclusive "
-			"- use only " "mfscachemode\nsee: %s -h for help\n",
+			"sfscachemode and sfscachefiles options are exclusive "
+			"- use only " "sfscachemode\nsee: %s -h for help\n",
 		        argv[0]);
 		return 1;
 	}
@@ -610,14 +548,13 @@ int main(int argc, char *argv[]) try {
 	           !strcasecmp(gMountOptions.cachemode, "NONE") ||
 	           !strcasecmp(gMountOptions.cachemode, "NEVER")) {
 		gMountOptions.keepcache = 2;
-		gMountOptions.cacheexpirationtime = 0;
 	} else {
 		fprintf(stderr, "unrecognized cachemode option\nsee: %s -h "
 				"for help\n", argv[0]);
 		return 1;
 	}
 	if (!gMountOptions.sugidclearmodestr) {
-		gMountOptions.sugidclearmode = LizardClient::FsInitParams::kDefaultSugidClearMode;
+		gMountOptions.sugidclearmode = SaunaClient::FsInitParams::kDefaultSugidClearMode;
 	} else if (!strcasecmp(gMountOptions.sugidclearmodestr, "NEVER")) {
 		gMountOptions.sugidclearmode = SugidClearMode::kNever;
 	} else if (!strcasecmp(gMountOptions.sugidclearmodestr, "ALWAYS")) {
@@ -628,8 +565,8 @@ int main(int argc, char *argv[]) try {
 		gMountOptions.sugidclearmode = SugidClearMode::kBsd;
 	} else if (!strcasecmp(gMountOptions.sugidclearmodestr, "EXT")) {
 		gMountOptions.sugidclearmode = SugidClearMode::kExt;
-	} else if (!strcasecmp(gMountOptions.sugidclearmodestr, "XFS")) {
-		gMountOptions.sugidclearmode = SugidClearMode::kXfs;
+	} else if (!strcasecmp(gMountOptions.sugidclearmodestr, "SFS")) {
+		gMountOptions.sugidclearmode = SugidClearMode::kSfs;
 	} else {
 		fprintf(stderr, "unrecognized sugidclearmode option\nsee: %s "
 				"-h for help\n", argv[0]);
@@ -690,6 +627,12 @@ int main(int argc, char *argv[]) try {
 		gMountOptions.writewindowsize = 1;
 	}
 
+	if (gMountOptions.readworkers < 1) {
+		fprintf(stderr, "no read workers - increasing number of "
+				"workers to 1\n");
+		gMountOptions.readworkers = 1;
+	}
+
 	if (!gMountOptions.nostdmountoptions)
 		fuse_opt_add_arg(&args, "-o" DEFAULT_OPTIONS);
 
@@ -708,7 +651,6 @@ int main(int argc, char *argv[]) try {
 
 	make_fsname(&args);
 
-#if FUSE_VERSION >= 30
 	struct fuse_cmdline_opts fuse_opts;
 	if (fuse_parse_cmdline(&args, &fuse_opts)) {
 		fprintf(stderr, "see: %s -h for help\n", argv[0]);
@@ -721,33 +663,18 @@ int main(int argc, char *argv[]) try {
 	}
 
 	if (fuse_opts.show_version) {
-		printf("LizardFS version %s\n", LIZARDFS_PACKAGE_VERSION);
+		printf("SaunaFS version %s\n", SAUNAFS_PACKAGE_VERSION);
 		printf("FUSE library version: %s\n", fuse_pkgversion());
 		fuse_lowlevel_version();
 		return 0;
 	}
-#else
-	int multithread, foreground;
-	char *mountpoint;
-
-	if (fuse_parse_cmdline(&args, &mountpoint, &multithread, &foreground)) {
-		fprintf(stderr, "see: %s -h for help\n", argv[0]);
-		return 1;
-	}
-#endif
 
 	if (gMountOptions.passwordask && !gMountOptions.password && !gMountOptions.md5pass)
-		gMountOptions.password = getpass("LizardFS Password:");
+		gMountOptions.password = getpass("SaunaFS Password:");
 
-#if FUSE_VERSION >= 30
 	if (!fuse_opts.mountpoint) {
 		if (gDefaultMountpoint) {
 			fuse_opts.mountpoint = gDefaultMountpoint;
-#else
-	if (!mountpoint) {
-		if (gDefaultMountpoint) {
-			mountpoint = gDefaultMountpoint;
-#endif
 		} else {
 			fprintf(stderr, "no mount point\nsee: %s -h for help\n", argv[0]);
 			return 1;
@@ -755,7 +682,6 @@ int main(int argc, char *argv[]) try {
 	}
 
 	int res;
-#if FUSE_VERSION >= 30
 	struct stat stbuf;
 	res = stat(fuse_opts.mountpoint, &stbuf);
 	if (res) {
@@ -774,12 +700,6 @@ int main(int argc, char *argv[]) try {
 		res = daemonize_and_wait(std::bind(&mainloop, &args, &fuse_opts, conn_opts));
 	else
 		res = mainloop(&args, &fuse_opts, conn_opts);
-#else
-	if (!foreground)
-		res = daemonize_and_wait(std::bind(&mainloop, &args, mountpoint, multithread, foreground));
-	else
-		res = mainloop(&args, mountpoint, multithread, foreground);
-#endif
 
 	fuse_opt_free_args(&args);
 	fuse_opt_free_args(&defaultargs);
@@ -790,16 +710,10 @@ int main(int argc, char *argv[]) try {
 	free(gMountOptions.subfolder);
 	if (gMountOptions.iolimits)
 		free(gMountOptions.iolimits);
-#if FUSE_VERSION >= 30
 	if (gDefaultMountpoint && gDefaultMountpoint != fuse_opts.mountpoint)
 		free(gDefaultMountpoint);
 	free(fuse_opts.mountpoint);
 	free(conn_opts);
-#else
-	if (gDefaultMountpoint && gDefaultMountpoint != mountpoint)
-		free(gDefaultMountpoint);
-	free(mountpoint);
-#endif
 	stats_term();
 	return res;
 } catch (std::bad_alloc& ex) {

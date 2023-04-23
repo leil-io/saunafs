@@ -1,6 +1,6 @@
 This package was debianized by Peter aNeutrino after Fri, 15 Nov 2013 13:05:21 +0200.
 
-Sources are available for download at <http://lizardfs.org/>.
+Sources are available for download at <http://saunafs.com/>.
 
 Author(s):
 
@@ -24,11 +24,13 @@ Author(s):
 
 Copyright:
 
-    Copyright (C) 2001-2008 Gemius S.A., 2013 Skytechnology sp. z o.o.
+    Copyright 2001-2008 Gemius S.A.
+    Copyright 2013      Skytechnology sp. z o.o.
+    Copyright 2023      Leil Storage OÜ
 
 Contact:
 
-    <contact (at) lizardfs.org>
+    <contact (at) saunafs.com>
 
 License:
 

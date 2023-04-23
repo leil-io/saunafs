@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2019 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -23,7 +24,7 @@
 #include <utility>
 
 #include "common/massert.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
 WriteCacheBlock::WriteCacheBlock(uint32_t chunkIndex, uint32_t blockIndex, Type type)
 		: chunkIndex(chunkIndex),
@@ -31,8 +32,8 @@ WriteCacheBlock::WriteCacheBlock(uint32_t chunkIndex, uint32_t blockIndex, Type 
 		  from(0),
 		  to(0),
 		  type(type) {
-	sassert(blockIndex < MFSBLOCKSINCHUNK);
-	blockData = new uint8_t[MFSBLOCKSIZE];
+	sassert(blockIndex < SFSBLOCKSINCHUNK);
+	blockData = new uint8_t[SFSBLOCKSIZE];
 }
 
 WriteCacheBlock::WriteCacheBlock(WriteCacheBlock&& block) noexcept {
@@ -82,11 +83,11 @@ bool WriteCacheBlock::expand(uint32_t from, uint32_t to, const uint8_t *buffer) 
 }
 
 uint64_t WriteCacheBlock::offsetInFile() const {
-	return static_cast<uint64_t>(chunkIndex) * MFSCHUNKSIZE + offsetInChunk();
+	return static_cast<uint64_t>(chunkIndex) * SFSCHUNKSIZE + offsetInChunk();
 }
 
 uint32_t WriteCacheBlock::offsetInChunk() const {
-	return blockIndex * MFSBLOCKSIZE + from;
+	return blockIndex * SFSBLOCKSIZE + from;
 }
 
 uint32_t WriteCacheBlock::size() const {

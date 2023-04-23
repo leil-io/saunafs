@@ -7,14 +7,14 @@ timeout_set 2 minutes
 # '6 xor5' -- 6 xor5 chunks (each is different)
 chunks_state() {
 	{
-		find_all_chunks | grep -o chunk_.* | grep -o chunk_00000 | sed -e 's/.*/standard/'
-		find_all_chunks | grep -o chunk_.* | sort -u | grep -o '_of_[2-9]' | sed -e 's/_of_/xor/'
+		find_all_metadata_chunks | grep -o chunk_.* | grep -o chunk_00000 | sed -e 's/.*/standard/'
+		find_all_metadata_chunks | grep -o chunk_.* | sort -u | grep -o '_of_[2-9]' | sed -e 's/_of_/xor/'
 	} | sort | uniq -c | tr '\n' ' ' | trim_hard
 }
 
 count_chunks_on_chunkservers() {
 	for i in $@; do
-		find_chunkserver_chunks $i
+		find_chunkserver_metadata_chunks $i
 	done | wc -l
 }
 
@@ -31,23 +31,23 @@ USE_RAMDISK=YES \
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|CHUNKS_REBALANCING_BETWEEN_LABELS=1`
 			`|OPERATIONS_DELAY_DISCONNECT = 0"\
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 mkdir dir
-lizardfs setgoal xor2_ssd dir
+saunafs setgoal xor2_ssd dir
 FILE_SIZE=1K file-generate dir/file
 
 assert_equals "3 xor2" "$(chunks_state)"
 assert_equals 3 "$(count_chunks_on_chunkservers {6..8})"
 assert_equals 3 "$(count_chunks_on_chunkservers {0..8})"
 
-lizardfs setgoal xor3_hdd dir/file
+saunafs setgoal xor3_hdd dir/file
 assert_eventually_prints '4 xor3' 'chunks_state' '2 minutes'
 assert_equals 3 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 4 "$(count_chunks_on_chunkservers {0..8})"
 
-lizardfs setgoal xor5_mix dir/file
+saunafs setgoal xor5_mix dir/file
 assert_eventually_prints '6 xor5' 'chunks_state' '2 minutes'
 assert_less_or_equal 2 "$(count_chunks_on_chunkservers {3..5})"
 assert_less_or_equal 2 "$(count_chunks_on_chunkservers {6..8})"

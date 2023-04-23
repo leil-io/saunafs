@@ -1,28 +1,28 @@
 timeout_set 3 minutes
 USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
-cat $TEMP_DIR/lizardfs/etc/mfsmetalogger.cfg
-lizardfs_metalogger_daemon start
+	setup_local_empty_saunafs info
+cat $TEMP_DIR/saunafs/etc/sfsmetalogger.cfg
+saunafs_metalogger_daemon start
 
 # Create 100 files and save 5 metadata files containing 20, 40, 60, 80 and 100 of them. Remove all
 # changelogs after 40 files, so the filesystem can't be recovered from metadata.1 and metadata.2
 for i in {1..5}; do
 	touch "${info[mount0]}/file_$i."{1..20}
-	lizardfs_master_daemon stop
-	cp "${info[master_data_path]}/metadata.mfs" "$TEMP_DIR/metadata.$i"
+	saunafs_master_daemon stop
+	cp "${info[master_data_path]}/metadata.sfs" "$TEMP_DIR/metadata.$i"
 	if (( $i == 2 )); then
-		lizardfs_metalogger_daemon stop
+		saunafs_metalogger_daemon stop
 		rm "${info[master_data_path]}"/*changelog*
-		lizardfs_metalogger_daemon start
+		saunafs_metalogger_daemon start
 	fi
-	lizardfs_master_daemon start
+	saunafs_master_daemon start
 done
-lizardfs_master_daemon kill
-lizardfs_metalogger_daemon kill
+saunafs_master_daemon kill
+saunafs_metalogger_daemon kill
 
 # Function takes three metadata files as arguments and tries to recover the filesystem
 verify_recovery() {
-	declare -A files=([metadata.mfs]="$1" [metadata.mfs.1]="$2" [metadata_ml.mfs]="$3")
+	declare -A files=([metadata.sfs]="$1" [metadata.sfs.1]="$2" [metadata_ml.sfs]="$3")
 	rm -f "${info[master_data_path]}"/metadata*
 	local filelist=""
 	for file in "${!files[@]}"; do
@@ -34,10 +34,10 @@ verify_recovery() {
 	(
 		export MESSAGE="$MESSAGE (from$filelist)"
 		echo "$MESSAGE"
-		assertlocal_success mfsmetarestore -d "${info[master_data_path]}" -a
-		assertlocal_success lizardfs_master_daemon start
+		assertlocal_success sfsmetarestore -d "${info[master_data_path]}" -a
+		assertlocal_success saunafs_master_daemon start
 		expect_equals 100 $(ls "${info[mount0]}" | wc -l)
-		expect_success lizardfs_master_daemon kill
+		expect_success saunafs_master_daemon kill
 	) || true
 }
 
@@ -64,7 +64,7 @@ verify_recovery "" "$TEMP_DIR/metadata.1" "$TEMP_DIR/metadata.5"
 verify_recovery "$TEMP_DIR/metadata.1" "" "$TEMP_DIR/metadata.4"
 verify_recovery "$TEMP_DIR/metadata.1" "" "$TEMP_DIR/metadata.5"
 
-MESSAGE="Veryfing recovery when metadata.mfs is older than a backup"
+MESSAGE="Veryfing recovery when metadata.sfs is older than a backup"
 verify_recovery "$TEMP_DIR/metadata.1" "$TEMP_DIR/metadata.4" ""
 verify_recovery "$TEMP_DIR/metadata.1" "$TEMP_DIR/metadata.5" ""
 

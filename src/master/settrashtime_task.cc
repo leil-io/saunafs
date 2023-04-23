@@ -1,19 +1,21 @@
 /*
+
    Copyright 2016 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -30,7 +32,7 @@ int SetTrashtimeTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {
 	++current_inode_;
 	FSNode *node = fsnodes_id_to_node(inode);
 	if (!node) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	uint8_t result = setTrashtime(node, ts);
@@ -49,7 +51,7 @@ int SetTrashtimeTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {
 		}
 
 		if ((smode_ & SMODE_RMASK) == 0 && result == kNotPermitted) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		(*stats_)[result] += 1;
 		if (result == kChanged) {
@@ -58,7 +60,7 @@ int SetTrashtimeTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {
 			             inode, uid_, trashtime_, smode_);
 		}
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 bool SetTrashtimeTask::isFinished() const {

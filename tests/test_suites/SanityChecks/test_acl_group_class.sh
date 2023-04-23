@@ -1,7 +1,7 @@
 assert_program_installed setfacl
 
 USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 touch file

@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -39,7 +40,7 @@
 
 class ChunkReader {
 public:
-	ChunkReader(ChunkConnector& connector, double bandwidth_overuse);
+	ChunkReader(ChunkConnector& connector, ReadChunkLocator& _locator, double bandwidth_overuse);
 
 	/**
 	 * Uses a locator to locate the chunk and chooses chunkservers to read from.
@@ -71,12 +72,12 @@ public:
 		return location_->version;
 	}
 
-	/// Counter for the .lizardfds_tweaks file.
+	/// Counter for the .saunafds_tweaks file.
 	static std::atomic<uint64_t> preparations;
 
 private:
 	ChunkConnector& connector_;
-	ReadChunkLocator locator_;
+	ReadChunkLocator *locator_;
 	uint32_t inode_;
 	uint32_t index_;
 	std::shared_ptr<const ChunkLocationInfo> location_;

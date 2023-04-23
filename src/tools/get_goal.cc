@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2016 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -29,7 +30,7 @@
 
 static void get_goal_usage() {
 	fprintf(stderr,
-	        "get objects goal (desired number of copies)\n\nusage:\n lizardfs getgoal [-nhHr] name [name "
+	        "get objects goal (desired number of copies)\n\nusage:\n saunafs getgoal [-nhHr] name [name "
 	        "...]\n");
 	print_numberformat_options();
 	print_recursive_option();
@@ -46,7 +47,7 @@ static int get_goal(const char *fname, uint8_t mode) {
 		MessageBuffer request;
 		cltoma::fuseGetGoal::serialize(request, messageId, inode, mode);
 		MessageBuffer response =
-		    ServerConnection::sendAndReceive(fd, request, LIZ_MATOCL_FUSE_GETGOAL);
+		    ServerConnection::sendAndReceive(fd, request, SAU_MATOCL_FUSE_GETGOAL);
 		PacketVersion version;
 		std::vector<FuseGetGoalStats> goalsStats;
 		deserializePacketVersionNoHeader(response, version);

@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2018 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -27,15 +28,15 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "protocol/MFSCommunication.h"
-#include "mount/lizard_client.h"
+#include "protocol/SFSCommunication.h"
+#include "mount/sauna_client.h"
 
-#if defined(LIZARDFS_HAVE_MLOCKALL) && defined(RLIMIT_MEMLOCK)
+#if defined(SAUNAFS_HAVE_MLOCKALL) && defined(RLIMIT_MEMLOCK)
 #  include <sys/mman.h>
 #endif
 
 #if defined(MCL_CURRENT) && defined(MCL_FUTURE)
-#  define MFS_USE_MEMLOCK
+#  define SFS_USE_MEMLOCK
 #endif
 
 #if defined(__APPLE__)
@@ -53,14 +54,12 @@ enum {
 	KEY_PATH,
 	KEY_PASSWORDASK,
 	KEY_NOSTDMOUNTOPTIONS,
-#if FUSE_VERSION >= 30
 	KEY_NONEMPTY,
-#endif
 	KEY_HELP,
 	KEY_VERSION
 };
 
-struct mfsopts_ {
+struct sfsopts_ {
 	char *masterhost;
 	char *masterport;
 	char *bindhost;
@@ -69,12 +68,10 @@ struct mfsopts_ {
 	char *md5pass;
 	unsigned nofile;
 	signed nice;
-#ifdef MFS_USE_MEMLOCK
+#ifdef SFS_USE_MEMLOCK
 	int memlock;
 #endif
-#if FUSE_VERSION >= 26
 	int filelocks;
-#endif
 	int nostdmountoptions;
 	int meta;
 	int debug;
@@ -109,14 +106,14 @@ struct mfsopts_ {
 	int chunkserverwriteto;
 	int cacheexpirationtime;
 	int readaheadmaxwindowsize;
+	unsigned readworkers;
+	unsigned maxreadaheadrequests;
 	int prefetchxorstripes;
 	unsigned symlinkcachetimeout;
 	double bandwidthoveruse;
-#if FUSE_VERSION >= 30
 	int nonemptymount;
-#endif
 
-	mfsopts_()
+	sfsopts_()
 		: masterhost(NULL),
 		masterport(NULL),
 		bindhost(NULL),
@@ -125,62 +122,60 @@ struct mfsopts_ {
 		md5pass(NULL),
 		nofile(0),
 		nice(-19),
-#ifdef MFS_USE_MEMLOCK
+#ifdef SFS_USE_MEMLOCK
 		memlock(0),
 #endif
-#if FUSE_VERSION >= 26
 		filelocks(0),
-#endif
 		nostdmountoptions(0),
 		meta(0),
-		debug(LizardClient::FsInitParams::kDefaultDebugMode),
-		delayedinit(LizardClient::FsInitParams::kDefaultDelayedInit),
+		debug(SaunaClient::FsInitParams::kDefaultDebugMode),
+		delayedinit(SaunaClient::FsInitParams::kDefaultDelayedInit),
 		acl(), // deprecated
-		aclcacheto(LizardClient::FsInitParams::kDefaultAclCacheTimeout),
-		aclcachesize(LizardClient::FsInitParams::kDefaultAclCacheSize),
-		rwlock(LizardClient::FsInitParams::kDefaultUseRwLock),
-		mkdircopysgid(LizardClient::FsInitParams::kDefaultMkdirCopySgid),
+		aclcacheto(SaunaClient::FsInitParams::kDefaultAclCacheTimeout),
+		aclcachesize(SaunaClient::FsInitParams::kDefaultAclCacheSize),
+		rwlock(SaunaClient::FsInitParams::kDefaultUseRwLock),
+		mkdircopysgid(SaunaClient::FsInitParams::kDefaultMkdirCopySgid),
 		sugidclearmodestr(NULL),
-		sugidclearmode(LizardClient::FsInitParams::kDefaultSugidClearMode),
+		sugidclearmode(SaunaClient::FsInitParams::kDefaultSugidClearMode),
 		cachemode(NULL),
 		cachefiles(0),
-		keepcache(LizardClient::FsInitParams::kDefaultKeepCache),
+		keepcache(SaunaClient::FsInitParams::kDefaultKeepCache),
 		passwordask(0),
-		donotrememberpassword(LizardClient::FsInitParams::kDefaultDoNotRememberPassword),
-		writecachesize(LizardClient::FsInitParams::kDefaultWriteCacheSize),
-		cachePerInodePercentage(LizardClient::FsInitParams::kDefaultCachePerInodePercentage),
-		writeworkers(LizardClient::FsInitParams::kDefaultWriteWorkers),
-		ioretries(LizardClient::FsInitParams::kDefaultIoRetries),
-		writewindowsize(LizardClient::FsInitParams::kDefaultWriteWindowSize),
-		attrcacheto(LizardClient::FsInitParams::kDefaultAttrCacheTimeout),
-		entrycacheto(LizardClient::FsInitParams::kDefaultEntryCacheTimeout),
-		direntrycacheto(LizardClient::FsInitParams::kDefaultDirentryCacheTimeout),
-		direntrycachesize(LizardClient::FsInitParams::kDefaultDirentryCacheSize),
-		reportreservedperiod(LizardClient::FsInitParams::kDefaultReportReservedPeriod),
+		donotrememberpassword(SaunaClient::FsInitParams::kDefaultDoNotRememberPassword),
+		writecachesize(SaunaClient::FsInitParams::kDefaultWriteCacheSize),
+		cachePerInodePercentage(SaunaClient::FsInitParams::kDefaultCachePerInodePercentage),
+		writeworkers(SaunaClient::FsInitParams::kDefaultWriteWorkers),
+		ioretries(SaunaClient::FsInitParams::kDefaultIoRetries),
+		writewindowsize(SaunaClient::FsInitParams::kDefaultWriteWindowSize),
+		attrcacheto(SaunaClient::FsInitParams::kDefaultAttrCacheTimeout),
+		entrycacheto(SaunaClient::FsInitParams::kDefaultEntryCacheTimeout),
+		direntrycacheto(SaunaClient::FsInitParams::kDefaultDirentryCacheTimeout),
+		direntrycachesize(SaunaClient::FsInitParams::kDefaultDirentryCacheSize),
+		reportreservedperiod(SaunaClient::FsInitParams::kDefaultReportReservedPeriod),
 		iolimits(NULL),
-		chunkserverrtt(LizardClient::FsInitParams::kDefaultRoundTime),
-		chunkserverconnectreadto(LizardClient::FsInitParams::kDefaultChunkserverConnectTo),
-		chunkserverwavereadto(LizardClient::FsInitParams::kDefaultChunkserverWaveReadTo),
-		chunkservertotalreadto(LizardClient::FsInitParams::kDefaultChunkserverTotalReadTo),
-		chunkserverwriteto(LizardClient::FsInitParams::kDefaultChunkserverWriteTo),
-		cacheexpirationtime(LizardClient::FsInitParams::kDefaultCacheExpirationTime),
-		readaheadmaxwindowsize(LizardClient::FsInitParams::kDefaultReadaheadMaxWindowSize),
-		prefetchxorstripes(LizardClient::FsInitParams::kDefaultPrefetchXorStripes),
-		symlinkcachetimeout(LizardClient::FsInitParams::kDefaultSymlinkCacheTimeout),
-		bandwidthoveruse(LizardClient::FsInitParams::kDefaultBandwidthOveruse)
-#if FUSE_VERSION >= 30
-		, nonemptymount(LizardClient::FsInitParams::kDefaultNonEmptyMounts)
-#endif
+		chunkserverrtt(SaunaClient::FsInitParams::kDefaultRoundTime),
+		chunkserverconnectreadto(SaunaClient::FsInitParams::kDefaultChunkserverConnectTo),
+		chunkserverwavereadto(SaunaClient::FsInitParams::kDefaultChunkserverWaveReadTo),
+		chunkservertotalreadto(SaunaClient::FsInitParams::kDefaultChunkserverTotalReadTo),
+		chunkserverwriteto(SaunaClient::FsInitParams::kDefaultChunkserverWriteTo),
+		cacheexpirationtime(SaunaClient::FsInitParams::kDefaultCacheExpirationTime),
+		readaheadmaxwindowsize(SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize),
+		readworkers(SaunaClient::FsInitParams::kDefaultReadWorkers),
+		maxreadaheadrequests(SaunaClient::FsInitParams::kDefaultMaxReadaheadRequests),
+		prefetchxorstripes(SaunaClient::FsInitParams::kDefaultPrefetchXorStripes),
+		symlinkcachetimeout(SaunaClient::FsInitParams::kDefaultSymlinkCacheTimeout),
+		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
+		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts)
 	{ }
 };
 
-extern mfsopts_ gMountOptions;
+extern sfsopts_ gMountOptions;
 extern int gCustomCfg;
 extern char *gDefaultMountpoint;
-extern fuse_opt gMfsOptsStage1[];
-extern fuse_opt gMfsOptsStage2[];
+extern fuse_opt gSfsOptsStage1[];
+extern fuse_opt gSfsOptsStage2[];
 
 void usage(const char *progname);
-void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *outargs);
-int mfs_opt_proc_stage1(void *data, const char *arg, int key, struct fuse_args *outargs);
-int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse_args *outargs);
+void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *outargs);
+int sfs_opt_proc_stage1(void *data, const char *arg, int key, struct fuse_args *outargs);
+int sfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse_args *outargs);

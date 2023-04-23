@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -77,7 +79,7 @@ void registerFunctionCalledOnPromotion(void(*f)(void)) {
 }
 
 void promoteToMaster() {
-	lzfs_pretty_syslog(LOG_INFO, "changing metadataserver personality from Shadow to Master");
+	safs_pretty_syslog(LOG_INFO, "changing metadataserver personality from Shadow to Master");
 	for (auto& f : gChangePersonalityReloadFunctions) {
 		f();
 	}
@@ -90,7 +92,7 @@ void personality_reload(void) {
 	bool optionHaManaged = main_has_extra_argument(kClusterManagedCmdOption,
 			CaseSensitivity::kIgnore);
 	if (configHaManaged != optionHaManaged) {
-		lzfs_pretty_syslog(LOG_ERR,
+		safs_pretty_syslog(LOG_ERR,
 				"metadata server personality cannot be switched between %s and master/shadow",
 				kClusterManagedPersonality.c_str());
 		return;
@@ -108,13 +110,13 @@ void personality_reload(void) {
 			if (personality == Personality::kMaster) {
 				promoteToMaster();
 			} else {
-				lzfs_pretty_syslog(LOG_ERR,
+				safs_pretty_syslog(LOG_ERR,
 						"trying to preform forbidden personality change from Master to Shadow");
 			}
 		}
 	} catch (const ConfigurationException& e) {
 		/* reload shall not break instance */
-		lzfs_pretty_syslog(LOG_ERR, "bad configuration: `%s'", e.what());
+		safs_pretty_syslog(LOG_ERR, "bad configuration: `%s'", e.what());
 	}
 }
 
@@ -131,7 +133,7 @@ bool promoteAutoToMaster() {
 
 int personality_validate() {
 	static std::string haAdvise = "This installation is managed by HA cluster,"
-			" one should manipulate metadata servers only using lizardfs-cluster-manager.";
+			" one should manipulate metadata servers only using saunafs-cluster-manager.";
 	static std::string nonHaAdvise = "Metadata server configuration states that this installation"
 			" is NOT managed by HA cluster. In case if it is supposed to be managed by a cluster"
 			" change the configuration (change the personality defined in " + cfg_filename() +

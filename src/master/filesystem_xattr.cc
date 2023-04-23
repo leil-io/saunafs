@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -107,15 +108,15 @@ uint8_t xattr_setattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 	xattr_data_entry *xa;
 	uint32_t hash, ihash;
 
-	if (avleng > MFS_XATTR_SIZE_MAX) {
-		return LIZARDFS_ERROR_ERANGE;
+	if (avleng > SFS_XATTR_SIZE_MAX) {
+		return SAUNAFS_ERROR_ERANGE;
 	}
-#if MFS_XATTR_NAME_MAX < 255
-	if (anleng == 0U || anleng > MFS_XATTR_NAME_MAX) {
+#if SFS_XATTR_NAME_MAX < 255
+	if (anleng == 0U || anleng > SFS_XATTR_NAME_MAX) {
 #else
 	if (anleng == 0U) {
 #endif
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	ihash = xattr_inode_hash_fn(inode);
@@ -128,7 +129,7 @@ uint8_t xattr_setattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 		    memcmp(xa->attrname, attrname, anleng) == 0) {
 			passert(ih);
 			if (mode == XATTR_SMODE_CREATE_ONLY) {  // create only
-				return LIZARDFS_ERROR_EEXIST;
+				return SAUNAFS_ERROR_EEXIST;
 			}
 			if (mode == XATTR_SMODE_REMOVE) {  // remove
 				ih->anleng -= anleng + 1U;
@@ -136,7 +137,7 @@ uint8_t xattr_setattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 				xattr_removeentry(xa);
 				if (ih->data_head == NULL) {
 					if (ih->anleng != 0 || ih->avleng != 0) {
-						lzfs_pretty_syslog(LOG_WARNING,
+						safs_pretty_syslog(LOG_WARNING,
 						       "xattr non zero lengths on remove "
 						       "(inode:%" PRIu32 ",anleng:%" PRIu32
 						       ",avleng:%" PRIu32 ")",
@@ -144,7 +145,7 @@ uint8_t xattr_setattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 					}
 					xattr_removeinode(inode);
 				}
-				return LIZARDFS_STATUS_OK;
+				return SAUNAFS_STATUS_OK;
 			}
 			ih->avleng -= xa->avleng;
 			if (xa->attrvalue) {
@@ -160,16 +161,16 @@ uint8_t xattr_setattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 			xa->avleng = avleng;
 			ih->avleng += avleng;
 			xattr_update_checksum(xa);
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 	}
 
 	if (mode == XATTR_SMODE_REPLACE_ONLY || mode == XATTR_SMODE_REMOVE) {
-		return LIZARDFS_ERROR_ENOATTR;
+		return SAUNAFS_ERROR_ENOATTR;
 	}
 
-	if (ih && ih->anleng + anleng + 1 > MFS_XATTR_LIST_MAX) {
-		return LIZARDFS_ERROR_ERANGE;
+	if (ih && ih->anleng + anleng + 1 > SFS_XATTR_LIST_MAX) {
+		return SAUNAFS_ERROR_ERANGE;
 	}
 
 	xa = new xattr_data_entry;
@@ -216,7 +217,7 @@ uint8_t xattr_setattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 	}
 	xa->checksum = 0;
 	xattr_update_checksum(xa);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t xattr_getattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, uint32_t *avleng,
@@ -227,15 +228,15 @@ uint8_t xattr_getattr(uint32_t inode, uint8_t anleng, const uint8_t *attrname, u
 	     xa = xa->next) {
 		if (xa->inode == inode && xa->anleng == anleng &&
 		    memcmp(xa->attrname, attrname, anleng) == 0) {
-			if (xa->avleng > MFS_XATTR_SIZE_MAX) {
-				return LIZARDFS_ERROR_ERANGE;
+			if (xa->avleng > SFS_XATTR_SIZE_MAX) {
+				return SAUNAFS_ERROR_ERANGE;
 			}
 			*attrvalue = xa->attrvalue;
 			*avleng = xa->avleng;
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 	}
-	return LIZARDFS_ERROR_ENOATTR;
+	return SAUNAFS_ERROR_ENOATTR;
 }
 
 uint8_t xattr_listattr_leng(uint32_t inode, void **xanode, uint32_t *xasize) {
@@ -248,14 +249,14 @@ uint8_t xattr_listattr_leng(uint32_t inode, void **xanode, uint32_t *xasize) {
 			for (xa = ih->data_head; xa; xa = xa->nextinode) {
 				*xasize += xa->anleng + 1U;
 			}
-			if (*xasize > MFS_XATTR_LIST_MAX) {
-				return LIZARDFS_ERROR_ERANGE;
+			if (*xasize > SFS_XATTR_LIST_MAX) {
+				return SAUNAFS_ERROR_ERANGE;
 			}
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 	}
 	*xanode = NULL;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void xattr_listattr_data(void *xanode, uint8_t *xabuff) {

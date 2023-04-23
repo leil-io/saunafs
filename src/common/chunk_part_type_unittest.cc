@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -86,25 +87,25 @@ TEST(ChunkTypeTests, validChunkTypeIDTest) {
 			slice_traits::chunkLengthToChunkPartLength(chunkType, wholeChunkLen))
 
 TEST(ChunkTypeTests, chunkTypeLengthTest) {
-	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 2 * MFSBLOCKSIZE    , 4 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 2 * MFSBLOCKSIZE + 1, 4 * MFSBLOCKSIZE + 1);
-	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 3 * MFSBLOCKSIZE    , 5 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 3 * MFSBLOCKSIZE    , 5 * MFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 2 * SFSBLOCKSIZE    , 4 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 2 * SFSBLOCKSIZE + 1, 4 * SFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 3 * SFSBLOCKSIZE    , 5 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(xor_p_of_2, 3 * SFSBLOCKSIZE    , 5 * SFSBLOCKSIZE + 1);
 
-	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 2 * MFSBLOCKSIZE    , 4 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 2 * MFSBLOCKSIZE + 1, 4 * MFSBLOCKSIZE + 1);
-	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 3 * MFSBLOCKSIZE    , 5 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 3 * MFSBLOCKSIZE    , 5 * MFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 2 * SFSBLOCKSIZE    , 4 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 2 * SFSBLOCKSIZE + 1, 4 * SFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 3 * SFSBLOCKSIZE    , 5 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(xor_1_of_2, 3 * SFSBLOCKSIZE    , 5 * SFSBLOCKSIZE + 1);
 
-	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * MFSBLOCKSIZE    , 4 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * MFSBLOCKSIZE    , 4 * MFSBLOCKSIZE + 1);
-	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * MFSBLOCKSIZE    , 5 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * MFSBLOCKSIZE + 1, 5 * MFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * SFSBLOCKSIZE    , 4 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * SFSBLOCKSIZE    , 4 * SFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * SFSBLOCKSIZE    , 5 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(xor_2_of_2, 2 * SFSBLOCKSIZE + 1, 5 * SFSBLOCKSIZE + 1);
 
-	CHECK_CHUNK_TYPE_LENGTH(standard,   4 * MFSBLOCKSIZE    , 4 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(standard,   4 * MFSBLOCKSIZE + 1, 4 * MFSBLOCKSIZE + 1);
-	CHECK_CHUNK_TYPE_LENGTH(standard,   5 * MFSBLOCKSIZE    , 5 * MFSBLOCKSIZE);
-	CHECK_CHUNK_TYPE_LENGTH(standard,   5 * MFSBLOCKSIZE + 1, 5 * MFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(standard,   4 * SFSBLOCKSIZE    , 4 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(standard,   4 * SFSBLOCKSIZE + 1, 4 * SFSBLOCKSIZE + 1);
+	CHECK_CHUNK_TYPE_LENGTH(standard,   5 * SFSBLOCKSIZE    , 5 * SFSBLOCKSIZE);
+	CHECK_CHUNK_TYPE_LENGTH(standard,   5 * SFSBLOCKSIZE + 1, 5 * SFSBLOCKSIZE + 1);
 }
 
 TEST(ChunkTypeTests, GetNumberOfBlocks) {
@@ -129,15 +130,15 @@ TEST(ChunkTypeTests, GetNumberOfBlocks) {
 	ASSERT_EQ(4, slice_traits::getNumberOfBlocks(xor_p_of_3, 12));
 
 
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 1, int(slice_traits::getNumberOfBlocks(standard, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 2, int(slice_traits::getNumberOfBlocks(xor_1_of_2, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 2, int(slice_traits::getNumberOfBlocks(xor_2_of_2, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 2, int(slice_traits::getNumberOfBlocks(xor_p_of_2, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 3, int(slice_traits::getNumberOfBlocks(xor_3_of_3, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 4, int(slice_traits::getNumberOfBlocks(xor_1_of_4, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ(MFSBLOCKSINCHUNK / 7, int(slice_traits::getNumberOfBlocks(xor_7_of_7, MFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 1, int(slice_traits::getNumberOfBlocks(standard, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 2, int(slice_traits::getNumberOfBlocks(xor_1_of_2, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 2, int(slice_traits::getNumberOfBlocks(xor_2_of_2, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 2, int(slice_traits::getNumberOfBlocks(xor_p_of_2, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 3, int(slice_traits::getNumberOfBlocks(xor_3_of_3, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 4, int(slice_traits::getNumberOfBlocks(xor_1_of_4, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ(SFSBLOCKSINCHUNK / 7, int(slice_traits::getNumberOfBlocks(xor_7_of_7, SFSBLOCKSINCHUNK)));
 
-	ASSERT_EQ((MFSBLOCKSINCHUNK + 2)/ 3, int(slice_traits::getNumberOfBlocks(xor_1_of_3, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ((MFSBLOCKSINCHUNK + 1)/ 3, int(slice_traits::getNumberOfBlocks(xor_2_of_3, MFSBLOCKSINCHUNK)));
-	ASSERT_EQ((MFSBLOCKSINCHUNK + 2)/ 3, int(slice_traits::getNumberOfBlocks(xor_p_of_3, MFSBLOCKSINCHUNK)));
+	ASSERT_EQ((SFSBLOCKSINCHUNK + 2)/ 3, int(slice_traits::getNumberOfBlocks(xor_1_of_3, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ((SFSBLOCKSINCHUNK + 1)/ 3, int(slice_traits::getNumberOfBlocks(xor_2_of_3, SFSBLOCKSINCHUNK)));
+	ASSERT_EQ((SFSBLOCKSINCHUNK + 2)/ 3, int(slice_traits::getNumberOfBlocks(xor_p_of_3, SFSBLOCKSINCHUNK)));
 }

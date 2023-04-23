@@ -21,8 +21,8 @@ import select
 
  ######################## ! DEPRECATION WARNING ! #########################
  #                                                                        #
- # mfscgiserv service is deprecated, please use lizardfs-cgiserv instead. #
- # See manual entry lizardfs-cgiserver(8) for details.                    #
+ # sfscgiserv service is deprecated, please use saunafs-cgiserv instead. #
+ # See manual entry saunafs-cgiserver(8) for details.                    #
  #                                                                        #
  ######################## ! DEPRECATION WARNING ! #########################
 
@@ -407,7 +407,7 @@ def wdlock(fname,runmode,timeout):
 					print "can't find process to terminate"
 					return -1
 			if runmode==3:
-				print "mfscgiserv is not running"
+				print "sfscgiserv is not running"
 				return 0
 			print "lockfile created and locked"
 			return 1
@@ -416,7 +416,7 @@ def wdlock(fname,runmode,timeout):
 			return -1
 		else:
 			if runmode==3:
-				print "mfscgiserv pid:%u" % l
+				print "sfscgiserv pid:%u" % l
 				return 0
 			if runmode==1:
 				print "can't start: lockfile is already locked by another process"
@@ -443,8 +443,8 @@ if __name__=="__main__":
 	print
 	print " ######################## ! DEPRECATION WARNING ! #########################"
 	print " #                                                                        #"
-	print " # mfscgiserv service is deprecated, please use lizardfs-cgiserv instead. #"
-	print " # See manual entry lizardfs-cgiserver(8) for details.                    #"
+	print " # sfscgiserv service is deprecated, please use saunafs-cgiserv instead. #"
+	print " # See manual entry saunafs-cgiserver(8) for details.                    #"
 	print " #                                                                        #"
 	print " ######################## ! DEPRECATION WARNING ! #########################"
 	print
@@ -472,7 +472,7 @@ if __name__=="__main__":
 
 	datapath = os.path.realpath(datapath)
 	rootpath = os.path.realpath(rootpath)
-	lockfname = datapath + os.path.sep + '.mfscgiserv.lock'
+	lockfname = datapath + os.path.sep + '.sfscgiserv.lock'
 
 	try:
 		mode = args[0]

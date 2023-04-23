@@ -1,0 +1,28 @@
+---
+# Complete list of style options can be found at:
+# http://clang.llvm.org/docs/ClangFormatStyleOptions.html
+
+BasedOnStyle: Google
+Standard: Latest
+IndentWidth: '4'
+TabWidth: '4'
+UseTab: ForIndentation
+AccessModifierOffset: -4
+
+DerivePointerAlignment: false
+PointerAlignment: Right
+
+IndentCaseLabels: false
+
+# All enumerators in their own line
+AllowShortEnumsOnASingleLine: false
+
+# Respects common/platform.h if it is in a separated group of includes
+IncludeBlocks: Preserve
+
+# Clang Format doesn't support adding a semicolon to the end of a single for
+# loop. Instead, we must braces until it does.
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: true
+
+...

@@ -4,19 +4,23 @@ PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
 WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
 die() { echo "Error: $*" >&2; exit 1; }
 
-export LIZARDFS_ROOT=${WORKSPACE}/install/lizardfs
-echo "LIZARDFS_ROOT: ${LIZARDFS_ROOT}"
+test_filter="${1:-}"
+[ -n "${test_filter}" ] || test_filter="SanityChecks.*"
+echo "test_filter: ${test_filter}"
+
+export SAUNAFS_ROOT=${WORKSPACE}/install/saunafs
+echo "SAUNAFS_ROOT: ${SAUNAFS_ROOT}"
 export TEST_OUTPUT_DIR=${WORKSPACE}/test_output
 echo "TEST_OUTPUT_DIR: ${TEST_OUTPUT_DIR}"
 export TERM=xterm
 
-killall -9 lizardfs-tests || true
+killall -9 saunafs-tests || true
 mkdir -m 777 -p "${TEST_OUTPUT_DIR}"
 rm -rf "${TEST_OUTPUT_DIR:?}"/* || true
 rm -rf /mnt/ramdisk/* || true
-[ -f "${LIZARDFS_ROOT}/bin/lizardfs-tests" ] || \
-	die "${LIZARDFS_ROOT}/bin/lizardfs-tests" not found, did you build the project?
-export PATH="${LIZARDFS_ROOT}/bin:${PATH}"
-sudo sed -E -i '\,.*:\s+\$\{LIZARDFS_ROOT\s*:=.*,d' /etc/lizardfs_tests.conf || true
-echo ": \${LIZARDFS_ROOT:=${LIZARDFS_ROOT}}" | sudo tee -a /etc/lizardfs_tests.conf >/dev/null || true
-sudo "${LIZARDFS_ROOT}/bin/lizardfs-tests" --gtest_color=yes --gtest_filter='SanityChecks.*' --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml"
+[ -f "${SAUNAFS_ROOT}/bin/saunafs-tests" ] || \
+	die "${SAUNAFS_ROOT}/bin/saunafs-tests" not found, did you build the project?
+export PATH="${SAUNAFS_ROOT}/bin:${PATH}"
+sudo sed -E -i '\,.*:\s+\$\{SAUNAFS_ROOT\s*:=.*,d' /etc/saunafs_tests.conf || true
+echo ": \${SAUNAFS_ROOT:=${SAUNAFS_ROOT}}" | sudo tee -a /etc/saunafs_tests.conf >/dev/null || true
+sudo "${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes --gtest_filter="${test_filter}"  --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml"

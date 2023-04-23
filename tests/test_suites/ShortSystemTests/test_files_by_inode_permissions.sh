@@ -1,8 +1,8 @@
 USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 
-# Create files as lizardfstest user
+# Create files as saunafstest user
 cd "${info[mount0]}"
 mkdir "${info[mount0]}/dir"
 for size in {1,2,4,8,16}M; do
@@ -17,7 +17,7 @@ chmod 660 "dir/file_8M" # inode 6
 chmod 770 "dir/file_16M" # inode 7
 
 # Check permissions for files accessed by inode
-INODE_PATH="${info[mount0]}/.lizardfs_file_by_inode"
+INODE_PATH="${info[mount0]}/.saunafs_file_by_inode"
 assert_success file-validate "$INODE_PATH/3"
 assert_failure dd if=/dev/random of="$INODE_PATH/3" bs=1 count=1
 assert_failure file-validate "$INODE_PATH/4"
@@ -32,6 +32,6 @@ assert_success dd if=/dev/random of="$INODE_PATH/6" bs=1 count=1
 assert_success printf "#/bin/bash\necho 'Hello!\n' > /dev/null" > "$INODE_PATH/7"
 assert_success "$INODE_PATH/7"
 
-# ls on .lizardfs_file_by_inode should fail, or we can end up
+# ls on .saunafs_file_by_inode should fail, or we can end up
 # with very long listing.
 assert_failure ls $INODE_PATH

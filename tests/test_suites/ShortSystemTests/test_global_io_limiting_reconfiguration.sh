@@ -12,8 +12,8 @@ fi
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
 	MASTER_EXTRA_CONFIG="GLOBALIOLIMITS_FILENAME = $iolimits" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 truncate -s1M "${info[mount0]}/file"
 
@@ -23,7 +23,7 @@ cat "${info[mount0]}/file" >/dev/null
 {
 	sleep 2
 	echo "limit unclassified 2048" > "$iolimits"
-	lizardfs_master_daemon reload
+	saunafs_master_daemon reload
 } &
 
 start=$(nanostamp)

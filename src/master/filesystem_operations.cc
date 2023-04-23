@@ -1,20 +1,22 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -100,11 +102,11 @@ void fs_changelog(uint32_t ts, const char *format, ...) {
 #ifndef METARESTORE
 uint8_t fs_readreserved_size(uint32_t rootinode, uint8_t sesflags, uint32_t *dbuffsize) {
 	if (rootinode != 0) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	(void)sesflags;
 	*dbuffsize = fsnodes_getdetachedsize(gMetadata->reserved);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void fs_readreserved_data(uint32_t rootinode, uint8_t sesflags, uint8_t *dbuff) {
@@ -119,11 +121,11 @@ void fs_readreserved(uint32_t off, uint32_t max_entries, std::vector<NamedInodeE
 
 uint8_t fs_readtrash_size(uint32_t rootinode, uint8_t sesflags, uint32_t *dbuffsize) {
 	if (rootinode != 0) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	(void)sesflags;
 	*dbuffsize = fsnodes_getdetachedsize(gMetadata->trash);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void fs_readtrash_data(uint32_t rootinode, uint8_t sesflags, uint8_t *dbuff) {
@@ -142,44 +144,44 @@ uint8_t fs_getdetachedattr(uint32_t rootinode, uint8_t sesflags, uint32_t inode,
 	FSNode *p;
 	attr.fill(0);
 	if (rootinode != 0) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	(void)sesflags;
 	if (!DTYPE_ISVALID(dtype)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (dtype == DTYPE_TRASH && p->type == FSNode::kReserved) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (dtype == DTYPE_RESERVED && p->type == FSNode::kTrash) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	fsnodes_fill_attr(p, NULL, p->uid, p->gid, p->uid, p->gid, sesflags, attr);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_gettrashpath(uint32_t rootinode, uint8_t sesflags, uint32_t inode, std::string &path) {
 	FSNode *p;
 	if (rootinode != 0) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	(void)sesflags;
 	p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kTrash) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	path = (std::string)gMetadata->trash.at(TrashPathKey(p));
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -187,21 +189,21 @@ uint8_t fs_settrashpath(const FsContext &context, uint32_t inode, const std::str
 	ChecksumUpdater cu(context.ts());
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kOnlyMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	} else if (p->type != FSNode::kTrash) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	} else if (path.length() == 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	for (uint32_t i = 0; i < path.length(); i++) {
 		if (path[i] == 0) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 	}
 
@@ -213,27 +215,27 @@ uint8_t fs_settrashpath(const FsContext &context, uint32_t inode, const std::str
 	} else {
 		gMetadata->metaversion++;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_undel(const FsContext &context, uint32_t inode) {
 	ChecksumUpdater cu(context.ts());
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kOnlyMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	} else if (p->type != FSNode::kTrash) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 
 	status = fsnodes_undel(context.ts(), static_cast<FSNodeFile*>(p));
 	if (context.isPersonalityMaster()) {
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			fs_changelog(context.ts(), "UNDEL(%" PRIu32 ")", p->id);
 		}
 	} else {
@@ -246,15 +248,15 @@ uint8_t fs_purge(const FsContext &context, uint32_t inode) {
 	ChecksumUpdater cu(context.ts());
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kOnlyMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	} else if (p->type != FSNode::kTrash) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	uint32_t purged_inode =
 	        p->id;  // This should be equal to inode, because p is not a directory
@@ -265,7 +267,7 @@ uint8_t fs_purge(const FsContext &context, uint32_t inode) {
 	} else {
 		gMetadata->metaversion++;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -296,7 +298,7 @@ uint8_t fs_getrootinode(uint32_t *rootinode, const uint8_t *path) {
 		}
 		if (*name == '\0') {
 			*rootinode = parent->id;
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 		nleng = 0;
 		while (name[nleng] && name[nleng] != '/') {
@@ -304,14 +306,14 @@ uint8_t fs_getrootinode(uint32_t *rootinode, const uint8_t *path) {
 		}
 		hname = HString((const char*)name, nleng);
 		if (fsnodes_namecheck(hname) < 0) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 		FSNode *child = fsnodes_lookup(parent, hname);
 		if (!child) {
-			return LIZARDFS_ERROR_ENOENT;
+			return SAUNAFS_ERROR_ENOENT;
 		}
 		if (child->type != FSNode::kDirectory) {
-			return LIZARDFS_ERROR_ENOTDIR;
+			return SAUNAFS_ERROR_ENOTDIR;
 		}
 		parent = static_cast<FSNodeDirectory*>(child);
 		name += nleng;
@@ -349,27 +351,27 @@ void fs_statfs(const FsContext &context, uint64_t *totalspace, uint64_t *availsp
 #endif /* #ifndef METARESTORE */
 
 uint8_t fs_apply_checksum(const std::string &version, uint64_t checksum) {
-	std::string versionString = lizardfsVersionToString(LIZARDFS_VERSHEX);
+	std::string versionString = saunafsVersionToString(SAUNAFS_VERSHEX);
 	uint64_t computedChecksum = fs_checksum(ChecksumMode::kGetCurrent);
 	gMetadata->metaversion++;
 	if (!gDisableChecksumVerification && (version == versionString)) {
 		if (checksum != computedChecksum) {
-			return LIZARDFS_ERROR_BADMETADATACHECKSUM;
+			return SAUNAFS_ERROR_BADMETADATACHECKSUM;
 		}
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_apply_access(uint32_t ts, uint32_t inode) {
 	FSNode *p;
 	p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	p->atime = ts;
 	fsnodes_update_checksum(p);
 	gMetadata->metaversion++;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -377,7 +379,7 @@ uint8_t fs_access(const FsContext &context, uint32_t inode, int modemask) {
 	FSNode *p;
 
 	uint8_t status = verify_session(context, (modemask & MODE_MASK_W) ? OperationMode::kReadWrite : OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -393,13 +395,13 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 	attr.fill(0);
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_X,
 	                                        parent, &wd, &rn);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -412,7 +414,7 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 			}
 			fsnodes_fill_attr(wd, wd, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 			++gFsStatsArray[FsStats::Lookup];
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 		if (name.length() == 2 && name[1] == '.') {  // parent
 			if (wd->id == context.rootinode()) {
@@ -435,20 +437,20 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 				}
 			}
 			++gFsStatsArray[FsStats::Lookup];
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 	}
 	if (fsnodes_namecheck(name) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
 	if (!child) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	*inode = child->id;
 	fsnodes_fill_attr(child, wd, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Lookup];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_whole_path_lookup(const FsContext &context, uint32_t parent, const std::string &path, uint32_t *found_inode, Attributes &attr) {
@@ -461,7 +463,7 @@ uint8_t fs_whole_path_lookup(const FsContext &context, uint32_t parent, const st
 		if (current_it != delim_it) {
 			HString hstr(current_it, delim_it);
 			status = fs_lookup(context, parent, hstr, &tmp_inode, attr);
-			if (status != LIZARDFS_STATUS_OK) {
+			if (status != SAUNAFS_STATUS_OK) {
 				return status;
 			}
 			parent = tmp_inode;
@@ -476,7 +478,7 @@ uint8_t fs_whole_path_lookup(const FsContext &context, uint32_t parent, const st
 	if (tmp_inode == context.rootinode()) {
 		return fs_getattr(context, SPECIAL_INODE_ROOT, attr);
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_getattr(const FsContext &context, uint32_t inode, Attributes &attr) {
@@ -485,19 +487,19 @@ uint8_t fs_getattr(const FsContext &context, uint32_t inode, Attributes &attr) {
 	attr.fill(0);
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Getattr];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_try_setlength(const FsContext &context, uint32_t inode, uint8_t opened,
@@ -509,21 +511,21 @@ uint8_t fs_try_setlength(const FsContext &context, uint32_t inode, uint8_t opene
 	attr.fill(0);
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile,
 	                                        opened == 0 ? MODE_MASK_W : MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	FSNodeFile *node_file = static_cast<FSNodeFile*>(p);
 
-	if (length & MFSCHUNKMASK) {
-		uint32_t indx = (length >> MFSCHUNKBITS);
+	if (length & SFSCHUNKMASK) {
+		uint32_t indx = (length >> SFSCHUNKBITS);
 		if (indx < node_file->chunks.size()) {
 			uint64_t ochunkid = node_file->chunks[indx];
 			if (ochunkid > 0) {
@@ -532,9 +534,9 @@ uint8_t fs_try_setlength(const FsContext &context, uint32_t inode, uint8_t opene
 				// We deny truncating parity only if truncating down
 				denyTruncatingParity = denyTruncatingParity && (length < node_file->length);
 				status = chunk_multi_truncate(
-				    ochunkid, lockId, (length & MFSCHUNKMASK), p->goal, denyTruncatingParity,
+				    ochunkid, lockId, (length & SFSCHUNKMASK), p->goal, denyTruncatingParity,
 				    fsnodes_quota_exceeded(p, {{QuotaResource::kSize, 1}}), &nchunkid);
-				if (status != LIZARDFS_STATUS_OK) {
+				if (status != SAUNAFS_STATUS_OK) {
 					return status;
 				}
 				node_file->chunks[indx] = nchunkid;
@@ -542,13 +544,13 @@ uint8_t fs_try_setlength(const FsContext &context, uint32_t inode, uint8_t opene
 				fs_changelog(ts, "TRUNC(%" PRIu32 ",%" PRIu32 ",%" PRIu32 "):%" PRIu64, p->id, indx,
 				             lockId, nchunkid);
 				fsnodes_update_checksum(p);
-				return LIZARDFS_ERROR_DELAYED;
+				return SAUNAFS_ERROR_DELAYED;
 			}
 		}
 	}
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Setattr];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -558,39 +560,39 @@ uint8_t fs_apply_trunc(uint32_t ts, uint32_t inode, uint32_t indx, uint64_t chun
 	uint8_t status;
 	FSNodeFile *p = fsnodes_id_to_node<FSNodeFile>(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (indx > MAX_INDEX) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 	if (indx >= p->chunks.size()) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	ochunkid = p->chunks[indx];
 	if (ochunkid == 0) {
-		return LIZARDFS_ERROR_NOCHUNK;
+		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	status = chunk_apply_modification(ts, ochunkid, lockid, p->goal, true, &nchunkid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (chunkid != nchunkid) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 	p->chunks[indx] = nchunkid;
 	gMetadata->metaversion++;
 	fsnodes_update_checksum(p);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_set_nextchunkid(const FsContext &context, uint64_t nextChunkId) {
 	ChecksumUpdater cu(context.ts());
 	uint8_t status = chunk_set_next_chunkid(nextChunkId);
 	if (context.isPersonalityMaster()) {
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			fs_changelog(context.ts(), "NEXTCHUNKID(%" PRIu64 ")", nextChunkId);
 		}
 	} else {
@@ -623,13 +625,13 @@ uint8_t fs_do_setlength(const FsContext &context, uint32_t inode, uint64_t lengt
 	attr.fill(0);
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -640,7 +642,7 @@ uint8_t fs_do_setlength(const FsContext &context, uint32_t inode, uint64_t lengt
 	fsnodes_update_checksum(p);
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Setattr];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_setattr(const FsContext &context, uint32_t inode, uint8_t setmask, uint16_t attrmode,
@@ -653,40 +655,40 @@ uint8_t fs_setattr(const FsContext &context, uint32_t inode, uint8_t setmask, ui
 	attr.fill(0);
 
 	auto status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (context.uid() != 0 && (context.sesflags() & SESFLAG_MAPALL) && (setmask & (SET_UID_FLAG | SET_GID_FLAG))) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if ((p->mode & (EATTR_NOOWNER << 12)) == 0 && context.uid() != 0 && context.uid() != p->uid) {
 		if (setmask & (SET_MODE_FLAG | SET_UID_FLAG | SET_GID_FLAG)) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		if ((setmask & SET_ATIME_FLAG) && !(setmask & SET_ATIME_NOW_FLAG)) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		if ((setmask & SET_MTIME_FLAG) && !(setmask & SET_MTIME_NOW_FLAG)) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		if ((setmask & (SET_ATIME_NOW_FLAG | SET_MTIME_NOW_FLAG)) &&
 		    !fsnodes_access(context, p, MODE_MASK_W)) {
-			return LIZARDFS_ERROR_EACCES;
+			return SAUNAFS_ERROR_EACCES;
 		}
 	}
 	if (context.uid() != 0 && context.uid() != attruid && (setmask & SET_UID_FLAG)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if ((context.sesflags() & SESFLAG_IGNOREGID) == 0) {
 		if (context.uid() != 0 && (setmask & SET_GID_FLAG) && !context.hasGroup(attrgid)) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 	}
 	// first ignore sugid clears done by kernel
@@ -729,7 +731,7 @@ uint8_t fs_setattr(const FsContext &context, uint32_t inode, uint8_t setmask, ui
 				}
 			}
 			break;
-		case SugidClearMode::kXfs:
+		case SugidClearMode::kSfs:
 			if (p->type != FSNode::kDirectory) {  // similar to EXT3, but unprivileged users
 				                          // also clear suid/sgid bits on
 				                          // directories
@@ -773,7 +775,7 @@ uint8_t fs_setattr(const FsContext &context, uint32_t inode, uint8_t setmask, ui
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	fsnodes_update_checksum(p);
 	++gFsStatsArray[FsStats::Setattr];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -781,10 +783,10 @@ uint8_t fs_apply_attr(uint32_t ts, uint32_t inode, uint32_t mode, uint32_t uid, 
 			uint32_t atime, uint32_t mtime) {
 	FSNode *p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (mode > 07777) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	p->mode = mode | (p->mode & 0xF000);
 	gMetadata->acl_storage.setMode(p->id, p->mode, p->type == FSNode::kDirectory);
@@ -796,23 +798,23 @@ uint8_t fs_apply_attr(uint32_t ts, uint32_t inode, uint32_t mode, uint32_t uid, 
 	fsnodes_update_ctime(p, ts);
 	fsnodes_update_checksum(p);
 	gMetadata->metaversion++;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_apply_length(uint32_t ts, uint32_t inode, uint64_t length) {
 	FSNode *p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	fsnodes_setlength(static_cast<FSNodeFile*>(p), length);
 	p->mtime = ts;
 	fsnodes_update_ctime(p, ts);
 	fsnodes_update_checksum(p);
 	gMetadata->metaversion++;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -833,23 +835,23 @@ uint8_t fs_readlink(const FsContext &context, uint32_t inode, std::string &path)
 	FSNode *p = NULL;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kSymlink) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	path = (std::string)static_cast<FSNodeSymlink*>(p)->path;
 	fs_update_atime(p, ts);
 	++gFsStatsArray[FsStats::Readlink];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -858,32 +860,32 @@ uint8_t fs_symlink(const FsContext &context, uint32_t parent, const HString &nam
 	ChecksumUpdater cu(context.ts());
 	FSNode *wd;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent, &wd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (path.length() == 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	for (uint32_t i = 0; i < path.length(); i++) {
 		if (path[i] == 0) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 	}
 	if (fsnodes_namecheck(name) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (fsnodes_nameisused(static_cast<FSNodeDirectory*>(wd), name)) {
-		return LIZARDFS_ERROR_EEXIST;
+		return SAUNAFS_ERROR_EEXIST;
 	}
 	if (context.isPersonalityMaster() &&
 	    (fsnodes_quota_exceeded_ug(context.uid(), context.gid(), {{QuotaResource::kInodes, 1}}) ||
 	     fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}}))) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 	FSNodeSymlink *p = static_cast<FSNodeSymlink *>(fsnodes_create_node(
 	    context.ts(), static_cast<FSNodeDirectory *>(wd), name, FSNode::kSymlink, 0777, 0,
@@ -906,14 +908,14 @@ uint8_t fs_symlink(const FsContext &context, uint32_t parent, const HString &nam
 		             context.uid(), context.gid(), p->id);
 	} else {
 		if (*inode != p->id) {
-			return LIZARDFS_ERROR_MISMATCH;
+			return SAUNAFS_ERROR_MISMATCH;
 		}
 		gMetadata->metaversion++;
 	}
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Symlink];
 #endif /* #ifndef METARESTORE */
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -927,30 +929,30 @@ uint8_t fs_mknod(const FsContext &context, uint32_t parent, const HString &name,
 	attr.fill(0);
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (type != FSNode::kFile && type != FSNode::kSocket && type != FSNode::kFifo &&
 	    type != FSNode::kBlockDev && type != FSNode::kCharDev) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent, &wd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (fsnodes_namecheck(name) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (fsnodes_nameisused(static_cast<FSNodeDirectory*>(wd), name)) {
-		return LIZARDFS_ERROR_EEXIST;
+		return SAUNAFS_ERROR_EEXIST;
 	}
 	if (fsnodes_quota_exceeded_ug(context.uid(), context.gid(), {{QuotaResource::kInodes, 1}}) ||
 	    fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}})) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory*>(wd), name, type, mode, umask, context.uid(), context.gid(), 0,
 	                        AclInheritance::kInheritAcl);
@@ -965,7 +967,7 @@ uint8_t fs_mknod(const FsContext &context, uint32_t parent, const HString &name,
 	             rdev, p->id);
 	++gFsStatsArray[FsStats::Mknod];
 	fsnodes_update_checksum(p);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_mkdir(const FsContext &context, uint32_t parent, const HString &name, uint16_t mode,
@@ -977,25 +979,25 @@ uint8_t fs_mkdir(const FsContext &context, uint32_t parent, const HString &name,
 	attr.fill(0);
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent, &wd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (fsnodes_namecheck(name) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (fsnodes_nameisused(static_cast<FSNodeDirectory*>(wd), name)) {
-		return LIZARDFS_ERROR_EEXIST;
+		return SAUNAFS_ERROR_EEXIST;
 	}
 	if (fsnodes_quota_exceeded_ug(context.uid(), context.gid(), {{QuotaResource::kInodes, 1}}) ||
 	    fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}})) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory *>(wd), name, FSNode::kDirectory, mode,
 	                        umask, context.uid(), context.gid(), copysgid, AclInheritance::kInheritAcl);
@@ -1005,7 +1007,7 @@ uint8_t fs_mkdir(const FsContext &context, uint32_t parent, const HString &name,
 	             wd->id, fsnodes_escape_name(name).c_str(), FSNode::kDirectory, p->mode & 07777,
 	             context.uid(), context.gid(), 0, p->id);
 	++gFsStatsArray[FsStats::Mkdir];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -1015,17 +1017,17 @@ uint8_t fs_apply_create(uint32_t ts, uint32_t parent, const HString &name,
 	FSNode *wd, *p;
 	if (type != FSNode::kFile && type != FSNode::kSocket && type != FSNode::kFifo &&
 	    type != FSNode::kBlockDev && type != FSNode::kCharDev && type != FSNode::kDirectory) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	wd = fsnodes_id_to_node(parent);
 	if (!wd) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (wd->type != FSNode::kDirectory) {
-		return LIZARDFS_ERROR_ENOTDIR;
+		return SAUNAFS_ERROR_ENOTDIR;
 	}
 	if (fsnodes_nameisused(static_cast<FSNodeDirectory*>(wd), name)) {
-		return LIZARDFS_ERROR_EEXIST;
+		return SAUNAFS_ERROR_EEXIST;
 	}
 	// we pass requested inode number here
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory*>(wd), name, type, mode, 0, uid, gid, 0,
@@ -1036,10 +1038,10 @@ uint8_t fs_apply_create(uint32_t ts, uint32_t parent, const HString &name,
 	}
 	if (inode != p->id) {
 		// if inode!=p->id then requested inode number was already acquired
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 	gMetadata->metaversion++;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -1049,34 +1051,34 @@ uint8_t fs_unlink(const FsContext &context, uint32_t parent, const HString &name
 	FSNode *wd;
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent, &wd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (fsnodes_namecheck(name) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
 	if (!child) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (!fsnodes_sticky_access(wd, child, context.uid())) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if (child->type == FSNode::kDirectory) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	fs_changelog(ts, "UNLINK(%" PRIu32 ",%s):%" PRIu32, wd->id,
 	             fsnodes_escape_name(name).c_str(), child->id);
 	fsnodes_unlink(ts, static_cast<FSNodeDirectory*>(wd), name, child);
 	++gFsStatsArray[FsStats::Unlink];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_recursive_remove(const FsContext &context, uint32_t parent,
@@ -1086,18 +1088,18 @@ uint8_t fs_recursive_remove(const FsContext &context, uint32_t parent,
 	FSNode *wd_tmp;
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent, &wd_tmp);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd_tmp), name);
 	if (!child) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 
 	auto shared_context = std::make_shared<FsContext>(context);
@@ -1117,37 +1119,37 @@ uint8_t fs_rmdir(const FsContext &context, uint32_t parent, const HString &name)
 	FSNode *wd;
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent, &wd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (fsnodes_namecheck(name) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
 	if (!child) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (!fsnodes_sticky_access(wd, child, context.uid())) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if (child->type != FSNode::kDirectory) {
-		return LIZARDFS_ERROR_ENOTDIR;
+		return SAUNAFS_ERROR_ENOTDIR;
 	}
 	if (!static_cast<FSNodeDirectory*>(child)->entries.empty()) {
-		return LIZARDFS_ERROR_ENOTEMPTY;
+		return SAUNAFS_ERROR_ENOTEMPTY;
 	}
 	fs_changelog(ts, "UNLINK(%" PRIu32 ",%s):%" PRIu32, wd->id,
 	             fsnodes_escape_name(name).c_str(), child->id);
 	fsnodes_unlink(ts, static_cast<FSNodeDirectory*>(wd), name, child);
 	++gFsStatsArray[FsStats::Rmdir];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -1156,24 +1158,24 @@ uint8_t fs_apply_unlink(uint32_t ts, uint32_t parent, const HString &name,
 	FSNode *wd;
 	wd = fsnodes_id_to_node(parent);
 	if (!wd) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (wd->type != FSNode::kDirectory) {
-		return LIZARDFS_ERROR_ENOTDIR;
+		return SAUNAFS_ERROR_ENOTDIR;
 	}
 	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
 	if (!child) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (child->id != inode) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 	if (child->type == FSNode::kDirectory && !static_cast<FSNodeDirectory*>(child)->entries.empty()) {
-		return LIZARDFS_ERROR_ENOTEMPTY;
+		return SAUNAFS_ERROR_ENOTEMPTY;
 	}
 	fsnodes_unlink(ts, static_cast<FSNodeDirectory*>(wd), name, child);
 	gMetadata->metaversion++;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_rename(const FsContext &context, uint32_t parent_src, const HString &name_src,
@@ -1182,39 +1184,39 @@ uint8_t fs_rename(const FsContext &context, uint32_t parent_src, const HString &
 	FSNode *swd;
 	FSNode *dwd;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent_dst, &dwd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent_src, &swd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (fsnodes_namecheck(name_src) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *se_child = fsnodes_lookup(static_cast<FSNodeDirectory*>(swd), name_src);
 	if (!se_child) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (context.canCheckPermissions() && !fsnodes_sticky_access(swd, se_child, context.uid())) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if ((context.personality() != metadataserver::Personality::kMaster) &&
 	    (se_child->id != *inode)) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	} else {
 		*inode = se_child->id;
 	}
 	std::array<int64_t, 2> quota_delta = {{1, 1}};
 	if (se_child->type == FSNode::kDirectory) {
 		if (fsnodes_isancestor(static_cast<FSNodeDirectory*>(se_child), dwd)) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 		const statsrecord &stats = static_cast<FSNodeDirectory*>(se_child)->stats;
 		quota_delta = {{(int64_t)stats.inodes, (int64_t)stats.size}};
@@ -1222,21 +1224,21 @@ uint8_t fs_rename(const FsContext &context, uint32_t parent_src, const HString &
 		quota_delta[(int)QuotaResource::kSize] = fsnodes_get_size(se_child);
 	}
 	if (fsnodes_namecheck(name_dst) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *de_child = fsnodes_lookup(static_cast<FSNodeDirectory*>(dwd), name_dst);
 
 	if (de_child == se_child) {
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	}
 
 	if (de_child) {
 		if (de_child->type == FSNode::kDirectory && !static_cast<FSNodeDirectory*>(de_child)->entries.empty()) {
-			return LIZARDFS_ERROR_ENOTEMPTY;
+			return SAUNAFS_ERROR_ENOTEMPTY;
 		}
 		if (context.canCheckPermissions() &&
 		    !fsnodes_sticky_access(dwd, de_child, context.uid())) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		if (de_child->type == TYPE_DIRECTORY) {
 			const statsrecord &stats = static_cast<FSNodeDirectory*>(de_child)->stats;
@@ -1255,7 +1257,7 @@ uint8_t fs_rename(const FsContext &context, uint32_t parent_src, const HString &
 	        static_cast<FSNodeDirectory *>(dwd), static_cast<FSNodeDirectory *>(swd),
 	        {{QuotaResource::kInodes, quota_delta[(int)QuotaResource::kInodes]},
 	         {QuotaResource::kSize, quota_delta[(int)QuotaResource::kSize]}})) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 
 	if (de_child) {
@@ -1276,7 +1278,7 @@ uint8_t fs_rename(const FsContext &context, uint32_t parent_src, const HString &
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Rename];
 #endif
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_link(const FsContext &context, uint32_t inode_src, uint32_t parent_dst,
@@ -1285,27 +1287,27 @@ uint8_t fs_link(const FsContext &context, uint32_t inode_src, uint32_t parent_ds
 	FSNode *sp;
 	FSNode *dwd;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_W,
 	                                        parent_dst, &dwd);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kNotDirectory,
 	                                        MODE_MASK_EMPTY, inode_src, &sp);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (sp->type == FSNode::kTrash || sp->type == FSNode::kReserved) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (fsnodes_namecheck(name_dst) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (fsnodes_nameisused(static_cast<FSNodeDirectory*>(dwd), name_dst)) {
-		return LIZARDFS_ERROR_EEXIST;
+		return SAUNAFS_ERROR_EEXIST;
 	}
 	fsnodes_link(context.ts(), static_cast<FSNodeDirectory*>(dwd), sp, name_dst);
 	if (inode) {
@@ -1323,34 +1325,34 @@ uint8_t fs_link(const FsContext &context, uint32_t inode_src, uint32_t parent_ds
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Link];
 #endif
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_append(const FsContext &context, uint32_t inode, uint32_t inode_src) {
 	ChecksumUpdater cu(context.ts());
 	FSNode *p, *sp;
 	if (inode == inode_src) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_W,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_R,
 	                                        inode_src, &sp);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (context.isPersonalityMaster() && fsnodes_quota_exceeded(p, {{QuotaResource::kSize, 1}})) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 	status = fsnodes_appendchunks(context.ts(), static_cast<FSNodeFile*>(p), static_cast<FSNodeFile*>(sp));
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (context.isPersonalityMaster()) {
@@ -1365,9 +1367,9 @@ static int fsnodes_check_lock_permissions(const FsContext &context, uint32_t ino
 	FSNode *dummy;
 	uint8_t modemask = MODE_MASK_EMPTY;
 
-	if (op == lzfs_locks::kExclusive) {
+	if (op == safs_locks::kExclusive) {
 		modemask = MODE_MASK_W;
-	} else if (op == lzfs_locks::kShared) {
+	} else if (op == safs_locks::kShared) {
 		modemask = MODE_MASK_R;
 	}
 
@@ -1376,14 +1378,14 @@ static int fsnodes_check_lock_permissions(const FsContext &context, uint32_t ino
 
 int fs_posixlock_probe(const FsContext &context, uint32_t inode, uint64_t start, uint64_t end,
 		uint64_t owner, uint32_t sessionid, uint32_t reqid, uint32_t msgid, uint16_t op,
-		lzfs_locks::FlockWrapper &info) {
+		safs_locks::FlockWrapper &info) {
 	uint8_t status;
 
-	if (op != lzfs_locks::kShared && op != lzfs_locks::kExclusive && op != lzfs_locks::kUnlock) {
-		return LIZARDFS_ERROR_EINVAL;
+	if (op != safs_locks::kShared && op != safs_locks::kExclusive && op != safs_locks::kUnlock) {
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
-	if ((status = fsnodes_check_lock_permissions(context, inode, op)) != LIZARDFS_STATUS_OK) {
+	if ((status = fsnodes_check_lock_permissions(context, inode, op)) != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -1394,13 +1396,13 @@ int fs_posixlock_probe(const FsContext &context, uint32_t inode, uint64_t start,
 			FileLocks::Owner{owner, sessionid, reqid, msgid});
 
 	if (collision == nullptr) {
-		info.l_type = lzfs_locks::kUnlock;
-		return LIZARDFS_STATUS_OK;
+		info.l_type = safs_locks::kUnlock;
+		return SAUNAFS_STATUS_OK;
 	} else {
 		info.l_type = static_cast<int>(collision->type);
 		info.l_start = collision->start;
 		info.l_len = std::min<uint64_t>(collision->end - collision->start, std::numeric_limits<int64_t>::max());
-		return LIZARDFS_ERROR_WAITING;
+		return SAUNAFS_ERROR_WAITING;
 	}
 }
 
@@ -1410,7 +1412,7 @@ int fs_lock_op(const FsContext &context, FileLocks &locks, uint32_t inode,
 		std::vector<FileLocks::Owner> &applied) {
 	uint8_t status;
 
-	if ((status = fsnodes_check_lock_permissions(context, inode, op)) != LIZARDFS_STATUS_OK) {
+	if ((status = fsnodes_check_lock_permissions(context, inode, op)) != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -1418,15 +1420,15 @@ int fs_lock_op(const FsContext &context, FileLocks &locks, uint32_t inode,
 	bool success = false;
 
 	switch (op) {
-	case lzfs_locks::kShared:
+	case safs_locks::kShared:
 		success = locks.sharedLock(inode, start, end,
 				FileLocks::Owner{owner, sessionid, reqid, msgid}, nonblocking);
 		break;
-	case lzfs_locks::kExclusive:
+	case safs_locks::kExclusive:
 		success = locks.exclusiveLock(inode, start, end,
 				FileLocks::Owner{owner, sessionid, reqid, msgid}, nonblocking);
 		break;
-	case lzfs_locks::kRelease:
+	case safs_locks::kRelease:
 		locks.removePending(inode, [sessionid,owner](const FileLocks::Lock &lock) {
 			const FileLocks::Lock::Owner &lock_owner = lock.owner();
 			return lock_owner.sessionid == sessionid && lock_owner.owner == owner;
@@ -1434,14 +1436,14 @@ int fs_lock_op(const FsContext &context, FileLocks &locks, uint32_t inode,
 		start = 0;
 		end   = std::numeric_limits<uint64_t>::max();
 		/* fallthrough */
-	case lzfs_locks::kUnlock:
+	case safs_locks::kUnlock:
 		success = locks.unlock(inode, start, end,
 				FileLocks::Owner{owner, sessionid, reqid, msgid});
 		break;
 	default:
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
-	status = success ? LIZARDFS_STATUS_OK : LIZARDFS_ERROR_WAITING;
+	status = success ? SAUNAFS_STATUS_OK : SAUNAFS_ERROR_WAITING;
 
 	// If lock is exclusive, no further action is required
 	// For shared locks it is required to gather candidates for lock.
@@ -1449,7 +1451,7 @@ int fs_lock_op(const FsContext &context, FileLocks &locks, uint32_t inode,
 	// and he issued shared lock for this same range. This converts exclusive lock
 	// to shared lock. In the result we may need to apply other shared pending locks
 	// for this range.
-	if (op == lzfs_locks::kExclusive) {
+	if (op == safs_locks::kExclusive) {
 		return status;
 	}
 
@@ -1470,7 +1472,7 @@ int fs_flock_op(const FsContext &context, uint32_t inode, uint64_t owner, uint32
 			reqid, msgid, op, nonblocking, applied);
 	if (context.isPersonalityMaster()) {
 		fs_changelog(context.ts(), "FLCK(%" PRIu8 ",%" PRIu32 ",0,1,%" PRIu64 ",%" PRIu32 ",%" PRIu16 ")",
-				(uint8_t)lzfs_locks::Type::kFlock, inode, owner, sessionid, op);
+				(uint8_t)safs_locks::Type::kFlock, inode, owner, sessionid, op);
 	} else {
 		gMetadata->metaversion++;
 	}
@@ -1485,7 +1487,7 @@ int fs_posixlock_op(const FsContext &context, uint32_t inode, uint64_t start, ui
 			reqid, msgid, op, nonblocking, applied);
 	if (context.isPersonalityMaster()) {
 		fs_changelog(context.ts(), "FLCK(%" PRIu8 ",%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu32 ",%" PRIu16 ")",
-				(uint8_t)lzfs_locks::Type::kPosix, inode, start, end, owner, sessionid, op);
+				(uint8_t)safs_locks::Type::kPosix, inode, start, end, owner, sessionid, op);
 	} else {
 		gMetadata->metaversion++;
 	}
@@ -1495,13 +1497,13 @@ int fs_posixlock_op(const FsContext &context, uint32_t inode, uint64_t start, ui
 int fs_locks_clear_session(const FsContext &context, uint8_t type, uint32_t inode,
 		uint32_t sessionid, std::vector<FileLocks::Owner> &applied) {
 
-	if (type != (uint8_t)lzfs_locks::Type::kFlock && type != (uint8_t)lzfs_locks::Type::kPosix) {
-		return LIZARDFS_ERROR_EINVAL;
+	if (type != (uint8_t)safs_locks::Type::kFlock && type != (uint8_t)safs_locks::Type::kPosix) {
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	ChecksumUpdater cu(context.ts());
 
-	FileLocks *locks = type == (uint8_t)lzfs_locks::Type::kFlock ? &gMetadata->flock_locks
+	FileLocks *locks = type == (uint8_t)safs_locks::Type::kFlock ? &gMetadata->flock_locks
 	                                                             : &gMetadata->posix_locks;
 
 	locks->removePending(inode, [sessionid](const FileLocks::Lock &lock) {
@@ -1526,19 +1528,19 @@ int fs_locks_clear_session(const FsContext &context, uint8_t type, uint32_t inod
 		gMetadata->metaversion++;
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 int fs_locks_list_all(const FsContext &context, uint8_t type, bool pending, uint64_t start,
-		uint64_t max, std::vector<lzfs_locks::Info> &result) {
+		uint64_t max, std::vector<safs_locks::Info> &result) {
 	(void)context;
 	FileLocks *locks;
-	if (type == (uint8_t)lzfs_locks::Type::kFlock) {
+	if (type == (uint8_t)safs_locks::Type::kFlock) {
 		locks = &gMetadata->flock_locks;
-	} else if (type == (uint8_t)lzfs_locks::Type::kPosix) {
+	} else if (type == (uint8_t)safs_locks::Type::kPosix) {
 		locks = &gMetadata->posix_locks;
 	} else {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	if (pending) {
@@ -1547,20 +1549,20 @@ int fs_locks_list_all(const FsContext &context, uint8_t type, bool pending, uint
 		locks->copyActiveToVector(start, max, result);
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 int fs_locks_list_inode(const FsContext &context, uint8_t type, bool pending, uint32_t inode,
-		uint64_t start, uint64_t max, std::vector<lzfs_locks::Info> &result) {
+		uint64_t start, uint64_t max, std::vector<safs_locks::Info> &result) {
 	(void)context;
 	FileLocks *locks;
 
-	if (type == (uint8_t)lzfs_locks::Type::kFlock) {
+	if (type == (uint8_t)safs_locks::Type::kFlock) {
 		locks = &gMetadata->flock_locks;
-	} else if (type == (uint8_t)lzfs_locks::Type::kPosix) {
+	} else if (type == (uint8_t)safs_locks::Type::kPosix) {
 		locks = &gMetadata->posix_locks;
 	} else {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	if (pending) {
@@ -1569,7 +1571,7 @@ int fs_locks_list_inode(const FsContext &context, uint8_t type, bool pending, ui
 		locks->copyActiveToVector(inode, start, max, result);
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 static void fs_manage_lock_try_lock_pending(FileLocks &locks, uint32_t inode, uint64_t start,
@@ -1587,15 +1589,15 @@ int fs_locks_unlock_inode(const FsContext &context, uint8_t type, uint32_t inode
 		std::vector<FileLocks::Owner> &applied) {
 	ChecksumUpdater cu(context.ts());
 
-	if (type == (uint8_t)lzfs_locks::Type::kFlock) {
+	if (type == (uint8_t)safs_locks::Type::kFlock) {
 		gMetadata->flock_locks.unlock(inode);
 		fs_manage_lock_try_lock_pending(gMetadata->flock_locks, inode, 0, 1, applied);
-	} else if (type == (uint8_t)lzfs_locks::Type::kPosix) {
+	} else if (type == (uint8_t)safs_locks::Type::kPosix) {
 		gMetadata->posix_locks.unlock(inode);
 		fs_manage_lock_try_lock_pending(gMetadata->posix_locks, inode, 0,
 		                                std::numeric_limits<uint64_t>::max(), applied);
 	} else {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	if (context.isPersonalityMaster()) {
@@ -1604,7 +1606,7 @@ int fs_locks_unlock_inode(const FsContext &context, uint8_t type, uint32_t inode
 		gMetadata->metaversion++;
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 int fs_locks_remove_pending(const FsContext &context, uint8_t type, uint64_t ownerid,
@@ -1613,12 +1615,12 @@ int fs_locks_remove_pending(const FsContext &context, uint8_t type, uint64_t own
 
 	FileLocks *locks;
 
-	if (type == (uint8_t)lzfs_locks::Type::kFlock) {
+	if (type == (uint8_t)safs_locks::Type::kFlock) {
 		locks = &gMetadata->flock_locks;
-	} else if (type == (uint8_t)lzfs_locks::Type::kPosix) {
+	} else if (type == (uint8_t)safs_locks::Type::kPosix) {
 		locks = &gMetadata->posix_locks;
 	} else {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	locks->removePending(inode,
@@ -1641,7 +1643,7 @@ int fs_locks_remove_pending(const FsContext &context, uint8_t type, uint64_t own
 		gMetadata->metaversion++;
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -1652,19 +1654,19 @@ uint8_t fs_readdir_size(const FsContext &context, uint32_t inode, uint8_t flags,
 	*dbuffsize = 0;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_R,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	*dnode = p;
 	*dbuffsize = fsnodes_getdirsize(static_cast<FSNodeDirectory*>(p), flags & GETDIR_FLAG_WITHATTR);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void fs_readdir_data(const FsContext &context, uint8_t flags, void *dnode, uint8_t *dbuff) {
@@ -1682,14 +1684,14 @@ template <typename SerializableDirentType>
 uint8_t fs_readdir(const FsContext &context, uint32_t inode, uint64_t first_entry, uint64_t number_of_entries,
 		std::vector<SerializableDirentType> &dir_entries) {
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	FSNode *dir;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kDirectory, MODE_MASK_R,
 	                                        inode, &dir);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -1706,7 +1708,7 @@ uint8_t fs_readdir(const FsContext &context, uint32_t inode, uint64_t first_entr
 
 	++gFsStatsArray[FsStats::Readdir];
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 template uint8_t fs_readdir<legacy::DirectoryEntry>(const FsContext &context, uint32_t inode, uint64_t first_entry, uint64_t number_of_entries,
 		std::vector<legacy::DirectoryEntry> &dir_entries);
@@ -1718,18 +1720,18 @@ uint8_t fs_checkfile(const FsContext &context, uint32_t inode,
 	FSNode *p;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	fsnodes_checkfile(static_cast<FSNodeFile*>(p), chunkcount);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_opencheck(const FsContext &context, uint32_t inode, uint8_t flags, Attributes &attr) {
@@ -1737,20 +1739,20 @@ uint8_t fs_opencheck(const FsContext &context, uint32_t inode, uint8_t flags, At
 
 
 	uint8_t status = verify_session(context, (flags & WANT_WRITE) ? OperationMode::kReadWrite : OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 #ifndef METARESTORE
 	if (fsnodes_has_tape_goal(p) && (flags & WANT_WRITE)) {
-		lzfs_pretty_syslog(LOG_INFO, "Access denied: node %d has tape goal", inode);
-		return LIZARDFS_ERROR_EPERM;
+		safs_pretty_syslog(LOG_INFO, "Access denied: node %d has tape goal", inode);
+		return SAUNAFS_ERROR_EPERM;
 	}
 #endif
 	if ((flags & AFTER_CREATE) == 0) {
@@ -1762,12 +1764,12 @@ uint8_t fs_opencheck(const FsContext &context, uint32_t inode, uint8_t flags, At
 			modemask |= MODE_MASK_W;
 		}
 		if (!fsnodes_access(context, p, modemask)) {
-			return LIZARDFS_ERROR_EACCES;
+			return SAUNAFS_ERROR_EACCES;
 		}
 	}
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Open];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -1780,13 +1782,13 @@ uint8_t fs_acquire(const FsContext &context, uint32_t inode, uint32_t sessionid)
 #endif /* #ifndef METARESTORE */
 	FSNodeFile *p = fsnodes_id_to_node<FSNodeFile>(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if (std::find(p->sessionid.begin(), p->sessionid.end(), sessionid) != p->sessionid.end()) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	p->sessionid.push_back(sessionid);
 	fsnodes_update_checksum(p);
@@ -1795,17 +1797,17 @@ uint8_t fs_acquire(const FsContext &context, uint32_t inode, uint32_t sessionid)
 	} else {
 		gMetadata->metaversion++;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_release(const FsContext &context, uint32_t inode, uint32_t sessionid) {
 	ChecksumUpdater cu(context.ts());
 	FSNodeFile *p = fsnodes_id_to_node<FSNodeFile>(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	auto it = std::find(p->sessionid.begin(), p->sessionid.end(), sessionid);
 	if (it != p->sessionid.end()) {
@@ -1825,12 +1827,12 @@ uint8_t fs_release(const FsContext &context, uint32_t inode, uint32_t sessionid)
 		} else {
 			gMetadata->metaversion++;
 		}
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	}
 #ifndef METARESTORE
-	lzfs_pretty_syslog(LOG_WARNING, "release: session not found");
+	safs_pretty_syslog(LOG_WARNING, "release: session not found");
 #endif
-	return LIZARDFS_ERROR_EINVAL;
+	return SAUNAFS_ERROR_EINVAL;
 }
 
 #ifndef METARESTORE
@@ -1843,11 +1845,11 @@ uint32_t fs_newsessionid(void) {
 #endif
 uint8_t fs_apply_session(uint32_t sessionid) {
 	if (sessionid != gMetadata->nextsessionid) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 	gMetadata->metaversion++;
 	gMetadata->nextsessionid++;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -1858,14 +1860,14 @@ uint8_t fs_auto_repair_if_needed(FSNodeFile *p, uint32_t chunkIndex) {
 		uint32_t notchanged, erased, repaired;
 		FsContext context = FsContext::getForMasterWithSession(0, SPECIAL_INODE_ROOT, 0, 0, 0, 0, 0);
 		fs_repair(context, p->id, 0, &notchanged, &erased, &repaired);
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 		       "auto repair inode %" PRIu32 ", chunk %016" PRIX64
 		       ": "
 		       "not changed: %" PRIu32 ", erased: %" PRIu32 ", repaired: %" PRIu32,
 		       p->id, chunkId, notchanged, erased, repaired);
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.file_auto_repaired: %u %u", p->id, repaired);
+		safs_silent_syslog(LOG_DEBUG, "master.fs.file_auto_repaired: %u %u", p->id, repaired);
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_readchunk(uint32_t inode, uint32_t indx, uint64_t *chunkid, uint64_t *length) {
@@ -1877,13 +1879,13 @@ uint8_t fs_readchunk(uint32_t inode, uint32_t indx, uint64_t *chunkid, uint64_t 
 	*length = 0;
 	p = fsnodes_id_to_node<FSNodeFile>(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if (indx > MAX_INDEX) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 #ifndef METARESTORE
 	if (gMagicAutoFileRepair) {
@@ -1896,7 +1898,7 @@ uint8_t fs_readchunk(uint32_t inode, uint32_t indx, uint64_t *chunkid, uint64_t 
 	*length = p->length;
 	fs_update_atime(p, ts);
 	++gFsStatsArray[FsStats::Read];
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -1909,17 +1911,17 @@ uint8_t fs_writechunk(const FsContext &context, uint32_t inode, uint32_t indx, b
 	FSNodeFile *p;
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_EMPTY,
 	                                        inode, &node);
 	p = static_cast<FSNodeFile*>(node);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (indx > MAX_INDEX) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 #ifndef METARESTORE
 	if (gMagicAutoFileRepair && context.isPersonalityMaster()) {
@@ -1934,7 +1936,7 @@ uint8_t fs_writechunk(const FsContext &context, uint32_t inode, uint32_t indx, b
 	/* resize chunks structure */
 	if (indx >= p->chunks.size()) {
 		if (context.isPersonalityMaster() && quota_exceeded) {
-			return LIZARDFS_ERROR_QUOTA;
+			return SAUNAFS_ERROR_QUOTA;
 		}
 		uint32_t new_size;
 		if (indx < 8) {
@@ -1964,13 +1966,13 @@ uint8_t fs_writechunk(const FsContext &context, uint32_t inode, uint32_t indx, b
 		status = chunk_apply_modification(context.ts(), ochunkid, *lockid, p->goal,
 		                                  increaseVersion, &nchunkid);
 	}
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		fsnodes_update_checksum(p);
 		return status;
 	}
 	if (context.isPersonalityShadow() && nchunkid != *chunkid) {
 		fsnodes_update_checksum(p);
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 	p->chunks[indx] = nchunkid;
 	*chunkid = nchunkid;
@@ -1997,7 +1999,7 @@ uint8_t fs_writechunk(const FsContext &context, uint32_t inode, uint32_t indx, b
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Write];
 #endif
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -2005,16 +2007,16 @@ uint8_t fs_writeend(uint32_t inode, uint64_t length, uint64_t chunkid, uint32_t 
 	uint32_t ts = eventloop_time();
 	ChecksumUpdater cu(ts);
 	uint8_t status = chunk_can_unlock(chunkid, lockid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (length > 0) {
 		FSNodeFile *p = fsnodes_id_to_node<FSNodeFile>(inode);
 		if (!p) {
-			return LIZARDFS_ERROR_ENOENT;
+			return SAUNAFS_ERROR_ENOENT;
 		}
 		if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		if (length > p->length) {
 			fsnodes_setlength(p, length);
@@ -2054,13 +2056,13 @@ uint8_t fs_repair(const FsContext &context, uint32_t inode,
 	*repaired = 0;
 
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_W,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -2089,7 +2091,7 @@ uint8_t fs_repair(const FsContext &context, uint32_t inode,
 	}
 	fsnodes_quota_update(p, {{QuotaResource::kSize, nsr.size - psr.size}});
 	fsnodes_update_checksum(p);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif /* #ifndef METARESTORE */
 
@@ -2100,19 +2102,19 @@ uint8_t fs_apply_repair(uint32_t ts, uint32_t inode, uint32_t indx, uint32_t nve
 
 	p = fsnodes_id_to_node<FSNodeFile>(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (p->type != FSNode::kFile && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if (indx > MAX_INDEX) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 	if (indx >= p->chunks.size()) {
-		return LIZARDFS_ERROR_NOCHUNK;
+		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (p->chunks[indx] == 0) {
-		return LIZARDFS_ERROR_NOCHUNK;
+		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	fsnodes_get_stats(p, &psr);
 	if (nversion == 0) {
@@ -2140,21 +2142,21 @@ uint8_t fs_getgoal(const FsContext &context, uint32_t inode, uint8_t gmode,
 	FSNode *p;
 
 	if (!GMODE_ISVALID(gmode)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFileOrDirectory, 0, inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	fsnodes_getgoal_recursive(p, gmode, fgtab, dgtab);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_gettrashtime_prepare(const FsContext &context, uint32_t inode, uint8_t gmode,
@@ -2162,22 +2164,22 @@ uint8_t fs_gettrashtime_prepare(const FsContext &context, uint32_t inode, uint8_
 	FSNode *p;
 
 	if (!GMODE_ISVALID(gmode)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFileOrDirectory, 0, inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	fsnodes_gettrashtime_recursive(p, gmode, fileTrashtimes, dirTrashtimes);
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void fs_gettrashtime_store(TrashtimeMap &fileTrashtimes,TrashtimeMap &dirTrashtimes,uint8_t *buff) {
@@ -2198,21 +2200,21 @@ uint8_t fs_geteattr(const FsContext &context, uint32_t inode, uint8_t gmode,
 	memset(feattrtab, 0, 16 * sizeof(uint32_t));
 	memset(deattrtab, 0, 16 * sizeof(uint32_t));
 	if (!GMODE_ISVALID(gmode)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, 0, inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	fsnodes_geteattr_recursive(p, gmode, feattrtab, deattrtab);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #endif
@@ -2223,21 +2225,21 @@ uint8_t fs_setgoal(const FsContext &context, uint32_t inode, uint8_t goal, uint8
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode) || !GoalId::isValid(goal) ||
 	    (smode & (SMODE_INCREASE | SMODE_DECREASE))) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kDirectory && p->type != FSNode::kFile &&
 	    p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	sassert(context.hasUidGidData());
 	(*setgoal_stats)[SetGoalTask::kChanged] = 0;      // - Number of inodes with changed goal
@@ -2269,21 +2271,21 @@ uint8_t fs_apply_setgoal(const FsContext &context, uint32_t inode, uint8_t goal,
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode) || !GoalId::isValid(goal) ||
 	    (smode & (SMODE_INCREASE | SMODE_DECREASE))) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kDirectory && p->type != FSNode::kFile &&
 	    p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	sassert(context.hasUidGidData());
 
@@ -2292,10 +2294,10 @@ uint8_t fs_apply_setgoal(const FsContext &context, uint32_t inode, uint8_t goal,
 
 	gMetadata->metaversion++;
 	if (master_result != my_result) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_deprecated_setgoal(const FsContext &context, uint32_t inode, uint8_t goal, uint8_t smode,
@@ -2303,7 +2305,7 @@ uint8_t fs_deprecated_setgoal(const FsContext &context, uint32_t inode, uint8_t 
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode) || !GoalId::isValid(goal) ||
 	    (smode & (SMODE_INCREASE | SMODE_DECREASE))) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
 	if (status != 0) {
@@ -2312,12 +2314,12 @@ uint8_t fs_deprecated_setgoal(const FsContext &context, uint32_t inode, uint8_t 
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kDirectory && p->type != FSNode::kFile && p->type != FSNode::kTrash &&
 	    p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	sassert(context.hasUidGidData());
 	uint32_t si = 0;
@@ -2328,7 +2330,7 @@ uint8_t fs_deprecated_setgoal(const FsContext &context, uint32_t inode, uint8_t 
 
 	if (context.isPersonalityMaster()) {
 		if ((smode & SMODE_RMASK) == 0 && nsi > 0 && si == 0 && nci == 0) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		*sinodes = si;
 		*ncinodes = nci;
@@ -2339,10 +2341,10 @@ uint8_t fs_deprecated_setgoal(const FsContext &context, uint32_t inode, uint8_t 
 	} else {
 		gMetadata->metaversion++;
 		if ((*sinodes != si) || (*ncinodes != nci) || (*nsinodes != nsi)) {
-			return LIZARDFS_ERROR_MISMATCH;
+			return SAUNAFS_ERROR_MISMATCH;
 		}
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_settrashtime(const FsContext &context, uint32_t inode, uint32_t trashtime, uint8_t smode,
@@ -2350,21 +2352,21 @@ uint8_t fs_settrashtime(const FsContext &context, uint32_t inode, uint32_t trash
 			const std::function<void(int)> &callback) {
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kDirectory && p->type != FSNode::kFile && p->type != FSNode::kTrash &&
 	    p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	sassert(context.hasUidGidData());
 	(*settrashtime_stats)[SetTrashtimeTask::kChanged] = 0;      // - Number of inodes with changed trashtime
@@ -2387,21 +2389,21 @@ uint8_t fs_apply_settrashtime(const FsContext &context, uint32_t inode, uint32_t
 	assert(context.isPersonalityShadow());
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kDirectory && p->type != FSNode::kFile && p->type != FSNode::kTrash &&
 	    p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	sassert(context.hasUidGidData());
 
@@ -2410,10 +2412,10 @@ uint8_t fs_apply_settrashtime(const FsContext &context, uint32_t inode, uint32_t
 
 	gMetadata->metaversion++;
 	if (master_result != my_result) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_deprecated_settrashtime(const FsContext &context, uint32_t inode, uint32_t trashtime,
@@ -2421,7 +2423,7 @@ uint8_t fs_deprecated_settrashtime(const FsContext &context, uint32_t inode, uin
 				   uint32_t *nsinodes) {
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kAny);
 	if (status != 0) {
@@ -2430,12 +2432,12 @@ uint8_t fs_deprecated_settrashtime(const FsContext &context, uint32_t inode, uin
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (p->type != FSNode::kDirectory && p->type != FSNode::kFile && p->type != FSNode::kTrash &&
 	    p->type != FSNode::kReserved) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	uint32_t si = 0;
 	uint32_t nci = 0;
@@ -2445,7 +2447,7 @@ uint8_t fs_deprecated_settrashtime(const FsContext &context, uint32_t inode, uin
 	                               &nsi);
 	if (context.isPersonalityMaster()) {
 		if ((smode & SMODE_RMASK) == 0 && nsi > 0 && si == 0 && nci == 0) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		*sinodes = si;
 		*ncinodes = nci;
@@ -2456,10 +2458,10 @@ uint8_t fs_deprecated_settrashtime(const FsContext &context, uint32_t inode, uin
 	} else {
 		gMetadata->metaversion++;
 		if ((*sinodes != si) || (*ncinodes != nci) || (*nsinodes != nsi)) {
-			return LIZARDFS_ERROR_MISMATCH;
+			return SAUNAFS_ERROR_MISMATCH;
 		}
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_seteattr(const FsContext &context, uint32_t inode, uint8_t eattr, uint8_t smode,
@@ -2467,16 +2469,16 @@ uint8_t fs_seteattr(const FsContext &context, uint32_t inode, uint8_t eattr, uin
 	ChecksumUpdater cu(context.ts());
 	if (!SMODE_ISVALID(smode) ||
 	    (eattr & (~(EATTR_NOOWNER | EATTR_NOACACHE | EATTR_NOECACHE | EATTR_NODATACACHE)))) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	FSNode *p;
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -2487,7 +2489,7 @@ uint8_t fs_seteattr(const FsContext &context, uint32_t inode, uint8_t eattr, uin
 	fsnodes_seteattr_recursive(p, context.ts(), context.uid(), eattr, smode, &si, &nci, &nsi);
 	if (context.isPersonalityMaster()) {
 		if ((smode & SMODE_RMASK) == 0 && nsi > 0 && si == 0 && nci == 0) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		*sinodes = si;
 		*ncinodes = nci;
@@ -2498,10 +2500,10 @@ uint8_t fs_seteattr(const FsContext &context, uint32_t inode, uint8_t eattr, uin
 	} else {
 		gMetadata->metaversion++;
 		if ((*sinodes != si) || (*ncinodes != nci) || (*nsinodes != nsi)) {
-			return LIZARDFS_ERROR_MISMATCH;
+			return SAUNAFS_ERROR_MISMATCH;
 		}
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -2511,13 +2513,13 @@ uint8_t fs_listxattr_leng(const FsContext &context, uint32_t inode, uint8_t open
 	FSNode *p;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny,
 	                                        opened == 0 ? MODE_MASK_R : MODE_MASK_EMPTY, inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -2539,24 +2541,24 @@ uint8_t fs_setxattr(const FsContext &context, uint32_t inode, uint8_t opened,
 	uint8_t status;
 
 	status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny,
 	                                        opened == 0 ? MODE_MASK_W : MODE_MASK_EMPTY, inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (xattr_namecheck(anleng, attrname) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (mode > XATTR_SMODE_REMOVE) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	status = xattr_setattr(p->id, anleng, attrname, avleng, attrvalue, mode);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	fsnodes_update_ctime(p, ts);
@@ -2565,7 +2567,7 @@ uint8_t fs_setxattr(const FsContext &context, uint32_t inode, uint8_t opened,
 	             fsnodes_escape_name(std::string((const char*)attrname, anleng)).c_str(),
 	             fsnodes_escape_name(std::string((const char*)attrvalue, avleng)).c_str(),
 	             mode);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_getxattr(const FsContext &context, uint32_t inode, uint8_t opened,
@@ -2574,18 +2576,18 @@ uint8_t fs_getxattr(const FsContext &context, uint32_t inode, uint8_t opened,
 	FSNode *p;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny,
 	                                        opened == 0 ? MODE_MASK_R : MODE_MASK_EMPTY, inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	if (xattr_namecheck(anleng, attrname) < 0) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	return xattr_getattr(p->id, anleng, attrname, avleng, attrvalue);
 }
@@ -2596,17 +2598,17 @@ uint8_t fs_apply_setxattr(uint32_t ts, uint32_t inode, uint32_t anleng, const ui
 			uint32_t avleng, const uint8_t *attrvalue, uint32_t mode) {
 	FSNode *p;
 	uint8_t status;
-	if (anleng == 0 || anleng > MFS_XATTR_NAME_MAX || avleng > MFS_XATTR_SIZE_MAX ||
+	if (anleng == 0 || anleng > SFS_XATTR_NAME_MAX || avleng > SFS_XATTR_SIZE_MAX ||
 	    mode > XATTR_SMODE_REMOVE) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	status = xattr_setattr(inode, anleng, attrname, avleng, attrvalue, mode);
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	fsnodes_update_ctime(p, ts);
@@ -2619,17 +2621,17 @@ uint8_t fs_deleteacl(const FsContext &context, uint32_t inode, AclType type) {
 	ChecksumUpdater cu(context.ts());
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_deleteacl(p, type, context.ts());
 	if (context.isPersonalityMaster()) {
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			static char acl_type[3] = {'a', 'd', 'r'};
 
 			static_assert((int)AclType::kAccess == 0, "fix acl_type table");
@@ -2650,18 +2652,18 @@ uint8_t fs_setacl(const FsContext &context, uint32_t inode, const RichACL &acl) 
 	ChecksumUpdater cu(context.ts());
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	std::string acl_string = acl.toString();
 	status = fsnodes_setacl(p, acl, context.ts());
 	if (context.isPersonalityMaster()) {
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			fs_changelog(context.ts(), "SETRICHACL(%" PRIu32 ",%s)", p->id, acl_string.c_str());
 		}
 	} else {
@@ -2674,18 +2676,18 @@ uint8_t fs_setacl(const FsContext &context, uint32_t inode, AclType type, const 
 	ChecksumUpdater cu(context.ts());
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadWrite, SessionType::kNotMeta);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	std::string acl_string = acl.toString();
 	status = fsnodes_setacl(p, type, acl, context.ts());
 	if (context.isPersonalityMaster()) {
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			fs_changelog(context.ts(), "SETACL(%" PRIu32 ",%c,%s)", p->id,
 						 (type == AclType::kAccess ? 'a' : 'd'), acl_string.c_str());
 		}
@@ -2694,18 +2696,18 @@ uint8_t fs_setacl(const FsContext &context, uint32_t inode, AclType type, const 
 	}
 	return status;
 
-	return LIZARDFS_ERROR_EINVAL;
+	return SAUNAFS_ERROR_EINVAL;
 }
 
 uint8_t fs_getacl(const FsContext &context, uint32_t inode, RichACL &acl) {
 	FSNode *p;
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	return fsnodes_getacl(p, acl);
@@ -2718,18 +2720,18 @@ uint8_t fs_apply_setacl(uint32_t ts, uint32_t inode, char aclType, const char *a
 	try {
 		acl = AccessControlList::fromString(aclString);
 	} catch (Exception &) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	AclType aclTypeEnum;
 	if (!decodeChar("da", {AclType::kDefault, AclType::kAccess}, aclType, aclTypeEnum)) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	uint8_t status = fsnodes_setacl(p, aclTypeEnum, std::move(acl), ts);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		gMetadata->metaversion++;
 	}
 	return status;
@@ -2740,14 +2742,14 @@ uint8_t fs_apply_setrichacl(uint32_t ts, uint32_t inode, const std::string &acl_
 	try {
 		acl = RichACL::fromString(acl_string);
 	} catch (Exception &) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	FSNode *p = fsnodes_id_to_node(inode);
 	if (!p) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	uint8_t status = fsnodes_setacl(p, std::move(acl), ts);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		gMetadata->metaversion++;
 	}
 	return status;
@@ -2809,13 +2811,13 @@ uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode, uint32_t *ino
 	statsrecord sr;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFileOrDirectory, MODE_MASK_EMPTY,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -2828,7 +2830,7 @@ uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode, uint32_t *ino
 	*size = sr.size;
 	*rsize = sr.realsize;
 	//      syslog(LOG_NOTICE,"using fast stats");
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_get_chunkid(const FsContext &context, uint32_t inode, uint32_t index,
@@ -2837,42 +2839,42 @@ uint8_t fs_get_chunkid(const FsContext &context, uint32_t inode, uint32_t index,
 	uint8_t status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile,
 	                                                MODE_MASK_EMPTY, inode, &p);
 	FSNodeFile *node_file = static_cast<FSNodeFile*>(p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (index > MAX_INDEX) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 	if (index < node_file->chunks.size()) {
 		*chunkid = node_file->chunks[index];
 	} else {
 		*chunkid = 0;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
 uint8_t fs_add_tape_copy(const TapeKey &tapeKey, TapeserverId tapeserver) {
 	FSNode *node = fsnodes_id_to_node(tapeKey.inode);
 	if (node == NULL) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (node->type != FSNode::kTrash && node->type != FSNode::kReserved && node->type != FSNode::kFile) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	if (node->mtime != tapeKey.mtime || static_cast<FSNodeFile*>(node)->length != tapeKey.fileLength) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
 	// Try to reuse an existing copy from this tapeserver
 	auto &tapeCopies = gMetadata->tapeCopies[node->id];
 	for (auto &tapeCopy : tapeCopies) {
 		if (tapeCopy.server == tapeserver) {
 			tapeCopy.state = TapeCopyState::kOk;
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 	}
 	tapeCopies.emplace_back(TapeCopyState::kOk, tapeserver);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
@@ -2881,15 +2883,15 @@ uint8_t fs_get_tape_copy_locations(uint32_t inode, std::vector<TapeCopyLocationI
 	std::vector<TapeserverId> disconnectedTapeservers;
 	FSNode *node = fsnodes_id_to_node(inode);
 	if (node == NULL) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	auto it = gMetadata->tapeCopies.find(node->id);
 	if (it == gMetadata->tapeCopies.end()) {
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	}
 	for (auto &tapeCopy : it->second) {
 		TapeserverListEntry tapeserverInfo;
-		if (matotsserv_get_tapeserver_info(tapeCopy.server, tapeserverInfo) == LIZARDFS_STATUS_OK) {
+		if (matotsserv_get_tapeserver_info(tapeCopy.server, tapeserverInfo) == SAUNAFS_STATUS_OK) {
 			locations.emplace_back(tapeserverInfo, tapeCopy.state);
 		} else {
 			disconnectedTapeservers.push_back(tapeCopy.server);
@@ -2902,7 +2904,7 @@ uint8_t fs_get_tape_copy_locations(uint32_t inode, std::vector<TapeCopyLocationI
 			               return copy.server == tapeserverId;
 			       });
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -2944,9 +2946,9 @@ std::vector<JobInfo> fs_get_current_tasks_info() {
 
 uint8_t fs_cancel_job(uint32_t job_id) {
 	if (gMetadata->task_manager.cancelJob(job_id)) {
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	} else {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 }
 
@@ -2961,17 +2963,17 @@ uint8_t fs_getchunksinfo(const FsContext& context, uint32_t current_ip, uint32_t
 	FSNode *p;
 
 	uint8_t status = verify_session(context, OperationMode::kReadOnly, SessionType::kAny);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
 	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kFile, MODE_MASK_R,
 	                                        inode, &p);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 	if (chunk_index > MAX_INDEX) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 
 	FSNodeFile *file_node = static_cast<FSNodeFile *>(p);
@@ -2991,7 +2993,7 @@ uint8_t fs_getchunksinfo(const FsContext& context, uint32_t current_ip, uint32_t
 		chunk_version = 0;
 		if (chunk_id > 0) {
 			status = chunk_getversionandlocations(chunk_id, current_ip, chunk_version, kMaxNumberOfChunkCopies, chunk_parts);
-			if (status != LIZARDFS_STATUS_OK) {
+			if (status != SAUNAFS_STATUS_OK) {
 				return status;
 			}
 		}
@@ -3001,7 +3003,7 @@ uint8_t fs_getchunksinfo(const FsContext& context, uint32_t current_ip, uint32_t
 		chunk_count--;
 	}
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #endif

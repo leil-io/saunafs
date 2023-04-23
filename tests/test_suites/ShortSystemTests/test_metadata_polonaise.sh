@@ -2,18 +2,18 @@ timeout_set '3 minutes'
 CHUNKSERVERS=3 \
 	MOUNTS=1 \
 	USE_RAMDISK="YES" \
-	MFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
-	setup_local_empty_lizardfs info
+	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
+	setup_local_empty_saunafs info
 
 # Start Polonaise
-lizardfs-polonaise-server --master-host=localhost \
+saunafs-polonaise-server --master-host=localhost \
 	--master-port=${info[matocl]} \
 	--bind-port=9090 &> /dev/null &
 sleep 3
-mnt="$TEMP_DIR/mfspolon"
+mnt="$TEMP_DIR/sfspolon"
 mkdir -p "$mnt"
 polonaise-fuse-client "$mnt" -o allow_other &
-MESSAGE="Client is not available" assert_eventually 'lizardfs dirinfo "$mnt"'
+MESSAGE="Client is not available" assert_eventually 'saunafs dirinfo "$mnt"'
 
 cd "$mnt"
 for generator in $(metadata_get_all_generators | egrep -v "acl|xattr|trash"); do

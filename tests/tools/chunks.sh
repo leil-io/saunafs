@@ -41,8 +41,8 @@ function check_one_file_part_coverage_impl_() {
 	local expected_number_of_parts="${2}"
 	local size=$(size_of "${path}")
 	local n_chunks="$(filesize_to_chunk_count ${size})"
-	local goal="$(lizardfs getgoal "${path}" | awk '{print $2}')"
-	local fileinfo="$(lizardfs fileinfo ${path})"
+	local goal="$(saunafs getgoal "${path}" | awk '{print $2}')"
+	local fileinfo="$(saunafs fileinfo ${path})"
 	# echo "DEBUG: ${FUNCNAME[0]} pwd=$(pwd), path=${path}, n_chunks=${n_chunks}, goal=${goal}, expected_number_of_parts=${expected_number_of_parts}"
 	if [[ "${goal}" =~ ^(xor|ec) ]] ; then
 		for n in $(seq ${n_chunks}); do
@@ -68,7 +68,7 @@ function check_one_file_part_coverage() {
 function check_one_file_replicated() {
 	local path="${1}"
 	local replication_timeout="${2}"
-	local goal="$(lizardfs getgoal "${path}" | awk '{print $2}')"
+	local goal="$(saunafs getgoal "${path}" | awk '{print $2}')"
 	local expected_number_of_parts=$(goal_to_part_count ${goal})
 	assert_eventually 'check_one_file_part_coverage_impl_ "${path}" "${expected_number_of_parts}"' "${replication_timeout}"
 }

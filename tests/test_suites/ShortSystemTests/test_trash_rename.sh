@@ -1,10 +1,10 @@
 CHUNKSERVERS=1 \
 	MOUNTS=2 \
 	USE_RAMDISK="YES" \
-	MOUNT_0_EXTRA_CONFIG="mfscachemode=NEVER" \
-	MOUNT_1_EXTRA_CONFIG="mfsmeta" \
-	MFSEXPORTS_META_EXTRA_OPTIONS="nonrootmeta" \
-	setup_local_empty_lizardfs info
+	MOUNT_0_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_1_EXTRA_CONFIG="sfsmeta" \
+	SFSEXPORTS_META_EXTRA_OPTIONS="nonrootmeta" \
+	setup_local_empty_saunafs info
 
 # This determines number of files to be created in this test
 file_suffixes=$(seq 300 | xargs echo)
@@ -15,7 +15,7 @@ mkdir dir
 for i in $file_suffixes; do
 	echo content_$i > dir/file_$i
 done
-lizardfs settrashtime -r 3600 dir/
+saunafs settrashtime -r 3600 dir/
 rm -rf dir/
 
 # Create a directory where all the files from trash will be restored and recover them there

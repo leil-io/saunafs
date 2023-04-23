@@ -1,23 +1,23 @@
 # Load config file with machine-specific configuration
-if [[ ! -z "${LIZARDFS_TESTS_CONF:-}" && -f "${LIZARDFS_TESTS_CONF}" ]]; then
-	echo "Using \"${LIZARDFS_TESTS_CONF}\" tests configuration file"
-	. "${LIZARDFS_TESTS_CONF}"
-elif [[ -f /home/${SUDO_USER}/etc/lizardfs/tests.conf ]]; then
-	echo "Using \"/home/${SUDO_USER}/etc/lizardfs/tests.conf\" tests configuration file"
-	. /home/${SUDO_USER}/etc/lizardfs/tests.conf
-elif [[ -f /etc/lizardfs_tests.conf ]]; then
-	echo "Using the default \"/etc/lizardfs_tests.conf\" tests configuration file"
-	. /etc/lizardfs_tests.conf
+if [[ ! -z "${SAUNAFS_TESTS_CONF:-}" && -f "${SAUNAFS_TESTS_CONF}" ]]; then
+	echo "Using \"${SAUNAFS_TESTS_CONF}\" tests configuration file"
+	. "${SAUNAFS_TESTS_CONF}"
+elif [[ -f /home/${SUDO_USER}/etc/saunafs/tests.conf ]]; then
+	echo "Using \"/home/${SUDO_USER}/etc/saunafs/tests.conf\" tests configuration file"
+	. /home/${SUDO_USER}/etc/saunafs/tests.conf
+elif [[ -f /etc/saunafs_tests.conf ]]; then
+	echo "Using the default \"/etc/saunafs_tests.conf\" tests configuration file"
+	. /etc/saunafs_tests.conf
 fi
 
 # Set up the default configuration values if not set yet
 # This is a list of all configuration variables, that these tests use
-: ${LIZARDFS_DISKS:=}
-: ${LIZARDFS_LOOP_DISKS:=}
-: ${TEMP_DIR:=/tmp/LizardFS-autotests}
-: ${MOOSEFS_DIR:=/tmp/LizardFS-autotests-mfs}
-: ${LIZARDFSXX_DIR_BASE:=/tmp/LizardFS-autotests-old}
-: ${LIZARDFS_ROOT:=$HOME/local}
+: ${SAUNAFS_DISKS:=}
+: ${SAUNAFS_LOOP_DISKS:=}
+: ${TEMP_DIR:=/tmp/SaunaFS-autotests}
+: ${XAUNAFS_DIR:=/tmp/SaunaFS-autotests-sfs}
+: ${SAUNAFSXX_DIR_BASE:=/tmp/SaunaFS-autotests-old}
+: ${SAUNAFS_ROOT:=$HOME/local}
 : ${FIRST_PORT_TO_USE:=9600}
 : ${ERROR_FILE:=}
 : ${RAMDISK_DIR:=/mnt/ramdisk}
@@ -32,7 +32,7 @@ mkdir -p "$TEMP_DIR"
 chmod 777 "$TEMP_DIR"
 
 # Prepare important environment variables
-export PATH="$LIZARDFS_ROOT/sbin:$LIZARDFS_ROOT/bin:$PATH"
+export PATH="$SAUNAFS_ROOT/sbin:$SAUNAFS_ROOT/bin:$PATH"
 
 # Quick checks needed to call test_begin and test_fail
 if (( BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 402 )); then
@@ -47,25 +47,25 @@ fi
 # This function shold be called just after test_fail is able to work
 check_configuration() {
 	for prog in \
-			$LIZARDFS_ROOT/sbin/{mfsmaster,mfschunkserver} \
-			$LIZARDFS_ROOT/bin/lizardfs \
-			$LIZARDFS_ROOT/bin/file-generate \
-			$LIZARDFS_ROOT/bin/file-validate
+			$SAUNAFS_ROOT/sbin/{sfsmaster,sfschunkserver} \
+			$SAUNAFS_ROOT/bin/saunafs \
+			$SAUNAFS_ROOT/bin/file-generate \
+			$SAUNAFS_ROOT/bin/file-validate
 	do
 		if ! [[ -x $prog ]]; then
 			test_fail "Configuration error, executable $prog not found"
 		fi
 	done
 
-	if [[ ! -x $LIZARDFS_ROOT/bin/mfsmount ]] && [[ ! -x $LIZARDFS_ROOT/bin/mfsmount3 ]]; then
-		test_fail "Configuration error, mfsmount executable ($LIZARDFS_ROOT/bin/mfsmount or $LIZARDFS_ROOT/bin/mfsmount3) not found"
+	if [[ ! -x $SAUNAFS_ROOT/bin/sfsmount ]] ; then
+		test_fail "Configuration error, sfsmount executable not found"
 	fi
 
 	if ! df -T "$RAMDISK_DIR" | grep "tmpfs\|ramfs" >/dev/null; then
 		test_fail "Configuration error, ramdisk ($RAMDISK_DIR) is missing"
 	fi
 
-	for dir in "$TEMP_DIR" "$RAMDISK_DIR" "$TEST_OUTPUT_DIR" $LIZARDFS_LOOP_DISKS; do
+	for dir in "$TEMP_DIR" "$RAMDISK_DIR" "$TEST_OUTPUT_DIR" $SAUNAFS_LOOP_DISKS; do
 		if [[ ! -w $dir ]]; then
 			test_fail "Configuration error, cannot create files in $dir"
 		fi
@@ -78,4 +78,15 @@ check_configuration() {
 	if ! grep '[[:blank:]]*user_allow_other' /etc/fuse.conf >/dev/null; then
 		test_fail "Configuration error, user_allow_other not enabled in /etc/fuse.conf"
 	fi
+}
+
+parse_true() {
+	local value="${1:-}"
+	if [[ -z "${value}" ]]; then
+		return 1
+	fi
+	case "${value,,}" in
+		1|true|t|yes|y|on) return 0 ;;
+		*) return 1 ;;
+	esac
 }

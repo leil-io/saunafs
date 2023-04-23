@@ -54,7 +54,7 @@ void uRaftController::init() {
 	check_node_status_timer_.async_wait(boost::bind(&uRaftController::checkNodeStatus, this,
 	                                    boost::asio::placeholders::error));
 
-	syslog(LOG_NOTICE, "Lizardfs-uraft initialized properly");
+	syslog(LOG_NOTICE, "Saunafs-uraft initialized properly");
 }
 
 void uRaftController::set_options(const uRaftController::Options &opt) {
@@ -76,7 +76,7 @@ void uRaftController::nodePromote() {
 	}
 
 	setSlowCommandTimeout(opt_.promote_timeout);
-	if (runSlowCommand("lizardfs-uraft-helper promote")) {
+	if (runSlowCommand("saunafs-uraft-helper promote")) {
 		command_type_ = kCmdPromote;
 	}
 }
@@ -95,7 +95,7 @@ void uRaftController::nodeDemote() {
 	}
 
 	setSlowCommandTimeout(opt_.demote_timeout);
-	if (runSlowCommand("lizardfs-uraft-helper demote")) {
+	if (runSlowCommand("saunafs-uraft-helper demote")) {
 		command_type_ = kCmdDemote;
 		set_block_promotion(true);
 	}
@@ -112,7 +112,7 @@ uint64_t uRaftController::nodeGetVersion() {
 		std::string version;
 
 		std::vector<std::string> params = {
-			"lizardfs-uraft-helper", "metadata-version", opt_.local_master_server,
+			"saunafs-uraft-helper", "metadata-version", opt_.local_master_server,
 			boost::lexical_cast<std::string>(opt_.local_master_port)
 		};
 
@@ -183,7 +183,7 @@ void uRaftController::checkCommandStatus(const boost::system::error_code &error)
 void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 	if (error) return;
 
-	std::vector<std::string> params = { "lizardfs-uraft-helper", "isalive" };
+	std::vector<std::string> params = { "saunafs-uraft-helper", "isalive" };
 	std::string              result;
 	bool                     is_alive = node_alive_;
 
@@ -207,7 +207,7 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 				demoteLeader();
 				set_block_promotion(true);
 				setSlowCommandTimeout(opt_.dead_handler_timeout);
-				if (runSlowCommand("lizardfs-uraft-helper dead")) {
+				if (runSlowCommand("saunafs-uraft-helper dead")) {
 					command_type_ = kCmdStatusDead;
 				}
 			}

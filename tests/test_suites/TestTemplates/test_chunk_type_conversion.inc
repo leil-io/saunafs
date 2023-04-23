@@ -1,35 +1,35 @@
 CHUNKSERVERS=$NUMBER_OF_CHUNKSERVERS \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_TIME = 1|CHUNKS_LOOP_MAX_CPU = 90|OPERATIONS_DELAY_INIT = 0|`
 	`ACCEPTABLE_DIFFERENCE = 10.0|REDUNDANCY_LEVEL = 10|CHUNKS_REBALANCING_BETWEEN_LABELS = 1" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 
 # echo "OK" on success, echo <some error message> otherwise
 verify_file_goal() {
 	file=$1;
-	goal=$(lizardfs getgoal "$file" | awk '{print $NF}')
+	goal=$(saunafs getgoal "$file" | awk '{print $NF}')
 
 	if [[ $goal =~ xor([2-9]|10) ]]; then
 		level=${BASH_REMATCH[1]}
 		# Check if all parts are present:
 		for i in $(seq $((level+1))); do
-			lizardfs fileinfo "$file" | grep "part $i/$((level+1)) of $goal$" > /dev/null \
+			saunafs fileinfo "$file" | grep "part $i/$((level+1)) of $goal$" > /dev/null \
 					|| { echo "$file: missing part $i of $goal"; return; };
 		done
 	elif [[ $goal =~ ([1-9]) ]]; then
 		level=${BASH_REMATCH[1]}
 
-		copies=$(lizardfs fileinfo "$file" | egrep 'copy.*:[a-zA-Z0-9_]+$' | sort | uniq | wc -l)
+		copies=$(saunafs fileinfo "$file" | egrep 'copy.*:[a-zA-Z0-9_]+$' | sort | uniq | wc -l)
 		if (( $level > $copies )); then
 			echo "$file: expected $level copies, have $copies"
-			lizardfs fileinfo "$file"
+			saunafs fileinfo "$file"
 			return
 		fi
 	else
-		test_fail "Unknown 'lizardfs getgoal $file' output: $goal"
+		test_fail "Unknown 'saunafs getgoal $file' output: $goal"
 	fi
 
 	echo -n "OK"
@@ -47,7 +47,7 @@ goals="$GOALS_TO_BE_TESTED"
 # Create files with goals from the $goals list
 for goal in $goals; do
 	mkdir "dir_$goal"
-	lizardfs setgoal "$goal" "dir_$goal"
+	saunafs setgoal "$goal" "dir_$goal"
 	FILE_SIZE=1M file-generate "dir_$goal/file"
 done
 old_chunks=$(find_all_chunks)
@@ -56,7 +56,7 @@ old_chunks=$(find_all_chunks)
 prev_goal=$(echo $goals | tr " " "\n" | tail -n1) # last one on the $goals list
 for next_goal in $goals; do
 	file="dir_${prev_goal}/file"
-	lizardfs setgoal "$next_goal" "$file"
+	saunafs setgoal "$next_goal" "$file"
 	prev_goal="$next_goal"
 done
 
@@ -87,23 +87,23 @@ fi
 # After verifying that all chunks that should be created were created, remove all the old copies
 # and restart chunkservers to make them notice this removal
 for csid in $(seq 0 $(($NUMBER_OF_CHUNKSERVERS - 1))); do
-	lizardfs_chunkserver_daemon $csid stop &
+	saunafs_chunkserver_daemon $csid stop &
 done
 wait
 echo "$old_chunks" | xargs -d'\n' rm -f || true  # Some of the files might already be removed
 for csid in $(seq 0 $(($NUMBER_OF_CHUNKSERVERS - 1))); do
-	lizardfs_chunkserver_daemon $csid start &
+	saunafs_chunkserver_daemon $csid start &
 done
 wait
 
 # Check if all files are readable from the new copies with one of the chunkservers turned off
 # (so hopefully we'll check if all the files that were created are valid)
 for csid in $(seq 0 $(($NUMBER_OF_CHUNKSERVERS - 1))); do
-	lizardfs_wait_for_all_ready_chunkservers
-	lizardfs_chunkserver_daemon $csid stop
+	saunafs_wait_for_all_ready_chunkservers
+	saunafs_chunkserver_daemon $csid stop
 	for goal in $goals; do
 		file="dir_$goal/file"
 		file-validate "$file"
 	done
-	lizardfs_chunkserver_daemon $csid start
+	saunafs_chunkserver_daemon $csid start
 done

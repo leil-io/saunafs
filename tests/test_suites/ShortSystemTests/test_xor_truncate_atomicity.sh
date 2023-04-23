@@ -3,9 +3,9 @@ timeout_set '1 minute'
 CHUNKSERVERS=10 \
 	DISK_PER_CHUNKSERVER=1 \
 	MOUNTS=5 \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Create a source file -- a valid file-generated file which consists of 200 kB of data
 source="$RAMDISK_DIR/source"
@@ -16,7 +16,7 @@ for level in 2 3 4 7 9; do
 	# Create a file which consists of 400 kB of random data
 	file="file$level"
 	touch "$file"
-	lizardfs setgoal xor$level "$file"
+	saunafs setgoal xor$level "$file"
 	head -c 400K /dev/urandom > "$file"
 
 	# Run in parallel 200 dd processes, each copies different 1 kB of data from the source file

@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -164,8 +165,8 @@ void fsnodes_getdirdata(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t
 	uint8_t withattr);
 namespace legacy {
 /**
- * This implementation was not removed so as to support pre-3.13 client (mfsmount) using
- * old LIZ_FUSE_GETDIR packet version (0 = kLegacyClient).
+ * This implementation was not removed so as to support pre-3.13 client (sfsmount) using
+ * old SAU_FUSE_GETDIR packet version (0 = kLegacyClient).
  */
 void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t auid,
 		uint32_t agid, uint8_t sesflags, FSNodeDirectory *p,

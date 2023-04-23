@@ -19,41 +19,41 @@ shift
 
 set -eux
 
-sudoers="/etc/sudoers.d/lizardfstest"
+sudoers="/etc/sudoers.d/saunafstest"
 
-for username in lizardfstest_{0..9}; do
+for username in saunafstest_{0..9}; do
 	if getent passwd $username > /dev/null; then
 		userdel $username
 	fi
 done
 
-if getent passwd lizardfstest > /dev/null; then
-	userdel lizardfstest
+if getent passwd saunafstest > /dev/null; then
+	userdel saunafstest
 fi
 
-if getent group lizardfstest > /dev/null; then
-	groupdel lizardfstest
+if getent group saunafstest > /dev/null; then
+	groupdel saunafstest
 fi
 
-rm -f /etc/sudoers.d/lizardfstest
-rm -rf /var/lib/lizardfstest
-rm -f /etc/security/limits.d/10-lizardfstests.conf
-rm -f /etc/lizardfs_tests.conf
+rm -f /etc/sudoers.d/saunafstest
+rm -rf /var/lib/saunafstest
+rm -f /etc/security/limits.d/10-saunafstests.conf
+rm -f /etc/saunafs_tests.conf
 
 mountpoint /mnt/ramdisk && umount /mnt/ramdisk
 rm -rf /mnt/ramdisk
 
-sed -i -e "/### Reload pam limits on sudo - necessary for lizardfs tests. ###/d" /etc/pam.d/sudo
+sed -i -e "/### Reload pam limits on sudo - necessary for saunafs tests. ###/d" /etc/pam.d/sudo
 sed -i -e "/session required pam_limits.so/d" /etc/pam.d/sudo
 
-sed -i -e "/# Ramdisk used in LizardFS tests/d" /etc/fstab
+sed -i -e "/# Ramdisk used in SaunaFS tests/d" /etc/fstab
 sed -i -e "\[ramdisk  /mnt/ramdisk  tmpfs  mode=1777,size=2g[d" /etc/fstab
-sed -i -e "/# Loop devices used in LizardFS tests/d" /etc/fstab
+sed -i -e "/# Loop devices used in SaunaFS tests/d" /etc/fstab
 
 tempfile=$(mktemp -p /tmp revert_setup_machine-etc-fstab.XXXXXXXXXX)
 cp /etc/fstab $tempfile
 
-cat $tempfile | grep "lizardfstest_loop" | while read -r line ; do
+cat $tempfile | grep "saunafstest_loop" | while read -r line ; do
 	file_system=$(echo $line | awk '{print $1}')
 	file_system_directory=$(dirname $file_system)
 	mount_point=$(echo $line | awk '{print $2}')

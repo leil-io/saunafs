@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -99,10 +100,10 @@ bool ChunkWriter::Operation::isFullStripe(uint32_t stripeSize) const {
 		return false;
 	}
 	uint32_t elementsInStripe = stripeSize;
-	// The last one is shorter when MFSBLOCKSINCHUNK % stripeSize != 0
+	// The last one is shorter when SFSBLOCKSINCHUNK % stripeSize != 0
 	uint32_t stripe = journalPositions.front()->blockIndex / stripeSize;
-	if (stripe == (MFSBLOCKSINCHUNK - 1) / stripeSize && MFSBLOCKSINCHUNK % stripeSize != 0) {
-		elementsInStripe = MFSBLOCKSINCHUNK % stripeSize;
+	if (stripe == (SFSBLOCKSINCHUNK - 1) / stripeSize && SFSBLOCKSINCHUNK % stripeSize != 0) {
+		elementsInStripe = SFSBLOCKSINCHUNK % stripeSize;
 	}
 	return (journalPositions.size() == elementsInStripe);
 }
@@ -233,7 +234,7 @@ void ChunkWriter::processOperations(uint32_t msTimeout) {
 				const uint32_t dataFdBufferSize = 1024;
 				uint8_t dataFdBuffer[dataFdBufferSize];
 				if (read(dataChainFd_, dataFdBuffer, dataFdBufferSize) < 0) {
-					lzfs_pretty_syslog(LOG_NOTICE, "read pipe error: %s", strerr(errno));
+					safs_pretty_syslog(LOG_NOTICE, "read pipe error: %s", strerr(errno));
 				}
 			}
 		} else {
@@ -448,7 +449,7 @@ void ChunkWriter::fillStripe(Operation &operation, int first_block, std::vector<
 
 	int hole_start = 0;
 	int hole_size = 0;
-	int range_end = std::min(combinedStripeSize_, MFSBLOCKSINCHUNK - first_block);
+	int range_end = std::min(combinedStripeSize_, SFSBLOCKSINCHUNK - first_block);
 	for (int i = 0; i < range_end; ++i) {
 		if (stripe_element[i] == nullptr) {
 			if (hole_size == 0) {
@@ -603,14 +604,14 @@ void ChunkWriter::readBlocks(int block_index, int size, int block_from, int bloc
 
 	int offset = 0;
 	for (int index = block_index; index < block_index + size; ++index) {
-		assert(index < MFSBLOCKSINCHUNK);
+		assert(index < SFSBLOCKSINCHUNK);
 
 		WriteCacheBlock block(locator_->chunkIndex(), index, WriteCacheBlock::kReadBlock);
-		memcpy(block.data(), buffer.data() + offset, MFSBLOCKSIZE);
+		memcpy(block.data(), buffer.data() + offset, SFSBLOCKSIZE);
 		block.from = block_from;
 		block.to = block_to;
 		blocks.push_back(std::move(block));
-		offset += MFSBLOCKSIZE;
+		offset += SFSBLOCKSIZE;
 	}
 }
 
@@ -623,7 +624,7 @@ void ChunkWriter::processStatus(const WriteExecutor& executor,
 				", got chunk " + std::to_string(status.chunkId),
 				executor.server());
 	}
-	if (status.status != LIZARDFS_STATUS_OK) {
+	if (status.status != SAUNAFS_STATUS_OK) {
 		throw RecoverableWriteException("Chunk write error", status.status);
 	}
 

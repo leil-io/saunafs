@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2015 Skytechnology sp. z o.o.
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -40,7 +41,7 @@
 #include "common/main.h"
 #include "common/massert.h"
 #include "common/md5.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "common/slogger.h"
 
 typedef struct _exports {
@@ -251,12 +252,12 @@ uint8_t exports_check(uint32_t ip, uint32_t version, uint8_t meta,
 	if (f==NULL) {
 		if (nopass) {
 			if (rndstate==0 || rndcode==NULL || passcode==NULL) {
-				return LIZARDFS_ERROR_NOPASSWORD;
+				return SAUNAFS_ERROR_NOPASSWORD;
 			} else {
-				return LIZARDFS_ERROR_BADPASSWORD;
+				return SAUNAFS_ERROR_BADPASSWORD;
 			}
 		}
-		return LIZARDFS_ERROR_EACCES;
+		return SAUNAFS_ERROR_EACCES;
 	}
 	*sesflags = f->sesflags;
 	*rootuid = f->rootuid;
@@ -267,7 +268,7 @@ uint8_t exports_check(uint32_t ip, uint32_t version, uint8_t meta,
 	*maxgoal = f->maxgoal;
 	*mintrashtime = f->mintrashtime;
 	*maxtrashtime = f->maxtrashtime;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 static void exports_freelist(exports *arec) {
@@ -600,7 +601,7 @@ static int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint
 		if (*eptr!=0) { // not only digits - treat it as a groupname
 			getgrnam_r(gptr+1,&grp,pwgrbuff,16384,&grrec);
 			if (grrec==NULL) {
-				lzfs_pretty_syslog(LOG_WARNING,"mfsexports/maproot: can't find group named '%s' defined in line: %" PRIu32,gptr+1,lineno);
+				safs_pretty_syslog(LOG_WARNING,"sfsexports/maproot: can't find group named '%s' defined in line: %" PRIu32,gptr+1,lineno);
 				return -1;
 			}
 			gid = grrec->gr_gid;
@@ -622,7 +623,7 @@ static int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint
 	if (*eptr!=0) { // not only digits - treat it as a username
 		getpwnam_r(uptr,&pwd,pwgrbuff,16384,&pwrec);
 		if (pwrec==NULL) {
-			lzfs_pretty_syslog(LOG_WARNING,"mfsexports/maproot: can't find user named '%s' defined in line: %" PRIu32,uptr,lineno);
+			safs_pretty_syslog(LOG_WARNING,"sfsexports/maproot: can't find user named '%s' defined in line: %" PRIu32,uptr,lineno);
 			return -1;
 		}
 		*ruid = pwrec->pw_uid;
@@ -639,7 +640,7 @@ static int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint
 	} else {
 		getpwuid_r(uid,&pwd,pwgrbuff,16384,&pwrec);
 		if (pwrec==NULL) {
-			lzfs_pretty_syslog(LOG_WARNING,"mfsexports/maproot: can't determine gid, because can't find user with uid %" PRIu32 " defined in line: %" PRIu32,uid,lineno);
+			safs_pretty_syslog(LOG_WARNING,"sfsexports/maproot: can't determine gid, because can't find user with uid %" PRIu32 " defined in line: %" PRIu32,uid,lineno);
 			return -1;
 		}
 		*ruid = pwrec->pw_uid;
@@ -676,7 +677,7 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'i':
 			if (strcmp(p,"ignoregid")==0) {
 				if (arec->meta) {
-					lzfs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->sesflags |= SESFLAG_IGNOREGID;
 				}
@@ -686,14 +687,14 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'a':
 			if (strcmp(p,"allcanchangequota")==0) {
 				if (arec->meta) {
-					lzfs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->sesflags |= SESFLAG_ALLCANCHANGEQUOTA;
 				}
 				o=1;
 			} else if (strcmp(p,"alldirs")==0) {
 				if (arec->meta) {
-					lzfs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->alldirs = 1;
 				}
@@ -709,7 +710,7 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'n':
 			if (strcmp(p,"nomasterpermcheck")==0) {
 				if (arec->meta) {
-					lzfs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->sesflags |= SESFLAG_NOMASTERPERMCHECK;
 				}
@@ -718,7 +719,7 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 				if (arec->meta) {
 					arec->sesflags |= SESFLAG_NONROOTMETA;
 				} else {
-					lzfs_pretty_syslog(LOG_WARNING,"non-meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"non-meta option ignored: %s",p);
 				}
 				o=1;
 			}
@@ -727,7 +728,7 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			if (strncmp(p,"maproot=",8)==0) {
 				o=1;
 				if (arec->meta) {
-					lzfs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					if (exports_parseuidgid(p+8,lineno,&arec->rootuid,&arec->rootgid)<0) {
 						return -1;
@@ -737,7 +738,7 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			} else if (strncmp(p,"mapall=",7)==0) {
 				o=1;
 				if (arec->meta) {
-					lzfs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					safs_pretty_syslog(LOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					if (exports_parseuidgid(p+7,lineno,&arec->mapalluid,&arec->mapallgid)<0) {
 						return -1;
@@ -774,53 +775,53 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 					}
 					arec->needpassword=1;
 				} else {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect md5pass definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect md5pass definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"minversion=",11)==0) {
 				o=1;
 				if (exports_parseversion(p+11,&arec->minversion)<0) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect minversion definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect minversion definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"mingoal=",8)==0) {
 				o=1;
 				if (exports_parsegoal(p+8,&arec->mingoal)<0) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect mingoal definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect mingoal definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 				if (arec->mingoal>arec->maxgoal) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: mingoal>maxgoal in definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: mingoal>maxgoal in definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"maxgoal=",8)==0) {
 				o=1;
 				if (exports_parsegoal(p+8,&arec->maxgoal)<0) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect maxgoal definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect maxgoal definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 				if (arec->mingoal>arec->maxgoal) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: maxgoal<mingoal in definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: maxgoal<mingoal in definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"mintrashtime=",13)==0) {
 				o=1;
 				if (exports_parsetime(p+13,&arec->mintrashtime)<0) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect mintrashtime definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect mintrashtime definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 				if (arec->mintrashtime>arec->maxtrashtime) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: mintrashtime>maxtrashtime in definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: mintrashtime>maxtrashtime in definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"maxtrashtime=",13)==0) {
 				o=1;
 				if (exports_parsetime(p+13,&arec->maxtrashtime)<0) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect maxtrashtime definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect maxtrashtime definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 				if (arec->mintrashtime>arec->maxtrashtime) {
-					lzfs_pretty_syslog(LOG_WARNING,"mfsexports: maxtrashtime<mintrashtime in definition (%s) in line: %" PRIu32,p,lineno);
+					safs_pretty_syslog(LOG_WARNING,"sfsexports: maxtrashtime<mintrashtime in definition (%s) in line: %" PRIu32,p,lineno);
 					return -1;
 				}
 			}
@@ -836,7 +837,7 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			break;
 		}
 		if (o==0) {
-			lzfs_pretty_syslog(LOG_WARNING,"mfsexports: unknown option '%s' in line: %" PRIu32 " (ignored)",p,lineno);
+			safs_pretty_syslog(LOG_WARNING,"sfsexports: unknown option '%s' in line: %" PRIu32 " (ignored)",p,lineno);
 		}
 	}
 	return 0;
@@ -876,13 +877,13 @@ static int exports_parseline(char *line,uint32_t lineno,exports *arec) {
 		p++;
 	}
 	if (*p==0) {
-		lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incomplete definition in line: %" PRIu32,lineno);
+		safs_pretty_syslog(LOG_WARNING,"sfsexports: incomplete definition in line: %" PRIu32,lineno);
 		return -1;
 	}
 	*p=0;
 	p++;
 	if (exports_parsenet(net,&arec->fromip,&arec->toip)<0) {
-		lzfs_pretty_syslog(LOG_WARNING,"mfsexports: incorrect ip/network definition in line: %" PRIu32,lineno);
+		safs_pretty_syslog(LOG_WARNING,"sfsexports: incorrect ip/network definition in line: %" PRIu32,lineno);
 		return -1;
 	}
 
@@ -963,7 +964,7 @@ static void exports_loadexports(void) {
 			std::string err_msg = std::string("exports "
 				"configuration file (") + ExportsFileName +
 				") not found - please create one (you can copy "
-				APP_EXAMPLES_SUBDIR "/mfsexports.cfg to "
+				APP_EXAMPLES_SUBDIR "/sfsexports.cfg to "
 				"get a base configuration)";
 			throw InitializeException(err_msg);
 		} else {
@@ -1009,14 +1010,14 @@ static void exports_loadexports(void) {
 	fclose(fd);
 	exports_freelist(exports_records);
 	exports_records = newexports;
-	lzfs_pretty_syslog(LOG_INFO,"initialized exports from file %s", ExportsFileName);
+	safs_pretty_syslog(LOG_INFO,"initialized exports from file %s", ExportsFileName);
 }
 
 static void exports_load(void) {
 	if (ExportsFileName) {
 		free(ExportsFileName);
 	}
-	ExportsFileName = cfg_getstr("EXPORTS_FILENAME", ETC_PATH "/mfsexports.cfg");
+	ExportsFileName = cfg_getstr("EXPORTS_FILENAME", ETC_PATH "/sfsexports.cfg");
 	exports_loadexports();
 }
 
@@ -1024,7 +1025,7 @@ static void exports_reload(void) {
 	try {
 		exports_load();
 	} catch (Exception& ex) {
-		lzfs_pretty_syslog(LOG_WARNING, "exports not changed because %s", ex.what());
+		safs_pretty_syslog(LOG_WARNING, "exports not changed because %s", ex.what());
 	}
 }
 

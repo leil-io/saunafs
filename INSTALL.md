@@ -1,0 +1,135 @@
+# INSTALL - SaunaFS
+
+You can install SaunaFS from pre-built packages or from source. The
+pre-built packages are available for the following platforms:
+
+- Linux (x86_64)
+  - [Ubuntu 22.04 (Jammy)](#ubuntu-2204-jammy)
+
+Please, follow the instructions below to install SaunaFS on your
+system.
+
+## Installing from pre-built packages
+
+### Ubuntu 22.04 (Jammy)
+
+1. Import the public key used to sign the packages:
+
+    ```shell
+    gpg --no-default-keyring \
+        --keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
+        --keyserver hkps://keyserver.ubuntu.com \
+        --receive-keys 0xA80B96E2C79457D4
+    ```
+
+    It will create a new keyring file `/usr/share/keyrings/saunafs-archive-keyring.gpg` and import the
+    public key used to sign the packages. Please, notice that at the time of writing, the `add-apt-repository` command
+    is deprecated and does not support the `--keyring` option.
+
+    You can verify the keyring file by running the following command:
+
+    ```shell
+    gpg --no-default-keyring \
+        --keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
+        --list-keys
+    ```
+
+2. Add the SaunaFS repository to your system:
+
+    <!-- TODO(Baldor): provide accessible repository URL -->
+    The repository is available at http://192.168.50.208:8081/repository/saunafs-ubuntu-22.04-dev/. You can
+    either add it to your system manually or use the following command:
+
+    ```shell
+    cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
+    deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] http://192.168.50.208:8081/repository/saunafs-ubuntu-22.04-dev/ jammy main
+    EOF
+    ```
+
+3. Update the package list:
+
+    ```shell
+    sudo apt update
+    ```
+
+4. Install SaunaFS:
+
+    ```shell
+    sudo apt update
+    sudo apt install \
+        saunafs-adm \
+        saunafs-chunkserver \
+        saunafs-cgi \
+        saunafs-master
+    ```
+
+## Installing from source
+
+SaunaFS is written in C++ and uses CMake as its build system. There are some utility scripts that can be used to
+automate the build process. Please, follow the instructions below to build SaunaFS from source.
+
+### Dependencies
+
+The following scripts can be used to install the dependencies on Ubuntu 22.04 (Jammy):
+
+(elevated privileges are required)
+```shell
+./tests/ci_build/setup-build-machine.sh
+```
+
+...or, if you want to also install the dependencies to run the tests:
+
+(elevated privileges are required)
+```shell
+./tests/ci_build/setup-test-machine.sh
+```
+
+Notice: _The above script will also create test users and modify system configurations (`/etc/fstab`, `sudoers`) to allow the
+tests to run. Please, check the script and make sure you are comfortable before running it._
+
+In case you want to run again the scripts above, you can use the following command to remove the installed packages:
+
+(elevated privileges are required)
+```shell
+./tests/revert_setup_machine.sh
+```
+
+As it is a destructive operation, it will ask for confirmation before removing the packages.
+
+### Building
+
+The following script can be used to build SaunaFS with appropriate flags to run the tests
+
+```shell
+./tests/ci_build/run-build.sh test
+```
+
+If you want to build SaunaFS without the tests, you can use the following command:
+
+(might require elevated privileges depending on your filesystem permissions)
+```shell
+```shell
+./tests/ci_build/run-build.sh release
+```
+
+If you don't want to use the scripts above, you can use the following commands to build SaunaFS:
+
+```shell
+mkdir build
+cmake -B ./build \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -G 'Unix Makefiles' \
+	-DENABLE_DOCS=ON \
+	-DENABLE_CLIENT_LIB=ON \
+    -DENABLE_TESTS=ON \
+    -DENABLE_WERROR=ON
+make -C ./build -j$(nproc)
+```
+
+### Installing
+
+The following command can be used to install SaunaFS:
+
+```shell
+sudo make install
+```

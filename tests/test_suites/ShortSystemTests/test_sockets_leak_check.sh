@@ -1,7 +1,7 @@
 CHUNKSERVERS=1 \
 	DISK_PER_CHUNKSERVER=1 \
 	USE_RAMDISK="yes" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 max_files=10
 max_sockets_delta=100

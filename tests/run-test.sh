@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-# This file can be used to run tests as a user lizardfstests
+# This file can be used to run tests as a user saunafstests
 # To create such user:
-#   sudo adduser --quiet --system --group --home /var/lib/lizardfstest lizardfstest
-#   sudo usermod -a -G fuse lizardfstest
-# To work as a shell script it also needs the file /etc/sudoers.d/lizardfstest;
-# you can create this file with: sudo visudo -f /etc/sudoers.d/lizardfstest
+#   sudo adduser --quiet --system --group --home /var/lib/saunafstest saunafstest
+#   sudo usermod -a -G fuse saunafstest
+# To work as a shell script it also needs the file /etc/sudoers.d/saunafstest;
+# you can create this file with: sudo visudo -f /etc/sudoers.d/saunafstest
 # The file should contain these two lines:
-#   ALL ALL = (lizardfstest) NOPASSWD: ALL
-#   ALL ALL = NOPASSWD: /usr/bin/pkill -9 -u lizardfstest
+#   ALL ALL = (saunafstest) NOPASSWD: ALL
+#   ALL ALL = NOPASSWD: /usr/bin/pkill -9 -u saunafstest
 
 start_test() {
 	local test_name=$1
@@ -19,7 +19,7 @@ start_test() {
 	fi
 
 	test_script="set -eu; source tools/test_main.sh; test_begin; trap test_end INT; $test_env source '$test_name'; test_end"
-	nice nice sudo -HEu lizardfstest bash -c "$test_script"
+	nice nice sudo -HEu saunafstest bash -c "$test_script"
 	status=$?
 	stop_tests
 }
@@ -54,11 +54,11 @@ unwrap_generators() {
 }
 
 stop_tests() {
-	local users=$(echo lizardfstest lizardfstest_{0..9})
+	local users=$(echo saunafstest saunafstest_{0..9})
 	local users_list=${users// /,}
 	local try_count=0
-	# start with killing lizardfstest processes, this will likely suffice
-	sudo pkill -9 -u lizardfstest
+	# start with killing saunafstest processes, this will likely suffice
+	sudo pkill -9 -u saunafstest
 	sleep 0.1
 	while pgrep -u $users_list >/dev/null ; do
 		for user in $users; do
@@ -79,8 +79,8 @@ if [[ $# != 1 ]]; then
 	exit 1
 fi
 export SOURCE_DIR=$(readlink -m "$(dirname "$0")/..")
-export ERROR_DIR=/tmp/lizardfs_error_dir # Error dir content lifetime scope is a test suit
-export LIZARDFS_LOG_ORIGIN=yes # adds file:line:function to debug logs
+export ERROR_DIR=/tmp/saunafs_error_dir # Error dir content lifetime scope is a test suit
+export SAUNAFS_LOG_ORIGIN=yes # adds file:line:function to debug logs
 umask 0022
 sudo rm -rf "${ERROR_DIR}"
 mkdir -p "${ERROR_DIR}"
@@ -92,7 +92,7 @@ stop_tests
 
 unwrap_generators $1
 
-nice nice sudo -HEu lizardfstest sh -c "chmod -Rf a+rwX ${ERROR_DIR}"
+nice nice sudo -HEu saunafstest sh -c "chmod -Rf a+rwX ${ERROR_DIR}"
 for log_file in "$ERROR_DIR"/* ; do
 	log_file_name=$(basename "$log_file")
 	if [[ -s ${log_file} ]]; then

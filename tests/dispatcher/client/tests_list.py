@@ -19,12 +19,12 @@ def get_excluded_tests_two_types(
 
 
 def get_gtest_testlist(
-    lizardfs_tests_path: str, test_suite: str, excluded_tests: List[str]
+    saunafs_tests_path: str, test_suite: str, excluded_tests: List[str]
 ) -> List[str]:
     """Returns a list of (all minus excluded) tests in a given test_suite"""
 
     tests_list = os.popen(
-        lizardfs_tests_path + " --gtest_list_tests --gtest_filter=" + test_suite + "*"
+        saunafs_tests_path + " --gtest_list_tests --gtest_filter=" + test_suite + "*"
     )
 
     # Remove unnecessary lines - go just to tests' list

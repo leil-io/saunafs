@@ -1,19 +1,20 @@
 /*
-   Copyright 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -26,7 +27,7 @@
 int printUsage(int argc, char **argv) {
 	if (argc < 2) {
 		fprintf(stderr, "usage:\n");
-		fprintf(stderr, "\tlizardfs <tool name> [options]\n");
+		fprintf(stderr, "\tsaunafs <tool name> [options]\n");
 		printTools();
 	}
 	else {
@@ -62,7 +63,7 @@ static int cd_func(int argc, char **argv) {
 	if (argc == 2) {
 		int status = chdir(argv[1]);
 		if (status == -1) {
-			fprintf(stderr, "lfs: %s: No such file or directory\n", argv[1]);
+			fprintf(stderr, "sau: %s: No such file or directory\n", argv[1]);
 		}
 		return status;
 	}
@@ -77,7 +78,7 @@ static int ls_func(int argc, char **argv) {
 	}
 	int status = system(command.c_str());
 	if (status == -1) {
-		fprintf(stderr, "lfs: ls operation failed to execute successfully\n");
+		fprintf(stderr, "sau: ls operation failed to execute successfully\n");
 	}
 	return status;
 }
@@ -87,7 +88,7 @@ static int exit_func(int /*argc*/, char **/*argv*/) {
 	return 0;
 }
 
-static std::unordered_map<std::string, std::function<int(int, char **)>> lizard_commands({
+static std::unordered_map<std::string, std::function<int(int, char **)>> sauna_commands({
 	{"getgoal", get_goal_run},
 	{"rgetgoal", rget_goal_run},
 	{"setgoal", set_goal_run},
@@ -116,8 +117,8 @@ static std::unordered_map<std::string, std::function<int(int, char **)>> lizard_
 });
 
 std::function<int(int, char **)> getCommand(const std::string &func_name) {
-	auto func = lizard_commands.find(func_name);
-	if (func == lizard_commands.end()) {
+	auto func = sauna_commands.find(func_name);
+	if (func == sauna_commands.end()) {
 		return nullptr;
 	} else {
 		return func->second;

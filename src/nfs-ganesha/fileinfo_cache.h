@@ -1,30 +1,32 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
 
-#include "mount/client/lizardfs_c_api.h"
+#include "mount/client/saunafs_c_api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef liz_fileinfo_t fileinfo_t;
+typedef sau_fileinfo_t fileinfo_t;
 
 typedef struct FileInfoCache FileInfoCache_t;
 typedef struct FileInfoEntry FileInfoEntry_t;
@@ -60,9 +62,9 @@ void destroyFileInfoCache(FileInfoCache_t *cache);
 * \param inode Inode of a file
 * \return Cache entry if succeeded, NULL if cache is full
 * \attention entry->fileinfo will be NULL if file still needs to be open first
-* \post Set fileinfo to a valid pointer after opening a file with liz_attach_fileinfo
+* \post Set fileinfo to a valid pointer after opening a file with sau_attach_fileinfo
 */
-FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, liz_inode_t inode);
+FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, sau_inode_t inode);
 
 /*!
 * \brief Release fileinfo from cache

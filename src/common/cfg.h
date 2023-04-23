@@ -1,26 +1,28 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <map>
 #include <string>
 
 #include "common/slogger.h"
@@ -33,6 +35,19 @@ void cfg_term (void);
 
 /// Returns the name of the currently loaded config file.
 std::string cfg_filename();
+
+/// Returns the current configuration in memory as a YAML string.
+/// service_name is the service of the configuration (e.g "master") that will be
+/// printed in the returned value.
+std::string cfg_yaml_string(std::string service_name);
+
+/// Returns the current configuration in memory as a YAML string.
+std::string cfg_yaml_string();
+
+/// Returns a string representation of YAML key-value maps under the key
+/// service_name. The value in the map must be a valid YAML string
+std::string cfg_yaml_list(std::string service_name,
+                          std::map<std::string, std::string> &services);
 
 int cfg_isdefined(const char *name);
 
@@ -68,13 +83,13 @@ inline double cfg_get(const char* name, double defaultValue) {
 inline double cfg_ranged_get(const char *name, double defaultValue, double lower, double upper) {
 	double ret = cfg_getdouble(name, defaultValue);
 	if (ret < lower) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 				"Wrong value for %s: Setting min acceptable value %f instead of %f",
 				name, lower, ret);
 		ret = lower;
 	}
 	if (ret > upper){
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 				"Wrong value for %s: Setting max acceptable value %f instead of %f",
 				name, upper, ret);
 		ret = upper;
@@ -90,7 +105,7 @@ template <class T>
 T cfg_get_minvalue(const char* name, T defaultValue, T minValue) {
 	T configValue = cfg_get(name, defaultValue);
 	if (configValue < minValue) {
-		lzfs_pretty_syslog(LOG_WARNING, "config value %s was set to %s but minimal value is %s - increasing",
+		safs_pretty_syslog(LOG_WARNING, "config value %s was set to %s but minimal value is %s - increasing",
 				name, std::to_string(configValue).c_str(), std::to_string(minValue).c_str());
 		configValue = minValue;
 	}
@@ -101,7 +116,7 @@ template <class T>
 T cfg_get_maxvalue(const char* name, T defaultValue, T maxValue) {
 	T configValue = cfg_get(name, defaultValue);
 	if (configValue > maxValue) {
-		lzfs_pretty_syslog(LOG_WARNING, "config value %s was set to %s, but maximal value is %s - decreasing",
+		safs_pretty_syslog(LOG_WARNING, "config value %s was set to %s, but maximal value is %s - decreasing",
 				name, std::to_string(configValue).c_str(), std::to_string(maxValue).c_str());
 		configValue = maxValue;
 	}
@@ -112,11 +127,11 @@ template <class T>
 T cfg_get_minmaxvalue(const char* name, T defaultValue, T minValue, T maxValue) {
 	T configValue = cfg_get(name, defaultValue);
 	if (configValue < minValue) {
-		lzfs_pretty_syslog(LOG_WARNING, "config value %s was set to %s, but minimal value is %s - increasing",
+		safs_pretty_syslog(LOG_WARNING, "config value %s was set to %s, but minimal value is %s - increasing",
 				name, std::to_string(configValue).c_str(), std::to_string(minValue).c_str());
 		configValue = minValue;
 	} else if (configValue > maxValue) {
-		lzfs_pretty_syslog(LOG_WARNING, "config value %s was set to %s, but maximal value is %s - decreasing",
+		safs_pretty_syslog(LOG_WARNING, "config value %s was set to %s, but maximal value is %s - decreasing",
 				name, std::to_string(configValue).c_str(), std::to_string(maxValue).c_str());
 		configValue = maxValue;
 	}
@@ -127,6 +142,6 @@ template <class T>
 void cfg_warning_on_value_change(const char* name, T expectedValue) {
 	T newValue = cfg_get(name, expectedValue);
 	if (expectedValue != newValue) {
-		lzfs_pretty_syslog(LOG_WARNING, "config value %s has changed, but changing it requires restart", name);
+		safs_pretty_syslog(LOG_WARNING, "config value %s has changed, but changing it requires restart", name);
 	}
 }

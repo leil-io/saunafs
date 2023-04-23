@@ -2,7 +2,7 @@ timeout_set '6 minutes'
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # This function prints some names of directories to be created
 file_names() {

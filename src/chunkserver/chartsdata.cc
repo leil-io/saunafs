@@ -1,23 +1,24 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "common/platform.h"
-#include "chunkserver/chartsdata.h"
+#include "chartsdata.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -30,15 +31,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "chunkserver-common/hdd_stats.h"
 #include "chunkserver/chunk_replicator.h"
-#include "chunkserver/hddspacemgr.h"
-#include "chunkserver/legacy_replicator.h"
 #include "chunkserver/masterconn.h"
 #include "chunkserver/network_stats.h"
 #include "common/charts.h"
 #include "common/event_loop.h"
 
-#define CHARTS_FILENAME "csstats.mfs"
+#define CHARTS_FILENAME "csstats.sfs"
 
 #define CHARTS_UCPU 0
 #define CHARTS_SCPU 1
@@ -71,7 +71,7 @@
 #define CHARTS_CHUNKIOJOBS 28
 #define CHARTS_CHUNKOPJOBS 29
 
-#define CHARTS 30
+#define CHARTS_NUMBER 30
 
 /* name , join mode , percent , scale , multiplier , divisor */
 #define STATDEFS { \
@@ -131,81 +131,105 @@ static const estatdef estatdefs[]=ESTATDEFS
 
 static struct itimerval it_set;
 
+inline uint32_t toMicroSeconds(struct itimerval &itimer) {
+    return itimer.it_value.tv_sec * 1000000 + itimer.it_value.tv_usec;
+}
+
 void chartsdata_refresh(void) {
-	uint64_t data[CHARTS];
-	uint64_t bin,bout,total_bytesr,total_bytesw;
-	uint32_t i,opr,opw,total_opr,total_opw,repl;
-	uint32_t op_cr,op_de,op_ve,op_du,op_tr,op_dt,op_te;
-	uint32_t csservjobs,masterjobs;
-	struct itimerval uc,pc;
-	uint32_t ucusec,pcusec;
+	uint64_t data[CHARTS_NUMBER];
+	uint64_t bytesIn, bytesOut, totalBytesRead, totalBytesWrite;
+	uint32_t opsRead, opsWrite, totalOpsRead, totalOpsWrite, replications = 0;
+	uint32_t opsCreate, opsDelete, opsUpdateVersion, opsDuplicate, opsTruncate;
+	uint32_t opsDupTrunc, opsTest;
+	uint32_t maxChunkServerJobsCount, maxMasterJobsCount;
 
-	for (i=0 ; i<CHARTS ; i++) {
-		data[i]=0;
+	// Timer runs only when the process is executing.
+	struct itimerval userTime;
+
+	// Timer runs when the process is executing and when
+	// the system is executing on behalf of the process.
+	struct itimerval procTime;
+
+	uint32_t userTimeMicroSeconds, procTimeMicroSeconds;
+
+	for (auto i = 0; i < CHARTS_NUMBER; ++i) {
+		data[i] = 0;
 	}
 
-	setitimer(ITIMER_VIRTUAL,&it_set,&uc);             // user time
-	setitimer(ITIMER_PROF,&it_set,&pc);                // user time + system time
+	setitimer(ITIMER_VIRTUAL, &it_set, &userTime); // user time
+	setitimer(ITIMER_PROF, &it_set, &procTime);    // user time + system time
 
-	if (uc.it_value.tv_sec<=999) {  // on fucken linux timers can go backward !!!
-		uc.it_value.tv_sec = 999-uc.it_value.tv_sec;
-		uc.it_value.tv_usec = 999999-uc.it_value.tv_usec;
+	// on fucken linux timers can go backward !!!
+	if (userTime.it_value.tv_sec <= 999) {
+		userTime.it_value.tv_sec = 999 - userTime.it_value.tv_sec;
+		userTime.it_value.tv_usec = 999999 - userTime.it_value.tv_usec;
 	} else {
-		uc.it_value.tv_sec = 0;
-		uc.it_value.tv_usec = 0;
+		userTime.it_value.tv_sec = 0;
+		userTime.it_value.tv_usec = 0;
 	}
-	if (pc.it_value.tv_sec<=999) {  // as abowe - who the hell has invented this stupid os !!!
-		pc.it_value.tv_sec = 999-pc.it_value.tv_sec;
-		pc.it_value.tv_usec = 999999-pc.it_value.tv_usec;
+
+	// as abowe - who the hell has invented this stupid os !!!
+	if (procTime.it_value.tv_sec <= 999) {
+		procTime.it_value.tv_sec = 999 - procTime.it_value.tv_sec;
+		procTime.it_value.tv_usec = 999999 - procTime.it_value.tv_usec;
 	} else {
-		pc.it_value.tv_sec = 0;
-		uc.it_value.tv_usec = 0;
+		procTime.it_value.tv_sec = 0;
+		userTime.it_value.tv_usec = 0;
 	}
 
-	ucusec = uc.it_value.tv_sec*1000000+uc.it_value.tv_usec;
-	pcusec = pc.it_value.tv_sec*1000000+pc.it_value.tv_usec;
+	userTimeMicroSeconds = toMicroSeconds(userTime);
+	procTimeMicroSeconds = toMicroSeconds(procTime);
 
-	if (pcusec>ucusec) {
-		pcusec-=ucusec;
+	if (procTimeMicroSeconds > userTimeMicroSeconds) {
+		procTimeMicroSeconds -= userTimeMicroSeconds;
 	} else {
-		pcusec=0;
+		procTimeMicroSeconds = 0;
 	}
-	data[CHARTS_UCPU] = ucusec;
-	data[CHARTS_SCPU] = pcusec;
 
-	masterconn_stats(&bin,&bout,&masterjobs);
-	data[CHARTS_MASTERIN]=bin;
-	data[CHARTS_MASTEROUT]=bout;
-	data[CHARTS_CHUNKOPJOBS]=masterjobs;
-	data[CHARTS_CSCONNIN]=0;
-	data[CHARTS_CSCONNOUT]=0;
-	networkStats(&bin,&bout,&opr,&opw,&csservjobs);
-	data[CHARTS_CSSERVIN]=bin;
-	data[CHARTS_CSSERVOUT]=bout;
-	data[CHARTS_CHUNKIOJOBS]=csservjobs;
-	data[CHARTS_HLOPR]=opr;
-	data[CHARTS_HLOPW]=opw;
-	hdd_stats(&bin,&bout,&opr,&opw,&total_bytesr,&total_bytesw,&total_opr,&total_opw,data+CHARTS_TOTAL_RTIME,data+CHARTS_TOTAL_WTIME);
-	data[CHARTS_OVERHEAD_BYTESR]=bin;
-	data[CHARTS_OVERHEAD_BYTESW]=bout;
-	data[CHARTS_OVERHEAD_LLOPR]=opr;
-	data[CHARTS_OVERHEAD_LLOPW]=opw;
-	data[CHARTS_TOTAL_BYTESR]=total_bytesr;
-	data[CHARTS_TOTAL_BYTESW]=total_bytesw;
-	data[CHARTS_TOTAL_LLOPR]=total_opr;
-	data[CHARTS_TOTAL_LLOPW]=total_opw;
-	legacy_replicator_stats(&repl);
-	data[CHARTS_REPL] = repl + gReplicator.getStats();
-	hdd_op_stats(&op_cr,&op_de,&op_ve,&op_du,&op_tr,&op_dt,&op_te);
-	data[CHARTS_CREATE]=op_cr;
-	data[CHARTS_DELETE]=op_de;
-	data[CHARTS_VERSION]=op_ve;
-	data[CHARTS_DUPLICATE]=op_du;
-	data[CHARTS_TRUNCATE]=op_tr;
-	data[CHARTS_DUPTRUNC]=op_dt;
-	data[CHARTS_TEST]=op_te;
+	data[CHARTS_UCPU] = userTimeMicroSeconds;
+	data[CHARTS_SCPU] = procTimeMicroSeconds;
 
-	charts_add(data,eventloop_time()-60);
+	masterconn_stats(&bytesIn, &bytesOut, &maxMasterJobsCount);
+	data[CHARTS_MASTERIN] = bytesIn;
+	data[CHARTS_MASTEROUT] = bytesOut;
+	data[CHARTS_CHUNKOPJOBS] = maxMasterJobsCount;
+	data[CHARTS_CSCONNIN] = 0;
+	data[CHARTS_CSCONNOUT] = 0;
+
+	networkStats(&bytesIn, &bytesOut, &opsRead, &opsWrite,
+	             &maxChunkServerJobsCount);
+	data[CHARTS_CSSERVIN] = bytesIn;
+	data[CHARTS_CSSERVOUT] = bytesOut;
+	data[CHARTS_CHUNKIOJOBS] = maxChunkServerJobsCount;
+	data[CHARTS_HLOPR] = opsRead;
+	data[CHARTS_HLOPW] = opsWrite;
+
+	HddStats::stats(HddStats::statsReport(
+	    &bytesIn, &bytesOut, &opsRead, &opsWrite, &totalBytesRead,
+	    &totalBytesWrite, &totalOpsRead, &totalOpsWrite,
+	    data + CHARTS_TOTAL_RTIME, data + CHARTS_TOTAL_WTIME));
+	data[CHARTS_OVERHEAD_BYTESR] = bytesIn;
+	data[CHARTS_OVERHEAD_BYTESW] = bytesOut;
+	data[CHARTS_OVERHEAD_LLOPR] = opsRead;
+	data[CHARTS_OVERHEAD_LLOPW] = opsWrite;
+	data[CHARTS_TOTAL_BYTESR] = totalBytesRead;
+	data[CHARTS_TOTAL_BYTESW] = totalBytesWrite;
+	data[CHARTS_TOTAL_LLOPR] = totalOpsRead;
+	data[CHARTS_TOTAL_LLOPW] = totalOpsWrite;
+	data[CHARTS_REPL] = replications + gReplicator.getStats();
+
+	HddStats::operationStats(&opsCreate, &opsDelete, &opsUpdateVersion,
+	                         &opsDuplicate, &opsTruncate, &opsDupTrunc,
+	                         &opsTest);
+	data[CHARTS_CREATE] = opsCreate;
+	data[CHARTS_DELETE] = opsDelete;
+	data[CHARTS_VERSION] = opsUpdateVersion;
+	data[CHARTS_DUPLICATE] = opsDuplicate;
+	data[CHARTS_TRUNCATE] = opsTruncate;
+	data[CHARTS_DUPTRUNC] = opsDupTrunc;
+	data[CHARTS_TEST] = opsTest;
+
+	charts_add(data, eventloop_time() - SECONDS_IN_ONE_MINUTE);
 }
 
 void chartsdata_term(void) {
@@ -218,18 +242,20 @@ void chartsdata_store(void) {
 	charts_store();
 }
 
-int chartsdata_init (void) {
-	struct itimerval uc,pc;
+int chartsdata_init(void) {
+	struct itimerval userTime, procTime;
 
 	it_set.it_interval.tv_sec = 0;
 	it_set.it_interval.tv_usec = 0;
 	it_set.it_value.tv_sec = 999;
 	it_set.it_value.tv_usec = 999999;
-	setitimer(ITIMER_VIRTUAL,&it_set,&uc);             // user time
-	setitimer(ITIMER_PROF,&it_set,&pc);                // user time + system time
+	setitimer(ITIMER_VIRTUAL, &it_set, &userTime); // user time
+	setitimer(ITIMER_PROF, &it_set, &procTime);    // user time + system time
 
-	eventloop_timeregister(TIMEMODE_RUN_LATE,60,0,chartsdata_refresh);
-	eventloop_timeregister(TIMEMODE_RUN_LATE,3600,0,chartsdata_store);
+	eventloop_timeregister(TIMEMODE_RUN_LATE, SECONDS_IN_ONE_MINUTE, 0,
+	                       chartsdata_refresh);
+	eventloop_timeregister(TIMEMODE_RUN_LATE, SECONDS_IN_ONE_HOUR, 0,
+	                       chartsdata_store);
 	eventloop_destructregister(chartsdata_term);
-	return charts_init(calcdefs,statdefs,estatdefs,CHARTS_FILENAME);
+	return charts_init(calcdefs, statdefs, estatdefs, CHARTS_FILENAME);
 }

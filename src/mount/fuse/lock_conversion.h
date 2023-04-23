@@ -1,19 +1,21 @@
 /*
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -27,10 +29,10 @@
 #include "common/serialization_macros.h"
 #include "protocol/lock_info.h"
 
-namespace lzfs_locks {
+namespace safs_locks {
 
 /*!
- * \brief Converts flock operation flags to lzfs_locks flags.
+ * \brief Converts flock operation flags to safs_locks flags.
  * \param op Integer containing flags to be converted.
  *
  * \return Returns converted flag (or kInvalid)
@@ -48,7 +50,7 @@ inline uint32_t flockOpConv(int op) {
 }
 
 /*!
- * \brief Converts posix lock operation flags to lzfs_locks flags.
+ * \brief Converts posix lock operation flags to safs_locks flags.
  * \param op Integer containing flags to be converted.
  * \param sleep Denotes if lock operation can sleep.
  *
@@ -120,4 +122,4 @@ inline struct flock convertToFlock(FlockWrapper& fl) {
 		return ret;
 }
 
-} // namespace lzfs_locks
+} // namespace safs_locks

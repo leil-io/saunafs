@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -29,7 +30,7 @@
 #include <sys/statvfs.h>
 
 #include "common/datapack.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/serialization.h"
 #include "common/special_inode_defs.h"
 #include "common/sockets.h"
@@ -56,9 +57,9 @@ static int master_register(int rfd, uint32_t cuid) {
 	wptr += 64;
 	put8bit(&wptr, REGISTER_TOOLS);
 	put32bit(&wptr, cuid);
-	put16bit(&wptr, LIZARDFS_PACKAGE_VERSION_MAJOR);
-	put8bit(&wptr, LIZARDFS_PACKAGE_VERSION_MINOR);
-	put8bit(&wptr, LIZARDFS_PACKAGE_VERSION_MICRO);
+	put16bit(&wptr, SAUNAFS_PACKAGE_VERSION_MAJOR);
+	put8bit(&wptr, SAUNAFS_PACKAGE_VERSION_MINOR);
+	put8bit(&wptr, SAUNAFS_PACKAGE_VERSION_MICRO);
 	if (tcpwrite(rfd, regbuff, 8 + 73) != 8 + 73) {
 		printf("register to master: send error\n");
 		return -1;
@@ -79,7 +80,7 @@ static int master_register(int rfd, uint32_t cuid) {
 		return -1;
 	}
 	if (*rptr) {
-		printf("register to master: %s\n", lizardfs_error_string(*rptr));
+		printf("register to master: %s\n", saunafs_error_string(*rptr));
 		return -1;
 	}
 	return 0;
@@ -219,7 +220,7 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode, bool needr
 		rpath[rpath_len] = 0;
 
 		if (rpath[0] != '/' || rpath[1] == '\0') {
-			printf("%s: not LizardFS object\n", name);
+			printf("%s: not SaunaFS object\n", name);
 			return -1;
 		}
 		dirname_inplace(rpath);

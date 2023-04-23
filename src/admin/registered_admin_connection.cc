@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -71,8 +73,8 @@ std::unique_ptr<RegisteredAdminConnection> RegisteredAdminConnection::create(
 
 	// Get a challenge
 	auto challengeMessage = connection->sendAndReceive(
-			cltoma::adminRegister::build(), LIZ_MATOCL_ADMIN_REGISTER_CHALLENGE);
-	LizMatoclAdminRegisterChallengeData challenge;
+			cltoma::adminRegister::build(), SAU_MATOCL_ADMIN_REGISTER_CHALLENGE);
+	SauMatoclAdminRegisterChallengeData challenge;
 	matocl::adminRegisterChallenge::deserialize(challengeMessage, challenge);
 
 	// Read a password from stdin and send the response
@@ -80,14 +82,14 @@ std::unique_ptr<RegisteredAdminConnection> RegisteredAdminConnection::create(
 	auto response = md5_challenge_response(challenge, password);
 	std::fill(password.begin(), password.end(), char(0)); // shred the password
 	auto registerResponse = connection->sendAndReceive(
-			cltoma::adminRegisterResponse::build(response), LIZ_MATOCL_ADMIN_REGISTER_RESPONSE);
+			cltoma::adminRegisterResponse::build(response), SAU_MATOCL_ADMIN_REGISTER_RESPONSE);
 
 	// Receive information about authentication
 	uint8_t status;
 	matocl::adminRegisterResponse::deserialize(registerResponse, status);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		throw ConnectionException(
-				std::string("Authentication with the admin password failed: ") + lizardfs_error_string(status));
+				std::string("Authentication with the admin password failed: ") + saunafs_error_string(status));
 	}
 	return connection;
 }

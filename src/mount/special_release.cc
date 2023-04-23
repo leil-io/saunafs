@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -22,7 +24,7 @@
 #include "mount/special_inode.h"
 #include "mount/stats.h"
 
-using namespace LizardClient;
+using namespace SaunaClient;
 
 namespace InodeMasterInfo {
 static void release(FileInfo */*fi*/) {
@@ -73,7 +75,7 @@ static void release(FileInfo *fi) {
 	if (file->wasWritten) {
 		auto separatorPos = file->value.find('=');
 		if (separatorPos == file->value.npos) {
-			lzfs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Wrong value '%s'",
+			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Wrong value '%s'",
 			                   file->value.c_str());
 		} else {
 			std::string name = file->value.substr(0, separatorPos);
@@ -82,7 +84,7 @@ static void release(FileInfo *fi) {
 				value.resize(value.size() - 1);
 			}
 			gTweaks.setValue(name, value);
-			lzfs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Setting '%s' to '%s'",
+			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Setting '%s' to '%s'",
 			                   name.c_str(), value.c_str());
 		}
 	}
@@ -98,6 +100,7 @@ static const std::array<ReleaseFunc, 16> funcs = {{
 	 &InodeOplog::release,          //0x1U
 	 &InodeOphistory::release,      //0x2U
 	 &InodeTweaks::release,         //0x3U
+	 nullptr,                       //0x4U
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
@@ -108,16 +111,15 @@ static const std::array<ReleaseFunc, 16> funcs = {{
 	 nullptr,                       //0xCU
 	 nullptr,                       //0xDU
 	 nullptr,                       //0xEU
-	 nullptr,                       //0xEU
 	 &InodeMasterInfo::release      //0xFU
 }};
 
 void special_release(Inode ino, FileInfo *fi) {
 	auto func = funcs[ino - SPECIAL_INODE_BASE];
 	if (!func) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 			"Trying to call unimplemented 'release' function for special inode");
-		throw RequestException(LIZARDFS_ERROR_EINVAL);
+		throw RequestException(SAUNAFS_ERROR_EINVAL);
 	}
 	return func(fi);
 }

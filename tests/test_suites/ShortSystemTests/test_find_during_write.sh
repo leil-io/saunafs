@@ -3,7 +3,7 @@ timeout_set 1 minute
 CHUNKSERVERS=1 \
 	MOUNTS=1 \
 	USE_RAMDISK="YES" \
-setup_local_empty_lizardfs info
+setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 

@@ -23,7 +23,7 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 
 	generic.add_options()
 	("help", "produce help message")
-	("config,c", po::value<std::string>()->default_value(ETC_PATH "/lizardfs-uraft.cfg"), "configuration file");
+	("config,c", po::value<std::string>()->default_value(ETC_PATH "/saunafs-uraft.cfg"), "configuration file");
 
 	po::options_description config("Configuration");
 	config.add_options()
@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 	bool                     make_daemon;
 	std::string              pidfile;
 
-	openlog("lizardfs-uraft", 0, LOG_DAEMON);
+	openlog("saunafs-uraft", 0, LOG_DAEMON);
 
 	srand(getSeed());
 	parseOptions(argc, argv, opt, make_daemon, pidfile);

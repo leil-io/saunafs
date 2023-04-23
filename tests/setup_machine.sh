@@ -4,12 +4,12 @@ usage() {
 	cat >&2 <<EOF
 Usage: $0 setup hdd...
 
-This scripts prepares the machine to run LizardFS tests here.
+This scripts prepares the machine to run SaunaFS tests here.
 Specifically:
-* creates users lizardfstest, lizardfstest_0, ..., lizardfstest_9
-* adds all lizardfstest users to the fuse group
-* grants all users rights to run programs as lizardfstest users
-* grants all users rights to run 'pkill -9 -u <some lizardfstest user>'
+* creates users saunafstest, saunafstest_0, ..., saunafstest_9
+* adds all saunafstest users to the fuse group
+* grants all users rights to run programs as saunafstest users
+* grants all users rights to run 'pkill -9 -u <some saunafstest user>'
 * allows all users to mount fuse filesystem with allow_other option
 * creates a 2G ramdisk in /mnt/ramdisk
 * creates 6 files mounted using loop device
@@ -28,7 +28,7 @@ if [[ ( ( "${1}" != "setup" ) && ( "${1}" != "setup-force" ) ) || ( ${#} -lt ${m
 	usage >&2
 fi
 
-grep -q lizardfstest_loop /etc/fstab
+grep -q saunafstest_loop /etc/fstab
 if [[ ( "${1}" != "setup-force" ) && ( ${?} == 0 ) ]]; then
 	echo The machine is at least partialy configured
 	echo Run revert-setup-machine.sh to revert the current configuration
@@ -58,13 +58,14 @@ case "$release" in
 	LinuxMint/*|Ubuntu/*|Debian/*)
 		apt-get -y install ca-certificates-java # https://www.mail-archive.com/debian-bugs-dist@lists.debian.org/msg1911078.html
 		apt-get -y install asciidoc build-essential cmake debhelper devscripts git fuse3 libfuse3-dev
-		apt-get -y install libfuse-dev pkg-config zlib1g-dev libboost-program-options-dev
+		apt-get -y install pkg-config zlib1g-dev libboost-program-options-dev
 		apt-get -y install libboost-system-dev acl attr netcat-openbsd pylint python3 rsync
 		apt-get -y install socat tidy wget libgoogle-perftools-dev libboost-filesystem-dev
 		apt-get -y install libboost-iostreams-dev libpam0g-dev libdb-dev nfs4-acl-tools libfmt-dev
 		apt-get -y install python3-pip valgrind ccache libfmt-dev libisal-dev libcrcutil-dev curl
 		apt-get -y install libgtest-dev libspdlog-dev libjudy-dev time bc
-		apt-get -y install libsystemd-dev liburcu-dev uuid-dev
+		apt-get -y install libsystemd-dev liburcu-dev uuid-dev libblkid-dev
+		apt-get -y install libyaml-cpp-dev
 		pip3 install mypy black flask requests types-requests
 		;;
 	CentOS/7*)
@@ -72,6 +73,7 @@ case "$release" in
 		yum -y install acl attr dbench nc pylint rsync socat tidy wget gperftools-libs
 		yum -y install boost-program-options boost-system libboost-filesystem libboost-iostreams
 		yum -y install pam-devel libdb-devel nfs4-acl-tools time bc
+		dnf -y install yaml-cpp-devel
 		;;
 	CentOS/8*)
 		dnf -y install asciidoc cmake fuse-devel git gcc gcc-c++ make pkgconfig rpm-build zlib-devel
@@ -80,6 +82,7 @@ case "$release" in
 		dnf -y install pam-devel libdb-devel nfs4-acl-tools fuse3 fuse3-devel
 		dnf -y install fmt-devel spdlog-devel boost-devel libtirpc-devel time bc
 		dnf -y install --enablerepo=PowerTools gtest-devel
+		dnf -y install yaml-cpp-devel
 		# install openbsd version of netcat
 		dnf -y install epel-release
 		dnf -y update
@@ -91,6 +94,7 @@ case "$release" in
 		dnf -y install cmake gcc-c++ gtest-devel fmt-devel spdlog-devel fuse-devel fuse3-devel boost-devel
 		dnf -y install Judy-devel pam-devel libdb-devel thrift-devel valgrind pylint nfs4-acl-tools
 		dnf -y install libtirpc-devel time dbench bc tidy wget fuse3 fuse fakeroot asciidoc dnf-utils
+		dnf -y install yaml-cpp-devel
 		# install openbsd version of netcat
 		dnf -y install netcat
 		update-alternatives --remove-all nc
@@ -108,22 +112,17 @@ esac
 echo ; echo Add group fuse
 groupadd -f fuse
 
-echo ; echo Add user lizardfstest
-if ! getent passwd lizardfstest > /dev/null; then
-	useradd --system --user-group --home /var/lib/lizardfstest lizardfstest
-fi
-if ! groups lizardfstest | grep -w fuse > /dev/null; then
-	usermod -a -G fuse lizardfstest # allow this user to mount fuse filesystem
-fi
-if ! groups lizardfstest | grep -w adm > /dev/null; then
-	usermod -a -G adm lizardfstest # allow this user to read files from /var/log
+echo ; echo Add user saunafstest
+if ! getent passwd saunafstest > /dev/null; then
+	useradd --system --user-group --home /var/lib/saunafstest --create-home saunafstest
+	chmod 755 /var/lib/saunafstest
 fi
 
-echo ; echo Create home directory /var/lib/lizardfstest
-if [[ ! -d /var/lib/lizardfstest ]]; then
-	mkdir -p /var/lib/lizardfstest
-	chown lizardfstest:lizardfstest /var/lib/lizardfstest
-	chmod 755 /var/lib/lizardfstest
+if ! groups saunafstest | grep -w fuse > /dev/null; then
+	usermod -a -G fuse saunafstest # allow this user to mount fuse filesystem
+fi
+if ! groups saunafstest | grep -w adm > /dev/null; then
+	usermod -a -G adm saunafstest # allow this user to read files from /var/log
 fi
 
 echo ; echo Prepare sudo configuration
@@ -134,38 +133,38 @@ if ! [[ -d /etc/sudoers.d ]]; then
 	echo "Then run this script again" >&2
 	exit 1
 fi
-if ! [[ -f /etc/sudoers.d/lizardfstest ]] || \
-		! grep drop_caches /etc/sudoers.d/lizardfstest >/dev/null; then
-	cat >/etc/sudoers.d/lizardfstest <<-END
-		ALL ALL = (lizardfstest) NOPASSWD: ALL
-		ALL ALL = NOPASSWD: /usr/bin/pkill -9 -u lizardfstest
-		ALL ALL = NOPASSWD: /bin/rm -rf /tmp/lizardfs_error_dir
-		lizardfstest ALL = NOPASSWD: /bin/sh -c echo\ 1\ >\ /proc/sys/vm/drop_caches
+if ! [[ -f /etc/sudoers.d/saunafstest ]] || \
+		! grep drop_caches /etc/sudoers.d/saunafstest >/dev/null; then
+	cat >/etc/sudoers.d/saunafstest <<-END
+		ALL ALL = (saunafstest) NOPASSWD: ALL
+		ALL ALL = NOPASSWD: /usr/bin/pkill -9 -u saunafstest
+		ALL ALL = NOPASSWD: /bin/rm -rf /tmp/saunafs_error_dir
+		saunafstest ALL = NOPASSWD: /bin/sh -c echo\ 1\ >\ /proc/sys/vm/drop_caches
 	END
-	chmod 0440 /etc/sudoers.d/lizardfstest
+	chmod 0440 /etc/sudoers.d/saunafstest
 fi
 if ! [[ -d /etc/security/limits.d ]]; then
 	echo "pam module pam_limits is not installed!" >&2
 	exit 1
 fi
-if ! [[ -f /etc/security/limits.d/10-lizardfstests.conf ]]; then
-	# Change limit of open files for user lizardfstest
-	echo "lizardfstest hard nofile 10000" > /etc/security/limits.d/10-lizardfstests.conf
-	chmod 0644 /etc/security/limits.d/10-lizardfstests.conf
+if ! [[ -f /etc/security/limits.d/10-saunafstests.conf ]]; then
+	# Change limit of open files for user saunafstest
+	echo "saunafstest hard nofile 10000" > /etc/security/limits.d/10-saunafstests.conf
+	chmod 0644 /etc/security/limits.d/10-saunafstests.conf
 fi
 if ! grep 'pam_limits.so' /etc/pam.d/sudo > /dev/null; then
 	cat >>/etc/pam.d/sudo <<-END
-		### Reload pam limits on sudo - necessary for lizardfs tests. ###
+		### Reload pam limits on sudo - necessary for saunafs tests. ###
 		session required pam_limits.so
 	END
 fi
 
-echo ; echo 'Add users lizardfstest_{0..9}'
-for username in lizardfstest_{0..9}; do
+echo ; echo 'Add users saunafstest_{0..9}'
+for username in saunafstest_{0..9}; do
 	if ! getent passwd $username > /dev/null; then
 		useradd --system --user-group --home /var/lib/$username --create-home \
-				--groups fuse,lizardfstest $username
-		cat >>/etc/sudoers.d/lizardfstest <<-END
+				--groups fuse,saunafstest $username
+		cat >>/etc/sudoers.d/saunafstest <<-END
 
 			ALL ALL = ($username) NOPASSWD: ALL
 			ALL ALL = NOPASSWD: /usr/bin/pkill -9 -u $username
@@ -173,8 +172,39 @@ for username in lizardfstest_{0..9}; do
 	fi
 done
 
+if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep '# SMR' /etc/sudoers.d/saunafstest >/dev/null; then
+	cat <<-'END' >>/etc/sudoers.d/saunafstest
+		# SMR
+		saunafstest ALL = NOPASSWD: /usr/sbin/modprobe null_blk nr_devices=0
+		saunafstest ALL = NOPASSWD: /usr/sbin/mkzonefs -f -o perm=666 /dev/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/sbin/mkzonefs -f -o perm=666 /dev/nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/mount -t zonefs /dev/sauna_nullb* /mnt/zoned/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/mount -t zonefs /dev/nullb* /mnt/zoned/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/umount -l /mnt/zoned/sauna_nullb*
+
+		saunafstest ALL = NOPASSWD: /usr/bin/mkdir -pm 777 /mnt/zoned/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/mkdir /sys/kernel/config/nullb/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/rmdir /sys/kernel/config/nullb/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/tee /sys/kernel/config/nullb/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/tee /sys/block/sauna_nullb*
+		saunafstest ALL = NOPASSWD: /usr/bin/tee /sys/block/nullb*
+	END
+fi
+
+if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep '# Ganesha' /etc/sudoers.d/saunafstest >/dev/null; then
+	cat <<-'END' >>/etc/sudoers.d/saunafstest
+		# Ganesha automated tests
+		saunafstest ALL = NOPASSWD: /tmp/SaunaFS-autotests/mnt/sfs0/bin/ganesha.nfsd
+		saunafstest ALL = NOPASSWD: /usr/bin/ganesha.nfsd
+		saunafstest ALL = NOPASSWD: /usr/bin/pkill -9 ganesha.nfsd
+		saunafstest ALL = NOPASSWD: /usr/bin/mkdir -p /var/run/ganesha
+		saunafstest ALL = NOPASSWD: /usr/bin/touch /var/run/ganesha/ganesha.pid
+		saunafstest ALL = NOPASSWD: /usr/bin/mount, /usr/bin/umount
+	END
+fi
+
 echo ; echo 'Fixing GIDs of users'
-for name in lizardfstest lizardfstest_{0..9}; do
+for name in saunafstest saunafstest_{0..9}; do
 	uid=$(getent passwd "$name" | cut -d: -f3)
 	gid=$(getent group  "$name" | cut -d: -f3)
 	if [[ $uid == "" || $gid == "" ]]; then
@@ -196,23 +226,23 @@ if ! grep '^[[:blank:]]*user_allow_other' /etc/fuse.conf >/dev/null; then
 	echo "user_allow_other" >> /etc/fuse.conf
 fi
 
-echo ; echo Prepare empty /etc/lizardfs_tests.conf
-if ! [[ -f /etc/lizardfs_tests.conf ]]; then
-	cat >/etc/lizardfs_tests.conf <<-END
-		: \${LIZARDFS_DISKS:="$*"}
-		# : \${TEMP_DIR:=/tmp/LizardFS-autotests}
-		# : \${LIZARDFS_ROOT:=$HOME/local}
+echo ; echo Prepare empty /etc/saunafs_tests.conf
+if ! [[ -f /etc/saunafs_tests.conf ]]; then
+	cat >/etc/saunafs_tests.conf <<-END
+		: \${SAUNAFS_DISKS:="$*"}
+		# : \${TEMP_DIR:=/tmp/SaunaFS-autotests}
+		# : \${SAUNAFS_ROOT:=$HOME/local}
 		# : \${FIRST_PORT_TO_USE:=25000}
 	END
 fi
 
 echo ; echo Prepare ramdisk
 if ! grep /mnt/ramdisk /etc/fstab >/dev/null; then
-	echo "# Ramdisk used in LizardFS tests" >> /etc/fstab
+	echo "# Ramdisk used in SaunaFS tests" >> /etc/fstab
 	echo "ramdisk  /mnt/ramdisk  tmpfs  mode=1777,size=2g" >> /etc/fstab
 	mkdir -p /mnt/ramdisk
 	mount /mnt/ramdisk
-	echo ': ${RAMDISK_DIR:=/mnt/ramdisk}' >> /etc/lizardfs_tests.conf
+	echo ': ${RAMDISK_DIR:=/mnt/ramdisk}' >> /etc/saunafs_tests.conf
 fi
 
 echo ; echo Prepare loop devices
@@ -225,26 +255,26 @@ while [ $i -lt $devices ] ; do
 		if (( i == devices )); then #stop if we have enough devices
 			break
 		fi
-		loops+=(/mnt/lizardfstest_loop_$i)
-		if grep -q lizardfstest_loop_$i /etc/fstab; then
+		loops+=(/mnt/saunafstest_loop_$i)
+		if grep -q saunafstest_loop_$i /etc/fstab; then
 			(( ++i ))
 			continue
 		fi
-		mkdir -p "$disk/lizardfstest_images"
+		mkdir -p "$disk/saunafstest_images"
 		# Create image file
-		image="$disk/lizardfstest_images/image_$i"
+		image="$disk/saunafstest_images/image_$i"
 		truncate -s 1G "$image"
 		mkfs.ext4 -Fq "$image"
 		# Add it to fstab
-		echo "$(readlink -m "$image") /mnt/lizardfstest_loop_$i  ext4  loop" >> /etc/fstab
-		mkdir -p /mnt/lizardfstest_loop_$i
+		echo "$(readlink -m "$image") /mnt/saunafstest_loop_$i  ext4  loop" >> /etc/fstab
+		mkdir -p /mnt/saunafstest_loop_$i
 		# Mount and set permissions
-		mount /mnt/lizardfstest_loop_$i
-		chmod 1777 /mnt/lizardfstest_loop_$i
+		mount /mnt/saunafstest_loop_$i
+		chmod 1777 /mnt/saunafstest_loop_$i
 		(( ++i ))
 	done
 done
-echo ': ${LIZARDFS_LOOP_DISKS:="'"${loops[*]}"'"}' >> /etc/lizardfs_tests.conf
+echo ': ${SAUNAFS_LOOP_DISKS:="'"${loops[*]}"'"}' >> /etc/saunafs_tests.conf
 
 set +x
 echo Machine configured successfully

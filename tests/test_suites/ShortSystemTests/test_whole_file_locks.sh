@@ -2,7 +2,7 @@ timeout_set 1 minutes
 
 USE_RAMDISK=YES \
 	MOUNT_EXTRA_CONFIG="enablefilelocks=1" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 	# Create files
 	cd "${info[mount0]}"
@@ -146,28 +146,28 @@ test_locks flock
 readlock "dir/file_1M" flock
 
 # There should be 1 pending lock and 3 active locks in the system (+1 line for header)
-assert_eventually_prints $((1 + 1)) 'lizardfs_admin_master manage-locks list flock --porcelain --pending | wc -l'
-assert_eventually_prints $((1 + 3)) 'lizardfs_admin_master manage-locks list flock --porcelain --active | wc -l'
+assert_eventually_prints $((1 + 1)) 'saunafs_admin_master manage-locks list flock --porcelain --pending | wc -l'
+assert_eventually_prints $((1 + 3)) 'saunafs_admin_master manage-locks list flock --porcelain --active | wc -l'
 
 # After releasing all locks from inode 4, 2 locks should disappear
-assert_success lizardfs_admin_master manage-locks unlock flock --inode 4
-assert_eventually_prints $((1 + 1)) 'lizardfs_admin_master manage-locks list flock --porcelain --pending | wc -l'
-assert_eventually_prints $((1 + 1)) 'lizardfs_admin_master manage-locks list flock --porcelain --active | wc -l'
+assert_success saunafs_admin_master manage-locks unlock flock --inode 4
+assert_eventually_prints $((1 + 1)) 'saunafs_admin_master manage-locks list flock --porcelain --pending | wc -l'
+assert_eventually_prints $((1 + 1)) 'saunafs_admin_master manage-locks list flock --porcelain --active | wc -l'
 
 # After releasing all locks from inode 3, pending read lock should be applied
-assert_success lizardfs_admin_master manage-locks unlock flock --inode 3
-assert_eventually_prints $((1 + 0)) 'lizardfs_admin_master manage-locks list flock --porcelain --pending | wc -l'
-assert_eventually_prints $((1 + 1)) 'lizardfs_admin_master manage-locks list flock --porcelain --active | wc -l'
+assert_success saunafs_admin_master manage-locks unlock flock --inode 3
+assert_eventually_prints $((1 + 0)) 'saunafs_admin_master manage-locks list flock --porcelain --pending | wc -l'
+assert_eventually_prints $((1 + 1)) 'saunafs_admin_master manage-locks list flock --porcelain --active | wc -l'
 
 # No processes actively try to lock a file, so master restart would not affect system state at all
-assert_success lizardfs_master_daemon restart
+assert_success saunafs_master_daemon restart
 
 # After releasing the last lock (read lock for inode 3), system should be clear from flocks
-lockinfo=$(lizardfs_admin_master manage-locks list flock --porcelain --active | tail -n 1)
+lockinfo=$(saunafs_admin_master manage-locks list flock --porcelain --active | tail -n 1)
 inode=$(echo ${lockinfo} | cut -d' ' -f1)
 owner=$(echo ${lockinfo} | cut -d' ' -f2)
 sessionid=$(echo ${lockinfo} | cut -d' ' -f3)
 assert_equals ${inode} 3
-assert_success lizardfs_admin_master manage-locks unlock flock --inode $inode --owner $owner --sessionid $sessionid
-assert_eventually_prints $((1 + 0)) 'lizardfs_admin_master manage-locks list flock --porcelain --pending | wc -l'
-assert_eventually_prints $((1 + 0)) 'lizardfs_admin_master manage-locks list flock --porcelain --active | wc -l'
+assert_success saunafs_admin_master manage-locks unlock flock --inode $inode --owner $owner --sessionid $sessionid
+assert_eventually_prints $((1 + 0)) 'saunafs_admin_master manage-locks list flock --porcelain --pending | wc -l'
+assert_eventually_prints $((1 + 0)) 'saunafs_admin_master manage-locks list flock --porcelain --active | wc -l'

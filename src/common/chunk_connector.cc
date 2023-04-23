@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -23,7 +24,7 @@
 #include <algorithm>
 
 #include "common/exceptions.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 
@@ -43,13 +44,13 @@ int ChunkConnector::startUsingConnection(const NetworkAddress& server,
 		fd = tcpsocket();
 		if (fd < 0) {
 			err = tcpgetlasterror();
-			lzfs_pretty_syslog(LOG_WARNING, "can't create tcp socket: %s", strerr(err));
+			safs_pretty_syslog(LOG_WARNING, "can't create tcp socket: %s", strerr(err));
 			break;
 		}
 		if (sourceIp_) {
 			if (tcpnumbind(fd, sourceIp_, 0) < 0) {
 				err = tcpgetlasterror();
-				lzfs_pretty_syslog(LOG_WARNING, "can't bind to given ip: %s", strerr(err));
+				safs_pretty_syslog(LOG_WARNING, "can't bind to given ip: %s", strerr(err));
 				tcpclose(fd);
 				fd = -1;
 				break;
@@ -73,7 +74,7 @@ int ChunkConnector::startUsingConnection(const NetworkAddress& server,
 				"Connection error: " + std::string(strerr(err)), server);
 	}
 	if (tcpnodelay(fd) < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "can't set TCP_NODELAY: %s", strerr(tcpgetlasterror()));
+		safs_pretty_syslog(LOG_WARNING, "can't set TCP_NODELAY: %s", strerr(tcpgetlasterror()));
 	}
 	return fd;
 }

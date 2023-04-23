@@ -4,32 +4,32 @@ touch "$TEMP_DIR/f"
 MESSAGE="Testing ACL support in $TEMP_DIR/" assert_success setfacl -m group:fuse:rw "$TEMP_DIR/f"
 
 USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
-lizdir="${info[mount0]}/subdir"
+saudir="${info[mount0]}/subdir"
 tmpdir="$TEMP_DIR/subdir"
-mkdir -p "$lizdir" "$tmpdir"
-chmod 770 "$lizdir" "$tmpdir"
+mkdir -p "$saudir" "$tmpdir"
+chmod 770 "$saudir" "$tmpdir"
 
-# Do the same things in two trees (lizdir and tmpdir) and compare results after each command
+# Do the same things in two trees (saudir and tmpdir) and compare results after each command
 counter=0
 while read command; do
 	command=$(sed -e 's/ *#.*//' <<< "$command") # Strip the trailing comment
 	export MESSAGE="Executing '$command' in both directory trees"
 	( cd "$tmpdir" ; assertlocal_success eval "$command" )
-	( cd "$lizdir" ; assertlocal_success eval "$command" )
+	( cd "$saudir" ; assertlocal_success eval "$command" )
 
 	if [[ $((RANDOM % 10)) == 0 && $counter < 3 ]]; then
-		lizardfs_master_daemon restart
-		lizardfs_wait_for_all_ready_chunkservers
+		saunafs_master_daemon restart
+		saunafs_wait_for_all_ready_chunkservers
 		counter=$((counter + 1))
 	fi
 
 	export MESSAGE="Veryfing permissions after '$command'"
-	cd "$lizdir"
+	cd "$saudir"
 	find . | while read f; do
-		assert_equals "$(stat --format=%A "$tmpdir/$f")" "$(stat --format=%A "$lizdir/$f")"
-		assert_equals "$(getfacl -cpE "$tmpdir/$f" | sort)" "$(getfacl -cpE "$lizdir/$f" | sort)"
+		assert_equals "$(stat --format=%A "$tmpdir/$f")" "$(stat --format=%A "$saudir/$f")"
+		assert_equals "$(getfacl -cpE "$tmpdir/$f" | sort)" "$(getfacl -cpE "$saudir/$f" | sort)"
 	done
 done <<'END'
 	mkdir minimal                      # Play with minimal ACL using setfacl and chmod
@@ -56,9 +56,9 @@ done <<'END'
 	chmod 650 file
 	chmod 444 file
 	chmod 750 file                     # After this change we start adding extended ACL
-	setfacl -m user:lizardfstest:rwx file
-	setfacl -m user:lizardfstest:rw- file
-	setfacl -x user:lizardfstest file
+	setfacl -m user:saunafstest:rwx file
+	setfacl -m user:saunafstest:rw- file
+	setfacl -x user:saunafstest file
 	setfacl -m user:nobody:--- file
 	setfacl -m group:adm:rwx file
 	setfacl -m mask::rwx file

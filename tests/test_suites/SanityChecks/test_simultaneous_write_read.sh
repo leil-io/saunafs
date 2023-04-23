@@ -2,8 +2,8 @@ timeout_set 3 minutes
 
 CHUNKSERVERS=4
 USE_RAMDISK=YES
-#MOUNT_EXTRA_CONFIG="mfscachemode=NEVER"
-setup_local_empty_lizardfs info
+MOUNT_EXTRA_CONFIG="cacheexpirationtime=0"
+setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 

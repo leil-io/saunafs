@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2016 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -32,7 +33,7 @@
 static void quota_set_usage() {
 	fprintf(stderr,
 	        "set quotas\n\n"
-	        "usage:\n lizardfs setquota (-u <uid>|-g <gid> |-d) "
+	        "usage:\n saunafs setquota (-u <uid>|-g <gid> |-d) "
 	        "<soft-limit-size> <hard-limit-size> "
 	        "<soft-limit-inodes> <hard-limit-inodes> <directory-path>\n"
 	        " 0 deletes the limit\n");
@@ -68,10 +69,10 @@ static int quota_set(const std::string &path, QuotaOwner owner, uint64_t soft_in
 		}
 	}
 	try {
-		auto response = ServerConnection::sendAndReceive(fd, request, LIZ_MATOCL_FUSE_SET_QUOTA);
+		auto response = ServerConnection::sendAndReceive(fd, request, SAU_MATOCL_FUSE_SET_QUOTA);
 		uint8_t status;
 		matocl::fuseSetQuota::deserialize(response, message_id, status);
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			throw Exception(std::string(path) + ": failed", status);
 		}
 	} catch (Exception &e) {

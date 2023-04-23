@@ -1,19 +1,21 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -60,7 +62,7 @@ TEST(DirEntryCache, Basic) {
 	attributes_with_9[0] = 9;
 	auto current_time = cache.updateTime();
 	cache.insertSequence(
-		LizardClient::Context(0, 0, 0, 0), 9,
+		SaunaClient::Context(0, 0, 0, 0), 9,
 		std::vector<DirectoryEntry>{
 			{0, 1, 7, "a1", dummy_attributes},
 			{1, 2, 8, "a2", dummy_attributes},
@@ -68,7 +70,7 @@ TEST(DirEntryCache, Basic) {
 		}, current_time
 	);
 	cache.insertSequence(
-		LizardClient::Context(1, 2, 0, 0), 11,
+		SaunaClient::Context(1, 2, 0, 0), 11,
 		std::vector<DirectoryEntry>{
 			{7, 8, 5, "a1", dummy_attributes},
 			{8, 9, 4, "a2", dummy_attributes},
@@ -76,7 +78,7 @@ TEST(DirEntryCache, Basic) {
 		}, current_time
 	);
 	cache.insertSequence(
-		LizardClient::Context(0, 0, 0, 0), 9,
+		SaunaClient::Context(0, 0, 0, 0), 9,
 		std::vector<DirectoryEntry>{
 			{1, 2, 11, "a4", dummy_attributes},
 			{2, 3, 13, "a3", attributes_with_9},
@@ -124,7 +126,7 @@ TEST(DirEntryCache, Basic) {
 	}
 	ASSERT_TRUE(lookup_output_it == lookup_output.end());
 
-	auto by_inode_it = cache.find(LizardClient::Context(0, 0, 0, 0), 12);
+	auto by_inode_it = cache.find(SaunaClient::Context(0, 0, 0, 0), 12);
 	ASSERT_NE(by_inode_it, cache.inode_end());
 	ASSERT_EQ(by_inode_it->attr[0], 6);
 	by_inode_it++;
@@ -141,8 +143,8 @@ TEST(DirEntryCache, Repetitions) {
 	dummy_attributes.fill(0);
 	auto current_time = cache.updateTime();
 
-	cache.insertSequence(LizardClient::Context(0, 0, 0, 0), 9, std::vector<DirectoryEntry>{{0, 1, 7, "a1", dummy_attributes}}, current_time);
-	cache.insertSequence(LizardClient::Context(0, 0, 0, 0), 9, std::vector<DirectoryEntry>{{1, 2, 7, "a1", dummy_attributes}}, current_time);
+	cache.insertSequence(SaunaClient::Context(0, 0, 0, 0), 9, std::vector<DirectoryEntry>{{0, 1, 7, "a1", dummy_attributes}}, current_time);
+	cache.insertSequence(SaunaClient::Context(0, 0, 0, 0), 9, std::vector<DirectoryEntry>{{1, 2, 7, "a1", dummy_attributes}}, current_time);
 	cache.removeOldest(5);
 }
 
@@ -157,7 +159,7 @@ TEST(DirEntryCache, RandomOrder) {
 	attributes_with_9[0] = 9;
 	auto current_time = cache.updateTime();
 	cache.insertSequence(
-		LizardClient::Context(0, 0, 0, 0), 9,
+		SaunaClient::Context(0, 0, 0, 0), 9,
 		std::vector<DirectoryEntry>{
 			{0, 1, 7, "a1", dummy_attributes},
 			{1, 2, 8, "a2", dummy_attributes},
@@ -165,7 +167,7 @@ TEST(DirEntryCache, RandomOrder) {
 		}, current_time
 	);
 	cache.insertSequence(
-		LizardClient::Context(0, 0, 0, 0), 9,
+		SaunaClient::Context(0, 0, 0, 0), 9,
 		std::vector<DirectoryEntry>{
 			{7, 8, 5, "a4", dummy_attributes},
 			{8, 9, 4, "a5", dummy_attributes},
@@ -173,7 +175,7 @@ TEST(DirEntryCache, RandomOrder) {
 		}, current_time
 	);
 	cache.insertSequence(
-		LizardClient::Context(0, 0, 0, 0), 9,
+		SaunaClient::Context(0, 0, 0, 0), 9,
 		std::vector<DirectoryEntry>{
 			{7, 0, 5, "a4", dummy_attributes},
 			{0, 2, 7, "a2", dummy_attributes},

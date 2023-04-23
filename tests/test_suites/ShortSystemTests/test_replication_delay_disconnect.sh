@@ -12,35 +12,35 @@ USE_RAMDISK=YES \
 			`|CHUNKS_WRITE_REP_LIMIT = 5`
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|OPERATIONS_DELAY_DISCONNECT = 30" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Leave only two servers
-lizardfs_chunkserver_daemon 0 stop
-lizardfs_chunkserver_daemon 1 stop
-lizardfs_chunkserver_daemon 2 stop
-lizardfs_chunkserver_daemon 3 stop
-lizardfs_chunkserver_daemon 4 stop
-lizardfs_wait_for_ready_chunkservers 2
+saunafs_chunkserver_daemon 0 stop
+saunafs_chunkserver_daemon 1 stop
+saunafs_chunkserver_daemon 2 stop
+saunafs_chunkserver_daemon 3 stop
+saunafs_chunkserver_daemon 4 stop
+saunafs_wait_for_ready_chunkservers 2
 
 # Create 20 files. Expect that for each file there are 2 chunk copies.
 FILE_SIZE=1K file-generate "${info[mount0]}"/file{1..20}
-assert_equals 20 $(lizardfs checkfile "${info[mount0]}"/* | grep 'with 2 copies:' | wc -l)
+assert_equals 20 $(saunafs checkfile "${info[mount0]}"/* | grep 'with 2 copies:' | wc -l)
 
 # Stop one server with valid copy and start four new servers.
-lizardfs_chunkserver_daemon 5 stop
-lizardfs_chunkserver_daemon 0 start
-lizardfs_chunkserver_daemon 1 start
-lizardfs_chunkserver_daemon 2 start
-lizardfs_chunkserver_daemon 3 start
-lizardfs_wait_for_ready_chunkservers 5
+saunafs_chunkserver_daemon 5 stop
+saunafs_chunkserver_daemon 0 start
+saunafs_chunkserver_daemon 1 start
+saunafs_chunkserver_daemon 2 start
+saunafs_chunkserver_daemon 3 start
+saunafs_wait_for_ready_chunkservers 5
 
 # All chunks has 4 missing copies but 2 chunkservers are disconnected,
 # so only two new copies should be created
-assert_eventually_prints 20 'lizardfs checkfile "${info[mount0]}"/* | grep "with 3 copies:" | wc -l' '5 seconds'
+assert_eventually_prints 20 'saunafs checkfile "${info[mount0]}"/* | grep "with 3 copies:" | wc -l' '5 seconds'
 
 # Replication shouldn't be started for few more seconds.
 sleep 10
-assert_equals 20 $(lizardfs checkfile "${info[mount0]}"/* | grep 'with 3 copies:' | wc -l)
+assert_equals 20 $(saunafs checkfile "${info[mount0]}"/* | grep 'with 3 copies:' | wc -l)
 
 # Expect two more copies of each chunk to migrate to the two empty servers
-assert_eventually_prints 20 'lizardfs checkfile "${info[mount0]}"/* | grep "with 3 copies:" | wc -l' '20 seconds'
+assert_eventually_prints 20 'saunafs checkfile "${info[mount0]}"/* | grep "with 3 copies:" | wc -l' '20 seconds'

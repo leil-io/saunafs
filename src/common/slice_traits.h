@@ -1,19 +1,22 @@
 /*
+
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -316,7 +319,7 @@ inline int getNumberOfBlocks(const ::ChunkPartType &cpt, uint32_t blocks_in_chun
 }
 
 inline int getNumberOfBlocks(const ::ChunkPartType &cpt) {
-	return getNumberOfBlocks(cpt, MFSBLOCKSINCHUNK);
+	return getNumberOfBlocks(cpt, SFSBLOCKSINCHUNK);
 }
 
 /*!
@@ -335,15 +338,15 @@ inline int chunkLengthToChunkPartLength(const ChunkPartType &cpt, int chunk_leng
 		return chunk_length;
 	}
 
-	int full_stripe = chunk_length / (getNumberOfDataParts(cpt) * MFSBLOCKSIZE);
-	int base_len = full_stripe * MFSBLOCKSIZE;
+	int full_stripe = chunk_length / (getNumberOfDataParts(cpt) * SFSBLOCKSIZE);
+	int base_len = full_stripe * SFSBLOCKSIZE;
 	int base = base_len * getNumberOfDataParts(cpt);
 	int rest = chunk_length - base;
 
 	int data_part_index = isDataPart(cpt) ? getDataPartIndex(cpt) : 0;
 
-	int part_rest_len = std::max(rest - data_part_index * MFSBLOCKSIZE, 0);
-	part_rest_len = std::min(part_rest_len, MFSBLOCKSIZE);
+	int part_rest_len = std::max(rest - data_part_index * SFSBLOCKSIZE, 0);
+	part_rest_len = std::min(part_rest_len, SFSBLOCKSIZE);
 
 	return base_len + part_rest_len;
 }

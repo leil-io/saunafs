@@ -51,18 +51,18 @@ add_executable(posixlockcmd posixlockcmd.cc)
 install(TARGETS posixlockcmd RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # ping client
-add_executable(mfsping mfs_ping.cc)
-target_link_libraries(mfsping mfscommon)
-install(TARGETS mfsping RUNTIME DESTINATION ${BIN_SUBDIR})
+add_executable(sfsping sfs_ping.cc)
+target_link_libraries(sfsping sfscommon)
+install(TARGETS sfsping RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # ping server
-add_executable(mfspingserv mfs_pingserv.cc)
-target_link_libraries(mfspingserv mfscommon)
-install(TARGETS mfspingserv RUNTIME DESTINATION ${BIN_SUBDIR})
+add_executable(sfspingserv sfs_pingserv.cc)
+target_link_libraries(sfspingserv sfscommon)
+install(TARGETS sfspingserv RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # ping pong fcntl lock test
-add_executable(lzfs_ping_pong ping_pong.cc)
-install(TARGETS lzfs_ping_pong RUNTIME DESTINATION ${BIN_SUBDIR})
+add_executable(safs_ping_pong ping_pong.cc)
+install(TARGETS safs_ping_pong RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # readdir-unlink loop for readdir() testing
 add_executable(readdir-unlink-test readdir_unlink_test.cc)

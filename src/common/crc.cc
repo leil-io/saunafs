@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -23,7 +25,7 @@
 #include <stdlib.h>
 #include <cstring>
 
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
 #ifndef ENABLE_CRC
 
@@ -235,8 +237,8 @@ void mycrc32_init(void) {
 void recompute_crc_if_block_empty(uint8_t* block, uint32_t& crc) {
 	// If both block and crcBuffer consist only of zeros recompute the crc
 	if (crc == 0) {
-		if (block[0] == 0 && !memcmp(block, block + 1, MFSBLOCKSIZE - 1)) {
-			static uint32_t emptyBlockCrc = mycrc32_zeroblock(0, MFSBLOCKSIZE);
+		if (block[0] == 0 && !memcmp(block, block + 1, SFSBLOCKSIZE - 1)) {
+			static uint32_t emptyBlockCrc = mycrc32_zeroblock(0, SFSBLOCKSIZE);
 			crc = emptyBlockCrc;
 		}
 	}

@@ -1,26 +1,27 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
 #include "master/filesystem_checksum_background_updater.h"
 
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "master/filesystem_checksum.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_operations.h"
@@ -32,7 +33,7 @@ ChecksumBackgroundUpdater::ChecksumBackgroundUpdater()
 }
 
 bool ChecksumBackgroundUpdater::start() {
-	lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.updater_start");
+	safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.updater_start");
 	if (step_ == ChecksumRecalculatingStep::kNone) {
 		++step_;
 		return true;
@@ -44,7 +45,7 @@ bool ChecksumBackgroundUpdater::start() {
 void ChecksumBackgroundUpdater::end() {
 	updateChecksum();
 	reset();
-	lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.updater_end");
+	safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.updater_end");
 }
 
 bool ChecksumBackgroundUpdater::inProgress() {
@@ -77,9 +78,9 @@ bool ChecksumBackgroundUpdater::isNodeIncluded(FSNode *node) {
 		ret = true;
 	}
 	if (ret) {
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_recalculated_node");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_recalculated_node");
 	} else {
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_not_recalculated_node");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_not_recalculated_node");
 	}
 	return ret;
 }
@@ -94,9 +95,9 @@ bool ChecksumBackgroundUpdater::isXattrIncluded(xattr_data_entry *xde) {
 		ret = true;
 	}
 	if (ret) {
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_recalculated_xattr");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_recalculated_xattr");
 	} else {
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_not_recalculated_xattr");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_not_recalculated_xattr");
 	}
 	return ret;
 }
@@ -111,14 +112,14 @@ uint32_t ChecksumBackgroundUpdater::getSpeedLimit() {
 
 void ChecksumBackgroundUpdater::updateChecksum() {
 	if (fsNodesChecksum != gMetadata->fsNodesChecksum) {
-		lzfs_pretty_syslog(LOG_WARNING, "FsNodes checksum mismatch found, replacing with a new value.");
+		safs_pretty_syslog(LOG_WARNING, "FsNodes checksum mismatch found, replacing with a new value.");
 		gMetadata->fsNodesChecksum = fsNodesChecksum;
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.mismatch");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.mismatch");
 	}
 	if (xattrChecksum != gMetadata->xattrChecksum) {
-		lzfs_pretty_syslog(LOG_WARNING, "Xattr checksum mismatch found, replacing with a new value.");
+		safs_pretty_syslog(LOG_WARNING, "Xattr checksum mismatch found, replacing with a new value.");
 		gMetadata->xattrChecksum = xattrChecksum;
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.checksum.mismatch");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.mismatch");
 	}
 }
 

@@ -1,19 +1,21 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "fsal.h"
@@ -23,8 +25,8 @@
 #include "nfs_exports.h"
 
 #include "context_wrap.h"
-#include "lzfs_fsal_types.h"
-#include "lzfs_fsal_methods.h"
+#include "safs_fsal_types.h"
+#include "safs_fsal_methods.h"
 #include "fileinfo_cache.h"
 
 /**
@@ -47,7 +49,7 @@ static void clearFileinfoCache(struct FSExport *export, int count) {
 		}
 
 		fileinfo_t *fileHandle = extractFileInfo(cacheHandle);
-		liz_release(export->fsInstance, fileHandle);
+		sau_release(export->fsInstance, fileHandle);
 		fileInfoEntryFree(cacheHandle);
 	}
 }
@@ -291,7 +293,7 @@ static nfsstat4 dsh_commit(struct fsal_ds_handle *const dataServerHandle,
 	nfsstat4 nfsStatus = openfile(export, dataServer);
 
 	if (nfsStatus != NFS4_OK) {
-		// If we failed here then there is no opened LizardFS file descriptor,
+		// If we failed here then there is no opened SaunaFS file descriptor,
 		// which implies that we don't need to flush anything
 		return NFS4_OK;
 	}
@@ -301,7 +303,7 @@ static nfsstat4 dsh_commit(struct fsal_ds_handle *const dataServerHandle,
 
 	if (status < 0) {
 		LogMajor(COMPONENT_PNFS, "ds_commit() failed  '%s'",
-		         liz_error_string(liz_last_err()));
+		         sau_error_string(sau_last_err()));
 		return NFS4ERR_INVAL;
 	}
 

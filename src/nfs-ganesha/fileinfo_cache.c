@@ -1,23 +1,25 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "fileinfo_cache.h"
-#include "lzfs_fsal_types.h"
+#include "safs_fsal_types.h"
 
 #include <time.h>
 #include <abstract_mem.h>
@@ -30,7 +32,7 @@ struct FileInfoEntry {
 	struct glist_head list_hook;
 	struct avltree_node tree_hook;
 
-	liz_inode_t inode;
+	sau_inode_t inode;
 	fileinfo_t *fileinfo;
 	uint64_t timestamp;
 	bool is_used;
@@ -127,7 +129,7 @@ void destroyFileInfoCache(FileInfoCache_t *cache) {
 	gsh_free(cache);
 }
 
-FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, liz_inode_t inode) {
+FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, sau_inode_t inode) {
 	FileInfoEntry_t key;
 	FileInfoEntry_t *entry = NULL;
 

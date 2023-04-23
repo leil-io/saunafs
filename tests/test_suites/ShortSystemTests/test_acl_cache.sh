@@ -1,8 +1,8 @@
 assert_program_installed setfacl getfacl
 
-file1_acl='user::rw- user:lizardfstest_1:r-x group::rw- group:lizardfstest_4:--- mask::rwx other::-wx'
-file2_acl='user::rw- user:lizardfstest_2:rwx group::rw- group:lizardfstest_5:-w- mask::rwx other::r-x'
-file3_acl='user::rw- user:lizardfstest_3:-w- group::rw- group:lizardfstest_6:rwx mask::rwx other::r--'
+file1_acl='user::rw- user:saunafstest_1:r-x group::rw- group:saunafstest_4:--- mask::rwx other::-wx'
+file2_acl='user::rw- user:saunafstest_2:rwx group::rw- group:saunafstest_5:-w- mask::rwx other::r-x'
+file3_acl='user::rw- user:saunafstest_3:-w- group::rw- group:saunafstest_6:rwx mask::rwx other::r--'
 
 count_misses() {
 	cat "$TEMP_DIR/aclcache.log" | grep "master.cltoma_fuse_getacl: $(stat -c %i $1)" | wc -l
@@ -21,19 +21,19 @@ function get_facl() {
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	MFSEXPORTS_EXTRA_OPTIONS=nomasterpermcheck,ignoregid \
+	SFSEXPORTS_EXTRA_OPTIONS=nomasterpermcheck,ignoregid \
 	MASTER_EXTRA_CONFIG="MAGIC_DEBUG_LOG = $TEMP_DIR/aclcache.log|LOG_FLUSH_ON=DEBUG" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER|mfsaclcachesize=2|mfsaclcacheto=5.0|mfsattrcacheto=50" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|sfsaclcachesize=2|sfsaclcacheto=5.0|sfsattrcacheto=50" \
+	setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 
 # Create files, set ACLs for them
 touch file1 file2 file3
 chmod 664 file*
-setfacl -m u:lizardfstest_1:r-x -m g:lizardfstest_4:--- -m o::-wx file1
-setfacl -m u:lizardfstest_2:rwx -m g:lizardfstest_5:-w- -m o::r-x file2
-setfacl -m u:lizardfstest_3:-w- -m g:lizardfstest_6:rwx -m o::r-- file3
+setfacl -m u:saunafstest_1:r-x -m g:saunafstest_4:--- -m o::-wx file1
+setfacl -m u:saunafstest_2:rwx -m g:saunafstest_5:-w- -m o::r-x file2
+setfacl -m u:saunafstest_3:-w- -m g:saunafstest_6:rwx -m o::r-- file3
 truncate -s0 "$TEMP_DIR/aclcache.log"
 
 # Load data into cache

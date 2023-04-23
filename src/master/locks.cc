@@ -1,19 +1,21 @@
 /*
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -255,7 +257,7 @@ void FileLocks::clear() {
 
 template <typename Container>
 void copyToVector(const Container &full_data, int64_t index, int64_t count,
-		std::vector<lzfs_locks::Info> &data) {
+		std::vector<safs_locks::Info> &data) {
 	int64_t pos = 0; // current index (increased only until pos < index)
 
 	data.clear();
@@ -293,7 +295,7 @@ void copyToVector(const Container &full_data, int64_t index, int64_t count,
 
 template <typename Container>
 void copyInodeToVector(const Container &lock_data, uint32_t inode, int64_t index, int64_t count,
-		std::vector<lzfs_locks::Info> &data) {
+		std::vector<safs_locks::Info> &data) {
 	int64_t pos = 0; // current index (increased only until pos < index)
 
 	data.clear();
@@ -328,17 +330,17 @@ void copyInodeToVector(const Container &lock_data, uint32_t inode, int64_t index
 }
 
 void FileLocks::copyActiveToVector(int64_t index, int64_t count,
-		std::vector<lzfs_locks::Info> &data) {
+		std::vector<safs_locks::Info> &data) {
 	::copyToVector(active_locks_, index, count, data);
 }
 
 void FileLocks::copyPendingToVector(int64_t index, int64_t count,
-		std::vector<lzfs_locks::Info> &data) {
+		std::vector<safs_locks::Info> &data) {
 	::copyToVector(pending_locks_, index, count, data);
 }
 
 void FileLocks::copyActiveToVector(uint32_t inode, int64_t index, int64_t count,
-		std::vector<lzfs_locks::Info> &data) {
+		std::vector<safs_locks::Info> &data) {
 	auto active_it = active_locks_.find(inode);
 
 	if (active_it == active_locks_.end()) {
@@ -350,7 +352,7 @@ void FileLocks::copyActiveToVector(uint32_t inode, int64_t index, int64_t count,
 }
 
 void FileLocks::copyPendingToVector(uint32_t inode, int64_t index, int64_t count,
-		std::vector<lzfs_locks::Info> &data) {
+		std::vector<safs_locks::Info> &data) {
 	auto pending_it = pending_locks_.find(inode);
 
 	if (pending_it == pending_locks_.end()) {
@@ -374,9 +376,9 @@ void load(FILE *file, Inserter insert) {
 	}
 	deserialize(buffer, count);
 
-	size = serializedSize(lzfs_locks::Info());
+	size = serializedSize(safs_locks::Info());
 	for (uint64_t i = 0; i < count; ++i) {
-		lzfs_locks::Info info;
+		safs_locks::Info info;
 
 		buffer.resize(size);
 		if (fread(buffer.data(), 1, size, file) != size) {
@@ -406,19 +408,19 @@ void store(FILE *file, const Container &data) {
 	buffer.clear();
 	serialize(buffer, count);
 	if (fwrite(buffer.data(), 1, buffer.size(), file) != buffer.size()) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 	}
 
 	for (const auto &entry : data) {
 		for (const auto &lock : entry.second) {
 			for (const auto &owner : lock.owners) {
-				lzfs_locks::Info info = {0, entry.first, owner.owner, owner.sessionid,
+				safs_locks::Info info = {0, entry.first, owner.owner, owner.sessionid,
 				                         static_cast<uint16_t>(lock.type), lock.start, lock.end};
 
 				buffer.clear();
 				serialize(buffer, info);
 				if (fwrite(buffer.data(), 1, buffer.size(), file) != buffer.size()) {
-					lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+					safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				}
 			}
 		}

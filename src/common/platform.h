@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -26,7 +28,7 @@
 #endif
 #endif
 
-#ifndef LIZARDFS_HAVE_STD_TO_STRING
+#ifndef SAUNAFS_HAVE_STD_TO_STRING
 
 #include <sstream>
 #include <string>
@@ -42,9 +44,9 @@ inline std::string to_string(const T val) {
 
 }
 
-#endif /* #ifndef LIZARDFS_HAVE_STD_TO_STRING */
+#endif /* #ifndef SAUNAFS_HAVE_STD_TO_STRING */
 
-#ifndef LIZARDFS_HAVE_STD_STOULL
+#ifndef SAUNAFS_HAVE_STD_STOULL
 
 #include <cstdlib>
 #include <string>
@@ -62,13 +64,13 @@ inline unsigned long long stoull(const std::string& s, std::size_t* pos = 0, int
 
 }
 
-#endif /* #ifndef LIZARDFS_HAVE_STD_STOULL */
+#endif /* #ifndef SAUNAFS_HAVE_STD_STOULL */
 
-#if defined(LIZARDFS_HAVE_JUDY) && (__WORDSIZE == 64 || _WIN64 || __x86_64__)
-#  define LIZARDFS_HAVE_64BIT_JUDY
+#if defined(SAUNAFS_HAVE_JUDY) && (__WORDSIZE == 64 || _WIN64 || __x86_64__)
+#  define SAUNAFS_HAVE_64BIT_JUDY
 #endif
 
 // thread_local hack for old GCC
-#ifndef LIZARDFS_HAVE_THREAD_LOCAL
+#ifndef SAUNAFS_HAVE_THREAD_LOCAL
 #define thread_local __thread
 #endif

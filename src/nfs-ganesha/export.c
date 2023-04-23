@@ -1,26 +1,28 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "fsal_convert.h"
 #include "FSAL/fsal_commonlib.h"
 #include "FSAL/fsal_config.h"
 #include "nfs_exports.h"
-#include "lzfs_fsal_methods.h"
+#include "safs_fsal_methods.h"
 #include "context_wrap.h"
 
 /* Flags to determine if ACLs are supported */
@@ -59,7 +61,7 @@ static void release(struct fsal_export *exportHandle) {
 			}
 
 			fileHandle = extractFileInfo(cacheHandle);
-			liz_release(export->fsInstance, fileHandle);
+			sau_release(export->fsInstance, fileHandle);
 			fileInfoEntryFree(cacheHandle);
 		}
 
@@ -67,7 +69,7 @@ static void release(struct fsal_export *exportHandle) {
 		export->fileinfoCache = NULL;
 	}
 
-	liz_destroy(export->fsInstance);
+	sau_destroy(export->fsInstance);
 	export->fsInstance = NULL;
 
 	gsh_free((char *)export->initialParameters.subfolder);
@@ -143,7 +145,7 @@ fsal_status_t lookup_path(struct fsal_export *exportHandle, const char *path,
 		}
 	}
 
-	liz_entry_t entry;
+	sau_entry_t entry;
 	int status = fs_lookup(export->fsInstance, &op_ctx->creds,
 	                       SPECIAL_INODE_ROOT, realPath, &entry);
 
@@ -183,8 +185,8 @@ static fsal_status_t get_dynamic_info(struct fsal_export *exportHandle,
 	struct FSExport *export = NULL;
 	export = container_of(exportHandle, struct FSExport, export);
 
-	liz_stat_t statfsEntry;
-	int status = liz_statfs(export->fsInstance, &statfsEntry);
+	sau_stat_t statfsEntry;
+	int status = sau_statfs(export->fsInstance, &statfsEntry);
 
 	if (status < 0) {
 		return fsalLastError();
@@ -280,25 +282,25 @@ static fsal_status_t wire_to_host(struct fsal_export *export,
 		return fsalstat(ERR_FSAL_FAULT, 0);
 	}
 
-	liz_inode_t *inode = (liz_inode_t *)bufferDescriptor->addr;
+	sau_inode_t *inode = (sau_inode_t *)bufferDescriptor->addr;
 
 	if (flags & FH_FSAL_BIG_ENDIAN) {
 #if (BYTE_ORDER != BIG_ENDIAN)
-		static_assert(sizeof(liz_inode_t) == 4, "");
+		static_assert(sizeof(sau_inode_t) == 4, "");
 		*inode = bswap_32(*inode);
 #endif
 	}
 	else {
 #if (BYTE_ORDER == BIG_ENDIAN)
-		assert(sizeof(liz_inode_t) == 4);
+		assert(sizeof(sau_inode_t) == 4);
 		*inode = bswap_32(*inode);
 #endif
 	}
 
-	if (bufferDescriptor->len != sizeof(liz_inode_t)) {
+	if (bufferDescriptor->len != sizeof(sau_inode_t)) {
 		LogMajor(COMPONENT_FSAL,
 		         "Size mismatch for handle. Should be %zu, got %zu",
-		         sizeof(liz_inode_t), bufferDescriptor->len);
+		         sizeof(sau_inode_t), bufferDescriptor->len);
 		return fsalstat(ERR_FSAL_SERVERFAULT, 0);
 	}
 
@@ -327,17 +329,17 @@ fsal_status_t create_handle(struct fsal_export *exportHandle,
                             struct fsal_attrlist *attributes) {
 	struct FSExport *export = NULL;
 	struct FSHandle *handle = NULL;
-	liz_inode_t *inode = NULL;
+	sau_inode_t *inode = NULL;
 
 	export = container_of(exportHandle, struct FSExport, export);
-	inode = (liz_inode_t *)bufferDescriptor->addr;
+	inode = (sau_inode_t *)bufferDescriptor->addr;
 
 	*publicHandle = NULL;
-	if (bufferDescriptor->len != sizeof(liz_inode_t)) {
+	if (bufferDescriptor->len != sizeof(sau_inode_t)) {
 		return fsalstat(ERR_FSAL_INVAL, 0);
 	}
 
-	liz_attr_reply_t result;
+	sau_attr_reply_t result;
 	int status = fs_getattr(export->fsInstance, &op_ctx->creds, *inode, &result);
 
 	if (status < 0) {

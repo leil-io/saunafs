@@ -1,63 +1,63 @@
-function stop_lizardfsXX_chunkservers_from_to {
+function stop_saunafsXX_chunkservers_from_to {
 	local from=$1
 	local to=$2
 	# stop [from, to)
 	for i in $(seq $from $((to - 1))); do
 		echo $i
-		lizardfsXX_chunkserver_daemon $i stop
+		saunafsXX_chunkserver_daemon $i stop
 	done
 }
 
-function stop_lizardfsXX_services {
+function stop_saunafsXX_services {
 	local mas_n=$1
 	local cs_n=$2
 	local cli_n=$3
 
 	assert_equals 1 $mas_n # so far, we always have only 1 legacy master
 	for i in $(seq 0 $((cli_n - 1)) ); do
-		assert_success lizardfs_mount_unmount $i
+		assert_success saunafs_mount_unmount $i
 	done
 	for i in $(seq 0 $((cs_n - 1)) ); do
-		assert_success lizardfsXX_chunkserver_daemon $i stop
+		assert_success saunafsXX_chunkserver_daemon $i stop
 	done
-	assert_success lizardfsXX_master_daemon stop
+	assert_success saunafsXX_master_daemon stop
 }
 
 # $1 = stop/start, etc. Start/stop chunkservers [from, to)
-function lizardfs_chunkservers_from_to {
+function saunafs_chunkservers_from_to {
 	local cmd=$1
 	local from=$2
 	local to=$3
 	for i in $(seq $from $((to - 1)) ); do
-		lizardfs_chunkserver_daemon $i $cmd
+		saunafs_chunkserver_daemon $i $cmd
 	done
 }
 
-function start_lizardfs_services {
+function start_saunafs_services {
 	local mas_n=$1
 	local cs_n=$2
 	local cli_n=$3
 	local mount_cmd="${4:-}"
 
 	for i in $(seq 0 $((mas_n - 1)) ); do
-		assert_success lizardfs_master_n $i start
+		assert_success saunafs_master_n $i start
 	done
 	for i in $(seq 0 $((cs_n - 1)) ); do
-		assert_success lizardfs_chunkserver_daemon $i start
+		assert_success saunafs_chunkserver_daemon $i start
 	done
 	for i in $(seq 0 $((cli_n - 1)) ); do
-		assert_success lizardfs_mount_start $i "${mount_cmd}"
+		assert_success saunafs_mount_start $i "${mount_cmd}"
 	done
-	lizardfs_wait_for_all_ready_chunkservers
+	saunafs_wait_for_all_ready_chunkservers
 }
 
 function print_running_services_info {
 	echo "Running masters:"
-	lizardfs_admin_master info
+	saunafs_admin_master info
 	echo "Running mounts:"
-	lizardfs_admin_master list-mounts
+	saunafs_admin_master list-mounts
 	echo "Running chunkservers"
-	lizardfs_admin_master list-chunkservers
+	saunafs_admin_master list-chunkservers
 }
 
 function check_all_files_readable_and_proper_parts_nr {

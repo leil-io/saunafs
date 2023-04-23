@@ -62,9 +62,9 @@ master_restarting_loop() {
 	touch ${MASTER_RESTARTING_LOOP_FILE}
 	pseudorandom_init
 	while [ -e ${MASTER_RESTARTING_LOOP_FILE} ]; do
-		expect_success lizardfs_master_daemon stop
+		expect_success saunafs_master_daemon stop
 		sleep $(pseudorandom 1 30)
-		expect_success lizardfs_master_daemon start
+		expect_success saunafs_master_daemon start
 		sleep $(pseudorandom 45 90)
 	done
 	echo "master_restarting_loop stopped"
@@ -79,9 +79,9 @@ chunkservers_restarting_loop() {
 			if [ ! -e ${CHUNKSERVERS_RESTARTING_LOOP_FILE} ]; then
 				break 2
 			fi
-			lizardfs_chunkserver_daemon $i stop
+			saunafs_chunkserver_daemon $i stop
 			sleep $(pseudorandom 1 30)
-			lizardfs_chunkserver_daemon $i start
+			saunafs_chunkserver_daemon $i start
 			sleep 5
 		done
 	done

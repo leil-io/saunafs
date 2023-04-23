@@ -14,12 +14,12 @@ report() {
 report_masters() {
 	REPORT=""
 	for ((msid_loc=0 ; msid_loc<${info[masterserver_count]}; ++msid_loc)); do
-		if [ "${msid_loc}" = "$(lizardfs_current_master_id)" ] ; then
+		if [ "${msid_loc}" = "$(saunafs_current_master_id)" ] ; then
 			PERSONALITY="m"
 		else
 			PERSONALITY="s"
 		fi
-		RESULT=$(lizardfs_master_n ${msid_loc} test |& cat)
+		RESULT=$(saunafs_master_n ${msid_loc} test |& cat)
 		if [ "${RESULT}" = "${RESULT/ not //}" ] ; then
 			REPORT="${REPORT}${PERSONALITY^}"
 		else

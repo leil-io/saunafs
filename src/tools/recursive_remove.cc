@@ -1,19 +1,20 @@
 /*
    Copyright 2016-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -37,7 +38,7 @@ static int kInfiniteTimeout = 10 * 24 * 3600 * 1000; // simulate infinite timeou
 
 static void recursive_remove_usage() {
 	fprintf(stderr,
-	        "recursive remove\n\nusage:\n lizardfs rremove [-l] name [name ...]\n");
+	        "recursive remove\n\nusage:\n saunafs rremove [-l] name [name ...]\n");
 	fprintf(stderr, " -l - wait until removing will finish (otherwise there is %ds timeout)\n",
 		kDefaultTimeout/1000);
 }
@@ -82,7 +83,7 @@ static int recursive_remove(const char *file_name, int long_wait) {
 	try {
 		auto request = cltoma::requestTaskId::build(msgid);
 		auto response = ServerConnection::sendAndReceive(fd,
-				request, LIZ_MATOCL_REQUEST_TASK_ID,
+				request, SAU_MATOCL_REQUEST_TASK_ID,
 				ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage,
 				long_wait ? kInfiniteTimeout : kDefaultTimeout);
 		matocl::requestTaskId::deserialize(response, msgid, job_id);
@@ -96,7 +97,7 @@ static int recursive_remove(const char *file_name, int long_wait) {
 			signal_thread.join();
 		});
 		request = cltoma::recursiveRemove::build(msgid, job_id, parent, fname, uid, gid);
-		response = ServerConnection::sendAndReceive(fd, request, LIZ_MATOCL_RECURSIVE_REMOVE,
+		response = ServerConnection::sendAndReceive(fd, request, SAU_MATOCL_RECURSIVE_REMOVE,
 					ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage,
 					long_wait ? kInfiniteTimeout : kDefaultTimeout);
 
@@ -104,11 +105,11 @@ static int recursive_remove(const char *file_name, int long_wait) {
 
 		close_master_conn(0);
 
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			printf("Recursive remove (%s) completed\n", path_buf);
 			return 0;
 		} else {
-			printf("Recursive remove (%s):\n returned error status %d: %s\n", path_buf, status, lizardfs_error_string(status));
+			printf("Recursive remove (%s):\n returned error status %d: %s\n", path_buf, status, saunafs_error_string(status));
 			return -1;
 		}
 

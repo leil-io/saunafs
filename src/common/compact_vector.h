@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -37,7 +38,7 @@ namespace detail {
  */
 template <typename Alloc, typename T, typename Size, typename Enable = void>
 class compact_vector_storage : public Alloc {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 	typedef std::allocator_traits<Alloc> alloc_traits;
 #else
 	typedef Alloc alloc_traits;
@@ -108,7 +109,7 @@ class compact_vector_storage<
 		!(std::is_pointer<T>::value && sizeof(T) == 8 &&
 		sizeof(typename std::conditional<std::is_void<Size>::value, uint8_t,
 		                                 Size>::type) <= 2)>::type> : public Alloc {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 	typedef std::allocator_traits<Alloc> alloc_traits;
 #else
 	typedef Alloc alloc_traits;
@@ -214,7 +215,7 @@ private:
 
 public:
 	compact_vector_storage() : ptr_(0) {
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 		debug_ptr_ = 0;
 #endif
 	}
@@ -247,7 +248,7 @@ public:
 		        ((static_cast<uint64_t>(1) << ptr_shift) - 1)) == 0);
 		ptr_ = ((reinterpret_cast<uint64_t>(p) >> ptr_shift) & ptr_mask) |
 		       (ptr_ & size_mask);
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 		debug_ptr_ = p;
 #endif
 		assert(debug_ptr_ == ptr());
@@ -264,7 +265,7 @@ public:
 
 	void swap(compact_vector_storage &v) noexcept {
 		std::swap(ptr_, v.ptr_);
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 		std::swap(debug_ptr_, v.debug_ptr_);
 #endif
 	}
@@ -282,7 +283,7 @@ private:
 		volatile uint64_t ptr_;
 		uint8_t data_[8];
 	};
-#if !defined(NDEBUG) || defined(LIZARDFS_TEST_POINTER_OBFUSCATION)
+#if !defined(NDEBUG) || defined(SAUNAFS_TEST_POINTER_OBFUSCATION)
 	pointer debug_ptr_;
 #endif
 };
@@ -294,18 +295,18 @@ private:
  */
 template <typename T, typename Size, typename Alloc>
 struct compact_vector_base {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
-	typedef typename std::allocator_traits<Alloc>::template rebind_alloc<T> allocator_type;
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
+	using allocator_type = typename std::allocator_traits<Alloc>::template rebind_alloc<T>;
 #else
 	typedef typename Alloc::template rebind<T>::other allocator_type;
 #endif
 
 	static_assert(std::is_empty<Alloc>::value,"compact_vector requires empty Allocator type");
 
-	typedef compact_vector_storage<allocator_type, typename allocator_type::pointer, Size> storage_type;
-	typedef typename storage_type::pointer                  pointer;
-	typedef typename storage_type::const_pointer            const_pointer;
-	typedef typename storage_type::size_type                size_type;
+	using pointer = T*;
+	using const_pointer = const T*;
+	using storage_type = compact_vector_storage<allocator_type, typename compact_vector_base::pointer, Size>;
+	using size_type = typename storage_type::size_type;
 
 	compact_vector_base() : storage_() {
 	}
@@ -370,7 +371,7 @@ struct compact_vector_base {
 			return storage_.internal_ptr();
 		}
 
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 		typedef std::allocator_traits<allocator_type> Tr;
 		return Tr::allocate(get_allocator(), n);
 #else
@@ -384,7 +385,7 @@ struct compact_vector_base {
 			return;
 		}
 
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 		typedef std::allocator_traits<allocator_type> Tr;
 		if (p) {
 			Tr::deallocate(get_allocator(), p, n);
@@ -600,7 +601,7 @@ inline normal_iterator<Iterator, Container> operator+(
 template <typename T, typename Size = void, typename Alloc = std::allocator<T>>
 class compact_vector : protected detail::compact_vector_base<T, Size, Alloc> {
 	typedef detail::compact_vector_base<T, Size, Alloc> base;
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 	typedef std::allocator_traits<typename base::allocator_type> alloc_traits;
 #else
 	typedef typename base::allocator_type alloc_traits;
@@ -608,8 +609,8 @@ class compact_vector : protected detail::compact_vector_base<T, Size, Alloc> {
 
 public:
 	typedef T                                                      value_type;
-	typedef typename base::pointer                                 pointer;
-	typedef typename alloc_traits::const_pointer                   const_pointer;
+	using pointer = T*;
+	using const_pointer = const T*;
 	typedef T&                                                     reference;
 	typedef const T&                                               const_reference;
 	typedef detail::normal_iterator<pointer, compact_vector>       iterator;
@@ -621,7 +622,7 @@ public:
 	typedef Alloc                                                  allocator_type;
 
 public:
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 	compact_vector() noexcept(std::is_nothrow_default_constructible<allocator_type>::value)
 	    : base() {
 	}
@@ -907,7 +908,7 @@ public:
 		auto dr = std::make_pair(ptr, ptr);
 
 		try {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 			alloc_traits::construct(base::get_allocator(), ptr + size(), std::forward<Args>(args)...);
 #else
 			base::get_allocator().construct(ptr + size(), std::forward<Args>(args)...);
@@ -944,7 +945,7 @@ public:
 		}
 
 		try {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 			alloc_traits::construct(base::get_allocator(), ptr + pos,
 			                        std::forward<Args>(args)...);
 #else
@@ -1119,7 +1120,7 @@ public:
 private:
 	void destroy(pointer s, pointer e) {
 		for (; s != e; ++s) {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 			alloc_traits::destroy(base::get_allocator(), s);
 #else
 			base::get_allocator().destroy(s);
@@ -1149,7 +1150,7 @@ private:
 	template <typename InputIterator, typename ForwardIterator>
 	ForwardIterator uninitialized_move_if_no_except(InputIterator first, InputIterator last,
 	                                                ForwardIterator result) {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 		typedef typename std::conditional<std::is_nothrow_move_constructible<T>::value,
 		                                  std::move_iterator<InputIterator>,
 		                                  InputIterator>::type iterator_type;
@@ -1279,7 +1280,7 @@ private:
 
 			//  the uninitialized memory
 			if (nd_n2 > 0) {
-#ifdef LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS
+#ifdef SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS
 				alloc_traits::construct(base::get_allocator(), end().current(),
 				                        std::forward<Args>(args)...);
 #else

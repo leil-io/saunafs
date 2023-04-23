@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -52,7 +53,7 @@ public:
 	 * 08000000 - (uint32_t)8
 	 * ...
 	 * ...
-	 * 3FFFFFFC - (uint32_t)MFSCHUNKSIZE - 4
+	 * 3FFFFFFC - (uint32_t)SFSCHUNKSIZE - 4
 	 *
 	 * \param plan Pointer to read plan.
 	 * \param result Output map storing generated chunk part data.
@@ -67,7 +68,7 @@ public:
 	 * \param a_offset Offset in vector \param a where comparison should start.
 	 * \param b Second vector with data to compare.
 	 * \param b_offset Offset in vector \param b to data that should be compared.
-	 * \param block_count number of blocks to compare (each block have MFSBLOCKSIZE bytes)
+	 * \param block_count number of blocks to compare (each block have SFSBLOCKSIZE bytes)
 	 * \return true both vectors are the same.
 	 *         false data are not the same.
 	 */

@@ -1,20 +1,22 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2016
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -37,7 +39,9 @@ struct csdbentry {
 
 	MediaLabel label;
 
-	csdbentry() : eptr(), csid(), label(MediaLabel::kWildcard) {}
+	std::string config;
+
+	csdbentry() : eptr(), csid(), label(MediaLabel::kWildcard), config() {}
 };
 
 extern std::array<csdbentry *, csdbentry::kMaxIdCount> gIdToCSEntry;
@@ -99,3 +103,9 @@ inline csdbentry *csdb_find(int id) {
 	assert(id >= 0 && id < csdbentry::kMaxIdCount);
 	return gIdToCSEntry[id];
 }
+
+/*! \brief Return chunkserver configurations
+ *
+ * \return String representation of YAML for chunkserver configurations.
+ */
+std::string csdb_chunkserver_configs();

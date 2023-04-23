@@ -61,17 +61,17 @@ valgrind_terminate() {
 	mv "$tmpfile" "$valgrind_script_"
 	# Wait a bit if there are any valgrind processes which have just started. This is
 	# because of a bug in glibc/valgrind which results in SIGSEGV if we kill memcheck too soon.
-	wait_for "! pgrep -u lizardfstest -d, memcheck | xargs -r ps -o etime= -p | grep -q '^ *00:0[0-3]$'" '5 seconds' || true
+	wait_for "! pgrep -u saunafstest -d, memcheck | xargs -r ps -o etime= -p | grep -q '^ *00:0[0-3]$'" '5 seconds' || true
 	local pattern='memcheck|polonaise-'
-	if pgrep -u lizardfstest "$pattern" >/dev/null; then
+	if pgrep -u saunafstest "$pattern" >/dev/null; then
 		echo " --- valgrind: Waiting for all processes to be terminated --- "
-		pkill -TERM -u lizardfstest "$pattern"
-		wait_for '! pgrep -u lizardfstest memcheck >/dev/null' '60 seconds' || true
-		if pgrep -u lizardfstest "$pattern" >/dev/null; then
+		pkill -TERM -u saunafstest "$pattern"
+		wait_for '! pgrep -u saunafstest memcheck >/dev/null' '60 seconds' || true
+		if pgrep -u saunafstest "$pattern" >/dev/null; then
 			echo " --- valgrind: Stop FAILED --- "
 		else
 			echo " --- valgrind: Stop OK --- "
 		fi
 	fi
-	rm -f /tmp/vgdb-pipe*by-lizardfstest* || true  # clean up any garbage left in /tmp
+	rm -f /tmp/vgdb-pipe*by-saunafstest* || true  # clean up any garbage left in /tmp
 }

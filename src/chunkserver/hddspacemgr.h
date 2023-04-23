@@ -1,161 +1,153 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/platform.h"
 
-#include <inttypes.h>
 #include <vector>
 
-#include "chunkserver/chunk_file_creator.h"
+#include "chunkserver-common/chunk_interface.h"
 #include "chunkserver/output_buffer.h"
 #include "common/chunk_part_type.h"
 #include "common/chunk_with_version_and_type.h"
 #include "protocol/chunks_with_type.h"
-#include "protocol/MFSCommunication.h"
 
-void hdd_stats(uint64_t *over_bytesr, uint64_t *over_bytesw, uint32_t *over_opr, uint32_t *over_opw, uint64_t *total_bytesr, uint64_t *total_bytesw,
-		uint32_t *total_opr, uint32_t *total_opw, uint64_t *total_rtime, uint64_t *total_wtime);
-void hdd_op_stats(uint32_t *op_create,uint32_t *op_delete,uint32_t *op_version,uint32_t *op_duplicate,uint32_t *op_truncate,uint32_t *op_duptrunc,uint32_t *op_test);
-uint32_t hdd_errorcounter(void);
+#define ChunkNotFound nullptr
+#define DiskNotFound nullptr
 
-void hdd_get_damaged_chunks(std::vector<ChunkWithType>& chunks, std::size_t limit);
-void hdd_get_lost_chunks(std::vector<ChunkWithType>& chunks, std::size_t limit);
-void hdd_get_new_chunks(std::vector<ChunkWithVersionAndType>& chunks, std::size_t limit);
+uint32_t hddGetAndResetErrorCounter();
+
+void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks, std::size_t limit);
+void hddGetLostChunks(std::vector<ChunkWithType>& chunks, std::size_t limit);
+void hddGetNewChunks(std::vector<ChunkWithVersionAndType>& chunks,
+                     std::size_t limit);
 
 /* lock/unlock pair */
-uint32_t hdd_diskinfo_v2_size();
-void hdd_diskinfo_v2_data(uint8_t *buff);
+uint32_t hddGetSerializedSizeOfAllDiskInfosV2();
+void hddSerializeAllDiskInfosV2(uint8_t *buff);
 
-const std::size_t CHUNK_BULK_SIZE = 1000;
-/** \brief Executes the given callback for each bulk of at most \p chunk_bulk_size chunks.
- */
-void hdd_foreach_chunk_in_bulks(std::function<void(std::vector<ChunkWithVersionAndType>&)> chunk_bulk_callback,
-		std::size_t chunk_bulk_size = CHUNK_BULK_SIZE);
+const std::size_t kChunkBulkSize = 1000;
+using BulkFunction = std::function<void(std::vector<ChunkWithVersionAndType>&)>;
+/// Executes the callback for each bulk of at most \p kChunkBulkSize chunks.
+void hddForeachChunkInBulks(BulkFunction bulkCallback,
+                            std::size_t bulkSize = kChunkBulkSize);
 
-int hdd_spacechanged(void);
-void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount,uint64_t *tdusedspace,uint64_t *tdtotalspace,uint32_t *tdchunkcount);
-int hdd_get_load_factor();
+int hddGetAndResetSpaceChanged();
+void hddGetTotalSpace(uint64_t *usedSpace, uint64_t *totalSpace,
+                      uint32_t *chunkCount, uint64_t *toDelUsedSpace,
+                      uint64_t *toDelTotalSpace, uint32_t *toDelChunkCount);
+int hddGetLoadFactor();
 
 /* I/O operations */
-void hdd_chunk_release(Chunk *c);
-int hdd_open(uint64_t chunkid, ChunkPartType chunkType);
-int hdd_close(uint64_t chunkid, ChunkPartType chunkType);
-int hdd_prefetch_blocks(uint64_t chunkid, ChunkPartType chunkType, uint32_t firstBlock,
-		uint16_t nrOfBlocks);
-int hdd_read(uint64_t chunkid, uint32_t version, ChunkPartType chunkType,
-		uint32_t offset, uint32_t size, uint32_t maxBlocksToBeReadBehind,
-		uint32_t blocksToBeReadAhead, OutputBuffer* outputBuffer);
-int hdd_write(Chunk* chunk, uint32_t version,
-		uint16_t blocknum, uint32_t offset, uint32_t size, uint32_t crc, const uint8_t* buffer);
-int hdd_write(uint64_t chunkid, uint32_t version, ChunkPartType chunkType,
-		uint16_t blocknum, uint32_t offset, uint32_t size, uint32_t crc, const uint8_t* buffer);
-int hdd_open(Chunk *chunk);
-int hdd_close(Chunk *chunk);
+int hddOpen(IChunk *chunk);
+int hddOpen(uint64_t chunkId, ChunkPartType chunkType);
+int hddClose(IChunk *chunk);
+int hddClose(uint64_t chunkId, ChunkPartType chunkType);
+int hddPrefetchBlocks(uint64_t chunkId, ChunkPartType chunkType,
+                      uint32_t firstBlock, uint16_t numberOfBlocks);
+int hddRead(uint64_t chunkId, uint32_t version, ChunkPartType chunkType,
+            uint32_t offset, uint32_t size,
+            [[maybe_unused]] uint32_t maxBlocksToBeReadBehind,
+            [[maybe_unused]] uint32_t blocksToBeReadAhead,
+            OutputBuffer *outputBuffer);
+int hddChunkWriteBlock(uint64_t chunkId, uint32_t version,
+                       ChunkPartType chunkType, uint16_t blocknum,
+                       uint32_t offset, uint32_t size, uint32_t crc,
+                       const uint8_t *buffer);
 
 /* chunk info */
-int hdd_check_version(uint64_t chunkid,uint32_t version);
-int hdd_get_blocks(uint64_t chunkid, ChunkPartType chunkType, uint32_t version, uint16_t *blocks);
+int hddChunkGetNumberOfBlocks(uint64_t chunkId, ChunkPartType chunkType,
+                              uint32_t version, uint16_t *blocks);
 
-bool hdd_scans_in_progress();
-bool hdd_chunk_trylock(Chunk *c);
+bool hddScansInProgress();
 
 /* chunk operations */
 
 /* all chunk operations in one call */
-// chunkNewVersion>0 && length==0xFFFFFFFF && chunkIdCopy==0    -> change version
+// chunkNewVersion>0 && length==0xFFFFFFFF && chunkIdCopy==0   -> change version
 // chunkNewVersion>0 && length==0xFFFFFFFF && chunkIdCopy>0     -> duplicate
-// chunkNewVersion>0 && length<=MFSCHUNKSIZE && chunkIdCopy==0     -> truncate
-// chunkNewVersion>0 && length<=MFSCHUNKSIZE && chunkIdCopy>0      -> duplicate and truncate
+// chunkNewVersion>0 && length<=SFSCHUNKSIZE && chunkIdCopy==0  -> truncate
+// chunkNewVersion>0 && length<=SFSCHUNKSIZE && chunkIdCopy>0   -> dup and trun
 // chunkNewVersion==0 && length==0                              -> delete
 // chunkNewVersion==0 && length==1                              -> create
 // chunkNewVersion==0 && length==2                              -> test
-int hdd_chunkop(uint64_t chunkId, uint32_t chunkVersion,  ChunkPartType chunkType,
-		uint32_t chunkNewVersion, uint64_t chunkIdCopy, uint32_t chunkVersionCopy, uint32_t length);
-
-#define hdd_delete(chunkId, chunkVersion, chunkType) \
-	hdd_chunkop(chunkId, chunkVersion, chunkType, 0, 0, 0, 0)
-
-#define hdd_create(chunkId, chunkVersion, chunkType) \
-	hdd_chunkop(chunkId, chunkVersion, chunkType, 0, 0, 0, 1)
-
-#define hdd_test(chunkId, chunkVersion) \
-	hdd_chunkop(chunkId, chunkVersion, ChunkType::getStandardChunkType(), 0, 0, 0, 2)
-
-#define hdd_version(chunkId, chunkVersion, chunkType, chunkNewVersion) \
-	(((chunkNewVersion) > 0) \
-	? hdd_chunkop(chunkId, chunkVersion, chunkType, chunkNewVersion, 0, 0, \
-			0xFFFFFFFF) \
-	: LIZARDFS_ERROR_EINVAL)
-
-#define hdd_truncate(chunkId, chunkVersion, chunkNewVersion, length) \
-	(((chunkNewVersion) > 0 && (length) != 0xFFFFFFFF) \
-	? hdd_chunkop(chunkId, chunkVersion, ChunkType::getStandardChunkType(), chunkNewVersion, 0, 0, \
-			length, ChunkType::getStandardChunkType()) \
-	: LIZARDFS_ERROR_EINVAL)
-
-#define hdd_duplicate(chunkId, chunkVersion, chunkNewVersion, chunkIdCopy, chunkVersionCopy) \
-	(((chunkNewVersion > 0) && (chunkIdCopy) > 0) \
-	? hdd_chunkop(chunkId, chunkVersion, ChunkType::getStandardChunkType(), chunkNewVersion, \
-			chunkIdCopy, chunkVersionCopy, 0xFFFFFFFF) \
-	: LIZARDFS_ERROR_EINVAL)
-
-#define hdd_duptrunc(chunkId, chunkVersion, chunkNewVersion, chunkIdCopy, chunkVersionCopy, \
-		length) \
-	(((chunkNewVersion > 0) && (chunkIdCopy) > 0 && (length) != 0xFFFFFFFF) \
-	? hdd_chunkop(chunkId, chunkVersion, , ChunkType::getStandardChunkType(), chunkNewVersion, \
-			chunkIdCopy, chunkVersionCopy, length) \
-	: LIZARDFS_ERROR_EINVAL)
+int hddChunkOperation(uint64_t chunkId, uint32_t chunkVersion,
+                      ChunkPartType chunkType, uint32_t chunkNewVersion,
+                      uint64_t chunkIdCopy, uint32_t chunkVersionCopy,
+                      uint32_t length);
 
 /* chunk testing */
-void hdd_test_chunk(ChunkWithVersionAndType chunk);
+void hddAddChunkToTestQueue(ChunkWithVersionAndType chunk);
 
 /* initialization */
-int hdd_late_init(void);
-int hdd_init(void);
+int loadPlugins();
+int hddLateInit();
+int hddInit();
 
-/**
- * Chunk low-level operations
- *
- * These functions shouldn't be used, unless for specific implementation
- * i.e.
- * \see ChunkFileCreator
- *
- * In most cases functions above are prefered.
-*/
+// Chunk low-level operations
+// The following functions shouldn't be used, unless for specific implementation
+// i.e. \see ChunkFileCreator
+// In most cases functions above are prefered.
 
-/** \brief Create new chunk on disk
+/// Deletes the chunk from the registry and from the disk's testlist in a
+/// thread-safe way.
+void hddDeleteChunkFromRegistry(IChunk *chunk);
+
+/// Remove old chunk and create new one in its place.
+///
+/// \param disk pointer to disk object which will be the owner if new chunk
+/// \param chunk pointer to old object
+/// \param chunkId chunk id that will be reused
+/// \param type type of new chunk object
+/// \return address of the new object or ChunkNotFound
+///
+/// \note ChunkId and threads waiting for this object are preserved.
+IChunk *hddRecreateChunk(IDisk *disk, IChunk *chunk, uint64_t chunkId,
+                         ChunkPartType type);
+
+/// Finds an existing chunk or creates a new one, and locks it anyway.
+///
+/// The function locks the returned chunk (may block if the chunk is already
+/// locked). To unlock it, use \ref hddChunkRelease.
+IChunk *hddChunkFindOrCreatePlusLock(IDisk *disk, uint64_t chunkid,
+                                     ChunkPartType chunkType,
+                                     disk::ChunkGetMode creationMode);
+
+/** \brief Creates a new chunk on disk
  *
  * \param chunkid - id of created chunk
  * \param version - version of created chunk
  * \param chunkType - type of created chunk
- * \return On success returns pair of LIZARDFS_STATUS_OK and created chunk in locked state.
- *         On failure returns pair of code of error and nullptr.
+ * \return On success returns pair of SAUNAFS_STATUS_OK and created chunk in
+ *         locked state. On failure, returns pair of error code and nullptr.
  */
-std::pair<int, Chunk *> hdd_int_create_chunk(uint64_t chunkid, uint32_t version,
-		ChunkPartType chunkType);
-int hdd_int_create(uint64_t chunkid, uint32_t version, ChunkPartType chunkType);
-int hdd_int_delete(Chunk *chunk, uint32_t version);
-int hdd_int_delete(uint64_t chunkid, uint32_t version, ChunkPartType chunkType);
-int hdd_int_version(Chunk *chunk, uint32_t version, uint32_t newversion);
-int hdd_int_version(uint64_t chunkid, uint32_t version, uint32_t newversion,
-		ChunkPartType chunkType);
-
-void hdd_error_occured(Chunk *c);
-void hdd_report_damaged_chunk(uint64_t chunkid, ChunkPartType chunk_type);
+std::pair<int, IChunk *> hddInternalCreateChunk(uint64_t chunkId,
+                                                uint32_t version,
+                                                ChunkPartType chunkType);
+int hddInternalCreate(uint64_t chunkId, uint32_t version,
+                      ChunkPartType chunkType);
+int hddInternalDelete(IChunk *chunk, uint32_t version);
+int hddInternalDelete(uint64_t chunkId, uint32_t version,
+                      ChunkPartType chunkType);
+int hddInternalUpdateVersion(IChunk *chunk, uint32_t version,
+                             uint32_t newversion);
+int hddInternalUpdateVersion(uint64_t chunkId, uint32_t version,
+                             uint32_t newversion, ChunkPartType chunkType);

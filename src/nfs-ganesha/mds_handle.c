@@ -1,26 +1,28 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "pnfs_utils.h"
 
 #include "context_wrap.h"
-#include "lzfs_fsal_methods.h"
-#include "protocol/MFSCommunication.h"
+#include "safs_fsal_methods.h"
+#include "protocol/SFSCommunication.h"
 
 /**
  * @brief Grant a layout segment.
@@ -56,7 +58,7 @@ static nfsstat4 layoutget(struct fsal_obj_handle *objectHandle, XDR *xdrStream,
 		.len = sizeof(struct DataServerWire)
 	};
 
-	struct pnfs_deviceid deviceid = DEVICE_ID_INIT_ZERO(FSAL_ID_LIZARDFS);
+	struct pnfs_deviceid deviceid = DEVICE_ID_INIT_ZERO(FSAL_ID_EXPERIMENTAL);
 	nfl_util4 layout_util = 0;
 	nfsstat4 nfs_status = NFS4_OK;
 
@@ -77,7 +79,7 @@ static nfsstat4 layoutget(struct fsal_obj_handle *objectHandle, XDR *xdrStream,
 	deviceid.devid = handle->inode;
 
 	dataServerWire.inode = handle->inode;
-	layout_util = MFSCHUNKSIZE;
+	layout_util = SFSCHUNKSIZE;
 
 	nfs_status = FSAL_encode_file_layout(xdrStream, &deviceid, layout_util,
 	                                     0, 0, &op_ctx->ctx_export->export_id,
@@ -141,7 +143,7 @@ static nfsstat4 layoutreturn(struct fsal_obj_handle *objectHandle,
  * @retval false: Otherwise
  */
 bool isOffsetChangedByClient(const struct fsal_layoutcommit_arg *arguments,
-                             struct liz_attr_reply previousReply) {
+                             struct sau_attr_reply previousReply) {
 	return arguments->new_offset &&
 	       previousReply.attr.st_size < (long)arguments->last_write + 1;
 }
@@ -156,7 +158,7 @@ bool isOffsetChangedByClient(const struct fsal_layoutcommit_arg *arguments,
  * @retval false: Otherwise
  */
 bool hasRecentModificationTime(const struct fsal_layoutcommit_arg *arguments,
-                               struct liz_attr_reply previousReply) {
+                               struct sau_attr_reply previousReply) {
 	return arguments->time_changed &&
 	       (arguments->new_time.seconds  > previousReply.attr.st_mtim.tv_sec ||
 	       (arguments->new_time.seconds == previousReply.attr.st_mtim.tv_sec &&
@@ -189,7 +191,7 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
 
 	struct FSExport *export = NULL;
 	struct FSHandle *handle = NULL;
-	struct liz_attr_reply previousReply;
+	struct sau_attr_reply previousReply;
 
 	// FIXME(haze): Does this function make sense for our implementation ?
 
@@ -207,7 +209,7 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
 	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to get "
 		        "attributes of file %lli.",
-		        liz_error_string(liz_last_err()),
+		        sau_error_string(sau_last_err()),
 		        (long long)handle->inode);
 
 		return Nfs4LastError();
@@ -219,7 +221,7 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
 	memset(&posixAttributes, 0, sizeof(posixAttributes));
 
 	if (isOffsetChangedByClient(arguments, previousReply)) {
-		mask |= LIZ_SET_ATTR_SIZE;
+		mask |= SAU_SET_ATTR_SIZE;
 		posixAttributes.st_size = (__off_t)arguments->last_write + 1;
 		output->size_supplied = true;
 		output->new_size = arguments->last_write + 1;
@@ -228,17 +230,17 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
 	if (hasRecentModificationTime(arguments, previousReply)) {
 		posixAttributes.st_mtim.tv_sec = arguments->new_time.seconds;
 		posixAttributes.st_mtim.tv_sec = arguments->new_time.nseconds;
-		mask |= LIZ_SET_ATTR_MTIME;
-		mask = (unsigned)mask | LIZ_SET_ATTR_MTIME;
+		mask |= SAU_SET_ATTR_MTIME;
+		mask = (unsigned)mask | SAU_SET_ATTR_MTIME;
 	}
 
-	liz_attr_reply_t reply;
+	sau_attr_reply_t reply;
 	retvalue = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
 	                      &posixAttributes, (int)mask, &reply);
 
 	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to set attributes "
-		        "of file %lli.", liz_error_string(liz_last_err()),
+		        "of file %lli.", sau_error_string(sau_last_err()),
 		        (long long)handle->inode);
 		return Nfs4LastError();
 	}

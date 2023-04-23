@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -54,7 +55,7 @@
 #include "common/exceptions.h"
 #include "common/main.h"
 #include "common/massert.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
 #include "common/slogger.h"
 #include "common/sockets.h"
@@ -114,16 +115,16 @@ void mainNetworkThreadReload(void) {
 	try {
 		replicationBandwidthLimitReload();
 	} catch (std::exception& ex) {
-		lzfs_pretty_errlog(LOG_ERR,
+		safs_pretty_errlog(LOG_ERR,
 				"main server module: can't reload REPLICATION_BANDWIDTH_LIMIT_KBPS: %s",
 				ex.what());
 	}
 	chunkReplicatorReload();
 
 	gHDDReadAhead.setReadAhead_kB(
-			cfg_get_maxvalue<uint32_t>("READ_AHEAD_KB", 0, MFSCHUNKSIZE / 1024));
+			cfg_get_maxvalue<uint32_t>("READ_AHEAD_KB", 0, SFSCHUNKSIZE / 1024));
 	gHDDReadAhead.setMaxReadBehind_kB(
-			cfg_get_maxvalue<uint32_t>("MAX_READ_BEHIND_KB", 0, MFSCHUNKSIZE / 1024));
+			cfg_get_maxvalue<uint32_t>("MAX_READ_BEHIND_KB", 0, SFSCHUNKSIZE / 1024));
 
 	char *oldListenHost, *oldListenPort;
 	int newlsock;
@@ -134,7 +135,7 @@ void mainNetworkThreadReload(void) {
 	if (strcmp(oldListenHost, ListenHost) == 0 && strcmp(oldListenPort, ListenPort) == 0) {
 		free(oldListenHost);
 		free(oldListenPort);
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 				"main server module: socket address hasn't changed (%s:%s)",
 				ListenHost, ListenPort);
 		return;
@@ -142,7 +143,7 @@ void mainNetworkThreadReload(void) {
 
 	newlsock = tcpsocket();
 	if (newlsock < 0) {
-		lzfs_pretty_errlog(LOG_WARNING,
+		safs_pretty_errlog(LOG_WARNING,
 				"main server module: socket address has changed, but can't create new socket");
 		free(ListenHost);
 		free(ListenPort);
@@ -154,10 +155,10 @@ void mainNetworkThreadReload(void) {
 	tcpnodelay(newlsock);
 	tcpreuseaddr(newlsock);
 	if (tcpsetacceptfilter(newlsock) < 0 && errno != ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE, "main server module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE, "main server module: can't set accept filter");
 	}
 	if (tcpstrlisten(newlsock, ListenHost, ListenPort, 100) < 0) {
-		lzfs_pretty_errlog(LOG_ERR,
+		safs_pretty_errlog(LOG_ERR,
 				"main server module: socket address has changed, but can't listen on socket (%s:%s)",
 				ListenHost, ListenPort);
 		free(ListenHost);
@@ -167,7 +168,7 @@ void mainNetworkThreadReload(void) {
 		tcpclose(newlsock);
 		return;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,
+	safs_pretty_syslog(LOG_NOTICE,
 			"main server module: socket address has changed, now listen on %s:%s",
 			ListenHost, ListenPort);
 	free(oldListenHost);
@@ -184,7 +185,7 @@ void mainNetworkThreadDesc(std::vector<pollfd> &pdesc) {
 
 void mainNetworkThreadTerm(void) {
 	TRACETHIS();
-	lzfs_pretty_syslog(LOG_NOTICE, "closing %s:%s", ListenHost, ListenPort);
+	safs_pretty_syslog(LOG_NOTICE, "closing %s:%s", ListenHost, ListenPort);
 	tcpclose(lsock);
 
 	free(ListenHost);
@@ -205,14 +206,14 @@ void mainNetworkThreadServe(const std::vector<pollfd> &pdesc) {
 	if (lsockpdescpos >= 0 && (pdesc[lsockpdescpos].revents & POLLIN)) {
 		newSocketFD = tcpaccept(lsock);
 		if (newSocketFD < 0) {
-			lzfs_silent_errlog(LOG_NOTICE, "accept error");
+			safs_silent_errlog(LOG_NOTICE, "accept error");
 		} else {
 			if (nextNetworkThread == networkThreadObjects.end()) {
 				nextNetworkThread = networkThreadObjects.begin();
 			}
 			if (job_pool_jobs_count(nextNetworkThread->bgJobPool())
 					>= (gBgjobsCountPerNetworkWorker * 9) / 10) {
-				lzfs_pretty_syslog(LOG_WARNING, "jobs queue is full !!!");
+				safs_pretty_syslog(LOG_WARNING, "jobs queue is full !!!");
 				tcpclose(newSocketFD);
 			} else {
 				nextNetworkThread->addConnection(newSocketFD);
@@ -234,9 +235,9 @@ int mainNetworkThreadInit(void) {
 			"BGJOBSCNT_PER_NETWORK_WORKER", 1000, 10);
 
 	gHDDReadAhead.setReadAhead_kB(
-			cfg_get_maxvalue<uint32_t>("READ_AHEAD_KB", 0, MFSCHUNKSIZE / 1024));
+			cfg_get_maxvalue<uint32_t>("READ_AHEAD_KB", 0, SFSCHUNKSIZE / 1024));
 	gHDDReadAhead.setMaxReadBehind_kB(
-			cfg_get_maxvalue<uint32_t>("MAX_READ_BEHIND_KB", 0, MFSCHUNKSIZE / 1024));
+			cfg_get_maxvalue<uint32_t>("MAX_READ_BEHIND_KB", 0, SFSCHUNKSIZE / 1024));
 
 	lsock = tcpsocket();
 	if (lsock < 0) {
@@ -247,14 +248,14 @@ int mainNetworkThreadInit(void) {
 	tcpnodelay(lsock);
 	tcpreuseaddr(lsock);
 	if (tcpsetacceptfilter(lsock) < 0 && errno != ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE, "main server module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE, "main server module: can't set accept filter");
 	}
 	tcpresolve(ListenHost, ListenPort, &mylistenip, &mylistenport, 1);
 	if (tcpnumlisten(lsock, mylistenip, mylistenport, 100) < 0) {
 		throw InitializeException("main server module: can't listen on socket" +
 				errorString(errno));
 	}
-	lzfs_pretty_syslog(LOG_NOTICE, "main server module: listen on %s:%s", ListenHost, ListenPort);
+	safs_pretty_syslog(LOG_NOTICE, "main server module: listen on %s:%s", ListenHost, ListenPort);
 
 	eventloop_reloadregister(mainNetworkThreadReload);
 	eventloop_destructregister(mainNetworkThreadTerm);

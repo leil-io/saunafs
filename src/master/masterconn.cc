@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -39,7 +41,7 @@
 #include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/metadata.h"
@@ -49,7 +51,7 @@
 #include "common/time_utils.h"
 #include "master/changelog.h"
 #include "protocol/matoml.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/mltoma.h"
 
 #ifndef METALOGGER
@@ -283,7 +285,7 @@ void masterconn_sendregister(masterconn *eptr) {
 	if (eptr->state == MasterConnectionState::kSynchronized) {
 		metadataVersion = fs_getversion();
 	}
-	auto request = mltoma::registerShadow::build(LIZARDFS_VERSHEX, Timeout * 1000, metadataVersion);
+	auto request = mltoma::registerShadow::build(SAUNAFS_VERSHEX, Timeout * 1000, metadataVersion);
 	masterconn_createpacket(eptr, std::move(request));
 	return;
 #endif
@@ -291,19 +293,25 @@ void masterconn_sendregister(masterconn *eptr) {
 	if (lastlogversion>0) {
 		buff = masterconn_createpacket(eptr,MLTOMA_REGISTER,1+4+2+8);
 		put8bit(&buff,2);
-		put16bit(&buff,LIZARDFS_PACKAGE_VERSION_MAJOR);
-		put8bit(&buff,LIZARDFS_PACKAGE_VERSION_MINOR);
-		put8bit(&buff,LIZARDFS_PACKAGE_VERSION_MICRO);
+		put16bit(&buff,SAUNAFS_PACKAGE_VERSION_MAJOR);
+		put8bit(&buff,SAUNAFS_PACKAGE_VERSION_MINOR);
+		put8bit(&buff,SAUNAFS_PACKAGE_VERSION_MICRO);
 		put16bit(&buff,Timeout);
 		put64bit(&buff,lastlogversion);
 	} else {
 		buff = masterconn_createpacket(eptr,MLTOMA_REGISTER,1+4+2);
 		put8bit(&buff,1);
-		put16bit(&buff,LIZARDFS_PACKAGE_VERSION_MAJOR);
-		put8bit(&buff,LIZARDFS_PACKAGE_VERSION_MINOR);
-		put8bit(&buff,LIZARDFS_PACKAGE_VERSION_MICRO);
+		put16bit(&buff,SAUNAFS_PACKAGE_VERSION_MAJOR);
+		put8bit(&buff,SAUNAFS_PACKAGE_VERSION_MINOR);
+		put8bit(&buff,SAUNAFS_PACKAGE_VERSION_MICRO);
 		put16bit(&buff,Timeout);
 	}
+}
+
+void masterconn_send_metalogger_config(masterconn *eptr) {
+	std::string config = cfg_yaml_string();
+	auto request = mltoma::dumpConfiguration::build(config);
+	masterconn_createpacket(eptr, std::move(request));
 }
 
 namespace {
@@ -347,11 +355,11 @@ void masterconn_request_metadata_dump(masterconn* eptr) {
 }
 
 void masterconn_handle_changelog_apply_error(masterconn* eptr, uint8_t status) {
-	if (eptr->version <= lizardfsVersion(2, 5, 0)) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Dropping in-memory metadata and starting download from master");
+	if (eptr->version <= saunafsVersion(2, 5, 0)) {
+		safs_pretty_syslog(LOG_NOTICE, "Dropping in-memory metadata and starting download from master");
 		masterconn_force_metadata_download(eptr);
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "Waiting for master to produce up-to-date metadata image");
+		safs_pretty_syslog(LOG_NOTICE, "Waiting for master to produce up-to-date metadata image");
 		eptr->error_status = status;
 		masterconn_request_metadata_dump(eptr);
 	}
@@ -360,14 +368,14 @@ void masterconn_handle_changelog_apply_error(masterconn* eptr, uint8_t status) {
 #ifndef METALOGGER
 void masterconn_int_send_matoclport(masterconn* eptr) {
 	static std::string previousPort = "";
-	if (eptr->version < LIZARDFS_VERSION(2, 5, 5)) {
+	if (eptr->version < SAUNAFS_VERSION(2, 5, 5)) {
 		return;
 	}
 	std::string portStr = cfg_getstring("MATOCL_LISTEN_PORT", "9421");
 	static uint16_t port = 0;
 	if (portStr != previousPort) {
 		if (tcpresolve(nullptr, portStr.c_str(), nullptr, &port, false) < 0) {
-			lzfs_pretty_syslog(LOG_WARNING, "Cannot resolve MATOCL_LISTEN_PORT: %s", portStr.c_str());
+			safs_pretty_syslog(LOG_WARNING, "Cannot resolve MATOCL_LISTEN_PORT: %s", portStr.c_str());
 			return;
 		}
 		previousPort = portStr;
@@ -381,7 +389,7 @@ void masterconn_registered(masterconn *eptr, const uint8_t *data, uint32_t lengt
 	if (responseVersion == matoml::registerShadow::kStatusPacketVersion) {
 		uint8_t status;
 		matoml::registerShadow::deserialize(data, length, status);
-		lzfs_pretty_syslog(LOG_NOTICE, "Cannot register to master: %s", lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE, "Cannot register to master: %s", saunafs_error_string(status));
 		eptr->mode = KILL;
 	} else if (responseVersion == matoml::registerShadow::kResponsePacketVersion) {
 		uint32_t masterVersion;
@@ -393,7 +401,7 @@ void masterconn_registered(masterconn *eptr, const uint8_t *data, uint32_t lengt
 			masterconn_force_metadata_download(eptr);
 		}
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "Unknown register response: #%u", unsigned(responseVersion));
+		safs_pretty_syslog(LOG_NOTICE, "Unknown register response: #%u", unsigned(responseVersion));
 	}
 }
 #endif
@@ -408,17 +416,17 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 		return;
 	}
 	if (length<10) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_METACHANGES_LOG - wrong size (%" PRIu32 "/9+data)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_METACHANGES_LOG - wrong size (%" PRIu32 "/9+data)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	if (data[0]!=0xFF) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_METACHANGES_LOG - wrong packet");
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_METACHANGES_LOG - wrong packet");
 		eptr->mode = KILL;
 		return;
 	}
 	if (data[length-1]!='\0') {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_METACHANGES_LOG - invalid string");
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_METACHANGES_LOG - invalid string");
 		eptr->mode = KILL;
 		return;
 	}
@@ -428,8 +436,8 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 	const char* changelogEntry = reinterpret_cast<const char*>(data);
 
 	if ((lastlogversion > 0) && (version != (lastlogversion + 1))) {
-		lzfs_pretty_syslog(LOG_WARNING, "some changes lost: [%" PRIu64 "-%" PRIu64 "], download metadata again",lastlogversion,version-1);
-		masterconn_handle_changelog_apply_error(eptr, LIZARDFS_ERROR_METADATAVERSIONMISMATCH);
+		safs_pretty_syslog(LOG_WARNING, "some changes lost: [%" PRIu64 "-%" PRIu64 "], download metadata again",lastlogversion,version-1);
+		masterconn_handle_changelog_apply_error(eptr, SAUNAFS_ERROR_METADATAVERSIONMISMATCH);
 		return;
 	}
 
@@ -440,9 +448,9 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 		static char const network[] = "network";
 		uint8_t status;
 		if ((status = restore(network, version, buf.c_str(),
-				RestoreRigor::kDontIgnoreAnyErrors)) != LIZARDFS_STATUS_OK) {
-			lzfs_pretty_syslog(LOG_WARNING, "malformed changelog sent by the master server, can't apply it. status: %s",
-					lizardfs_error_string(status));
+				RestoreRigor::kDontIgnoreAnyErrors)) != SAUNAFS_STATUS_OK) {
+			safs_pretty_syslog(LOG_WARNING, "malformed changelog sent by the master server, can't apply it. status: %s",
+					saunafs_error_string(status));
 			masterconn_handle_changelog_apply_error(eptr, status);
 			return;
 		}
@@ -454,7 +462,7 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 
 void masterconn_end_session(masterconn *eptr, const uint8_t* data, uint32_t length) {
 	matoml::endSession::deserialize(data, length); // verify the empty packet
-	lzfs_pretty_syslog(LOG_NOTICE, "Master server is terminating; closing the connection...");
+	safs_pretty_syslog(LOG_NOTICE, "Master server is terminating; closing the connection...");
 	masterconn_kill_session(eptr);
 }
 
@@ -463,7 +471,7 @@ int masterconn_download_end(masterconn *eptr) {
 	masterconn_createpacket(eptr,MLTOMA_DOWNLOAD_END,0);
 	if (eptr->metafd>=0) {
 		if (close(eptr->metafd)<0) {
-			lzfs_silent_errlog(LOG_NOTICE,"error closing metafile");
+			safs_silent_errlog(LOG_NOTICE,"error closing metafile");
 			eptr->metafd=-1;
 			return -1;
 		}
@@ -480,19 +488,19 @@ void masterconn_download_init(masterconn *eptr,uint8_t filenum) {
 		ptr = masterconn_createpacket(eptr,MLTOMA_DOWNLOAD_START,1);
 		put8bit(&ptr,filenum);
 		eptr->downloading=filenum;
-		if (filenum == DOWNLOAD_METADATA_MFS) {
+		if (filenum == DOWNLOAD_METADATA_SFS) {
 			masterconnsingleton->state = MasterConnectionState::kDownloading;
 		}
 	}
 }
 
 void masterconn_metadownloadinit() {
-	masterconn_download_init(masterconnsingleton, DOWNLOAD_METADATA_MFS);
+	masterconn_download_init(masterconnsingleton, DOWNLOAD_METADATA_SFS);
 }
 
 void masterconn_sessionsdownloadinit(void) {
 	if (masterconnsingleton->state == MasterConnectionState::kSynchronized) {
-		masterconn_download_init(masterconnsingleton, DOWNLOAD_SESSIONS_MFS);
+		masterconn_download_init(masterconnsingleton, DOWNLOAD_SESSIONS_SFS);
 	}
 }
 
@@ -501,7 +509,7 @@ int masterconn_metadata_check(const std::string& name) {
 		metadataGetVersion(name);
 		return 0;
 	} catch (MetadataCheckException& ex) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Verification of the downloaded metadata file failed: %s", ex.what());
+		safs_pretty_syslog(LOG_NOTICE, "Verification of the downloaded metadata file failed: %s", ex.what());
 		return -1;
 	}
 }
@@ -521,36 +529,36 @@ void masterconn_download_next(masterconn *eptr) {
 		}
 		std::string changelogFilename_1 = changelogFilename + ".1";
 		std::string changelogFilename_2 = changelogFilename + ".2";
-		lzfs_pretty_syslog(LOG_NOTICE, "%s downloaded %" PRIu64 "B/%" PRIu64 ".%06" PRIu32 "s (%.3f MB/s)",
-				(filenum == DOWNLOAD_METADATA_MFS) ? "metadata" :
-				(filenum == DOWNLOAD_SESSIONS_MFS) ? "sessions" :
-				(filenum == DOWNLOAD_CHANGELOG_MFS) ? changelogFilename_1.c_str() :
-				(filenum == DOWNLOAD_CHANGELOG_MFS_1) ? changelogFilename_2.c_str() : "???",
+		safs_pretty_syslog(LOG_NOTICE, "%s downloaded %" PRIu64 "B/%" PRIu64 ".%06" PRIu32 "s (%.3f MB/s)",
+				(filenum == DOWNLOAD_METADATA_SFS) ? "metadata" :
+				(filenum == DOWNLOAD_SESSIONS_SFS) ? "sessions" :
+				(filenum == DOWNLOAD_CHANGELOG_SFS) ? changelogFilename_1.c_str() :
+				(filenum == DOWNLOAD_CHANGELOG_SFS_1) ? changelogFilename_2.c_str() : "???",
 				eptr->filesize, dltime/1000000, (uint32_t)(dltime%1000000),
 				(double)(eptr->filesize) / (double)(dltime));
-		if (filenum == DOWNLOAD_METADATA_MFS) {
+		if (filenum == DOWNLOAD_METADATA_SFS) {
 			if (masterconn_metadata_check(metadataTmpFilename) == 0) {
 				if (BackMetaCopies>0) {
 					rotateFiles(metadataFilename, BackMetaCopies, 1);
 				}
 				if (rename(metadataTmpFilename.c_str(), metadataFilename.c_str()) < 0) {
-					lzfs_pretty_syslog(LOG_NOTICE,"can't rename downloaded metadata - do it manually before next download");
+					safs_pretty_syslog(LOG_NOTICE,"can't rename downloaded metadata - do it manually before next download");
 				}
 			}
-			masterconn_download_init(eptr, DOWNLOAD_CHANGELOG_MFS);
-		} else if (filenum == DOWNLOAD_CHANGELOG_MFS) {
+			masterconn_download_init(eptr, DOWNLOAD_CHANGELOG_SFS);
+		} else if (filenum == DOWNLOAD_CHANGELOG_SFS) {
 			if (rename(changelogTmpFilename.c_str(), changelogFilename_1.c_str()) < 0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"can't rename downloaded changelog - do it manually before next download");
+				safs_pretty_syslog(LOG_NOTICE,"can't rename downloaded changelog - do it manually before next download");
 			}
-			masterconn_download_init(eptr, DOWNLOAD_CHANGELOG_MFS_1);
-		} else if (filenum == DOWNLOAD_CHANGELOG_MFS_1) {
+			masterconn_download_init(eptr, DOWNLOAD_CHANGELOG_SFS_1);
+		} else if (filenum == DOWNLOAD_CHANGELOG_SFS_1) {
 			if (rename(changelogTmpFilename.c_str(), changelogFilename_2.c_str()) < 0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"can't rename downloaded changelog - do it manually before next download");
+				safs_pretty_syslog(LOG_NOTICE,"can't rename downloaded changelog - do it manually before next download");
 			}
-			masterconn_download_init(eptr, DOWNLOAD_SESSIONS_MFS);
-		} else if (filenum == DOWNLOAD_SESSIONS_MFS) {
+			masterconn_download_init(eptr, DOWNLOAD_SESSIONS_SFS);
+		} else if (filenum == DOWNLOAD_SESSIONS_SFS) {
 			if (rename(sessionsTmpFilename.c_str(), sessionsFilename.c_str()) < 0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"can't rename downloaded sessions - do it manually before next download");
+				safs_pretty_syslog(LOG_NOTICE,"can't rename downloaded sessions - do it manually before next download");
 			} else {
 #ifndef METALOGGER
 				/*
@@ -561,16 +569,16 @@ void masterconn_download_next(masterconn *eptr) {
 					try {
 						fs_loadall();
 						lastlogversion = fs_getversion() - 1;
-						lzfs_pretty_syslog(LOG_NOTICE, "synced at version = %" PRIu64, lastlogversion);
+						safs_pretty_syslog(LOG_NOTICE, "synced at version = %" PRIu64, lastlogversion);
 						eptr->state = MasterConnectionState::kSynchronized;
 					} catch (Exception& ex) {
-						lzfs_pretty_syslog(LOG_WARNING, "can't load downloaded metadata and changelogs: %s",
+						safs_pretty_syslog(LOG_WARNING, "can't load downloaded metadata and changelogs: %s",
 								ex.what());
 						uint8_t status = ex.status();
-						if (status == LIZARDFS_STATUS_OK) {
+						if (status == SAUNAFS_STATUS_OK) {
 							// unknown error - tell the master to apply changelogs and hope that
 							// all will be good
-							status = LIZARDFS_ERROR_CHANGELOGINCONSISTENT;
+							status = SAUNAFS_ERROR_CHANGELOGINCONSISTENT;
 						}
 						masterconn_handle_changelog_apply_error(eptr, status);
 					}
@@ -593,14 +601,14 @@ void masterconn_download_next(masterconn *eptr) {
 
 void masterconn_download_start(masterconn *eptr,const uint8_t *data,uint32_t length) {
 	if (length!=1 && length!=8) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_START - wrong size (%" PRIu32 "/1|8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_START - wrong size (%" PRIu32 "/1|8)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	passert(data);
 	if (length==1) {
 		eptr->downloading=0;
-		lzfs_pretty_syslog(LOG_NOTICE,"download start error");
+		safs_pretty_syslog(LOG_NOTICE,"download start error");
 		return;
 	}
 #ifndef METALOGGER
@@ -611,20 +619,20 @@ void masterconn_download_start(masterconn *eptr,const uint8_t *data,uint32_t len
 	eptr->dloffset = 0;
 	eptr->downloadretrycnt = 0;
 	eptr->dlstartuts = eventloop_utime();
-	if (eptr->downloading == DOWNLOAD_METADATA_MFS) {
+	if (eptr->downloading == DOWNLOAD_METADATA_SFS) {
 		eptr->metafd = open(metadataTmpFilename.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
-	} else if (eptr->downloading == DOWNLOAD_SESSIONS_MFS) {
+	} else if (eptr->downloading == DOWNLOAD_SESSIONS_SFS) {
 		eptr->metafd = open(sessionsTmpFilename.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
-	} else if ((eptr->downloading == DOWNLOAD_CHANGELOG_MFS)
-			|| (eptr->downloading == DOWNLOAD_CHANGELOG_MFS_1)) {
+	} else if ((eptr->downloading == DOWNLOAD_CHANGELOG_SFS)
+			|| (eptr->downloading == DOWNLOAD_CHANGELOG_SFS_1)) {
 		eptr->metafd = open(changelogTmpFilename.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,"unexpected MATOML_DOWNLOAD_START packet");
+		safs_pretty_syslog(LOG_NOTICE,"unexpected MATOML_DOWNLOAD_START packet");
 		eptr->mode = KILL;
 		return;
 	}
 	if (eptr->metafd<0) {
-		lzfs_silent_errlog(LOG_NOTICE,"error opening metafile");
+		safs_silent_errlog(LOG_NOTICE,"error opening metafile");
 		masterconn_download_end(eptr);
 		return;
 	}
@@ -637,12 +645,12 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 	uint32_t crc;
 	ssize_t ret;
 	if (eptr->metafd<0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - file not opened");
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - file not opened");
 		eptr->mode = KILL;
 		return;
 	}
 	if (length<16) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - wrong size (%" PRIu32 "/16+data)",length);
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - wrong size (%" PRIu32 "/16+data)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -651,28 +659,28 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 	leng = get32bit(&data);
 	crc = get32bit(&data);
 	if (leng+16!=length) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - wrong size (%" PRIu32 "/16+%" PRIu32 ")",length,leng);
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - wrong size (%" PRIu32 "/16+%" PRIu32 ")",length,leng);
 		eptr->mode = KILL;
 		return;
 	}
 	if (offset!=eptr->dloffset) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - unexpected file offset (%" PRIu64 "/%" PRIu64 ")",offset,eptr->dloffset);
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - unexpected file offset (%" PRIu64 "/%" PRIu64 ")",offset,eptr->dloffset);
 		eptr->mode = KILL;
 		return;
 	}
 	if (offset+leng>eptr->filesize) {
-		lzfs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - unexpected file size (%" PRIu64 "/%" PRIu64 ")",offset+leng,eptr->filesize);
+		safs_pretty_syslog(LOG_NOTICE,"MATOML_DOWNLOAD_DATA - unexpected file size (%" PRIu64 "/%" PRIu64 ")",offset+leng,eptr->filesize);
 		eptr->mode = KILL;
 		return;
 	}
-#ifdef LIZARDFS_HAVE_PWRITE
+#ifdef SAUNAFS_HAVE_PWRITE
 	ret = pwrite(eptr->metafd,data,leng,offset);
-#else /* LIZARDFS_HAVE_PWRITE */
+#else /* SAUNAFS_HAVE_PWRITE */
 	lseek(eptr->metafd,offset,SEEK_SET);
 	ret = write(eptr->metafd,data,leng);
-#endif /* LIZARDFS_HAVE_PWRITE */
+#endif /* SAUNAFS_HAVE_PWRITE */
 	if (ret!=(ssize_t)leng) {
-		lzfs_silent_errlog(LOG_NOTICE,"error writing metafile");
+		safs_silent_errlog(LOG_NOTICE,"error writing metafile");
 		if (eptr->downloadretrycnt>=5) {
 			masterconn_download_end(eptr);
 		} else {
@@ -682,7 +690,7 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 		return;
 	}
 	if (crc!=mycrc32(0,data,leng)) {
-		lzfs_pretty_syslog(LOG_NOTICE,"metafile data crc error");
+		safs_pretty_syslog(LOG_NOTICE,"metafile data crc error");
 		if (eptr->downloadretrycnt>=5) {
 			masterconn_download_end(eptr);
 		} else {
@@ -692,7 +700,7 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 		return;
 	}
 	if (fsync(eptr->metafd)<0) {
-		lzfs_silent_errlog(LOG_NOTICE,"error syncing metafile");
+		safs_silent_errlog(LOG_NOTICE,"error syncing metafile");
 		if (eptr->downloadretrycnt>=5) {
 			masterconn_download_end(eptr);
 		} else {
@@ -709,15 +717,15 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 void masterconn_changelog_apply_error(masterconn *eptr, const uint8_t *data, uint32_t length) {
 	uint8_t status;
 	matoml::changelogApplyError::deserialize(data, length, status);
-	lzfs_silent_syslog(LOG_DEBUG, "master.matoml_changelog_apply_error status: %u", status);
-	if (status == LIZARDFS_STATUS_OK) {
+	safs_silent_syslog(LOG_DEBUG, "master.matoml_changelog_apply_error status: %u", status);
+	if (status == SAUNAFS_STATUS_OK) {
 		masterconn_force_metadata_download(eptr);
-	} else if (status == LIZARDFS_ERROR_DELAYED) {
+	} else if (status == SAUNAFS_ERROR_DELAYED) {
 		eptr->state = MasterConnectionState::kLimbo;
-		lzfs_pretty_syslog(LOG_NOTICE, "Master temporarily refused to produce a new metadata image");
+		safs_pretty_syslog(LOG_NOTICE, "Master temporarily refused to produce a new metadata image");
 	} else {
 		eptr->state = MasterConnectionState::kLimbo;
-		lzfs_pretty_syslog(LOG_NOTICE, "Master failed to produce a new metadata image: %s", lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_NOTICE, "Master failed to produce a new metadata image: %s", saunafs_error_string(status));
 	}
 }
 
@@ -741,14 +749,14 @@ void masterconn_gotpacket(masterconn *eptr,uint32_t type,const uint8_t *data,uin
 			case ANTOAN_BAD_COMMAND_SIZE: // for future use
 				break;
 #ifndef METALOGGER
-			case LIZ_MATOML_REGISTER_SHADOW:
+			case SAU_MATOML_REGISTER_SHADOW:
 				masterconn_registered(eptr,data,length);
 				break;
 #endif
 			case MATOML_METACHANGES_LOG:
 				masterconn_metachanges_log(eptr,data,length);
 				break;
-			case LIZ_MATOML_END_SESSION:
+			case SAU_MATOML_END_SESSION:
 				masterconn_end_session(eptr,data,length);
 				break;
 			case MATOML_DOWNLOAD_START:
@@ -757,16 +765,16 @@ void masterconn_gotpacket(masterconn *eptr,uint32_t type,const uint8_t *data,uin
 			case MATOML_DOWNLOAD_DATA:
 				masterconn_download_data(eptr,data,length);
 				break;
-			case LIZ_MATOML_CHANGELOG_APPLY_ERROR:
+			case SAU_MATOML_CHANGELOG_APPLY_ERROR:
 				masterconn_changelog_apply_error(eptr, data, length);
 				break;
 			default:
-				lzfs_pretty_syslog(LOG_NOTICE,"got unknown message (type:%" PRIu32 ")",type);
+				safs_pretty_syslog(LOG_NOTICE,"got unknown message (type:%" PRIu32 ")",type);
 				eptr->mode = KILL;
 				break;
 		}
 	} catch (IncorrectDeserializationException& ex) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Packet 0x%" PRIX32 " - can't deserialize: %s", type, ex.what());
+		safs_pretty_syslog(LOG_NOTICE, "Packet 0x%" PRIX32 " - can't deserialize: %s", type, ex.what());
 		eptr->mode = KILL;
 	}
 }
@@ -812,6 +820,9 @@ void masterconn_connected(masterconn *eptr) {
 	eptr->outputtail = &(eptr->outputhead);
 
 	masterconn_sendregister(eptr);
+#ifdef METALOGGER
+	masterconn_send_metalogger_config(eptr);
+#endif
 	if (lastlogversion==0) {
 		masterconn_metadownloadinit();
 	} else if (eptr->state == MasterConnectionState::kDumpRequestPending) {
@@ -835,7 +846,7 @@ int masterconn_initconnect(masterconn *eptr) {
 			eptr->masterport = mport;
 			eptr->masteraddrvalid = 1;
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 					"can't resolve master host/port (%s:%s)",
 					MasterHost.c_str(), MasterPort.c_str());
 			return -1;
@@ -843,18 +854,18 @@ int masterconn_initconnect(masterconn *eptr) {
 	}
 	eptr->sock=tcpsocket();
 	if (eptr->sock<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"create socket, error");
+		safs_pretty_errlog(LOG_WARNING,"create socket, error");
 		return -1;
 	}
 	if (tcpnonblock(eptr->sock)<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"set nonblock, error");
+		safs_pretty_errlog(LOG_WARNING,"set nonblock, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		return -1;
 	}
 	if (eptr->bindip>0) {
 		if (tcpnumbind(eptr->sock,eptr->bindip,0)<0) {
-			lzfs_pretty_errlog(LOG_WARNING,"can't bind socket to given ip");
+			safs_pretty_errlog(LOG_WARNING,"can't bind socket to given ip");
 			tcpclose(eptr->sock);
 			eptr->sock = -1;
 			return -1;
@@ -862,18 +873,18 @@ int masterconn_initconnect(masterconn *eptr) {
 	}
 	status = tcpnumconnect(eptr->sock,eptr->masterip,eptr->masterport);
 	if (status<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"connect failed, error");
+		safs_pretty_errlog(LOG_WARNING,"connect failed, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		eptr->masteraddrvalid = 0;
 		return -1;
 	}
 	if (status==0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"connected to Master immediately");
+		safs_pretty_syslog(LOG_NOTICE,"connected to Master immediately");
 		masterconn_connected(eptr);
 	} else {
 		eptr->mode = CONNECTING;
-		lzfs_pretty_syslog_attempt(LOG_NOTICE,"connecting to Master");
+		safs_pretty_syslog_attempt(LOG_NOTICE,"connecting to Master");
 	}
 	return 0;
 }
@@ -883,14 +894,14 @@ void masterconn_connecttest(masterconn *eptr) {
 
 	status = tcpgetstatus(eptr->sock);
 	if (status) {
-		lzfs_silent_errlog(LOG_WARNING,"connection failed, error");
+		safs_silent_errlog(LOG_WARNING,"connection failed, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		eptr->mode = FREE;
 		eptr->masteraddrvalid = 0;
 		eptr->version = 0;
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,"connected to Master");
+		safs_pretty_syslog(LOG_NOTICE,"connected to Master");
 		masterconn_connected(eptr);
 	}
 }
@@ -905,13 +916,13 @@ void masterconn_read(masterconn *eptr) {
 	while (eptr->mode != KILL) {
 		i=read(eptr->sock,eptr->inputpacket.startptr,eptr->inputpacket.bytesleft);
 		if (i==0) {
-			lzfs_pretty_syslog(LOG_NOTICE,"connection was reset by Master");
+			safs_pretty_syslog(LOG_NOTICE,"connection was reset by Master");
 			masterconn_kill_session(eptr);
 			return;
 		}
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"read from Master error");
+				safs_silent_errlog(LOG_NOTICE,"read from Master error");
 				masterconn_kill_session(eptr);
 			}
 			return;
@@ -930,7 +941,7 @@ void masterconn_read(masterconn *eptr) {
 
 			if (size>0) {
 				if (size>MaxPacketSize) {
-					lzfs_pretty_syslog(LOG_WARNING,"Master packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
+					safs_pretty_syslog(LOG_WARNING,"Master packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
 					masterconn_kill_session(eptr);
 					return;
 				}
@@ -981,7 +992,7 @@ void masterconn_write(masterconn *eptr) {
 		i=write(eptr->sock,pack->startptr,pack->bytesleft);
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"write to Master error");
+				safs_silent_errlog(LOG_NOTICE,"write to Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -1132,7 +1143,7 @@ void masterconn_reload(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t ReconnectionDelay;
 
-	std::string newMasterHost = cfg_getstring("MASTER_HOST","mfsmaster");
+	std::string newMasterHost = cfg_getstring("MASTER_HOST","sfsmaster");
 	std::string newMasterPort = cfg_getstring("MASTER_PORT","9419");
 	std::string newBindHost = cfg_getstring("BIND_HOST","*");
 
@@ -1188,7 +1199,7 @@ int masterconn_init(void) {
 	masterconn *eptr;
 
 	ReconnectionDelay = cfg_getuint32("MASTER_RECONNECTION_DELAY", 1);
-	MasterHost = cfg_getstring("MASTER_HOST","mfsmaster");
+	MasterHost = cfg_getstring("MASTER_HOST","sfsmaster");
 	MasterPort = cfg_getstring("MASTER_PORT","9419");
 	BindHost = cfg_getstring("BIND_HOST","*");
 	Timeout = cfg_getuint32("MASTER_TIMEOUT",60);

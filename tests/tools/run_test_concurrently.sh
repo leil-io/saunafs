@@ -16,7 +16,7 @@
 # ./run_test_concurrently.sh list_of_arguments
 # All arguments should be passed in a following way: ARG_NAME=value
 # List of arguments:
-# WORKSPACE     - path to lizardfs directory
+# WORKSPACE     - path to saunafs directory
 # TEST_SUITE    - name of test_suite, e.g. SanityChecks
 # EXCLUDE_TESTS - list of tests we don't want to run, separated by ':',
 #                 e.g. test_valgrind:test_dirinfo
@@ -41,7 +41,7 @@ for ARGUMENT in "$@"; do
 		VALGRIND) VALGRIND=${VALUE} ;;
 		BUILD_ID) BUILD_ID=${VALUE} ;;
 		DISPATCHER_URL) DISPATCHER_URL=${VALUE} ;;
-		LIZARDFS_TESTS_PATH) LIZARDFS_TESTS_PATH=${VALUE} ;;
+		SAUNAFS_TESTS_PATH) SAUNAFS_TESTS_PATH=${VALUE} ;;
 		*) ;;
 	esac
 done
@@ -54,9 +54,9 @@ RUN_UNITTESTS=${RUN_UNITTESTS:-'false'}
 VALGRIND=${VALGRIND:-'No'}
 BUILD_ID=${BUILD_ID:-}
 DISPATCHER_URL=${DISPATCHER_URL:-}
-LIZARDFS_TESTS_PATH=${LIZARDFS_TESTS_PATH:-"${WORKSPACE}/install/lizardfs/bin/lizardfs-tests"}
+SAUNAFS_TESTS_PATH=${SAUNAFS_TESTS_PATH:-"${WORKSPACE}/install/saunafs/bin/saunafs-tests"}
 
-export LIZARDFS_ROOT=$WORKSPACE/install/lizardfs
+export SAUNAFS_ROOT=$WORKSPACE/install/saunafs
 export TEST_OUTPUT_DIR=$WORKSPACE/test_output
 export TERM=xterm
 
@@ -76,9 +76,9 @@ fi
 # exit 0
 # fi
 
-make -C build/lizardfs -j$(nproc) install
+make -C build/saunafs -j$(nproc) install
 
-killall -9 lizardfs-tests || true
+killall -9 saunafs-tests || true
 mkdir -m 777 -p $TEST_OUTPUT_DIR
 rm -rf "${TEST_OUTPUT_DIR:?}"/* || true
 rm -rf /mnt/ramdisk/* || true
@@ -89,10 +89,10 @@ if [ -z "${DISPATCHER_URL}" ]; then
 		--excluded_tests $EXCLUDE_TESTS --nodes_count $NODES_COUNT --node_number $NODE_NUMBER)
 
 	if [ $RUN_UNITTESTS == "true" ]; then
-		$WORKSPACE/build/lizardfs/src/unittests/unittests --gtest_color=yes --gtest_output=xml:$TEST_OUTPUT_DIR/unit_test_results.xml
+		$WORKSPACE/build/saunafs/src/unittests/unittests --gtest_color=yes --gtest_output=xml:$TEST_OUTPUT_DIR/unit_test_results.xml
 	fi
 
-	$LIZARDFS_ROOT/bin/lizardfs-tests --gtest_color=yes --gtest_filter=$FILTER --gtest_output=xml:$TEST_OUTPUT_DIR/test_results.xml
+	$SAUNAFS_ROOT/bin/saunafs-tests --gtest_color=yes --gtest_filter=$FILTER --gtest_output=xml:$TEST_OUTPUT_DIR/test_results.xml
 
 else
 	{
@@ -100,7 +100,7 @@ else
 		python3 "${WORKSPACE}/tests/dispatcher/client/dispatcher_client.py" \
 			--action push_list \
 			--build_id "${BUILD_ID}" \
-			--lizardfs_tests_path "${LIZARDFS_TESTS_PATH}" \
+			--saunafs_tests_path "${SAUNAFS_TESTS_PATH}" \
 			--test_suite "${TEST_SUITE}" \
 			--excluded_tests "${EXCLUDE_TESTS}"
 
@@ -125,7 +125,7 @@ else
 		NEXT_TEST=$(get_next_test)
 		START_TIME=$(($(date +%s%N) / 1000000))
 		while [ "${NEXT_TEST}" != "" ]; do
-			"${LIZARDFS_ROOT}/bin/lizardfs-tests" \
+			"${SAUNAFS_ROOT}/bin/saunafs-tests" \
 				--gtest_color=yes \
 				--gtest_filter="${TEST_SUITE}.${NEXT_TEST}" \
 				--gtest_output="xml:${TEST_OUTPUT_DIR}/test_results.xml" || {

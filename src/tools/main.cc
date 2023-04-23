@@ -1,19 +1,20 @@
 /*
-   Copyright 2013-2016 Skytechnology sp. z o.o..
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -24,7 +25,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "tools/tools_commands.h"
 #include "tools/tools_common_functions.h"
 
@@ -49,7 +50,7 @@ void split(std::vector<char*> &argv_new, std::vector<char> &line) {
 
 static void print_prefix() {
 	char *path = getcwd(path_buf, PATH_MAX);
-	fprintf(stdout, "lfs:%s$ ", path);
+	fprintf(stdout, "sau:%s$ ", path);
 }
 
 int main(int argc, char **argv) {

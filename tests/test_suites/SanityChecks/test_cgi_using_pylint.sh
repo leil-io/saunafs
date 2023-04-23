@@ -6,8 +6,8 @@ else
 	test_fail "pylint is not installed"
 fi
 
-# Get paths to mfs.cgi, chart.cgi and the CGI server
-files=$(echo $LIZARDFS_ROOT/share/mfscgi/*.cgi $LIZARDFS_ROOT/sbin/lizardfs-cgiserver)
+# Get paths to sfs.cgi, chart.cgi and the CGI server
+files=$(echo $SAUNAFS_ROOT/share/sfscgi/*.cgi $SAUNAFS_ROOT/sbin/saunafs-cgiserver)
 
 # Validate all found files using pylint
 expect_empty "$($pylintexec -E $files || true)"

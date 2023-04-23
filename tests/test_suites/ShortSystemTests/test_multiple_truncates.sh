@@ -1,22 +1,22 @@
 timeout_set 3 minutes
 CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
-block=$LIZARDFS_BLOCK_SIZE
-chunk=$LIZARDFS_CHUNK_SIZE
+block=$SAUNAFS_BLOCK_SIZE
+chunk=$SAUNAFS_CHUNK_SIZE
 goals="1 xor2 xor3 ec21 ec22"
 
-# Create the same files on LizardFS (in many goals) and in a temporary directory.
+# Create the same files on SaunaFS (in many goals) and in a temporary directory.
 # The test will do the same operations (truncate, write) on all the files and compare
 # them after each operation.
 real_file="$TEMP_DIR/file"
 FILE_SIZE=$chunk file-generate "$real_file"
 for goal in $goals; do
 	touch "file_$goal"
-	lizardfs setgoal "$goal" "file_$goal"
+	saunafs setgoal "$goal" "file_$goal"
 	FILE_SIZE=$chunk file-generate "file_$goal"
 done
 
@@ -63,7 +63,7 @@ verify_append 10000
 verify_truncate -100
 verify_truncate -100
 verify_truncate -10000
-for i in {0..3}; do lizardfs_chunkserver_daemon "$i" restart & done ; wait
+for i in {0..3}; do saunafs_chunkserver_daemon "$i" restart & done ; wait
 verify_truncate $((chunk + block))
 verify_append 1000
 verify_truncate $((chunk + 2 * block - 500))
@@ -74,5 +74,5 @@ verify_truncate -100
 verify_append 1000
 verify_truncate +1000
 verify_truncate +1000
-for i in {0..3}; do lizardfs_chunkserver_daemon "$i" restart & done ; wait
+for i in {0..3}; do saunafs_chunkserver_daemon "$i" restart & done ; wait
 verify_append 1000

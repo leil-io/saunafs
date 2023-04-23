@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2017 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2017 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -28,7 +29,7 @@
 
 #include "common/datapack.h"
 #include "common/lambda_guard.h"
-#include "common/moosefs_string.h"
+#include "common/xaunafs_string.h"
 #include "common/server_connection.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
@@ -41,7 +42,7 @@ static int kInfiniteTimeout = 10 * 24 * 3600 * 1000; // simulate infinite timeou
 
 static void snapshot_usage() {
 	fprintf(stderr,
-	        "make snapshot (lazy copy)\n\nusage:\n lizardfs makesnapshot [-ofl] src [src ...] dst\n");
+	        "make snapshot (lazy copy)\n\nusage:\n saunafs makesnapshot [-ofl] src [src ...] dst\n");
 	fprintf(stderr, " -o,-f - allow to overwrite existing objects\n");
 	fprintf(stderr, " -l - wait until snapshot will finish (otherwise there is 60s timeout)\n");
 }
@@ -79,7 +80,7 @@ static int make_snapshot(const char *dstdir, const char *dstbase, const char *sr
 	try {
 		auto request = cltoma::requestTaskId::build(msgid);
 		auto response = ServerConnection::sendAndReceive(fd, request,
-				LIZ_MATOCL_REQUEST_TASK_ID,
+				SAU_MATOCL_REQUEST_TASK_ID,
 				ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage,
 				long_wait ? kInfiniteTimeout : kDefaultTimeout);
 		matocl::requestTaskId::deserialize(response, msgid, job_id);
@@ -92,21 +93,21 @@ static int make_snapshot(const char *dstdir, const char *dstbase, const char *sr
 			kill(getpid(), SIGUSR1);
 			signal_thread.join();
 		});
-		request = cltoma::snapshot::build(msgid, job_id, srcinode, dstinode, MooseFsString<uint8_t>(dstbase),
+		request = cltoma::snapshot::build(msgid, job_id, srcinode, dstinode, XaunaFsString<uint8_t>(dstbase),
 		                                  uid, gid, canoverwrite, ignore_missing_src, initial_batch_size);
-		response = ServerConnection::sendAndReceive(fd, request, LIZ_MATOCL_FUSE_SNAPSHOT,
+		response = ServerConnection::sendAndReceive(fd, request, SAU_MATOCL_FUSE_SNAPSHOT,
 				ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage,
 				long_wait ? kInfiniteTimeout : kDefaultTimeout);
 		matocl::snapshot::deserialize(response, msgid, status);
 
 		close_master_conn(0);
 
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			printf("Snapshot %s -> %s/%s completed\n", srcname, dstdir, dstbase);
 			return 0;
 		} else {
 			printf("Snapshot %s -> %s/%s:\n returned error status %d: %s\n",
-			       srcname, dstdir, dstbase, status, lizardfs_error_string(status));
+			       srcname, dstdir, dstbase, status, saunafs_error_string(status));
 			return -1;
 		}
 

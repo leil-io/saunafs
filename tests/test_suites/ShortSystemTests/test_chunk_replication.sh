@@ -10,33 +10,33 @@
 # chunk 0000000000000003_00000001
 # chunk 0000000000000004_00000001 part 1/3
 get_list_of_chunks() {
-	lizardfs fileinfo */* | awk '/\tchunk/{id=$3} /\tcopy/{print "chunk",id,$4,$5}' | sort
+	saunafs fileinfo */* | awk '/\tchunk/{id=$3} /\tcopy/{print "chunk",id,$4,$5}' | sort
 }
 
 timeout_set "$test_timeout"
 CHUNKSERVERS=$number_of_chunkservers \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1`
 			`|CHUNKS_LOOP_MAX_CPU = 90`
 			`|CHUNKS_WRITE_REP_LIMIT = 10`
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|OPERATIONS_DELAY_DISCONNECT = 0`
 			`|ACCEPTABLE_DIFFERENCE = 10" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Create files with goals from the $goals list
 cd "${info[mount0]}"
 for goal in $goals; do
 	dir="dir_$goal"
 	mkdir "$dir"
-	lizardfs setgoal "$goal" "$dir"
+	saunafs setgoal "$goal" "$dir"
 	FILE_SIZE=1M file-generate "$dir/file"
 done
 
 # Remember list of all available chunks, stop one of the chunkservers and wait for replication
 chunks_before=$(get_list_of_chunks)
-lizardfs_chunkserver_daemon 0 stop
+saunafs_chunkserver_daemon 0 stop
 echo "Waiting $replication_timeout for replication..."
 end_time=$(date +%s -d "$replication_timeout")
 while (( $(date +%s) < end_time )); do
@@ -53,9 +53,9 @@ fi
 
 if [[ $verify_file_content == YES ]]; then
 	for ((csid=1; csid < number_of_chunkservers; ++csid)); do
-		lizardfs_chunkserver_daemon $csid stop
+		saunafs_chunkserver_daemon $csid stop
 		file-validate */*
-		lizardfs_chunkserver_daemon $csid start
-		lizardfs_wait_for_ready_chunkservers $((number_of_chunkservers - 1))
+		saunafs_chunkserver_daemon $csid start
+		saunafs_wait_for_ready_chunkservers $((number_of_chunkservers - 1))
 	done
 fi

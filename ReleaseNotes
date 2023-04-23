@@ -16,9 +16,9 @@ Detailed info:
 
 * uRaft HA *
 
-uRaft is HA solution designed for use with LizardFS. It allows for seamless switching
+uRaft is HA solution designed for use with SaunaFS. It allows for seamless switching
 of master server in case of hardware failure. More information about uRaft is available
-in LizardfFS Handbook (https://dev.lizardfs.com/docs/index.html)
+in SaunafFS Handbook (https://dev.saunafs.com/docs/index.html)
 
 * fixes to EC handling *
 
@@ -29,28 +29,28 @@ Unfortunately until all parity parts are recomputed affected chunks are in endan
 
 * nfs-ganesha plugin changed to use only C code *
 
-In preparation for moving LizardFS nfs-ganesha plugin to official nfs-ganesha repository,
+In preparation for moving SaunaFS nfs-ganesha plugin to official nfs-ganesha repository,
 we had to remove all occurrences of C++ code and replace it with plain C.
 
 * reduced number of secondary groups retrievals *
 
-In LizardFS we introduced handling of secondary groups. Unfortunately the function to retrieve
+In SaunaFS we introduced handling of secondary groups. Unfortunately the function to retrieve
 secondary groups in FUSE library turned out to be using a lot of CPU resources. Thanks to removing
 unnecessary calls to this function, mount performance increased significantly.
 
 * add fuse3 client *
 
-LizardFS now include mount3 client which uses FUSE3 library. Thanks to new features in FUSE3,
+SaunaFS now include mount3 client which uses FUSE3 library. Thanks to new features in FUSE3,
 now mount performs much better in many scenarios. Here are the most important changes visible
-to LizardFS users:
+to SaunaFS users:
  - big_writes option is now enabled by default (also it isn't recognized as a parameter anymore).
  - Added writeback_cache option. With kernel 3.14 and newer this
    enables write-back caching which can significantly improve performance.
  - increased read/write performance (specially for small operations)
 
 Because most of the Linux distributions don't include FUSE3 library, we have build FUSE3 packages
-and made them available on LizardFS page (https://lizardfs.com/)
+and made them available on SaunaFS page (https://saunafs.com/)
 
 Cheers,
 Artur Kornacki
-LizardFS Team
+SaunaFS Team

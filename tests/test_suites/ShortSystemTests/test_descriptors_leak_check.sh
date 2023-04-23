@@ -3,7 +3,7 @@ timeout_set 1 minute
 CHUNKSERVERS=1 \
 	DISK_PER_CHUNKSERVER=1 \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 max_files=100
 max_open_descriptors=10
@@ -15,19 +15,33 @@ done
 
 wait
 
-# wait for lizardfs to close files
-cs_pid=$(lizardfs_chunkserver_daemon 0 test 2>&1 | sed 's/.*: //')
+firstDisk=$(head -1 "${info[chunkserver0_hdd]}")
+isZoned=$(is_zoned_device "${firstDisk}")
+
+# wait for saunafs to close files
+cs_pid=$(saunafs_chunkserver_daemon 0 test 2>&1 | sed 's/.*: //')
 for ((time_elapsed=0; time_elapsed < time_limit; ++time_elapsed)); do
 	leaked_descriptors_number=$(lsof +D $RAMDISK_DIR -p$cs_pid 2>/dev/null | \
-			grep -v 'lock' | grep chunk_ | wc -l)
+		grep -v 'lock' | grep chunk_ | wc -l)
+
+	if $isZoned; then
+		open_zones=$(lsof +D "/mnt/zoned/sauna_nullb0" -p$cs_pid 2>/dev/null | \
+			grep -v 'lock' | grep "/zoned/" | wc -l)
+		echo "Open zones: $open_zones"
+		leaked_descriptors_number=$((leaked_descriptors_number + open_zones))
+	fi
+
 	if ((leaked_descriptors_number < max_open_descriptors)); then
 		break
 	fi
+
 	if ! ((time_elapsed % 10)); then
 		echo Open descriptors: $((leaked_descriptors_number))
 	fi
+
 	sleep 1
 done
+
 echo Open descriptors: $((leaked_descriptors_number))
 
 if ((leaked_descriptors_number >= max_open_descriptors)); then

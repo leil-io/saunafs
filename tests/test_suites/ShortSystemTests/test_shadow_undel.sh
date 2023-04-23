@@ -7,12 +7,12 @@ CHUNKSERVERS=1 \
 	MASTERSERVERS=2 \
 	MOUNTS=2 \
 	USE_RAMDISK="YES" \
-	MOUNT_0_EXTRA_CONFIG="mfscachemode=NEVER,mfsreportreservedperiod=1" \
-	MOUNT_1_EXTRA_CONFIG="mfsmeta" \
-	MFSEXPORTS_EXTRA_OPTIONS="allcanchangequota, ignoregid" \
-	MFSEXPORTS_META_EXTRA_OPTIONS="nonrootmeta" \
+	MOUNT_0_EXTRA_CONFIG="sfscachemode=NEVER,sfsreportreservedperiod=1" \
+	MOUNT_1_EXTRA_CONFIG="sfsmeta" \
+	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota, ignoregid" \
+	SFSEXPORTS_META_EXTRA_OPTIONS="nonrootmeta" \
 	MASTER_EXTRA_CONFIG="$master_cfg" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 stat_basic_info() {
 	stat --format="%A %u %g %i %s" "$@"
@@ -24,10 +24,10 @@ only_file_in_trash() {
 }
 
 trash="${info[mount1]}/trash"
-changelog_file="${info[master_data_path]}"/changelog.mfs
+changelog_file="${info[master_data_path]}"/changelog.sfs
 
-lizardfs_master_n 1 start
-assert_eventually "lizardfs_shadow_synchronized 1"
+saunafs_master_n 1 start
+assert_eventually "saunafs_shadow_synchronized 1"
 
 # Generate file for removal
 cd "${info[mount0]}"
@@ -52,4 +52,4 @@ assert_equals "$stat_before_rm" "$stat_after_recovery"
 create_count=$(cat $changelog_file | grep -B 3 UNDEL | grep CREATE | wc -l)
 assert_equals "$create_count" "3"
 
-assert_eventually "lizardfs_shadow_synchronized 1"
+assert_eventually "saunafs_shadow_synchronized 1"

@@ -1,19 +1,22 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -164,7 +167,7 @@ void eventloop_destruct() {
 		try {
 			fun();
 		} catch (Exception& ex) {
-			lzfs_pretty_syslog(LOG_WARNING, "term error: %s", ex.what());
+			safs_pretty_syslog(LOG_WARNING, "term error: %s", ex.what());
 		}
 	}
 }
@@ -200,11 +203,11 @@ uint64_t eventloop_utime() {
 uint8_t eventloop_want_to_terminate() {
 	if (gExitingStatus == ExitingStatus::kRunning) {
 		gExitingStatus = ExitingStatus::kWantExit;
-		lzfs_pretty_syslog(LOG_INFO, "Exiting on internal request.");
-		return LIZARDFS_STATUS_OK;
+		safs_pretty_syslog(LOG_INFO, "Exiting on internal request.");
+		return SAUNAFS_STATUS_OK;
 	} else {
-		lzfs_pretty_syslog(LOG_ERR, "Unable to exit on internal request.");
-		return LIZARDFS_ERROR_NOTPOSSIBLE;
+		safs_pretty_syslog(LOG_ERR, "Unable to exit on internal request.");
+		return SAUNAFS_ERROR_NOTPOSSIBLE;
 	}
 }
 
@@ -232,12 +235,12 @@ void eventloop_run() {
 		eventloop_updatetime();
 		if (i<0) {
 			if (errno==EAGAIN) {
-				lzfs_pretty_syslog(LOG_WARNING,"poll returned EAGAIN");
+				safs_pretty_syslog(LOG_WARNING,"poll returned EAGAIN");
 				usleep(100000);
 				continue;
 			}
 			if (errno!=EINTR) {
-				lzfs_pretty_syslog(LOG_WARNING,"poll error: %s",strerr(errno));
+				safs_pretty_syslog(LOG_WARNING,"poll error: %s",strerr(errno));
 				break;
 			}
 		} else {
@@ -319,7 +322,7 @@ void eventloop_run() {
 				try {
 					fun();
 				} catch (Exception& ex) {
-					lzfs_pretty_syslog(LOG_WARNING, "reload error: %s", ex.what());
+					safs_pretty_syslog(LOG_WARNING, "reload error: %s", ex.what());
 				}
 			}
 			gReloadRequested = false;

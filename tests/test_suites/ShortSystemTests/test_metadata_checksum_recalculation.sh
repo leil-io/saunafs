@@ -7,10 +7,10 @@ master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=DEBUG"
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="$master_cfg" \
 	DEBUG_LOG_FAIL_ON="master.fs.checksum.mismatch" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Create many chunks and directories to work on
 count=4000
@@ -33,7 +33,7 @@ truncate -s 0 "$TEMP_DIR/log"
 		assert_success attr -qs name -V $i dir_$k
 		assert_success attr -qs name -V $i dir_$((k+1))
 		for k in {0..19}; do
-			assert_success lizardfs setgoal $((1 + i % 7)) chunk_$(((k * s + (i % s)) % count))
+			assert_success saunafs setgoal $((1 + i % 7)) chunk_$(((k * s + (i % s)) % count))
 		done
 		: $((++i))
 	done &>/dev/null &
@@ -42,7 +42,7 @@ truncate -s 0 "$TEMP_DIR/log"
 # Recalculate metadata checksum in tight loop in background
 (
 	while ! test_frozen; do
-		assert_success lizardfs_admin_master magic-recalculate-metadata-checksum --timeout $(timeout_rescale_seconds 5)
+		assert_success saunafs_admin_master magic-recalculate-metadata-checksum --timeout $(timeout_rescale_seconds 5)
 	done &>/dev/null &
 )
 

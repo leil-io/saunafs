@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -eux -o pipefail
 script_dir="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")"
+# allow alias expansion in non-interactive shell
+shopt -s expand_aliases
+alias apt-get='apt-get --yes --assume-yes --option Dpkg::Options::="--force-confnew"'
 
 die() {  echo "Error: ${*}" >&2;  exit 1; }
+
+[ ${UID} -eq 0 ] || die "Run this script as root"
+
 extract_paragraphs() {
 	local search="${1}"
 	local file="${2}"
@@ -13,17 +19,16 @@ setup_machine_script="${script_dir}/../setup_machine.sh"
 [ -f "${setup_machine_script}" ] || die "Script not found: ${setup_machine_script}"
 
 extract_paragraphs 'echo Install necessary programs' "${setup_machine_script}" | \
-	sed "s/apt-get install/apt-get install -y/g" | \
 	bash -x /dev/stdin
 
 # Extras
-apt-get install -y \
+apt-get install \
   libdb-dev \
   libjudy-dev
 
 GTEST_ROOT="${GTEST_ROOT:-"/usr/local"}"
 readonly gtest_temp_build_dir="$(mktemp -d)"
-apt-get install -y cmake libgtest-dev
+apt-get install cmake libgtest-dev
 cmake -S /usr/src/googletest -B "${gtest_temp_build_dir}" -DCMAKE_INSTALL_PREFIX="${GTEST_ROOT}"
 make -C "${gtest_temp_build_dir}" install
 rm -rf "${gtest_temp_build_dir:?}"

@@ -1,0 +1,119 @@
+# Legacy version of SaunaFS used in tests and sources of its packages
+SAUNAFSXX_TAG="3.12.0"
+
+install_saunafsXX() {
+	rm -rf "$SAUNAFSXX_DIR"
+	mkdir -p "$SAUNAFSXX_DIR"
+	local distro="$(lsb_release -si)"
+	case "$distro" in
+		Ubuntu|Debian)
+			local codename="$(lsb_release -sc)"
+			mkdir -p ${TEMP_DIR}/apt/apt.conf.d
+			mkdir -p ${TEMP_DIR}/apt/var/lib/apt/partial
+			mkdir -p ${TEMP_DIR}/apt/var/cache/apt/archives/partial
+			mkdir -p ${TEMP_DIR}/apt/var/lib/dpkg
+			cp /var/lib/dpkg/status ${TEMP_DIR}/apt/var/lib/dpkg/status
+			cat >${TEMP_DIR}/apt/apt.conf << END
+Dir::State "${TEMP_DIR}/apt/var/lib/apt";
+Dir::State::status "${TEMP_DIR}/apt/var/lib/dpkg/status";
+Dir::Etc::SourceList "${TEMP_DIR}/apt/saunafs.list";
+Dir::Cache "${TEMP_DIR}/apt/var/cache/apt";
+Dir::Etc::Parts "${TEMP_DIR}/apt/apt.conf.d";
+END
+			local destdir="${TEMP_DIR}/apt/var/cache/apt/archives"
+			echo "deb [trusted=yes] https://dev.saunafs.com/packages/ ${codename}/" >${TEMP_DIR}/apt/saunafs.list
+			env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get update
+			env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get -y --allow-downgrades install -d \
+				saunafs-master=${SAUNAFSXX_TAG} \
+				saunafs-chunkserver=${SAUNAFSXX_TAG} \
+				saunafs-client=${SAUNAFSXX_TAG}
+			# unpack binaries
+			cd ${destdir}
+			find . -name "*master*.deb"      | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/sfsmaster
+			find . -name "*chunkserver*.deb" | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/sfschunkserver
+			find . -name "*client*.deb"      | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/bin/
+			cp -Rp usr/ ${SAUNAFSXX_DIR_BASE}/install
+			cd -
+			;;
+		CentOS|Fedora)
+			local destdir="${TEMP_DIR}/saunafsxx_packages"
+			mkdir ${destdir}
+			local url=""
+			if [ "$distro" == CentOS ]; then
+				url="http://dev.saunafs.com/packages/centos.saunafs.repo"
+			else
+				url="http://dev.saunafs.com/packages/fedora.saunafs.repo"
+			fi
+			mkdir -p ${TEMP_DIR}/dnf/etc/yum.repos.d
+			cat > ${TEMP_DIR}/dnf/dnf.conf << END
+[main]
+logdir=${TEMP_DIR}/dnf/var/log
+cachedir=${TEMP_DIR}/dnf/var/cache
+persistdir=${TEMP_DIR}/dnf/var/lib/dnf
+reposdir=${TEMP_DIR}/dnf/etc/yum.repos.d
+END
+			wget "$url" -O ${TEMP_DIR}/dnf/etc/yum.repos.d/saunafs.repo
+			for pkg in {saunafs-master,saunafs-chunkserver,saunafs-client}-${SAUNAFSXX_TAG} ; do
+				fakeroot dnf -y --config=${TEMP_DIR}/dnf/dnf.conf --destdir=${destdir} download ${pkg}
+			done
+			# unpack binaries
+			cd ${destdir}
+			find . -name "*master*.rpm"      | xargs rpm2cpio | cpio -idm ./usr/sbin/sfsmaster
+			find . -name "*chunkserver*.rpm" | xargs rpm2cpio | cpio -idm ./usr/sbin/sfschunkserver
+			find . -name "*client*.rpm"      | xargs rpm2cpio | cpio -idm ./usr/bin/*
+			cp -Rp usr/ ${SAUNAFSXX_DIR_BASE}/install
+			cd -
+			;;
+		*)
+			test_fail "Your distribution ($distro) is not supported."
+			;;
+	esac
+	test_saunafsXX_executables
+	echo "Legacy SaunaFS packages installed."
+}
+
+test_saunafsXX_executables() {
+	local awk_version_pattern="/$(sed 's/[.]/[.]/g' <<< $SAUNAFSXX_TAG)/"
+	test -x "$SAUNAFSXX_DIR/bin/sfsmount"
+	test -x "$SAUNAFSXX_DIR/sbin/sfschunkserver"
+	test -x "$SAUNAFSXX_DIR/sbin/sfsmaster"
+	assert_awk_finds $awk_version_pattern "$($SAUNAFSXX_DIR/bin/sfsmount --version 2>&1)"
+	assert_awk_finds $awk_version_pattern "$($SAUNAFSXX_DIR/sbin/sfschunkserver -v)"
+	assert_awk_finds $awk_version_pattern "$($SAUNAFSXX_DIR/sbin/sfsmaster -v)"
+}
+
+saunafsXX_chunkserver_daemon() {
+	"$SAUNAFSXX_DIR/sbin/sfschunkserver" -c "${saunafs_info_[chunkserver$1_cfg]}" "$2" | cat
+	return ${PIPESTATUS[0]}
+}
+
+saunafsXX_master_daemon() {
+	"$SAUNAFSXX_DIR/sbin/sfsmaster" -c "${saunafs_info_[master_cfg]}" "$1" | cat
+	return ${PIPESTATUS[0]}
+}
+
+# A generic function to run SaunaFS commands.
+#
+# Usage examples:
+#   sfs sfssetgoal 3 file
+#   sfs sfsdirinfo file
+#   sfs sfsmetalogger stop
+saunafsXX() {
+	local command="$1"
+	shift
+	"$SAUNAFSXX_DIR/"*bin"/$command" "$@" | cat
+	return ${PIPESTATUS[0]}
+}
+
+assert_saunafsXX_services_count_equals() {
+	local mas_expected="${1}"
+	local cs_expected="${2}"
+	local cli_expected="${3}"
+	assert_equals "${mas_expected}" "$(saunafs_admin_master info | grep "${SAUNAFSXX_TAG}" | wc -l)"
+	assert_equals "${cs_expected}" "$(saunafs_admin_master list-chunkservers | grep "${SAUNAFSXX_TAG}" | wc -l)"
+	assert_equals "${cli_expected}" "$(saunafs_admin_master list-mounts | grep "${SAUNAFSXX_TAG}" | wc -l)"
+}
+
+assert_no_saunafsXX_services_active() {
+	assert_saunafsXX_services_count_equals 0 0 0
+}

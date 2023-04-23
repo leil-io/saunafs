@@ -1,19 +1,21 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -23,7 +25,7 @@
 #include "common/attributes.h"
 #include "common/shared_mutex.h"
 #include "common/time_utils.h"
-#include "mount/lizard_client_context.h"
+#include "mount/sauna_client_context.h"
 #include "protocol/directory_entry.h"
 
 #include <boost/intrusive/list.hpp>
@@ -42,7 +44,7 @@
 class DirEntryCache {
 public:
 	struct DirEntry {
-		DirEntry(const LizardClient::Context &ctx, uint32_t parent_inode, uint32_t inode,
+		DirEntry(const SaunaClient::Context &ctx, uint32_t parent_inode, uint32_t inode,
 		         uint64_t index, uint64_t next_index, std::string name,
 				 Attributes attr, uint64_t ts)
 		    : uid(ctx.uid),
@@ -206,7 +208,7 @@ public:
 	 *
 	 * \return Iterator to found entry.
 	 */
-	LookupSet::iterator find(const LizardClient::Context &ctx, uint32_t parent_inode,
+	LookupSet::iterator find(const SaunaClient::Context &ctx, uint32_t parent_inode,
 	                         const std::string &name) {
 		return lookup_set_.find(std::make_tuple(parent_inode, ctx.uid, ctx.gid, name),
 		                        LookupCompare());
@@ -220,7 +222,7 @@ public:
 	 *
 	 * \return Iterator to found entry.
 	 */
-	IndexSet::iterator find(const LizardClient::Context &ctx, uint32_t parent_inode,
+	IndexSet::iterator find(const SaunaClient::Context &ctx, uint32_t parent_inode,
 	                        uint64_t index) {
 		return index_set_.find(std::make_tuple(parent_inode, ctx.uid, ctx.gid, index),
 		                       IndexCompare());
@@ -233,7 +235,7 @@ public:
 	 *
 	 * \return Iterator to found entry.
 	 */
-	InodeMultiset::iterator find(const LizardClient::Context &ctx, uint32_t inode) {
+	InodeMultiset::iterator find(const SaunaClient::Context &ctx, uint32_t inode) {
 		auto it = inode_multiset_.lower_bound(inode, InodeCompare());
 
 		while (it != inode_multiset_.end() && it->inode == inode) {
@@ -255,7 +257,7 @@ public:
 	 *
 	 * \return True if inode has been found in cache, false otherwise.
 	 */
-	bool lookup(const LizardClient::Context &ctx, uint32_t inode, Attributes &attr) {
+	bool lookup(const SaunaClient::Context &ctx, uint32_t inode, Attributes &attr) {
 		shared_lock<SharedMutex> guard(rwlock_);
 		updateTime();
 		auto it = find(ctx, inode);
@@ -278,7 +280,7 @@ public:
 	 *
 	 * \return True if inode has been found in cache, false otherwise.
 	 */
-	bool lookup(const LizardClient::Context &ctx, uint32_t parent_inode,
+	bool lookup(const SaunaClient::Context &ctx, uint32_t parent_inode,
 	            const std::string &name, uint32_t &inode, Attributes &attr) {
 		shared_lock<SharedMutex> guard(rwlock_);
 		updateTime();
@@ -302,7 +304,7 @@ public:
 	 * \param attr attributes of found directory entry.
 	 * \param timestamp Time when data has been obtained (used for entry timeout).
 	 */
-	void insert(const LizardClient::Context &ctx, uint32_t parent_inode, uint32_t inode,
+	void insert(const SaunaClient::Context &ctx, uint32_t parent_inode, uint32_t inode,
 	            uint64_t index, uint64_t next_index, const std::string name,
 				const Attributes &attr, uint64_t timestamp) {
 		// Avoid inserting stale data
@@ -329,7 +331,7 @@ public:
 	 * \param timestamp Time when data has been obtained (used for entry timeout).
 	 */
 	template <typename Container>
-	void insertSequence(const LizardClient::Context &ctx, uint32_t parent_inode,
+	void insertSequence(const SaunaClient::Context &ctx, uint32_t parent_inode,
 	                      const Container &container, uint64_t timestamp) {
 		// Avoid inserting stale data
 		if (timestamp + timeout_ <= current_time_) {
@@ -366,7 +368,7 @@ public:
 	 * \param parent_inode Parent node inode.
 	 * \param first_index Directory index of first entry to remove.
 	 */
-	void invalidate(const LizardClient::Context &ctx, uint32_t parent_inode, uint64_t first_index) {
+	void invalidate(const SaunaClient::Context &ctx, uint32_t parent_inode, uint64_t first_index) {
 		uint64_t entry_index = first_index;
 		while (true) {
 			auto it = index_set_.find(
@@ -422,7 +424,7 @@ public:
 	 * \param ctx Process credentials.
 	 * \param parent_inode Parent inode.
 	 */
-	void lockAndInvalidateParent(const LizardClient::Context &ctx, uint32_t parent_inode) {
+	void lockAndInvalidateParent(const SaunaClient::Context &ctx, uint32_t parent_inode) {
 		std::unique_lock<SharedMutex> guard(rwlock_);
 
 		auto it = index_set_.lower_bound(std::make_tuple(parent_inode, ctx.uid, ctx.gid, 0),
@@ -544,7 +546,7 @@ protected:
 		entry.attr = de.attributes;
 	}
 
-	IndexSet::iterator addEntry(const LizardClient::Context &ctx, uint32_t parent_inode,
+	IndexSet::iterator addEntry(const SaunaClient::Context &ctx, uint32_t parent_inode,
 	                            uint32_t inode, uint64_t index, uint64_t next_index,
 								std::string name, Attributes attr, uint64_t timestamp) {
 		DirEntry *entry =
@@ -554,7 +556,9 @@ protected:
 		inode_multiset_.insert(*entry);
 		fifo_list_.push_back(*entry);
 		if (lookup_set_.size() != index_set_.size()) {
-			lzfs::log_err("Inconsistent DirEntryCache index/lookup views, index:{} != lookup:{}\n", index_set_.size(), lookup_set_.size());
+			auto size1 = index_set_.size();
+			auto size2 = lookup_set_.size();
+			safs::log_err("Inconsistent DirEntryCache index-lookup views, index:%lu != lookup:%lu", size1, size2);
 		}
 		return result.first;
 	}

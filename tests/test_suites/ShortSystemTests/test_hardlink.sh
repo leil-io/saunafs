@@ -2,12 +2,12 @@ timeout_set 4 minutes
 
 CHUNKSERVERS=2 \
 	USE_RAMDISK="YES" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 mkdir hardlink_test
 cd hardlink_test
-lizardfs settrashtime -r 0 .
+saunafs settrashtime -r 0 .
 
 # Create a chain of hardlinks
 FILE_SIZE=123 file-generate file0
@@ -35,12 +35,12 @@ for i in {0..4098}; do
 	ln file63 file63-$i
 	assert_equals $(inode_of file63) $(inode_of file63-$i)
 	if ! ((i % 1024)); then
-		assert_success lizardfs_master_daemon restart
+		assert_success saunafs_master_daemon restart
 	fi
 done
 
 # Restart master and see if everything was loaded correctly
-assert_success lizardfs_master_daemon restart
+assert_success saunafs_master_daemon restart
 
 for i in {0..4098}; do
 	assert_success file-validate file63-$i

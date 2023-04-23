@@ -1,8 +1,8 @@
 #
-# To run this test you need to add the following lines to /etc/sudoers.d/lizardfstest:
+# To run this test you need to add the following lines to /etc/sudoers.d/saunafstest:
 #
-# lizardfstest ALL = NOPASSWD: /bin/mount, /bin/umount, /bin/pkill, /bin/mkdir, /bin/touch
-# lizardfstest ALL = NOPASSWD: /tmp/LizardFS-autotests/mnt/mfs0/bin/ganesha.nfsd
+# saunafstest ALL = NOPASSWD: /bin/mount, /bin/umount, /bin/pkill, /bin/mkdir, /bin/touch
+# saunafstest ALL = NOPASSWD: /usr/bin/ganesha.nfsd
 #
 # The path for the Ganesha daemon should match the installation folder inside the test.
 #
@@ -12,17 +12,13 @@
 #
 assert_program_installed fio
 
-timeout_set 5 minutes
+timeout_set 3 minutes
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
-	setup_local_empty_lizardfs info
-
-MINIMUM_PARALLEL_JOBS=4
-MAXIMUM_PARALLEL_JOBS=16
-PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
+	setup_local_empty_saunafs info
 
 test_error_cleanup() {
 	cd ${TEMP_DIR}
@@ -45,28 +41,7 @@ fi
 
 cd ${info[mount0]}
 
-# Copy Ganesha and libntirpc source code
-cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.3 nfs-ganesha-4.3
-cp -R "$SOURCE_DIR"/external/ntirpc-4.3 ntirpc-4.3
-
-# Remove original libntirpc folder to create a soft link
-rm -R nfs-ganesha-4.3/src/libntirpc
-ln -s ../../ntirpc-4.3 nfs-ganesha-4.3/src/libntirpc
-
-# Create build folder to compile Ganesha
-mkdir nfs-ganesha-4.3/src/build
-cd nfs-ganesha-4.3/src/build
-
-# flag -DUSE_GSS=NO disables the use of Kerberos library when compiling Ganesha
-CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} -DUSE_GSS=NO -D_USE_FSAL_LIZARDFS=OFF ..
-make -j${PARALLEL_JOBS} install
-
-# Copy LizardFS FSAL
-fsal_lizardfs=${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs.so
-assert_file_exists "$fsal_lizardfs"
-cp ${fsal_lizardfs} ${info[mount0]}/lib/ganesha
-
-cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
+cat <<EOF > ${info[mount0]}/ganesha.conf
 NFS_KRB5 {
 	Active_krb5=false;
 }
@@ -81,9 +56,9 @@ EXPORT
 	Pseudo = /;
 	Access_Type = RW;
 	FSAL {
-		Name = LizardFS;
+		Name = SaunaFS;
 		hostname = localhost;
-		port = ${lizardfs_info_[matocl]};
+		port = ${saunafs_info_[matocl]};
 		# How often to retry to connect
 		io_retries = 5;
 		cache_expiration_time_ms = 2500;
@@ -93,15 +68,15 @@ EXPORT
 		Clients = localhost;
 	}
 }
-LizardFS {
+SaunaFS {
 	PNFS_DS = true;
 	PNFS_MDS = true;
 }
 EOF
 
-sudo ${info[mount0]}/bin/ganesha.nfsd -f ${info[mount0]}/etc/ganesha/ganesha.conf
+sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
 
-sleep 10
+sleep 15
 sudo mount -vvvv localhost:/ $TEMP_DIR/mnt/ganesha
 
 echo ""
@@ -109,24 +84,30 @@ echo "Running fio sequential read on top of Ganesha Client:"
 cd ${TEMP_DIR}/mnt/ganesha
 
 # Run fio sequential read on top of Ganesha Client
-ganesha_report="$(fio --name=sequential_read_ganesha --directory=${TEMP_DIR}/mnt/ganesha --size=500M --rw=read --numjobs=1 --ioengine=libaio --group_reporting --bs=4M --direct=1 --iodepth=4)"
+ganesha_report="$(fio --name=sequential_read_ganesha \
+  --directory=${TEMP_DIR}/mnt/ganesha --size=500M --rw=read --numjobs=1 \
+  --ioengine=libaio --group_reporting --bs=4M --direct=1 --iodepth=4)"
 
 # print Ganesha read statistics
 echo "${ganesha_report}"
 
-ganesha_read_speed="$(echo "${ganesha_report}" | grep "READ: bw=" | cut -d ' ' -f 10 | cut -c2- | sed s/'),'/''/g)"
+ganesha_read_speed="$(echo "${ganesha_report}" | grep "READ: bw=" | \
+                      cut -d ' ' -f 10 | cut -c2- | sed s/'),'/''/g)"
 
 echo ""
 echo "Running fio sequential read on top of Linux Client:"
 cd ${info[mount0]}
 
 # Run fio sequential read on top of Linux Client
-linuxClient_report="$(fio --name=name=sequential_read_linux --directory=${info[mount0]}/linux --size=500M --rw=read --numjobs=1 --ioengine=libaio --group_reporting --bs=4M --direct=1 --iodepth=4)"
+linuxClient_report="$(fio --name=name=sequential_read_linux \
+  --directory=${info[mount0]}/linux --size=500M --rw=read --numjobs=1 \
+  --ioengine=libaio --group_reporting --bs=4M --direct=1 --iodepth=4)"
 
 # print Linux Client read statistics
 echo "${linuxClient_report}"
 
-linuxClient_read_speed="$(echo "${linuxClient_report}" | grep "READ: bw=" | cut -d ' ' -f 10 | cut -c2- | sed s/'),'/''/g)"
+linuxClient_read_speed="$(echo "${linuxClient_report}" | grep "READ: bw=" | \
+                          cut -d ' ' -f 10 | cut -c2- | sed s/'),'/''/g)"
 
 # Show performances of both clients
 echo ""

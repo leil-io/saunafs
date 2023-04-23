@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -36,7 +38,7 @@
 #include "common/slogger.h"
 #include "common/sockets.h"
 #include "mount/g_io_limiters.h"
-#include "mount/lizard_client.h"
+#include "mount/sauna_client.h"
 #include "mount/mastercomm.h"
 #include "mount/masterproxy.h"
 #include "mount/readdata.h"
@@ -51,9 +53,9 @@ using namespace ::polonaise;
 
 /**
  * Prepare a Polonaise's Status exception which informs the client that current operation
- * can't be performed in LizardFS.
+ * can't be performed in SaunaFS.
  * It indicates both an operation which can't be performed (e.g. because of permission denied)
- * or a LizardFS error
+ * or a SaunaFS error
  * \param type Status code
  * \return exception
  */
@@ -77,7 +79,7 @@ static Failure makeFailure(std::string message) {
 
 /**
  * Convert errno to Polonaise's StatusCode
- * \param errNo errno number from LizardFS client
+ * \param errNo errno number from SaunaFS client
  * \throw Failure when errno number is unknown
  * \return corresponding StatusCode for Polonaise client
  */
@@ -172,11 +174,11 @@ static uint64_t toUint64(int64_t value) {
 }
 
 /**
- * Convert flags from Polonaise client to LizardFS ones
+ * Convert flags from Polonaise client to SaunaFS ones
  * \param polonaiseFlags flags in Polonaise format
- * \return flags in LizardFS format
+ * \return flags in SaunaFS format
  */
-static int toLizardFsFlags(int32_t polonaiseFlags) {
+static int toSaunaFsFlags(int32_t polonaiseFlags) {
 	int flags = 0;
 	if ((polonaiseFlags & OpenFlags::kRead) && !(polonaiseFlags & OpenFlags::kWrite)) {
 		flags |= O_RDONLY;
@@ -196,14 +198,14 @@ static int toLizardFsFlags(int32_t polonaiseFlags) {
 }
 
 /**
- * Convert operation context to LizardFS format
+ * Convert operation context to SaunaFS format
  * \param ctx context in Polonaise format
  * \throw Failure when context couldn't be converted
  * \return converted context
  */
-static LizardClient::Context toLizardFsContext(const Context& ctx) {
+static SaunaClient::Context toSaunaFsContext(const Context& ctx) {
 	try {
-		LizardClient::Context outCtx(toUint32(ctx.uid), toUint32(ctx.gid), toInt32(ctx.pid),
+		SaunaClient::Context outCtx(toUint32(ctx.uid), toUint32(ctx.gid), toInt32(ctx.pid),
 				toUint32(ctx.umask));
 		return outCtx;
 	} catch (Failure& fail) {
@@ -254,7 +256,7 @@ static mode_t toModeFileType(const FileType::type type) {
  * \throw Failure when file type is incorrect
  * \return Unix file mode
  */
-static mode_t toLizardFsMode(const FileType::type& type, const Mode& mode) {
+static mode_t toSaunaFsMode(const FileType::type& type, const Mode& mode) {
 	mode_t result = toModeFileType(type);
 	result |= mode.setUid ? S_ISUID : 0;
 	result |= mode.setGid ? S_ISGID : 0;
@@ -272,21 +274,21 @@ static mode_t toLizardFsMode(const FileType::type& type, const Mode& mode) {
 }
 
 /**
- * Prepare LizardFS attributes set from Polonaise's ones.
- * The logic of the set is checked by a LizardFS call
+ * Prepare SaunaFS attributes set from Polonaise's ones.
+ * The logic of the set is checked by a SaunaFS call
  * \param set Polonaise attributes set
- * \return LizardFS one
+ * \return SaunaFS one
  */
-static int toLizardfsAttributesSet(int32_t set) {
+static int toSaunafsAttributesSet(int32_t set) {
 	int result = 0;
-	result |= (set & ToSet::kMode     ? LIZARDFS_SET_ATTR_MODE      : 0);
-	result |= (set & ToSet::kUid      ? LIZARDFS_SET_ATTR_UID       : 0);
-	result |= (set & ToSet::kGid      ? LIZARDFS_SET_ATTR_GID       : 0);
-	result |= (set & ToSet::kSize     ? LIZARDFS_SET_ATTR_SIZE      : 0);
-	result |= (set & ToSet::kAtime    ? LIZARDFS_SET_ATTR_ATIME     : 0);
-	result |= (set & ToSet::kMtime    ? LIZARDFS_SET_ATTR_MTIME     : 0);
-	result |= (set & ToSet::kAtimeNow ? LIZARDFS_SET_ATTR_ATIME_NOW : 0);
-	result |= (set & ToSet::kMtimeNow ? LIZARDFS_SET_ATTR_MTIME_NOW : 0);
+	result |= (set & ToSet::kMode     ? SAUNAFS_SET_ATTR_MODE      : 0);
+	result |= (set & ToSet::kUid      ? SAUNAFS_SET_ATTR_UID       : 0);
+	result |= (set & ToSet::kGid      ? SAUNAFS_SET_ATTR_GID       : 0);
+	result |= (set & ToSet::kSize     ? SAUNAFS_SET_ATTR_SIZE      : 0);
+	result |= (set & ToSet::kAtime    ? SAUNAFS_SET_ATTR_ATIME     : 0);
+	result |= (set & ToSet::kMtime    ? SAUNAFS_SET_ATTR_MTIME     : 0);
+	result |= (set & ToSet::kAtimeNow ? SAUNAFS_SET_ATTR_ATIME_NOW : 0);
+	result |= (set & ToSet::kMtimeNow ? SAUNAFS_SET_ATTR_MTIME_NOW : 0);
 	return result;
 }
 
@@ -299,7 +301,7 @@ static int toLizardfsAttributesSet(int32_t set) {
  */
 static struct stat toStructStat(const FileStat& fstat) {
 	struct stat result;
-	result.st_mode = toLizardFsMode(fstat.type, fstat.mode);
+	result.st_mode = toSaunaFsMode(fstat.type, fstat.mode);
 	result.st_dev = fstat.dev;
 	result.st_ino = fstat.inode;
 	result.st_nlink = fstat.nlink;
@@ -307,10 +309,10 @@ static struct stat toStructStat(const FileStat& fstat) {
 	result.st_gid = fstat.gid;
 	result.st_rdev = fstat.rdev;
 	result.st_size = fstat.size;
-#ifdef LIZARDFS_HAVE_STRUCT_STAT_ST_BLKSIZE
+#ifdef SAUNAFS_HAVE_STRUCT_STAT_ST_BLKSIZE
 	result.st_blksize = fstat.blockSize;
 #endif
-#ifdef LIZARDFS_HAVE_STRUCT_STAT_ST_BLOCKS
+#ifdef SAUNAFS_HAVE_STRUCT_STAT_ST_BLOCKS
 	result.st_blocks = fstat.blocks;
 #endif
 	result.st_atime = fstat.atime;
@@ -350,7 +352,7 @@ static FileStat toFileStat(const struct stat& in) {
 			reply.type = FileType::kSocket;
 			break;
 		default:
-			throw makeFailure("Unknown LizardFS file type: " + std::to_string(in.st_mode & S_IFMT));
+			throw makeFailure("Unknown SaunaFS file type: " + std::to_string(in.st_mode & S_IFMT));
 	}
 	reply.mode.setUid = in.st_mode & S_ISUID;
 	reply.mode.setGid = in.st_mode & S_ISGID;
@@ -373,10 +375,10 @@ static FileStat toFileStat(const struct stat& in) {
 	reply.gid = in.st_gid;
 	reply.rdev = in.st_rdev;
 	reply.size = in.st_size;
-#ifdef LIZARDFS_HAVE_STRUCT_STAT_ST_BLKSIZE
+#ifdef SAUNAFS_HAVE_STRUCT_STAT_ST_BLKSIZE
 	reply.blockSize = in.st_blksize;
 #endif
-#ifdef LIZARDFS_HAVE_STRUCT_STAT_ST_BLOCKS
+#ifdef SAUNAFS_HAVE_STRUCT_STAT_ST_BLOCKS
 	reply.blocks = in.st_blocks;
 #endif
 	reply.atime = in.st_atime;
@@ -387,11 +389,11 @@ static FileStat toFileStat(const struct stat& in) {
 
 /**
  * Convert file's entry to be sent to Polonaise client
- * \param in LizardFS's entry
+ * \param in SaunaFS's entry
  * \throw Failure when file type couldn't be converted
  * \return Polonaise's entry
  */
-static EntryReply toEntryReply(const LizardClient::EntryParam& in) {
+static EntryReply toEntryReply(const SaunaClient::EntryParam& in) {
 	if (in.attr_timeout < 0.0 || in.entry_timeout < 0.0) {
 		throw makeFailure("Invalid timeout");
 	}
@@ -414,16 +416,16 @@ static EntryReply toEntryReply(const LizardClient::EntryParam& in) {
  * End a general handling of exceptions
  */
 #define OPERATION_EPILOG\
-		} catch (LizardClient::RequestException& ex) {\
+		} catch (SaunaClient::RequestException& ex) {\
 			throw makeStatus(toStatusCode(ex.system_error_code));\
 		} catch (Failure& ex) {\
 			std::cerr << __FUNCTION__ << " failure: " << ex.message << std::endl;\
-			lzfs_pretty_syslog(LOG_ERR, "%s Failure: %s", __FUNCTION__, ex.message.c_str());\
+			safs_pretty_syslog(LOG_ERR, "%s Failure: %s", __FUNCTION__, ex.message.c_str());\
 			throw makeFailure(std::string(__FUNCTION__) + ": " + ex.message);\
 		}
 
 /**
- * Polonaise interface which operates on a LizardFS client
+ * Polonaise interface which operates on a SaunaFS client
  */
 class PolonaiseHandler : virtual public PolonaiseIf {
 public:
@@ -449,8 +451,8 @@ public:
 	void lookup(EntryReply& _return, const Context& context, const Inode inode,
 			const std::string& name) {
 		OPERATION_PROLOG
-		LizardClient::EntryParam entry = LizardClient::lookup(
-				toLizardFsContext(context),
+		SaunaClient::EntryParam entry = SaunaClient::lookup(
+				toSaunaFsContext(context),
 				toUint64(inode),
 				name.c_str());
 		_return = toEntryReply(entry);
@@ -464,8 +466,8 @@ public:
 	void getattr(AttributesReply& _return, const Context& context, const Inode inode,
 			const Descriptor) {
 		OPERATION_PROLOG
-		LizardClient::AttrReply reply = LizardClient::getattr(
-				toLizardFsContext(context),
+		SaunaClient::AttrReply reply = SaunaClient::getattr(
+				toSaunaFsContext(context),
 				toUint64(inode));
 		_return.attributes = toFileStat(reply.attr);
 		_return.attributesTimeout = reply.attrTimeout;
@@ -480,11 +482,11 @@ public:
 			const FileStat& attributes, const int32_t toSet, const Descriptor) {
 		OPERATION_PROLOG
 		struct stat stats = toStructStat(attributes);
-		LizardClient::AttrReply reply = LizardClient::setattr(
-				toLizardFsContext(context),
+		SaunaClient::AttrReply reply = SaunaClient::setattr(
+				toSaunaFsContext(context),
 				toUint64(inode),
 				&stats,
-				toLizardfsAttributesSet(toSet));
+				toSaunafsAttributesSet(toSet));
 		_return.attributes = toFileStat(reply.attr);
 		_return.attributesTimeout = reply.attrTimeout;
 		OPERATION_EPILOG
@@ -498,11 +500,11 @@ public:
 			const std::string& name, const FileType::type type, const Mode& mode,
 			const int32_t rdev) {
 		OPERATION_PROLOG
-		LizardClient::EntryParam reply = LizardClient::mknod(
-				toLizardFsContext(context),
+		SaunaClient::EntryParam reply = SaunaClient::mknod(
+				toSaunaFsContext(context),
 				toUint64(parent),
 				name.c_str(),
-				toLizardFsMode(type, mode),
+				toSaunaFsMode(type, mode),
 				rdev);
 		_return = toEntryReply(reply);
 		OPERATION_EPILOG
@@ -515,11 +517,11 @@ public:
 	void mkdir(EntryReply& _return, const Context& context, const Inode parent,
 			const std::string& name, const FileType::type type, const Mode& mode) {
 		OPERATION_PROLOG
-		LizardClient::EntryParam reply = LizardClient::mkdir(
-				toLizardFsContext(context),
+		SaunaClient::EntryParam reply = SaunaClient::mkdir(
+				toSaunaFsContext(context),
 				toUint64(parent),
 				name.c_str(),
-				toLizardFsMode(type, mode));
+				toSaunaFsMode(type, mode));
 		_return = toEntryReply(reply);
 		OPERATION_EPILOG
 	}
@@ -531,7 +533,7 @@ public:
 	Descriptor opendir(const Context& context, const Inode inode) {
 		OPERATION_PROLOG
 		Descriptor descriptor = createDescriptor(0);
-		LizardClient::opendir(toLizardFsContext(context), toUint32(inode));
+		SaunaClient::opendir(toSaunaFsContext(context), toUint32(inode));
 		return descriptor;
 		OPERATION_EPILOG
 	}
@@ -544,14 +546,14 @@ public:
 			const Inode inode, const int64_t firstEntryOffset,
 			const int64_t maxNumberOfEntries, const Descriptor) {
 		OPERATION_PROLOG
-		std::vector<LizardClient::DirEntry> entries = LizardClient::readdir(
-				toLizardFsContext(context),
+		std::vector<SaunaClient::DirEntry> entries = SaunaClient::readdir(
+				toSaunaFsContext(context),
 				toUint64(inode),
 				firstEntryOffset,
 				toUint64(maxNumberOfEntries));
 
 		_return.reserve(entries.size());
-		for (LizardClient::DirEntry& entry : entries) {
+		for (SaunaClient::DirEntry& entry : entries) {
 			_return.push_back({});
 			_return.back().name = std::move(entry.name);
 			_return.back().attributes = toFileStat(entry.attr);
@@ -566,7 +568,7 @@ public:
 	 */
 	void releasedir(const Context&, const Inode inode, const Descriptor descriptor) {
 		OPERATION_PROLOG
-		LizardClient::releasedir(toUint64(inode));
+		SaunaClient::releasedir(toUint64(inode));
 		removeDescriptor(descriptor);
 		OPERATION_EPILOG
 	}
@@ -577,7 +579,7 @@ public:
 	 */
 	void rmdir(const Context& context, const Inode parent, const std::string& name) {
 		OPERATION_PROLOG
-		LizardClient::rmdir(toLizardFsContext(context), toUint64(parent), name.c_str());
+		SaunaClient::rmdir(toSaunaFsContext(context), toUint64(parent), name.c_str());
 		OPERATION_EPILOG
 	}
 
@@ -587,14 +589,14 @@ public:
 	 */
 	void access(const Context& context, const Inode inode, const int32_t mask) {
 		OPERATION_PROLOG
-		int lizardFsMask = 0;
-		lizardFsMask |= mask & AccessMask::kRead    ? MODE_MASK_R : 0;
-		lizardFsMask |= mask & AccessMask::kWrite   ? MODE_MASK_W : 0;
-		lizardFsMask |= mask & AccessMask::kExecute ? MODE_MASK_X : 0;
-		LizardClient::access(
-				toLizardFsContext(context),
+		int saunaFsMask = 0;
+		saunaFsMask |= mask & AccessMask::kRead    ? MODE_MASK_R : 0;
+		saunaFsMask |= mask & AccessMask::kWrite   ? MODE_MASK_W : 0;
+		saunaFsMask |= mask & AccessMask::kExecute ? MODE_MASK_X : 0;
+		SaunaClient::access(
+				toSaunaFsContext(context),
 				toUint64(inode),
-				lizardFsMask);
+				saunaFsMask);
 		OPERATION_EPILOG
 	}
 
@@ -606,12 +608,12 @@ public:
 			const std::string& name, const Mode& mode, const int32_t flags) {
 		OPERATION_PROLOG
 		Descriptor descriptor = createDescriptor(flags);
-		LizardClient::FileInfo* fi = getFileInfo(descriptor);
-		LizardClient::EntryParam reply = LizardClient::create(
-				toLizardFsContext(context),
+		SaunaClient::FileInfo* fi = getFileInfo(descriptor);
+		SaunaClient::EntryParam reply = SaunaClient::create(
+				toSaunaFsContext(context),
 				toUint64(parent),
 				name.c_str(),
-				toLizardFsMode(FileType::kRegular, mode),
+				toSaunaFsMode(FileType::kRegular, mode),
 				fi);
 		_return.entry = toEntryReply(reply);
 		_return.descriptor = descriptor;
@@ -627,8 +629,8 @@ public:
 	void open(OpenReply& _return, const Context& context, const Inode inode, const int32_t flags) {
 		OPERATION_PROLOG
 		Descriptor descriptor = createDescriptor(flags);
-		LizardClient::FileInfo* fi = getFileInfo(descriptor);
-		LizardClient::open(toLizardFsContext(context), toUint64(inode), fi);
+		SaunaClient::FileInfo* fi = getFileInfo(descriptor);
+		SaunaClient::open(toSaunaFsContext(context), toUint64(inode), fi);
 		_return.descriptor = descriptor;
 		_return.directIo = fi->direct_io;
 		_return.keepCache = fi->keep_cache;
@@ -647,17 +649,17 @@ public:
 			throw makeFailure("Null descriptor");
 		}
 
-		if (LizardClient::isSpecialInode(inode)) {
-			std::vector<uint8_t> buffer = LizardClient::read_special_inode(
-					toLizardFsContext(context),
+		if (SaunaClient::isSpecialInode(inode)) {
+			std::vector<uint8_t> buffer = SaunaClient::read_special_inode(
+					toSaunaFsContext(context),
 					toUint64(inode),
 					size,
 					offset,
 					getFileInfo(descriptor));
 			_return.assign(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 		} else {
-			auto result = LizardClient::read(
-					toLizardFsContext(context),
+			auto result = SaunaClient::read(
+					toSaunaFsContext(context),
 					toUint64(inode),
 					size,
 					offset,
@@ -682,8 +684,8 @@ public:
 		if (descriptor == g_polonaise_constants.kNullDescriptor) {
 			throw makeFailure("Null descriptor");
 		}
-		LizardClient::BytesWritten written = LizardClient::write(
-				toLizardFsContext(context),
+		SaunaClient::BytesWritten written = SaunaClient::write(
+				toSaunaFsContext(context),
 				toUint64(inode),
 				data.data(),
 				size,
@@ -703,8 +705,8 @@ public:
 		if (descriptor == g_polonaise_constants.kNullDescriptor) {
 			throw makeFailure("Null descriptor");
 		}
-		LizardClient::fsync(
-				toLizardFsContext(context),
+		SaunaClient::fsync(
+				toSaunaFsContext(context),
 				toUint64(inode),
 				syncOnlyData,
 				getFileInfo(descriptor));
@@ -720,7 +722,7 @@ public:
 		if (descriptor == g_polonaise_constants.kNullDescriptor) {
 			throw makeFailure("Null descriptor");
 		}
-		LizardClient::flush(toLizardFsContext(context), toUint64(inode), getFileInfo(descriptor));
+		SaunaClient::flush(toSaunaFsContext(context), toUint64(inode), getFileInfo(descriptor));
 		OPERATION_EPILOG
 	}
 
@@ -733,7 +735,7 @@ public:
 		if (descriptor == g_polonaise_constants.kNullDescriptor) {
 			throw makeFailure("Null descriptor");
 		}
-		LizardClient::release(toUint64(inode), getFileInfo(descriptor));
+		SaunaClient::release(toUint64(inode), getFileInfo(descriptor));
 		removeDescriptor(descriptor);
 		OPERATION_EPILOG
 	}
@@ -744,7 +746,7 @@ public:
 	 */
 	void statfs(StatFsReply& _return, const Context& context, const Inode inode) {
 		OPERATION_PROLOG
-		struct statvfs sv = LizardClient::statfs(toLizardFsContext(context), toUint64(inode));
+		struct statvfs sv = SaunaClient::statfs(toSaunaFsContext(context), toUint64(inode));
 		_return.filesystemId = sv.f_fsid;
 		_return.maxNameLength = sv.f_namemax;
 		_return.blockSize = sv.f_bsize;
@@ -764,8 +766,8 @@ public:
 	void symlink(EntryReply& _return, const Context& context, const std::string& path,
 				const Inode parent, const std::string& name) {
 		OPERATION_PROLOG
-		LizardClient::EntryParam entry = LizardClient::symlink(
-				toLizardFsContext(context),
+		SaunaClient::EntryParam entry = SaunaClient::symlink(
+				toSaunaFsContext(context),
 				path.c_str(),
 				toUint64(parent),
 				name.c_str());
@@ -779,7 +781,7 @@ public:
 	 */
 	void readlink(std::string& _return, const Context& context, const Inode inode) {
 		OPERATION_PROLOG
-		_return = LizardClient::readlink(toLizardFsContext(context), toUint64(inode));
+		_return = SaunaClient::readlink(toSaunaFsContext(context), toUint64(inode));
 		OPERATION_EPILOG
 	}
 
@@ -790,8 +792,8 @@ public:
 	void link(EntryReply& _return, const Context& context, const Inode inode,
 			const Inode newParent, const std::string& newName) {
 		OPERATION_PROLOG
-		_return = toEntryReply(LizardClient::link(
-				toLizardFsContext(context),
+		_return = toEntryReply(SaunaClient::link(
+				toSaunaFsContext(context),
 				toUint64(inode),
 				toUint64(newParent),
 				newName.c_str()));
@@ -804,7 +806,7 @@ public:
 	 */
 	void unlink(const Context& context, const Inode parent, const std::string& name) {
 		OPERATION_PROLOG
-		LizardClient::unlink(toLizardFsContext(context), toUint64(parent), name.c_str());
+		SaunaClient::unlink(toSaunaFsContext(context), toUint64(parent), name.c_str());
 		OPERATION_EPILOG
 	}
 
@@ -815,8 +817,8 @@ public:
 	void rename(const Context& context, const Inode parent, const std::string& name,
 			const Inode newParent, const std::string& newName) {
 		OPERATION_PROLOG
-		LizardClient::rename(
-				toLizardFsContext(context),
+		SaunaClient::rename(
+				toSaunaFsContext(context),
 				toUint64(parent),
 				name.c_str(),
 				toUint64(newParent),
@@ -832,10 +834,10 @@ public:
 		      const std::string& name, const int64_t size) {
 		OPERATION_PROLOG
 		uint32_t position = 0;
-		auto a = LizardClient::getxattr(toLizardFsContext(context), toUint64(inode),
+		auto a = SaunaClient::getxattr(toSaunaFsContext(context), toUint64(inode),
 						name.c_str(), size, position);
 		if (size == 0) {
-			a = LizardClient::getxattr(toLizardFsContext(context), toUint64(inode),
+			a = SaunaClient::getxattr(toSaunaFsContext(context), toUint64(inode),
 						   name.c_str(),  a.valueLength, position);
 		}
 		_return.assign(a.valueBuffer.begin(), a.valueBuffer.end());
@@ -850,7 +852,7 @@ public:
 		      const std::string& value, const int64_t size, const int32_t flags) {
 		OPERATION_PROLOG
 		uint32_t position = 0;
-		LizardClient::setxattr(toLizardFsContext(context), toUint64(inode), name.c_str(), value.c_str(),
+		SaunaClient::setxattr(toSaunaFsContext(context), toUint64(inode), name.c_str(), value.c_str(),
 				       size, flags, position);
 		OPERATION_EPILOG
 	}
@@ -862,9 +864,9 @@ public:
 	void listxattr(std::string& _return, const Context& context, const Inode inode,
 		       const int64_t size) {
 		OPERATION_PROLOG
-		auto a = LizardClient::listxattr(toLizardFsContext(context), toUint64(inode), size);
+		auto a = SaunaClient::listxattr(toSaunaFsContext(context), toUint64(inode), size);
 		if (size == 0) {
-			a = LizardClient::listxattr(toLizardFsContext(context), toUint64(inode), a.valueLength);
+			a = SaunaClient::listxattr(toSaunaFsContext(context), toUint64(inode), a.valueLength);
 		}
 		_return.assign(a.valueBuffer.begin(), a.valueBuffer.end());
 		OPERATION_EPILOG
@@ -876,7 +878,7 @@ public:
 	 */
 	void removexattr(const Context& context, const Inode inode, const std::string& name) {
 		OPERATION_PROLOG
-		LizardClient::removexattr(toLizardFsContext(context), toUint64(inode), name.c_str());
+		SaunaClient::removexattr(toSaunaFsContext(context), toUint64(inode), name.c_str());
 		OPERATION_EPILOG
 	}
 
@@ -890,7 +892,7 @@ private:
 		std::lock_guard<std::mutex> lock(mutex_);
 		Descriptor descriptor = ++lastDescriptor_;
 		fileInfos_.insert({descriptor,
-				LizardClient::FileInfo(toLizardFsFlags(polonaiseFlags), 0, 0, descriptor, 0)});
+				SaunaClient::FileInfo(toSaunaFsFlags(polonaiseFlags), 0, 0, descriptor, 0)});
 		return descriptor;
 	}
 
@@ -909,12 +911,12 @@ private:
 	}
 
 	/**
-	 * Get file information for LizardFS by a descriptor
+	 * Get file information for SaunaFS by a descriptor
 	 * \param descriptor identifier of opened file
 	 * \throw Failure when descriptor doesn't exist
 	 * \return pointer to file information or NULL when null descriptor is given
 	 */
-	LizardClient::FileInfo* getFileInfo(Descriptor descriptor) {
+	SaunaClient::FileInfo* getFileInfo(Descriptor descriptor) {
 		std::lock_guard<std::mutex> lock(mutex_);
 		if (descriptor == g_polonaise_constants.kNullDescriptor) {
 			return nullptr;
@@ -934,7 +936,7 @@ private:
 	/**
 	 * Map for containing file information for each opened file
 	 */
-	std::map<Descriptor, LizardClient::FileInfo> fileInfos_;
+	std::map<Descriptor, SaunaClient::FileInfo> fileInfos_;
 
 	/**
 	 * Last descriptor used
@@ -977,7 +979,7 @@ bool daemonize() {
 			exit(0);
 		}
 
-		lzfs_pretty_syslog(LOG_ERR, "First fork failed: %s", strerror(errno));
+		safs_pretty_syslog(LOG_ERR, "First fork failed: %s", strerror(errno));
 		return false ;
 	}
 
@@ -987,7 +989,7 @@ bool daemonize() {
 	setsid();
 	int r = chdir("/");
 	if (r < 0) {
-		lzfs_pretty_syslog(LOG_ERR, "Change directory failed: %s", strerror(errno));
+		safs_pretty_syslog(LOG_ERR, "Change directory failed: %s", strerror(errno));
 	}
 	umask(0);
 
@@ -997,7 +999,7 @@ bool daemonize() {
 			exit(0);
 		}
 
-		lzfs_pretty_syslog(LOG_ERR, "Second fork failed: %s", strerror(errno));
+		safs_pretty_syslog(LOG_ERR, "Second fork failed: %s", strerror(errno));
 		return false;
 	}
 
@@ -1006,15 +1008,15 @@ bool daemonize() {
 	close(2);
 
 	if (open("/dev/null", O_RDONLY) < 0) {
-		lzfs_pretty_syslog(LOG_ERR, "Unable to open /dev/null: %s", strerror(errno));
+		safs_pretty_syslog(LOG_ERR, "Unable to open /dev/null: %s", strerror(errno));
 		return false;
 	}
 	if (open("/dev/null", O_WRONLY) < 0) {
-		lzfs_pretty_syslog(LOG_ERR, "Unable to open /dev/null: %s", strerror(errno));
+		safs_pretty_syslog(LOG_ERR, "Unable to open /dev/null: %s", strerror(errno));
 		return false;
 	}
 	if (dup(1) < 0) {
-		lzfs_pretty_syslog(LOG_ERR, "Unable to duplicate stdout descriptor: %s", strerror(errno));
+		safs_pretty_syslog(LOG_ERR, "Unable to duplicate stdout descriptor: %s", strerror(errno));
 		return false;
 	}
 
@@ -1036,11 +1038,11 @@ int main (int argc, char **argv) {
 	sigaction(SIGUSR1, &sa, nullptr);
 #endif
 
-	openlog("lizardfs-polonaise-server", 0, LOG_DAEMON);
+	openlog("saunafs-polonaise-server", 0, LOG_DAEMON);
 
 	// Daemonize if needed
 	if (gSetup.make_daemon && !daemonize()) {
-		lzfs_pretty_syslog(LOG_ERR, "Unable to daemonize lizardfs-polonaise-server");
+		safs_pretty_syslog(LOG_ERR, "Unable to daemonize saunafs-polonaise-server");
 		return EXIT_FAILURE;
 	}
 #endif
@@ -1048,8 +1050,8 @@ int main (int argc, char **argv) {
 	setvbuf(stdout, NULL, _IONBF, 0);
 	setvbuf(stderr, NULL, _IONBF, 0);
 
-	// Initialize LizardFS client
-	LizardClient::FsInitParams params("", gSetup.master_host, gSetup.master_port, gSetup.mountpoint);
+	// Initialize SaunaFS client
+	SaunaClient::FsInitParams params("", gSetup.master_host, gSetup.master_port, gSetup.mountpoint);
 	params.meta = false;
 	params.subfolder = gSetup.subfolder;
 	params.password_digest = std::vector<uint8_t>(gSetup.password.begin(), gSetup.password.end());
@@ -1069,7 +1071,7 @@ int main (int argc, char **argv) {
 
 	params.debug_mode = gSetup.debug;
 	params.verbose = true;
-	LizardClient::fs_init(params);
+	SaunaClient::fs_init(params);
 
 	// Thrift server start
 	using namespace ::apache::thrift;
@@ -1098,7 +1100,7 @@ int main (int argc, char **argv) {
 		gServer->serve();
 	}
 
-	LizardClient::fs_term();
+	SaunaClient::fs_term();
 
 	return 0;
 }

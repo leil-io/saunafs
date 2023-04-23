@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -101,7 +103,7 @@ public:
 		return acl;
 	}
 
-	LIZARDFS_DEFINE_SERIALIZE_METHODS(owningGroupMask_, list_);
+	SAUNAFS_DEFINE_SERIALIZE_METHODS(owningGroupMask_, list_);
 
 private:
 	AccessMask owningGroupMask_;
@@ -110,7 +112,7 @@ private:
 
 class AccessControlList {
 public:
-	LIZARDFS_CREATE_EXCEPTION_CLASS(IncorrectStringRepresentationException, Exception);
+	SAUNAFS_CREATE_EXCEPTION_CLASS(IncorrectStringRepresentationException, Exception);
 
 	AccessControlList() {
 	}
@@ -156,7 +158,7 @@ public:
 		return acl;
 	}
 
-	LIZARDFS_DEFINE_SERIALIZE_METHODS(mode, extendedAcl);
+	SAUNAFS_DEFINE_SERIALIZE_METHODS(mode, extendedAcl);
 
 	std::unique_ptr<ExtendedAcl> extendedAcl;
 	uint16_t mode;

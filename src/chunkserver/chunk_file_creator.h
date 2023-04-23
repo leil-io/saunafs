@@ -1,27 +1,28 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/platform.h"
 
+#include "chunkserver-common/chunk_interface.h"
 #include "common/chunk_part_type.h"
-#include "chunkserver/chunk.h"
 
 /**
  * @brief Helper class to create chunk with data.
@@ -48,7 +49,7 @@ protected:
 	uint32_t chunk_version_;
 	ChunkPartType chunk_type_;
 
-	Chunk *chunk_;
+	IChunk *chunk_;
 
 	bool is_created_;
 	bool is_open_;

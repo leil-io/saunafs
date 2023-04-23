@@ -1,31 +1,32 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2016
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "common/platform.h"
 #include "master/chunkserver_db.h"
+#include "common/platform.h"
 
+#include "common/cfg.h"
 #include "common/integer_sequence.h"
-#include "common/lizardfs_version.h"
-#include "common/media_label.h"
+#include "common/saunafs_version.h"
 #include "master/matocsserv.h"
 
-#include <cstdint>
 #include <unordered_map>
 
 struct csdb_hash {
@@ -123,6 +124,21 @@ std::vector<ChunkserverListEntry> csdb_chunkserver_list() {
 		}
 	}
 	return result;
+}
+
+std::string csdb_chunkserver_configs() {
+	std::map<std::string, std::string> chunkserverConfigs;
+
+	for (const auto &entry : gCSDB) {
+		if (entry.second.eptr == nullptr) {
+			continue;
+		}
+		std::string address = matocsserv_getstrip(entry.second.eptr)
+			+ std::string(":")
+			+ std::to_string(entry.first.second);
+		chunkserverConfigs[address] = entry.second.config;
+	}
+	return cfg_yaml_list("chunkservers", chunkserverConfigs);
 }
 
 int csdb_remove_server(uint32_t ip, uint16_t port) {

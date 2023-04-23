@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -26,7 +27,7 @@
 
 #if defined(__GNUC__) && defined(__GNUC_MINOR__)
 #  if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)
-#    define LIZARDFS_HAVE_BUILTIN_ASSUME_ALIGNED
+#    define SAUNAFS_HAVE_BUILTIN_ASSUME_ALIGNED
 #  endif
 #endif
 
@@ -72,7 +73,7 @@ static inline void blockXorAligned(uint8_t* dest, const uint8_t* source, size_t 
 	intptr_t d = reinterpret_cast<intptr_t>(dest);
 	intptr_t s = reinterpret_cast<intptr_t>(source);
 	sassert(d % ALIGNMENT == 0 && s % ALIGNMENT == 0);
-#ifdef LIZARDFS_HAVE_BUILTIN_ASSUME_ALIGNED
+#ifdef SAUNAFS_HAVE_BUILTIN_ASSUME_ALIGNED
 	uint8_t* alignedDest =
 		static_cast<uint8_t*>(__builtin_assume_aligned(dest, ALIGNMENT));
 	const uint8_t* alignedSource =

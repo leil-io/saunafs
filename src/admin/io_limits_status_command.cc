@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -34,7 +36,7 @@ void IoLimitsStatusCommand::usage() const {
 	std::cerr << "    Prints current configuration of global I/O limiting" << std::endl;
 }
 
-LizardFsProbeCommand::SupportedOptions IoLimitsStatusCommand::supportedOptions() const {
+SaunaFsProbeCommand::SupportedOptions IoLimitsStatusCommand::supportedOptions() const {
 	return { {kPorcelainMode, kPorcelainModeDescription} };
 }
 
@@ -45,7 +47,7 @@ void IoLimitsStatusCommand::run(const Options& options) const {
 
 	ServerConnection connection(options.argument(0), options.argument(1));
 	auto request = cltoma::iolimitsStatus::build(1);
-	auto response = connection.sendAndReceive(request, LIZ_MATOCL_IOLIMITS_STATUS);
+	auto response = connection.sendAndReceive(request, SAU_MATOCL_IOLIMITS_STATUS);
 
 	uint32_t messageId, configId, period_us, accumulate_ms;
 	std::string subsystem;

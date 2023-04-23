@@ -3,7 +3,7 @@ assert_program_installed nfs4_getfacl
 
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 
@@ -54,31 +54,31 @@ nfs4_getfacl dir1/dir2 | grep EVERYONE | grep ':rx'
 
 # Step 2: custom ACLs for files
 
-nfs4_setfacl -a A::lizardfstest_1:rwxcCa file1
-nfs4_setfacl -a A::lizardfstest_2:rwcCa file1
-nfs4_setfacl -a D::lizardfstest_3:rC file1
+nfs4_setfacl -a A::saunafstest_1:rwxcCa file1
+nfs4_setfacl -a A::saunafstest_2:rwcCa file1
+nfs4_setfacl -a D::saunafstest_3:rC file1
 
-nfs4_getfacl file1 | grep 'D::lizardfstest_3:rC'
-nfs4_getfacl file1 | grep 'A::lizardfstest_2:rwacC'
-nfs4_getfacl file1 | grep 'A::lizardfstest_1:rwaxcC'
+nfs4_getfacl file1 | grep 'D::saunafstest_3:rC'
+nfs4_getfacl file1 | grep 'A::saunafstest_2:rwacC'
+nfs4_getfacl file1 | grep 'A::saunafstest_1:rwaxcC'
 
-assert_equals 3 $(nfs4_getfacl file1 | grep lizardfstest_ | wc -l)
+assert_equals 3 $(nfs4_getfacl file1 | grep saunafstest_ | wc -l)
 
 # Step 3: custom ACLs for directories
 
-nfs4_setfacl -a D::lizardfstest_5:rwCD dir1
-nfs4_setfacl -a A::lizardfstest_6:D dir1
+nfs4_setfacl -a D::saunafstest_5:rwCD dir1
+nfs4_setfacl -a A::saunafstest_6:D dir1
 
-nfs4_setfacl -a A::lizardfstest_6:D dir1/dir2
-nfs4_setfacl -a D::lizardfstest_7:Dx dir1/dir2
+nfs4_setfacl -a A::saunafstest_6:D dir1/dir2
+nfs4_setfacl -a D::saunafstest_7:Dx dir1/dir2
 
 nfs4_getfacl dir1 | grep OWNER | grep ':rwaDx'
 nfs4_getfacl dir1 | grep EVERYONE | grep ':rx'
 nfs4_getfacl dir1/dir2 | grep OWNER | grep ':rwaDx'
 nfs4_getfacl dir1/dir2 | grep EVERYONE | grep ':rx'
 
-nfs4_getfacl dir1 | grep 'A::lizardfstest_6:D'
-nfs4_getfacl dir1 | grep 'D::lizardfstest_5:rwDC'
+nfs4_getfacl dir1 | grep 'A::saunafstest_6:D'
+nfs4_getfacl dir1 | grep 'D::saunafstest_5:rwDC'
 
-nfs4_getfacl dir1/dir2 | grep 'D::lizardfstest_7:Dx'
-nfs4_getfacl dir1/dir2 | grep 'A::lizardfstest_6:D'
+nfs4_getfacl dir1/dir2 | grep 'D::saunafstest_7:Dx'
+nfs4_getfacl dir1/dir2 | grep 'A::saunafstest_6:D'

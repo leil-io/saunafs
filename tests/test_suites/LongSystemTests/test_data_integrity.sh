@@ -1,15 +1,15 @@
 timeout_set 1 hour
 
 CHUNKSERVERS=3 \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd ${info[mount0]}
 directories=()
 for goal in 1 2 xor2; do
 	dir="goal_$goal"
 	mkdir "$dir"
-	lizardfs setgoal "$goal" "$dir"
+	saunafs setgoal "$goal" "$dir"
 	directories+=("$dir")
 done
 
@@ -28,7 +28,7 @@ test_worker() {
 			if ! file-validate "$file"; then
 				test_add_failure "Invalid data: block $block_size, size $file_size, file $file"
 			fi
-			lizardfs settrashtime 0 "$file" &>/dev/null
+			saunafs settrashtime 0 "$file" &>/dev/null
 			rm -f "$file"
 		else
 			test_add_failure "file-validate failed: block $block_size, size $file_size, file $file"

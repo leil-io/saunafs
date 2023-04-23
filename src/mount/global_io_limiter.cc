@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -31,13 +33,13 @@
 using namespace ioLimiting;
 
 MasterLimiter::MasterLimiter() : iolimitsConfigHandler_(*this), configVersion_(0) {
-	auto res = fs_register_packet_type_handler(LIZ_MATOCL_IOLIMITS_CONFIG, &iolimitsConfigHandler_);
+	auto res = fs_register_packet_type_handler(SAU_MATOCL_IOLIMITS_CONFIG, &iolimitsConfigHandler_);
 	(void)res;
 	assert(res);
 }
 
 MasterLimiter::~MasterLimiter() {
-	auto res = fs_unregister_packet_type_handler(LIZ_MATOCL_IOLIMITS_CONFIG, &iolimitsConfigHandler_);
+	auto res = fs_unregister_packet_type_handler(SAU_MATOCL_IOLIMITS_CONFIG, &iolimitsConfigHandler_);
 	(void)res;
 	assert(res);
 }
@@ -45,9 +47,9 @@ MasterLimiter::~MasterLimiter() {
 uint64_t MasterLimiter::request(const IoLimitGroupId& groupId, uint64_t size) {
 	MessageBuffer buffer;
 	cltoma::iolimit::serialize(buffer, 0, configVersion_, groupId, size);
-	uint8_t status = fs_raw_sendandreceive(buffer, LIZ_MATOCL_IOLIMIT);
-	if (status != LIZARDFS_STATUS_OK) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Sending IOLIMIT returned status %s", lizardfs_error_string(status));
+	uint8_t status = fs_raw_sendandreceive(buffer, SAU_MATOCL_IOLIMIT);
+	if (status != SAUNAFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_NOTICE, "Sending IOLIMIT returned status %s", saunafs_error_string(status));
 		return 0;
 	}
 	uint32_t receivedMsgid, receivedConfigVersion;
@@ -56,13 +58,13 @@ uint64_t MasterLimiter::request(const IoLimitGroupId& groupId, uint64_t size) {
 	matocl::iolimit::deserialize(buffer, receivedMsgid, receivedConfigVersion, receivedGroupId,
 			receivedSize);
 	if (receivedConfigVersion != configVersion_) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 				"Received unexpected IOLIMIT config version %" PRIu32 " instead of %" PRIu32,
 				receivedConfigVersion, configVersion_);
 		return 0;
 	}
 	if (receivedGroupId != groupId) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Received IOLIMIT group %s instead of %s",
+		safs_pretty_syslog(LOG_NOTICE, "Received IOLIMIT group %s instead of %s",
 				receivedGroupId.c_str(), groupId.c_str());
 		return 0;
 	}
@@ -79,10 +81,10 @@ bool MasterLimiter::IolimitsConfigHandler::handle(MessageBuffer buffer) {
 				configVersion, delta_us, subsystem, groups);
 		parent_.configVersion_ = configVersion;
 		parent_.reconfigure_(delta_us, subsystem, groups);
-		lzfs_pretty_syslog(LOG_INFO, "Received IO limits configuration update from master");
+		safs_pretty_syslog(LOG_INFO, "Received IO limits configuration update from master");
 		return true;
 	} catch (IncorrectDeserializationException& ex) {
-		lzfs_pretty_syslog(LOG_ERR, "Malformed MATOCL_IOLIMITS_CONFIG: %s", ex.what());
+		safs_pretty_syslog(LOG_ERR, "Malformed MATOCL_IOLIMITS_CONFIG: %s", ex.what());
 		return false;
 	}
 }
@@ -112,17 +114,17 @@ uint8_t LimiterProxy::waitForRead(const pid_t pid, const uint64_t size, SteadyTi
 	uint8_t status;
 	do {
 		if (!enabled_) {
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 		IoLimitGroupId groupId = getIoLimitGroupIdNoExcept(pid, subsystem_);
 		// Grab a shared_ptr reference on the group descriptor so that reconfigure() can
 		// quickly unreference this group from the groups_ map without waiting for us.
 		std::shared_ptr<Group> group = getGroup(groupId);
 		if (!group) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		status = group->wait(size, deadline, lock);
-	} while (status == LIZARDFS_ERROR_ENOENT); // loop if the group disappeared due to reconfiguration
+	} while (status == SAUNAFS_ERROR_ENOENT); // loop if the group disappeared due to reconfiguration
 	return status;
 }
 

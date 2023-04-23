@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -136,9 +138,9 @@ TEST(LimiterGroupTests, GroupDeadline) {
 	std::mutex mutex;
 	std::unique_lock<std::mutex> lock(mutex);
 
-	ASSERT_EQ(LIZARDFS_ERROR_TIMEOUT, group.wait(1, clock.now() - std::chrono::seconds(1), lock));
-	ASSERT_EQ(LIZARDFS_ERROR_TIMEOUT, group.wait(1, clock.now(), lock));
-	ASSERT_EQ(LIZARDFS_STATUS_OK, group.wait(1, clock.now() + std::chrono::seconds(1), lock));
+	ASSERT_EQ(SAUNAFS_ERROR_TIMEOUT, group.wait(1, clock.now() - std::chrono::seconds(1), lock));
+	ASSERT_EQ(SAUNAFS_ERROR_TIMEOUT, group.wait(1, clock.now(), lock));
+	ASSERT_EQ(SAUNAFS_STATUS_OK, group.wait(1, clock.now() + std::chrono::seconds(1), lock));
 }
 
 // Check if the request is handled without any sleeps when the limit is not reached
@@ -172,20 +174,20 @@ TEST(LimiterGroupTests, Die) {
 	{
 		std::unique_lock<std::mutex> lock(mutex);
 		clock.increase(std::chrono::seconds(1));
-		ASSERT_EQ(LIZARDFS_STATUS_OK, group.wait(1, clock.now() + std::chrono::seconds(1), lock));
+		ASSERT_EQ(SAUNAFS_STATUS_OK, group.wait(1, clock.now() + std::chrono::seconds(1), lock));
 	}
 	group.die(); // .. but not after 'die' is called:
 	{
 		std::unique_lock<std::mutex> lock(mutex);
 		clock.increase(std::chrono::seconds(1));
-		ASSERT_EQ(LIZARDFS_ERROR_ENOENT, group.wait(1, clock.now() + std::chrono::seconds(1), lock));
+		ASSERT_EQ(SAUNAFS_ERROR_ENOENT, group.wait(1, clock.now() + std::chrono::seconds(1), lock));
 	}
 }
 
 // It would be nice to provide this test, but we don't have any cgroup mock:
 // TEST(LimiterProxyTests, GroupRemoved)
 
-#if defined(LIZARDFS_HAVE_STD_FUTURE)
+#if defined(SAUNAFS_HAVE_STD_FUTURE)
 // Check if the throughput is properly limited during a reconfiguration
 TEST(LimiterGroupTests, ThroughputChangeAfterReconfiguration) {
 	const int N = 20;
@@ -210,7 +212,7 @@ TEST(LimiterGroupTests, ThroughputChangeAfterReconfiguration) {
 					std::unique_lock<std::mutex> lock(mutex);
 					uint8_t status = group.wait(1024 * 1024/*1MB*/,
 							clock.now() + std::chrono::seconds(10), lock);
-					ASSERT_EQ(LIZARDFS_STATUS_OK, status);
+					ASSERT_EQ(SAUNAFS_STATUS_OK, status);
 					total++;
 					someoneFinished.notify_all();
 				}));
@@ -268,7 +270,7 @@ TEST(LimiterProxyTests, EndTimeAfterManyParallelReads) {
 				}
 				// wait for them to finish:
 				for (auto& status : statuses) {
-					ASSERT_EQ(LIZARDFS_STATUS_OK, status.get());
+					ASSERT_EQ(SAUNAFS_STATUS_OK, status.get());
 				}
 
 				// Check if they finished after a sane time. The limit is 1KBps, so we expect that
@@ -331,7 +333,7 @@ TEST(LimiterProxyTests, ManyMountsSummaryThroughput) {
 			asyncs.push_back(std::async(std::launch::async, [&proxyLimiter, M, &deadline, &mutex,
 					&someoneCompleted, &completed, &expectedToBeCompleted]() {
 						for (auto i = 0; i < M; ++i) {
-							ASSERT_EQ(LIZARDFS_STATUS_OK, proxyLimiter.waitForRead(
+							ASSERT_EQ(SAUNAFS_STATUS_OK, proxyLimiter.waitForRead(
 									getpid(), 1024/*1KB*/, deadline));
 							std::unique_lock<std::mutex> lock(mutex);
 							completed++;
@@ -389,7 +391,7 @@ TEST(LimiterProxyTests, NumberOfRequestesSentToMaster) {
 				asyncs.push_back(
 						std::async(std::launch::async, [&lp, &deadline, &cond, &mutex, &completed]()
 						{
-							ASSERT_EQ(LIZARDFS_STATUS_OK, lp.waitForRead(getpid(), 1024/*1KB*/, deadline));
+							ASSERT_EQ(SAUNAFS_STATUS_OK, lp.waitForRead(getpid(), 1024/*1KB*/, deadline));
 							completed++;
 							std::unique_lock<std::mutex> lock(mutex);
 							cond.notify_all();

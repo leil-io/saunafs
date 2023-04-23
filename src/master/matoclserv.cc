@@ -1,22 +1,25 @@
 /*
-   Copyright 2005-2017 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2017 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
+#include "common/sessions_file.h"
 #include "master/matoclserv.h"
 
 #include <errno.h>
@@ -48,13 +51,13 @@
 #include "common/human_readable_format.h"
 #include "common/io_limits_config_loader.h"
 #include "common/io_limits_database.h"
-#include "common/lizardfs_statistics.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_statistics.h"
+#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/md5.h"
 #include "common/metadata.h"
-#include "common/moosefs_vector.h"
+#include "common/xaunafs_vector.h"
 #include "common/network_address.h"
 #include "common/random.h"
 #include "common/serialized_goal.h"
@@ -78,7 +81,7 @@
 #include "master/settrashtime_task.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
 #define MaxPacketSize 1000000
 
@@ -185,8 +188,8 @@ typedef struct packetstruct {
  *    1: FUSE_REGISTER_BLOB_NOACL       or (FUSE_REGISTER_BLOB_ACL and (REGISTER_NEWSESSION or REGISTER_NEWMETASESSION or REGISTER_RECONNECT))
  *       This is referred to as "mounts and new tools" or "standard, registered clients".
  *  100: FUSE_REGISTER_BLOB_TOOLS_NOACL or (FUSE_REGISTER_BLOB_ACL and REGISTER_TOOLS)
- *       This is referred to as "old mfstools".
- *  665: lizardfs-admin after successful authentication
+ *       This is referred to as "old sfstools".
+ *  665: saunafs-admin after successful authentication
  */
 enum class ClientState {
 	kUnregistered = 0,
@@ -221,7 +224,7 @@ struct matoclserventry {
 
 	uint8_t passwordrnd[32];
 	session *sesdata;
-	std::unique_ptr<LizMatoclAdminRegisterChallengeData> adminChallenge;
+	std::unique_ptr<SauMatoclAdminRegisterChallengeData> adminChallenge;
 	AdminTask adminTask;                   // admin task requested by this client
 	chunklist *chunkdelayedops;
 
@@ -259,7 +262,7 @@ public:
 	static const PacketSerializer* getSerializer(PacketHeader::Type type, uint32_t version);
 	virtual ~PacketSerializer() {}
 
-	virtual bool isLizardFsPacketSerializer() const = 0;
+	virtual bool isSaunaFsPacketSerializer() const = 0;
 
 	virtual void serializeFuseReadChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const = 0;
@@ -295,34 +298,34 @@ public:
 			uint32_t& uid, uint32_t& gid, uint64_t& length) const = 0;
 };
 
-class MooseFsPacketSerializer : public PacketSerializer {
+class XaunaFsPacketSerializer : public PacketSerializer {
 public:
-	virtual bool isLizardFsPacketSerializer() const {
+	virtual bool isSaunaFsPacketSerializer() const {
 		return false;
 	}
 
 	virtual void serializeFuseReadChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const {
-		serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, status);
+		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, status);
 	}
 
 	virtual void serializeFuseReadChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint64_t fileLength, uint64_t chunkId, uint32_t chunkVersion,
 			const std::vector<ChunkTypeWithAddress>& chunkCopies) const {
-		MooseFSVector<NetworkAddress> standardChunkCopies;
+		XaunaFSVector<NetworkAddress> standardChunkCopies;
 		getStandardChunkCopies(chunkCopies, standardChunkCopies);
-		serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, fileLength,
+		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, fileLength,
 				chunkId, chunkVersion, standardChunkCopies);
 	}
 
 	virtual void deserializeFuseReadChunk(const std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint32_t& inode, uint32_t& chunkIndex) const {
-		deserializeAllMooseFsPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
+		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
 	}
 
 	virtual void serializeFuseWriteChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const {
-		serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, status);
+		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, status);
 	}
 
 	virtual void serializeFuseWriteChunk(std::vector<uint8_t>& packetBuffer,
@@ -330,27 +333,27 @@ public:
 			uint64_t chunkId, uint32_t chunkVersion, uint32_t lockId,
 			const std::vector<ChunkTypeWithAddress>& chunkCopies) const {
 		sassert(lockId == 1);
-		MooseFSVector<NetworkAddress> standardChunkCopies;
+		XaunaFSVector<NetworkAddress> standardChunkCopies;
 		getStandardChunkCopies(chunkCopies, standardChunkCopies);
-		serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, fileLength,
+		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, fileLength,
 						chunkId, chunkVersion, standardChunkCopies);
 	}
 
 	virtual void deserializeFuseWriteChunk(const std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint32_t& inode, uint32_t& chunkIndex, uint32_t& lockId) const {
-		deserializeAllMooseFsPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
+		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
 		lockId = 1;
 	}
 
 	virtual void serializeFuseWriteChunkEnd(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const {
-		serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK_END, messageId, status);
+		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK_END, messageId, status);
 	}
 
 	virtual void deserializeFuseWriteChunkEnd(const std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint64_t& chunkId, uint32_t& lockId,
 			uint32_t& inode, uint64_t& fileLength) const {
-		deserializeAllMooseFsPacketDataNoHeader(packetBuffer,
+		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer,
 				messageId, chunkId, inode, fileLength);
 		lockId = 1;
 	}
@@ -359,11 +362,11 @@ public:
 			uint32_t type, uint32_t messageId, uint8_t status) const {
 		sassert(type == FUSE_TRUNCATE || type == FUSE_TRUNCATE_END);
 		if (type == FUSE_TRUNCATE) {
-			serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, status);
+			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, status);
 		} else {
 			// this should never happen, so do anything
-			serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
-					messageId, uint8_t(LIZARDFS_ERROR_ENOTSUP));
+			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
+					messageId, uint8_t(SAUNAFS_ERROR_ENOTSUP));
 		}
 	}
 
@@ -371,11 +374,11 @@ public:
 			uint32_t type, uint32_t messageId, const Attributes& attributes) const {
 		sassert(type == FUSE_TRUNCATE || type == FUSE_TRUNCATE_END);
 		if (type == FUSE_TRUNCATE) {
-			serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, attributes);
+			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, attributes);
 		} else {
 			// this should never happen, so do anything
-			serializeMooseFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
-					messageId, uint8_t(LIZARDFS_ERROR_ENOTSUP));
+			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
+					messageId, uint8_t(SAUNAFS_ERROR_ENOTSUP));
 		}
 
 	}
@@ -383,15 +386,15 @@ public:
 	virtual void deserializeFuseTruncate(std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint32_t& inode, bool& isOpened,
 			uint32_t& uid, uint32_t& gid, uint64_t& length) const {
-		deserializeAllMooseFsPacketDataNoHeader(packetBuffer,
+		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer,
 				messageId, inode, isOpened, uid, gid, length);
 
 	}
 };
 
-class LizardFsPacketSerializer : public PacketSerializer {
+class SaunaFsPacketSerializer : public PacketSerializer {
 public:
-	virtual bool isLizardFsPacketSerializer() const {
+	virtual bool isSaunaFsPacketSerializer() const {
 		return true;
 	}
 
@@ -471,7 +474,7 @@ public:
 	}
 };
 
-class LizardFsStdXorPacketSerializer : public LizardFsPacketSerializer {
+class SaunaFsStdXorPacketSerializer : public SaunaFsPacketSerializer {
 public:
 	virtual void serializeFuseReadChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint64_t fileLength, uint64_t chunkId, uint32_t chunkVersion,
@@ -505,15 +508,15 @@ public:
 
 
 const PacketSerializer* PacketSerializer::getSerializer(PacketHeader::Type type, uint32_t version) {
-	sassert((type >= PacketHeader::kMinLizPacketType && type <= PacketHeader::kMaxLizPacketType)
+	sassert((type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType)
 			|| type <= PacketHeader::kMaxOldPacketType);
 	if (type <= PacketHeader::kMaxOldPacketType) {
-		static MooseFsPacketSerializer singleton;
+		static XaunaFsPacketSerializer singleton;
 		return &singleton;
 	} else {
-		static LizardFsPacketSerializer singleton;
+		static SaunaFsPacketSerializer singleton;
 		if (version < kFirstECVersion) {
-			static LizardFsStdXorPacketSerializer singleton_stdxor;
+			static SaunaFsStdXorPacketSerializer singleton_stdxor;
 			return &singleton_stdxor;
 		}
 		return &singleton;
@@ -605,14 +608,14 @@ void matoclserv_store_sessions() {
 
 	fd = fopen(kSessionsTmpFilename, "w");
 	if (fd==NULL) {
-		lzfs_silent_errlog(LOG_WARNING,"can't store sessions, open error");
+		safs_silent_errlog(LOG_WARNING,"can't store sessions, open error");
 		return;
 	}
-	memcpy(fsesrecord,MFSSIGNATURE "S \001\006\004",8);
+	memcpy(fsesrecord,SFSSIGNATURE "S \001\006\004",8);
 	ptr = fsesrecord+8;
 	put16bit(&ptr,SESSION_STATS);
 	if (fwrite(fsesrecord,10,1,fd)!=1) {
-		lzfs_pretty_syslog(LOG_WARNING,"can't store sessions, fwrite error");
+		safs_pretty_syslog(LOG_WARNING,"can't store sessions, fwrite error");
 		fclose(fd);
 		return;
 	}
@@ -644,13 +647,13 @@ void matoclserv_store_sessions() {
 				put32bit(&ptr,asesdata->lasthouropstats[i]);
 			}
 			if (fwrite(fsesrecord,(43+SESSION_STATS*8),1,fd)!=1) {
-				lzfs_pretty_syslog(LOG_WARNING,"can't store sessions, fwrite error");
+				safs_pretty_syslog(LOG_WARNING,"can't store sessions, fwrite error");
 				fclose(fd);
 				return;
 			}
 			if (ileng>0) {
 				if (fwrite(asesdata->info,ileng,1,fd)!=1) {
-					lzfs_pretty_syslog(LOG_WARNING,"can't store sessions, fwrite error");
+					safs_pretty_syslog(LOG_WARNING,"can't store sessions, fwrite error");
 					fclose(fd);
 					return;
 				}
@@ -658,11 +661,11 @@ void matoclserv_store_sessions() {
 		}
 	}
 	if (fclose(fd)!=0) {
-		lzfs_silent_errlog(LOG_WARNING,"can't store sessions, fclose error");
+		safs_silent_errlog(LOG_WARNING,"can't store sessions, fclose error");
 		return;
 	}
 	if (rename(kSessionsTmpFilename, kSessionsFilename) < 0) {
-		lzfs_silent_errlog(LOG_WARNING,"can't store sessions, rename error");
+		safs_silent_errlog(LOG_WARNING,"can't store sessions, rename error");
 	}
 }
 
@@ -680,7 +683,7 @@ int matoclserv_load_sessions() {
 
 	fd = fopen(kSessionsFilename, "r");
 	if (fd==NULL) {
-		lzfs_silent_errlog(LOG_WARNING,"can't load sessions, fopen error");
+		safs_silent_errlog(LOG_WARNING,"can't load sessions, fopen error");
 		if (errno==ENOENT) {    // it's ok if file does not exist
 			return 0;
 		} else {
@@ -688,44 +691,44 @@ int matoclserv_load_sessions() {
 		}
 	}
 	if (fread(hdr,8,1,fd)!=1) {
-		lzfs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
+		safs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
 		fclose(fd);
 		return -1;
 	}
-	if (memcmp(hdr,MFSSIGNATURE "S 1.5",8)==0) {
+	if (memcmp(hdr,SFSSIGNATURE "S 1.5",8)==0) {
 		mapalldata = 0;
 		goaltrashdata = 0;
 		statsinfile = 16;
-	} else if (memcmp(hdr,MFSSIGNATURE "S \001\006\001",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\001",8)==0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		statsinfile = 16;
-	} else if (memcmp(hdr,MFSSIGNATURE "S \001\006\002",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\002",8)==0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		statsinfile = 21;
-	} else if (memcmp(hdr,MFSSIGNATURE "S \001\006\003",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\003",8)==0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		if (fread(hdr,2,1,fd)!=1) {
-			lzfs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
+			safs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
 			fclose(fd);
 			return -1;
 		}
 		ptr = hdr;
 		statsinfile = get16bit(&ptr);
-	} else if (memcmp(hdr,MFSSIGNATURE "S \001\006\004",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\004",8)==0) {
 		mapalldata = 1;
 		goaltrashdata = 1;
 		if (fread(hdr,2,1,fd)!=1) {
-			lzfs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
+			safs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
 			fclose(fd);
 			return -1;
 		}
 		ptr = hdr;
 		statsinfile = get16bit(&ptr);
 	} else {
-		lzfs_pretty_syslog(LOG_WARNING,"can't load sessions, bad header");
+		safs_pretty_syslog(LOG_WARNING,"can't load sessions, bad header");
 		fclose(fd);
 		return -1;
 	}
@@ -786,7 +789,7 @@ int matoclserv_load_sessions() {
 					free(asesdata->info);
 					delete asesdata;
 					free(fsesrecord);
-					lzfs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
+					safs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
 					fclose(fd);
 					return -1;
 				}
@@ -797,13 +800,13 @@ int matoclserv_load_sessions() {
 		}
 		if (ferror(fd)) {
 			free(fsesrecord);
-			lzfs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
+			safs_pretty_syslog(LOG_WARNING,"can't load sessions, fread error");
 			fclose(fd);
 			return -1;
 		}
 	}
 	free(fsesrecord);
-	lzfs_pretty_syslog(LOG_NOTICE,"sessions have been loaded");
+	safs_pretty_syslog(LOG_NOTICE,"sessions have been loaded");
 	fclose(fd);
 	return 1;
 }
@@ -815,7 +818,7 @@ int matoclserv_insert_openfile(session* cr,uint32_t inode) {
 	ofpptr = &(cr->openedfiles);
 	while ((ofptr=*ofpptr)) {
 		if (ofptr->inode==inode) {
-			return LIZARDFS_STATUS_OK;       // file already acquired - nothing to do
+			return SAUNAFS_STATUS_OK;       // file already acquired - nothing to do
 		}
 		if (ofptr->inode>inode) {
 			break;
@@ -823,7 +826,7 @@ int matoclserv_insert_openfile(session* cr,uint32_t inode) {
 		ofpptr = &(ofptr->next);
 	}
 	status = fs_acquire(FsContext::getForMaster(eventloop_time()), inode, cr->sessionid);
-	if (status==LIZARDFS_STATUS_OK) {
+	if (status==SAUNAFS_STATUS_OK) {
 		ofptr = (filelist*)malloc(sizeof(filelist));
 		passert(ofptr);
 		ofptr->inode = inode;
@@ -871,7 +874,7 @@ void matoclserv_remove_open_file(uint32_t sessionid, uint32_t inode) {
 	for (asesdata = sessionshead; asesdata && asesdata->sessionid != sessionid; asesdata = asesdata->next) {
 	}
 	if (asesdata == NULL) {
-		lzfs_pretty_syslog(LOG_ERR, "sessions file is corrupted");
+		safs_pretty_syslog(LOG_ERR, "sessions file is corrupted");
 		return;
 	}
 
@@ -950,12 +953,12 @@ static inline void matoclserv_ugid_remap(matoclserventry *eptr,uint32_t *auid,ui
 
 static inline uint8_t matoclserv_check_group_cache(matoclserventry *eptr, uint32_t gid) {
 	if (!user_groups::isGroupCacheId(gid)) {
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	}
 
 	assert(eptr && eptr->sesdata);
 	auto it = eptr->sesdata->group_cache.find(user_groups::decodeGroupCacheId(gid));
-	return it == eptr->sesdata->group_cache.end() ? LIZARDFS_ERROR_GROUPNOTREGISTERED : LIZARDFS_STATUS_OK;
+	return it == eptr->sesdata->group_cache.end() ? SAUNAFS_ERROR_GROUPNOTREGISTERED : SAUNAFS_STATUS_OK;
 }
 
 /**
@@ -1041,17 +1044,17 @@ uint8_t matoclserv_fuse_write_chunk_respond(matoclserventry *eptr,
 	remove_unsupported_ec_parts(eptr->version, allChunkCopies);
 
 	// don't allow old clients to modify standard copy of a xor chunk
-	if (status == LIZARDFS_STATUS_OK && !serializer->isLizardFsPacketSerializer()) {
+	if (status == SAUNAFS_STATUS_OK && !serializer->isSaunaFsPacketSerializer()) {
 		for (const ChunkTypeWithAddress& chunkCopy : allChunkCopies) {
 			if (!slice_traits::isStandard(chunkCopy.chunk_type)) {
-				status = LIZARDFS_ERROR_NOCHUNK;
+				status = SAUNAFS_ERROR_NOCHUNK;
 				break;
 			}
 		}
 	}
 
 	std::vector<uint8_t> outMessage;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		serializer->serializeFuseWriteChunk(outMessage, messageId, fileLength,
 				chunkId, chunkVersion, lockId, allChunkCopies);
 	} else {
@@ -1108,10 +1111,10 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	}
 
 	if (!eptr) {
-		lzfs_pretty_syslog(LOG_WARNING,"got chunk status, but don't want it");
+		safs_pretty_syslog(LOG_WARNING,"got chunk status, but don't want it");
 		return;
 	}
-	if (status==LIZARDFS_STATUS_OK) {
+	if (status==SAUNAFS_STATUS_OK) {
 		dcm_modify(inode,eptr->sesdata->sessionid);
 	}
 
@@ -1121,19 +1124,19 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 
 	switch (type) {
 	case FUSE_WRITE:
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			serializer->serializeFuseWriteChunk(reply, qid, status);
 			matoclserv_createpacket(eptr, std::move(reply));
 		} else {
 			status = matoclserv_fuse_write_chunk_respond(eptr, serializer,
 					chunkid, qid, fleng, lockid);
 		}
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			fs_writeend(0, 0, chunkid, 0); // ignore status - just do it.
 		}
 		return;
 	case FUSE_TRUNCATE_BEGIN:
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			matocl::fuseTruncate::serialize(reply, qid, status);
 		} else {
 			matocl::fuseTruncate::serialize(reply, qid, fleng, lockid);
@@ -1143,7 +1146,7 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	case FUSE_TRUNCATE:
 	case FUSE_TRUNCATE_END:
 		fs_end_setlength(chunkid);
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			serializer->serializeFuseTruncate(reply, type, qid, status);
 		} else {
 			Attributes attr;
@@ -1153,13 +1156,13 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 		matoclserv_createpacket(eptr, std::move(reply));
 		return;
 	default:
-		lzfs_pretty_syslog(LOG_WARNING,"got chunk status, but operation type is unknown");
+		safs_pretty_syslog(LOG_WARNING,"got chunk status, but operation type is unknown");
 	}
 }
 
 void matoclserv_cserv_list(matoclserventry *eptr, const uint8_t */*data*/, uint32_t length) {
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_CSERV_LIST - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_CSERV_LIST - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1179,7 +1182,7 @@ void matoclserv_cserv_list(matoclserventry *eptr, const uint8_t */*data*/, uint3
 	}
 }
 
-void matoclserv_liz_cserv_list(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
+void matoclserv_sau_cserv_list(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
 	MessageBuffer buffer;
 	PacketVersion version;
 	bool dummy;
@@ -1192,7 +1195,7 @@ void matoclserv_liz_cserv_list(matoclserventry *eptr, const uint8_t *data, uint3
 		cltoma::cservList::deserialize(data, length, message_id, dummy);
 		matocl::cservList::serialize(buffer, message_id, csdb_chunkserver_list());
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,"LIZ_CSERV_LIST - wrong packet version %u", version);
+		safs_pretty_syslog(LOG_NOTICE,"SAU_CSERV_LIST - wrong packet version %u", version);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1203,7 +1206,7 @@ void matoclserv_cserv_removeserv(matoclserventry *eptr,const uint8_t *data,uint3
 	uint32_t ip;
 	uint16_t port;
 	if (length!=6) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_CSSERV_REMOVESERV - wrong size (%" PRIu32 "/6)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_CSSERV_REMOVESERV - wrong size (%" PRIu32 "/6)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1237,10 +1240,10 @@ void matoclserv_metadataserver_status(matoclserventry* eptr, const uint8_t* data
 		metadataVersion = fs_getversion();
 	} catch (NoMetadataException&) {}
 	uint8_t status = metadataserver::isMaster()
-		? LIZ_METADATASERVER_STATUS_MASTER
+		? SAU_METADATASERVER_STATUS_MASTER
 		: (masterconn_is_connected()
-			 ? LIZ_METADATASERVER_STATUS_SHADOW_CONNECTED
-			 : LIZ_METADATASERVER_STATUS_SHADOW_DISCONNECTED);
+			 ? SAU_METADATASERVER_STATUS_SHADOW_CONNECTED
+			 : SAU_METADATASERVER_STATUS_SHADOW_DISCONNECTED);
 
 	MessageBuffer buffer;
 	matocl::metadataserverStatus::serialize(buffer,
@@ -1275,7 +1278,7 @@ void matoclserv_session_list(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uint8_t vmode;
 	(void)data;
 	if (length!=0 && length!=1) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_SESSION_LIST - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_SESSION_LIST - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1356,7 +1359,7 @@ void matoclserv_chart(matoclserventry *eptr,const uint8_t *data,uint32_t length)
 	uint32_t l;
 
 	if (length!=4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART - wrong size (%" PRIu32 "/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1383,7 +1386,7 @@ void matoclserv_chart_data(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uint32_t l;
 
 	if (length!=4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%" PRIu32 "/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1396,22 +1399,22 @@ void matoclserv_chart_data(matoclserventry *eptr,const uint8_t *data,uint32_t le
 }
 
 void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	LizardFsStatistics statistics;
+	SaunaFsStatistics statistics;
 	(void)data;
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_INFO - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_INFO - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
-	statistics.version = lizardfsVersion(LIZARDFS_PACKAGE_VERSION_MAJOR,
-			LIZARDFS_PACKAGE_VERSION_MINOR, LIZARDFS_PACKAGE_VERSION_MICRO);
+	statistics.version = saunafsVersion(SAUNAFS_PACKAGE_VERSION_MAJOR,
+			SAUNAFS_PACKAGE_VERSION_MINOR, SAUNAFS_PACKAGE_VERSION_MICRO);
 	fs_info(&statistics.totalSpace, &statistics.availableSpace, &statistics.trashSpace,
 			&statistics.trashNodes, &statistics.reservedSpace, &statistics.reservedNodes,
 			&statistics.allNodes, &statistics.dirNodes, &statistics.fileNodes);
 	chunk_info(&statistics.chunks, &statistics.chunkCopies, &statistics.regularCopies);
 	statistics.memoryUsage = chartsdata_memusage();
 	std::vector<uint8_t> response;
-	serializeMooseFsPacket(response, MATOCL_INFO, statistics);
+	serializeXaunaFsPacket(response, MATOCL_INFO, statistics);
 	matoclserv_createpacket(eptr, response);
 }
 
@@ -1420,7 +1423,7 @@ void matoclserv_fstest_info(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	(void)data;
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FSTEST_INFO - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FSTEST_INFO - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1445,7 +1448,7 @@ void matoclserv_chunkstest_info(matoclserventry *eptr,const uint8_t *data,uint32
 	uint8_t *ptr;
 	(void)data;
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_CHUNKSTEST_INFO - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_CHUNKSTEST_INFO - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1458,7 +1461,7 @@ void matoclserv_chunks_matrix(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t matrixid;
 	(void)data;
 	if (length>1) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_CHUNKS_MATRIX - wrong size (%" PRIu32 "/0|1)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_CHUNKS_MATRIX - wrong size (%" PRIu32 "/0|1)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1476,7 +1479,7 @@ void matoclserv_exports_info(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uint8_t *ptr;
 	uint8_t vmode;
 	if (length!=0 && length!=1) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_EXPORTS_INFO - wrong size (%" PRIu32 "/0|1)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_EXPORTS_INFO - wrong size (%" PRIu32 "/0|1)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1493,7 +1496,7 @@ void matoclserv_mlog_list(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	uint8_t *ptr;
 	(void)data;
 	if (length!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_MLOG_LIST - wrong size (%" PRIu32 "/0)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_MLOG_LIST - wrong size (%" PRIu32 "/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1503,7 +1506,7 @@ void matoclserv_mlog_list(matoclserventry *eptr,const uint8_t *data,uint32_t len
 
 void matoclserv_metadataservers_list(matoclserventry* eptr, const uint8_t* data, uint32_t length) {
 	cltoma::metadataserversList::deserialize(data, length);
-	matoclserv_createpacket(eptr, matocl::metadataserversList::build(LIZARDFS_VERSHEX,
+	matoclserv_createpacket(eptr, matocl::metadataserversList::build(SAUNAFS_VERSHEX,
 			matomlserv_shadows()));
 }
 
@@ -1530,7 +1533,7 @@ static void matoclserv_broadcast_iolimits_cfg() {
 
 void matoclserv_ping(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t size;
-	deserializeAllMooseFsPacketDataNoHeader(data, length, size);
+	deserializeAllXaunaFsPacketDataNoHeader(data, length, size);
 	matoclserv_createpacket(eptr, ANTOAN_PING_REPLY, size);
 }
 
@@ -1546,7 +1549,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		return;
 	}
 	if (length<64) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER - wrong size (%" PRIu32 "/<64)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER - wrong size (%" PRIu32 "/<64)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1554,19 +1557,19 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 	if (eptr->registered == ClientState::kUnregistered
 			&& (memcmp(data,FUSE_REGISTER_BLOB_NOACL,64)==0 || tools)) {
 		if (RejectOld) {
-			lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/NOACL - rejected (option REJECT_OLD_CLIENTS is set)");
+			safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/NOACL - rejected (option REJECT_OLD_CLIENTS is set)");
 			eptr->mode = KILL;
 			return;
 		}
 		if (tools) {
 			if (length!=64 && length!=68) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/NOACL-TOOLS - wrong size (%" PRIu32 "/64|68)",length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/NOACL-TOOLS - wrong size (%" PRIu32 "/64|68)",length);
 				eptr->mode = KILL;
 				return;
 			}
 		} else {
 			if (length!=68 && length!=72) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/NOACL-MOUNT - wrong size (%" PRIu32 "/68|72)",length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/NOACL-MOUNT - wrong size (%" PRIu32 "/68|72)",length);
 				eptr->mode = KILL;
 				return;
 			}
@@ -1584,15 +1587,15 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 		}
 		if (eptr->version<0x010500 && !tools) {
-			lzfs_pretty_syslog(LOG_NOTICE,"got register packet from mount older than 1.5 - rejecting");
+			safs_pretty_syslog(LOG_NOTICE,"got register packet from mount older than 1.5 - rejecting");
 			eptr->mode = KILL;
 			return;
 		}
 		if (sessionid==0) {     // new session
-			status = LIZARDFS_STATUS_OK; // exports_check(eptr->peerip,(const uint8_t*)"",NULL,NULL,&sesflags);      // check privileges for '/' w/o password
+			status = SAUNAFS_STATUS_OK; // exports_check(eptr->peerip,(const uint8_t*)"",NULL,NULL,&sesflags);      // check privileges for '/' w/o password
 				eptr->sesdata = matoclserv_new_session(0,tools);
 				if (eptr->sesdata==NULL) {
-					lzfs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
+					safs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
 					eptr->mode = KILL;
 					return;
 				}
@@ -1604,29 +1607,29 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			if (eptr->sesdata==NULL) {      // in old model if session doesn't exist then create it
 				eptr->sesdata = matoclserv_new_session(0,0);
 				if (eptr->sesdata==NULL) {
-					lzfs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
+					safs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
 					eptr->mode = KILL;
 					return;
 				}
 				eptr->sesdata->rootinode = SPECIAL_INODE_ROOT;
 				eptr->sesdata->sesflags = 0;
 				eptr->sesdata->peerip = eptr->peerip;
-				status = LIZARDFS_STATUS_OK;
+				status = SAUNAFS_STATUS_OK;
 			} else if (eptr->sesdata->peerip==0) { // created by "filesystem"
 				eptr->sesdata->peerip = eptr->peerip;
-				status = LIZARDFS_STATUS_OK;
+				status = SAUNAFS_STATUS_OK;
 			} else if (eptr->sesdata->peerip==eptr->peerip) {
-				status = LIZARDFS_STATUS_OK;
+				status = SAUNAFS_STATUS_OK;
 			} else {
-				status = LIZARDFS_ERROR_EACCES;
+				status = SAUNAFS_ERROR_EACCES;
 			}
 		}
 		if (tools) {
 			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,1);
 		} else {
-			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status!=LIZARDFS_STATUS_OK)?1:4);
+			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status!=SAUNAFS_STATUS_OK)?1:4);
 		}
-		if (status!=LIZARDFS_STATUS_OK) {
+		if (status!=SAUNAFS_STATUS_OK) {
 			put8bit(&wptr,status);
 			return;
 		}
@@ -1651,7 +1654,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		const char *info;
 
 		if (length<65) {
-			lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL - wrong size (%" PRIu32 "/<65)",length);
+			safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL - wrong size (%" PRIu32 "/<65)",length);
 			eptr->mode = KILL;
 			return;
 		}
@@ -1661,7 +1664,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 
 		if ((eptr->registered == ClientState::kUnregistered && rcode == REGISTER_CLOSESESSION) ||
 		    (eptr->registered != ClientState::kUnregistered && rcode != REGISTER_CLOSESESSION)) {
-			lzfs_pretty_syslog(
+			safs_pretty_syslog(
 			    LOG_NOTICE,
 			    "CLTOMA_FUSE_REGISTER/ACL - wrong rcode (%d) for registered status (%d)", rcode,
 			    (int)eptr->registered);
@@ -1672,7 +1675,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		switch (rcode) {
 		case REGISTER_GETRANDOM:
 			if (length!=65) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.1 - wrong size (%" PRIu32 "/65)",length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.1 - wrong size (%" PRIu32 "/65)",length);
 				eptr->mode = KILL;
 				return;
 			}
@@ -1684,14 +1687,14 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			return;
 		case REGISTER_NEWSESSION:
 			if (length<77) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%" PRIu32 "/>=77)",length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%" PRIu32 "/>=77)",length);
 				eptr->mode = KILL;
 				return;
 			}
 			eptr->version = get32bit(&rptr);
 			ileng = get32bit(&rptr);
 			if (length<77+ileng) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%" PRIu32 "/>=77+ileng(%" PRIu32 "))",length,ileng);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%" PRIu32 "/>=77+ileng(%" PRIu32 "))",length,ileng);
 				eptr->mode = KILL;
 				return;
 			}
@@ -1699,14 +1702,14 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			rptr+=ileng;
 			pleng = get32bit(&rptr);
 			if (length!=77+ileng+pleng && length!=77+16+ileng+pleng) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%" PRIu32 "/77+ileng(%" PRIu32 ")+pleng(%" PRIu32 ")[+16])",length,ileng,pleng);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%" PRIu32 "/77+ileng(%" PRIu32 ")+pleng(%" PRIu32 ")[+16])",length,ileng,pleng);
 				eptr->mode = KILL;
 				return;
 			}
 			path = rptr;
 			rptr+=pleng;
 			if (pleng>0 && rptr[-1]!=0) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - received path without ending zero");
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.2 - received path without ending zero");
 				eptr->mode = KILL;
 				return;
 			}
@@ -1718,13 +1721,13 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			} else {
 				status = exports_check(eptr->peerip,eptr->version,0,path,NULL,NULL,&sesflags,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
 			}
-			if (status==LIZARDFS_STATUS_OK) {
+			if (status==SAUNAFS_STATUS_OK) {
 				status = fs_getrootinode(&rootinode,path);
 			}
-			if (status==LIZARDFS_STATUS_OK) {
+			if (status==SAUNAFS_STATUS_OK) {
 				eptr->sesdata = matoclserv_new_session(1,0);
 				if (eptr->sesdata==NULL) {
-					lzfs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
+					safs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
 					eptr->mode = KILL;
 					return;
 				}
@@ -1752,8 +1755,8 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				}
 				matoclserv_store_sessions();
 			}
-			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status==LIZARDFS_STATUS_OK)?((eptr->version>=0x01061A)?35:(eptr->version>=0x010615)?25:(eptr->version>=0x010601)?21:13):1);
-			if (status!=LIZARDFS_STATUS_OK) {
+			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status==SAUNAFS_STATUS_OK)?((eptr->version>=0x01061A)?35:(eptr->version>=0x010615)?25:(eptr->version>=0x010601)?21:13):1);
+			if (status!=SAUNAFS_STATUS_OK) {
 				put8bit(&wptr,status);
 				return;
 			}
@@ -1761,9 +1764,9 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			if (eptr->version==0x010615) {
 				put32bit(&wptr,0);
 			} else if (eptr->version>=0x010616) {
-				put16bit(&wptr,LIZARDFS_PACKAGE_VERSION_MAJOR);
-				put8bit(&wptr,LIZARDFS_PACKAGE_VERSION_MINOR);
-				put8bit(&wptr,LIZARDFS_PACKAGE_VERSION_MICRO);
+				put16bit(&wptr,SAUNAFS_PACKAGE_VERSION_MAJOR);
+				put8bit(&wptr,SAUNAFS_PACKAGE_VERSION_MINOR);
+				put8bit(&wptr,SAUNAFS_PACKAGE_VERSION_MICRO);
 			}
 			put32bit(&wptr,sessionid);
 			put8bit(&wptr,sesflags);
@@ -1779,7 +1782,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				put32bit(&wptr,mintrashtime);
 				put32bit(&wptr,maxtrashtime);
 			}
-			if (eptr->version >= lizardfsVersion(1, 6, 30)) {
+			if (eptr->version >= saunafsVersion(1, 6, 30)) {
 				eptr->iolimits = true;
 				matoclserv_send_iolimits_cfg(eptr);
 			}
@@ -1787,14 +1790,14 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			return;
 		case REGISTER_NEWMETASESSION:
 			if (length<73) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.5 - wrong size (%" PRIu32 "/>=73)",length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.5 - wrong size (%" PRIu32 "/>=73)",length);
 				eptr->mode = KILL;
 				return;
 			}
 			eptr->version = get32bit(&rptr);
 			ileng = get32bit(&rptr);
 			if (length!=73+ileng && length!=73+16+ileng) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.5 - wrong size (%" PRIu32 "/73+ileng(%" PRIu32 ")[+16])",length,ileng);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.5 - wrong size (%" PRIu32 "/73+ileng(%" PRIu32 ")[+16])",length,ileng);
 				eptr->mode = KILL;
 				return;
 			}
@@ -1805,10 +1808,10 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			} else {
 				status = exports_check(eptr->peerip,eptr->version,1,NULL,NULL,NULL,&sesflags,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
 			}
-			if (status==LIZARDFS_STATUS_OK) {
+			if (status==SAUNAFS_STATUS_OK) {
 				eptr->sesdata = matoclserv_new_session(1,0);
 				if (eptr->sesdata==NULL) {
-					lzfs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
+					safs_pretty_syslog(LOG_NOTICE,"can't allocate session record");
 					eptr->mode = KILL;
 					return;
 				}
@@ -1836,16 +1839,16 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				}
 				matoclserv_store_sessions();
 			}
-			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status==LIZARDFS_STATUS_OK)?((eptr->version>=0x01061A)?19:(eptr->version>=0x010615)?9:5):1);
-			if (status!=LIZARDFS_STATUS_OK) {
+			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status==SAUNAFS_STATUS_OK)?((eptr->version>=0x01061A)?19:(eptr->version>=0x010615)?9:5):1);
+			if (status!=SAUNAFS_STATUS_OK) {
 				put8bit(&wptr,status);
 				return;
 			}
 			sessionid = eptr->sesdata->sessionid;
 			if (eptr->version>=0x010615) {
-				put16bit(&wptr,LIZARDFS_PACKAGE_VERSION_MAJOR);
-				put8bit(&wptr,LIZARDFS_PACKAGE_VERSION_MINOR);
-				put8bit(&wptr,LIZARDFS_PACKAGE_VERSION_MICRO);
+				put16bit(&wptr,SAUNAFS_PACKAGE_VERSION_MAJOR);
+				put8bit(&wptr,SAUNAFS_PACKAGE_VERSION_MINOR);
+				put8bit(&wptr,SAUNAFS_PACKAGE_VERSION_MICRO);
 			}
 			put32bit(&wptr,sessionid);
 			put8bit(&wptr,sesflags);
@@ -1860,7 +1863,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		case REGISTER_RECONNECT:
 		case REGISTER_TOOLS:
 			if (length<73) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.%" PRIu8 " - wrong size (%" PRIu32 "/73)",rcode,length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.%" PRIu8 " - wrong size (%" PRIu32 "/73)",rcode,length);
 				eptr->mode = KILL;
 				return;
 			}
@@ -1868,21 +1871,21 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			eptr->version = get32bit(&rptr);
 			eptr->sesdata = matoclserv_find_session(sessionid);
 			if (eptr->sesdata == NULL || eptr->sesdata->peerip == 0) {
-				status = LIZARDFS_ERROR_BADSESSIONID;
+				status = SAUNAFS_ERROR_BADSESSIONID;
 			} else {
 				if ((eptr->sesdata->sesflags&SESFLAG_DYNAMICIP)==0 && eptr->peerip!=eptr->sesdata->peerip) {
-					status = LIZARDFS_ERROR_EACCES;
+					status = SAUNAFS_ERROR_EACCES;
 				} else {
-					status = LIZARDFS_STATUS_OK;
+					status = SAUNAFS_STATUS_OK;
 				}
 			}
 			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,1);
 			put8bit(&wptr,status);
-			if (status!=LIZARDFS_STATUS_OK) {
+			if (status!=SAUNAFS_STATUS_OK) {
 				return;
 			}
 			if (rcode == REGISTER_RECONNECT) {
-				if (eptr->version >= lizardfsVersion(1, 6, 30) && eptr->sesdata->rootinode != 0) {
+				if (eptr->version >= saunafsVersion(1, 6, 30) && eptr->sesdata->rootinode != 0) {
 					eptr->iolimits = true;
 					matoclserv_send_iolimits_cfg(eptr);
 				}
@@ -1893,7 +1896,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			return;
 		case REGISTER_CLOSESESSION:
 			if (length<69) {
-				lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.6 - wrong size (%" PRIu32 "/69)",length);
+				safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL.6 - wrong size (%" PRIu32 "/69)",length);
 				eptr->mode = KILL;
 				return;
 			}
@@ -1902,11 +1905,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			eptr->mode = KILL;
 			return;
 		}
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL - wrong rcode (%" PRIu8 ")",rcode);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER/ACL - wrong rcode (%" PRIu8 ")",rcode);
 		eptr->mode = KILL;
 		return;
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER - wrong register blob");
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REGISTER - wrong register blob");
 		eptr->mode = KILL;
 		return;
 	}
@@ -1918,7 +1921,7 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 	uint32_t inode;
 
 	if ((length&0x3)!=0) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RESERVED_INODES - wrong size (%" PRIu32 "/N*4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RESERVED_INODES - wrong size (%" PRIu32 "/N*4)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -1941,7 +1944,7 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 			*ofpptr = ofptr->next;
 			free(ofptr);
 		} else if (ofptr->inode>inode) {
-			if (fs_acquire(context, inode, eptr->sesdata->sessionid) == LIZARDFS_STATUS_OK) {
+			if (fs_acquire(context, inode, eptr->sesdata->sessionid) == SAUNAFS_STATUS_OK) {
 				ofptr = (filelist*)malloc(sizeof(filelist));
 				passert(ofptr);
 				ofptr->next = *ofpptr;
@@ -1966,7 +1969,7 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 		}
 	}
 	while (inode>0) {
-		if (fs_acquire(context, inode, eptr->sesdata->sessionid) == LIZARDFS_STATUS_OK) {
+		if (fs_acquire(context, inode, eptr->sesdata->sessionid) == SAUNAFS_STATUS_OK) {
 			ofptr = (filelist*)malloc(sizeof(filelist));
 			passert(ofptr);
 			ofptr->next = *ofpptr;
@@ -1994,7 +1997,7 @@ void matoclserv_fuse_statfs(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint32_t msgid,inodes;
 	uint8_t *ptr;
 	if (length!=4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_STATFS - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_STATFS - wrong size (%" PRIu32 "/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2020,7 +2023,7 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=17) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_ACCESS - wrong size (%" PRIu32 "/17)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_ACCESS - wrong size (%" PRIu32 "/17)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2030,7 +2033,7 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	gid = get32bit(&data);
 	modemask = get8bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_access(context,inode,modemask);
 	}
@@ -2039,23 +2042,23 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	put8bit(&ptr,status);
 }
 
-void matoclserv_liz_whole_path_lookup(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
+void matoclserv_sau_whole_path_lookup(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
 	uint32_t msgid;
 	uint32_t inode, found_inode;
 	std::string path;
 	uint32_t uid, gid;
 	Attributes attr;
-	uint8_t status = LIZARDFS_STATUS_OK;
+	uint8_t status = SAUNAFS_STATUS_OK;
 
 	cltoma::wholePathLookup::deserialize(data, length, msgid, inode, path, uid, gid);
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_whole_path_lookup(context, inode, path, &found_inode, attr);
 	}
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		matoclserv_createpacket(eptr, matocl::wholePathLookup::build(msgid, status));
 	} else {
 		matoclserv_createpacket(eptr, matocl::wholePathLookup::build(msgid, found_inode, attr));
@@ -2073,7 +2076,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<17) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LOOKUP - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LOOKUP - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2081,7 +2084,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	inode = get32bit(&data);
 	nleng = get8bit(&data);
 	if (length!=17U+nleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LOOKUP - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",length,nleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LOOKUP - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",length,nleng);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2090,13 +2093,13 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_lookup(context,inode,HString((char*)name, nleng),&newinode,attr);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,(status!=LIZARDFS_STATUS_OK)?5:43);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,(status!=SAUNAFS_STATUS_OK)?5:43);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr,newinode);
@@ -2112,7 +2115,7 @@ void matoclserv_fuse_getattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=16) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETATTR - wrong size (%" PRIu32 "/16)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETATTR - wrong size (%" PRIu32 "/16)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2121,13 +2124,13 @@ void matoclserv_fuse_getattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_getattr(context,inode,attr);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETATTR,(status!=LIZARDFS_STATUS_OK)?5:39);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETATTR,(status!=SAUNAFS_STATUS_OK)?5:39);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		memcpy(ptr, attr.data(), attr.size());
@@ -2148,7 +2151,7 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uint16_t attrmode;
 	uint32_t attruid,attrgid,attratime,attrmtime;
 	if (length!=35 && length!=36) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETATTR - wrong size (%" PRIu32 "/35|36)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETATTR - wrong size (%" PRIu32 "/35|36)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2168,14 +2171,14 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 		sugidclearmode = SugidClearMode::kAlways; // this is safest option
 	}
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_setattr(context, inode, setmask, attrmode, attruid, attrgid,
 							attratime, attrmtime, sugidclearmode, attr);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETATTR,(status!=LIZARDFS_STATUS_OK)?5:39);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETATTR,(status!=SAUNAFS_STATUS_OK)?5:39);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		memcpy(ptr, attr.data(), attr.size());
@@ -2187,12 +2190,12 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 
 void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
 	sassert(header.type == CLTOMA_FUSE_TRUNCATE
-			|| header.type == LIZ_CLTOMA_FUSE_TRUNCATE
-			|| header.type == LIZ_CLTOMA_FUSE_TRUNCATE_END);
+			|| header.type == SAU_CLTOMA_FUSE_TRUNCATE
+			|| header.type == SAU_CLTOMA_FUSE_TRUNCATE_END);
 
 	// Deserialize the request
 	std::vector<uint8_t> request(data, data + header.length);
-	uint8_t status = LIZARDFS_STATUS_OK;
+	uint8_t status = SAUNAFS_STATUS_OK;
 	uint32_t messageId, inode, uid, gid, type;
 	uint32_t lockId = 0;
 	bool opened;
@@ -2200,21 +2203,21 @@ void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const 
 	FsContext context = matoclserv_get_context(eptr);
 
 	const PacketSerializer *serializer = PacketSerializer::getSerializer(header.type, eptr->version);
-	if (header.type == LIZ_CLTOMA_FUSE_TRUNCATE_END) {
+	if (header.type == SAU_CLTOMA_FUSE_TRUNCATE_END) {
 		cltoma::fuseTruncateEnd::deserialize(request,
 				messageId, inode, uid, gid, length, lockId);
 		type = FUSE_TRUNCATE_END;
 		status = matoclserv_check_group_cache(eptr, gid);
-		if (status == LIZARDFS_STATUS_OK) {
-			opened = true; // permissions have already been checked on LIZ_CLTOMA_TRUNCATE
+		if (status == SAUNAFS_STATUS_OK) {
+			opened = true; // permissions have already been checked on SAU_CLTOMA_TRUNCATE
 			context = matoclserv_get_context(eptr, uid, gid);
 			// We have to verify lockid in this request
 			if (lockId == 0) { // unlocking with lockid == 0 means "force unlock", this is not allowed
-				status = LIZARDFS_ERROR_WRONGLOCKID;
+				status = SAUNAFS_ERROR_WRONGLOCKID;
 			} else {
 				// let's check if chunk is still locked by us
-				status = fs_get_chunkid(context, inode, length / MFSCHUNKSIZE, &chunkId);
-				if (status == LIZARDFS_STATUS_OK) {
+				status = fs_get_chunkid(context, inode, length / SFSCHUNKSIZE, &chunkId);
+				if (status == SAUNAFS_STATUS_OK) {
 					status = chunk_can_unlock(chunkId, lockId);
 				}
 				fs_end_setlength(chunkId);
@@ -2224,33 +2227,33 @@ void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const 
 		serializer->deserializeFuseTruncate(request, messageId, inode, opened, uid, gid, length);
 		type = FUSE_TRUNCATE;
 		status = matoclserv_check_group_cache(eptr, gid);
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			context = matoclserv_get_context(eptr, uid, gid);
 		}
 	}
 
 	// Try to do the truncate
 	Attributes attr;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		status = fs_try_setlength(context, inode, opened, length,
 								  (type != FUSE_TRUNCATE_END), lockId, attr, &chunkId);
 	}
 
-	// In case of LIZARDFS_ERROR_NOTPOSSIBLE we have to tell the client to write the chunk before truncating
-	if (status == LIZARDFS_ERROR_NOTPOSSIBLE && header.type == CLTOMA_FUSE_TRUNCATE) {
+	// In case of SAUNAFS_ERROR_NOTPOSSIBLE we have to tell the client to write the chunk before truncating
+	if (status == SAUNAFS_ERROR_NOTPOSSIBLE && header.type == CLTOMA_FUSE_TRUNCATE) {
 		// Old client requested to truncate xor chunk. We can't do this!
-		status = LIZARDFS_ERROR_ENOTSUP;
-	} else if (status == LIZARDFS_ERROR_NOTPOSSIBLE && header.type == LIZ_CLTOMA_FUSE_TRUNCATE) {
+		status = SAUNAFS_ERROR_ENOTSUP;
+	} else if (status == SAUNAFS_ERROR_NOTPOSSIBLE && header.type == SAU_CLTOMA_FUSE_TRUNCATE) {
 		// New client requested to truncate xor chunk. He has to do it himself.
 		uint64_t fileLength;
 		uint8_t opflag;
-		fs_writechunk(context, inode, length / MFSCHUNKSIZE, false,
+		fs_writechunk(context, inode, length / SFSCHUNKSIZE, false,
 				&lockId, &chunkId, &opflag, &fileLength);
 		if (opflag) {
 			// But first we have to duplicate chunk :)
 			type = FUSE_TRUNCATE_BEGIN;
 			length = fileLength;
-			status = LIZARDFS_ERROR_DELAYED;
+			status = SAUNAFS_ERROR_DELAYED;
 		} else {
 			// No duplication is needed
 			std::vector<uint8_t> reply;
@@ -2263,7 +2266,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const 
 		}
 	}
 
-	if (status == LIZARDFS_ERROR_DELAYED) {
+	if (status == SAUNAFS_ERROR_DELAYED) {
 		// Duplicate or truncate request has been sent to chunkservers, delay the reply
 		chunklist *cl = (chunklist*)malloc(sizeof(chunklist));
 		passert(cl);
@@ -2285,15 +2288,15 @@ void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const 
 		}
 		return;
 	}
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		status = fs_do_setlength(context, inode, length, attr);
 	}
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		dcm_modify(inode, eptr->sesdata->sessionid);
 	}
 
 	std::vector<uint8_t> reply;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		serializer->serializeFuseTruncate(reply, type, messageId, attr);
 	} else {
 		serializer->serializeFuseTruncate(reply, type, messageId, status);
@@ -2311,7 +2314,7 @@ void matoclserv_fuse_readlink(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t status;
 	std::string path;
 	if (length != 8) {
-		lzfs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_READLINK - wrong size (%" PRIu32 "/8)", length);
+		safs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_READLINK - wrong size (%" PRIu32 "/8)", length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2320,9 +2323,9 @@ void matoclserv_fuse_readlink(matoclserventry *eptr,const uint8_t *data,uint32_t
 	FsContext context = matoclserv_get_context(eptr);
 	status = fs_readlink(context, inode, path);
 	ptr = matoclserv_createpacket(eptr, MATOCL_FUSE_READLINK,
-	                              (status != LIZARDFS_STATUS_OK) ? 5 : 8 + path.length() + 1);
+	                              (status != SAUNAFS_STATUS_OK) ? 5 : 8 + path.length() + 1);
 	put32bit(&ptr, msgid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		put8bit(&ptr, status);
 	} else {
 		put32bit(&ptr, path.length() + 1);
@@ -2348,7 +2351,7 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uint8_t status;
 	uint8_t *ptr;
 	if (length < 21) {
-		lzfs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_SYMLINK - wrong size (%" PRIu32 ")", length);
+		safs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_SYMLINK - wrong size (%" PRIu32 ")", length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2356,7 +2359,7 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	inode = get32bit(&data);
 	nleng = get8bit(&data);
 	if (length < 21U + nleng) {
-		lzfs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_SYMLINK - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",
+		safs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_SYMLINK - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",
 		       length, nleng);
 		eptr->mode = KILL;
 		return;
@@ -2365,7 +2368,7 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	data += nleng;
 	pleng = get32bit(&data);
 	if (length != 21U + nleng + pleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 		       "CLTOMA_FUSE_SYMLINK - wrong size (%" PRIu32 ":nleng=%" PRIu8 ":pleng=%" PRIu32 ")",
 		       length, nleng, pleng);
 		eptr->mode = KILL;
@@ -2380,15 +2383,15 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	}
 	newinode = 0;  // request to acquire new inode id
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		auto context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_symlink(context, inode, HString((char *)name, nleng),
 	                    std::string((char *)path, pleng), &newinode, &attr);
 	}
 	ptr =
-	    matoclserv_createpacket(eptr, MATOCL_FUSE_SYMLINK, (status != LIZARDFS_STATUS_OK) ? 5 : 43);
+	    matoclserv_createpacket(eptr, MATOCL_FUSE_SYMLINK, (status != SAUNAFS_STATUS_OK) ? 5 : 43);
 	put32bit(&ptr, msgid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		put8bit(&ptr, status);
 	} else {
 		put32bit(&ptr, newinode);
@@ -2401,15 +2404,15 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 
 void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
 	uint32_t messageId, inode, uid, gid, rdev;
-	MooseFsString<uint8_t> name;
+	XaunaFsString<uint8_t> name;
 	uint8_t type;
 	uint16_t mode, umask;
 
 	if (header.type == CLTOMA_FUSE_MKNOD) {
-		deserializeAllMooseFsPacketDataNoHeader(data, header.length,
+		deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
 				messageId, inode, name, type, mode, uid, gid, rdev);
 		umask = 0;
-	} else if (header.type == LIZ_CLTOMA_FUSE_MKNOD) {
+	} else if (header.type == SAU_CLTOMA_FUSE_MKNOD) {
 		cltoma::fuseMknod::deserialize(data, header.length,
 				messageId, inode, name, type, mode, umask, uid, gid, rdev);
 	} else {
@@ -2420,7 +2423,7 @@ void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uin
 	uint32_t newinode;
 	Attributes attr;
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 
 		status = fs_mknod(context,
@@ -2429,14 +2432,14 @@ void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uin
 	}
 
 	MessageBuffer reply;
-	if (status == LIZARDFS_STATUS_OK && header.type == CLTOMA_FUSE_MKNOD) {
-		serializeMooseFsPacket(reply, MATOCL_FUSE_MKNOD, messageId, newinode, attr);
-	} else if (status == LIZARDFS_STATUS_OK && header.type == LIZ_CLTOMA_FUSE_MKNOD) {
+	if (status == SAUNAFS_STATUS_OK && header.type == CLTOMA_FUSE_MKNOD) {
+		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKNOD, messageId, newinode, attr);
+	} else if (status == SAUNAFS_STATUS_OK && header.type == SAU_CLTOMA_FUSE_MKNOD) {
 		matocl::fuseMknod::serialize(reply, messageId, newinode, attr);
-	} else if (header.type == LIZ_CLTOMA_FUSE_MKNOD) {
+	} else if (header.type == SAU_CLTOMA_FUSE_MKNOD) {
 		matocl::fuseMknod::serialize(reply, messageId, status);
 	} else {
-		serializeMooseFsPacket(reply, MATOCL_FUSE_MKNOD, messageId, status);
+		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKNOD, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
 	if (eptr->sesdata) {
@@ -2446,21 +2449,21 @@ void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uin
 
 void matoclserv_fuse_mkdir(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
 	uint32_t messageId, inode, uid, gid;
-	MooseFsString<uint8_t> name;
+	XaunaFsString<uint8_t> name;
 	bool copysgid;
 	uint16_t mode, umask;
 
 	if (header.type == CLTOMA_FUSE_MKDIR) {
-		if (eptr->version >= lizardfsVersion(1, 6, 25)) {
-			deserializeAllMooseFsPacketDataNoHeader(data, header.length,
+		if (eptr->version >= saunafsVersion(1, 6, 25)) {
+			deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
 					messageId, inode, name, mode, uid, gid, copysgid);
 		} else {
-			deserializeAllMooseFsPacketDataNoHeader(data, header.length,
+			deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
 					messageId, inode, name, mode, uid, gid);
 			copysgid = false;
 		}
 		umask = 0;
-	} else if (header.type == LIZ_CLTOMA_FUSE_MKDIR) {
+	} else if (header.type == SAU_CLTOMA_FUSE_MKDIR) {
 		cltoma::fuseMkdir::deserialize(data, header.length, messageId,
 				inode, name, mode, umask, uid, gid, copysgid);
 	} else {
@@ -2471,7 +2474,7 @@ void matoclserv_fuse_mkdir(matoclserventry *eptr, PacketHeader header, const uin
 	uint32_t newinode;
 	Attributes attr;
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 
 		status = fs_mkdir(context, inode, HString(std::move(name)), mode, umask,
@@ -2479,14 +2482,14 @@ void matoclserv_fuse_mkdir(matoclserventry *eptr, PacketHeader header, const uin
 	}
 
 	MessageBuffer reply;
-	if (status == LIZARDFS_STATUS_OK && header.type == CLTOMA_FUSE_MKDIR) {
-		serializeMooseFsPacket(reply, MATOCL_FUSE_MKDIR, messageId, newinode, attr);
-	} else if (status == LIZARDFS_STATUS_OK && header.type == LIZ_CLTOMA_FUSE_MKDIR) {
+	if (status == SAUNAFS_STATUS_OK && header.type == CLTOMA_FUSE_MKDIR) {
+		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKDIR, messageId, newinode, attr);
+	} else if (status == SAUNAFS_STATUS_OK && header.type == SAU_CLTOMA_FUSE_MKDIR) {
 		matocl::fuseMkdir::serialize(reply, messageId, newinode, attr);
-	} else if (header.type == LIZ_CLTOMA_FUSE_MKDIR) {
+	} else if (header.type == SAU_CLTOMA_FUSE_MKDIR) {
 		matocl::fuseMkdir::serialize(reply, messageId, status);
 	} else {
-		serializeMooseFsPacket(reply, MATOCL_FUSE_MKDIR, messageId, status);
+		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKDIR, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
 	if (eptr->sesdata) {
@@ -2502,7 +2505,7 @@ void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<17) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_UNLINK - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_UNLINK - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2510,7 +2513,7 @@ void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	inode = get32bit(&data);
 	nleng = get8bit(&data);
 	if (length!=17U+nleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_UNLINK - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",length,nleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_UNLINK - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",length,nleng);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2519,7 +2522,7 @@ void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_unlink(context,inode, HString((char*)name, nleng));
 	}
@@ -2549,14 +2552,14 @@ void matoclserv_fuse_recursive_remove(matoclserventry *eptr, const uint8_t *data
 	cltoma::recursiveRemove::deserialize(data, length, msgid, job_id, parent_inode, name, uid, gid);
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 
 		status = fs_recursive_remove(context, parent_inode, HString(name),
 					    std::bind(matoclserv_fuse_recursive_remove_wake_up,
 				      eptr->sesdata->sessionid, msgid, std::placeholders::_1), job_id);
 	}
-	if (status != LIZARDFS_ERROR_WAITING) {
+	if (status != SAUNAFS_ERROR_WAITING) {
 		matoclserv_createpacket(eptr, matocl::recursiveRemove::build(msgid, status));
 	}
 }
@@ -2569,7 +2572,7 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<17) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RMDIR - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RMDIR - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2577,7 +2580,7 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	inode = get32bit(&data);
 	nleng = get8bit(&data);
 	if (length!=17U+nleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RMDIR - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",length,nleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RMDIR - wrong size (%" PRIu32 ":nleng=%" PRIu8 ")",length,nleng);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2586,7 +2589,7 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_rmdir(context,inode,HString((char*)name, nleng));
 	}
@@ -2608,7 +2611,7 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t status;
 	uint8_t *ptr;
 	if (length<22) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RENAME - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RENAME - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2616,7 +2619,7 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	inode_src = get32bit(&data);
 	nleng_src = get8bit(&data);
 	if (length<22U+nleng_src) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RENAME - wrong size (%" PRIu32 ":nleng_src=%" PRIu8 ")",length,nleng_src);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RENAME - wrong size (%" PRIu32 ":nleng_src=%" PRIu8 ")",length,nleng_src);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2625,7 +2628,7 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	inode_dst = get32bit(&data);
 	nleng_dst = get8bit(&data);
 	if (length!=22U+nleng_src+nleng_dst) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RENAME - wrong size (%" PRIu32 ":nleng_src=%" PRIu8 ":nleng_dst=%" PRIu8 ")",length,nleng_src,nleng_dst);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RENAME - wrong size (%" PRIu32 ":nleng_src=%" PRIu8 ":nleng_dst=%" PRIu8 ")",length,nleng_src,nleng_dst);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2634,18 +2637,18 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		auto context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_rename(context, inode_src, HString((char*)name_src, nleng_src),
 		                   inode_dst, HString((char*)name_dst, nleng_dst), &inode, &attr);
 	}
-	if (eptr->version>=0x010615 && status==LIZARDFS_STATUS_OK) {
+	if (eptr->version>=0x010615 && status==SAUNAFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RENAME,43);
 	} else {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RENAME,5);
 	}
 	put32bit(&ptr,msgid);
-	if (eptr->version>=0x010615 && status==LIZARDFS_STATUS_OK) {
+	if (eptr->version>=0x010615 && status==SAUNAFS_STATUS_OK) {
 		put32bit(&ptr,inode);
 		memcpy(ptr, attr.data(), attr.size());
 	} else {
@@ -2667,7 +2670,7 @@ void matoclserv_fuse_link(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<21) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LINK - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LINK - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2676,7 +2679,7 @@ void matoclserv_fuse_link(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	inode_dst = get32bit(&data);
 	nleng_dst = get8bit(&data);
 	if (length!=21U+nleng_dst) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LINK - wrong size (%" PRIu32 ":nleng_dst=%" PRIu8 ")",length,nleng_dst);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_LINK - wrong size (%" PRIu32 ":nleng_dst=%" PRIu8 ")",length,nleng_dst);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2685,13 +2688,13 @@ void matoclserv_fuse_link(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		auto context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_link(context, inode, inode_dst, HString((char*)name_dst, nleng_dst), &newinode, &attr);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LINK,(status!=LIZARDFS_STATUS_OK)?5:43);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LINK,(status!=SAUNAFS_STATUS_OK)?5:43);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr,newinode);
@@ -2716,20 +2719,20 @@ void matoclserv_fuse_getdir(matoclserventry *eptr,const PacketHeader &header, co
 		cltoma::fuseGetDirLegacy::deserialize(data, header.length, message_id, inode, uid, gid, first_entry, number_of_entries);
 	} else {
 		throw IncorrectDeserializationException(
-				"Unknown LIZ_CLTOMA_FUSE_GETDIR version: " + std::to_string(packet_version));
+				"Unknown SAU_CLTOMA_FUSE_GETDIR version: " + std::to_string(packet_version));
 	}
 
 	number_of_entries = std::min(number_of_entries, matocl::fuseGetDir::kMaxNumberOfDirectoryEntries);
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
 
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 
 		if (packet_version == cltoma::fuseGetDir::kClientAbleToProcessDirentIndex) {
 			std::vector<DirectoryEntry> dir_entries;
 			status = fs_readdir(context, inode, first_entry, number_of_entries, dir_entries); //<DirectoryEntry>
 
-			if (status != LIZARDFS_STATUS_OK) {
+			if (status != SAUNAFS_STATUS_OK) {
 				matocl::fuseGetDir::serialize(buffer, message_id, status);
 			} else {
 				matocl::fuseGetDir::serialize(buffer, message_id, first_entry, dir_entries);
@@ -2738,14 +2741,14 @@ void matoclserv_fuse_getdir(matoclserventry *eptr,const PacketHeader &header, co
 			std::vector<legacy::DirectoryEntry> dir_entries;
 			status = fs_readdir(context, inode, first_entry, number_of_entries, dir_entries); //<legacy::DirectoryEntry>
 
-			if (status != LIZARDFS_STATUS_OK) {
+			if (status != SAUNAFS_STATUS_OK) {
 				matocl::fuseGetDir::serialize(buffer, message_id, status);
 			} else {
 				matocl::fuseGetDirLegacy::serialize(buffer, message_id, first_entry, dir_entries);
 			}
 		} else {
 			throw IncorrectDeserializationException(
-					"Unknown LIZ_CLTOMA_FUSE_GETDIR version: " + std::to_string(packet_version));
+					"Unknown SAU_CLTOMA_FUSE_GETDIR version: " + std::to_string(packet_version));
 		}
 	} else {
 		matocl::fuseGetDir::serialize(buffer, message_id, status);
@@ -2764,7 +2767,7 @@ void matoclserv_fuse_getdir(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint32_t dleng;
 	void *custom;
 	if (length!=16 && length!=17) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIR - wrong size (%" PRIu32 "/16|17)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIR - wrong size (%" PRIu32 "/16|17)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2779,7 +2782,7 @@ void matoclserv_fuse_getdir(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	}
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr, MATOCL_FUSE_GETDIR, 5);
 		put32bit(&ptr,msgid);
 		put8bit(&ptr,status);
@@ -2789,9 +2792,9 @@ void matoclserv_fuse_getdir(matoclserventry *eptr,const uint8_t *data,uint32_t l
 
 	FsContext context = matoclserv_get_context(eptr, uid, gid);
 	status = fs_readdir_size(context,inode,flags,&custom,&dleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIR,(status!=LIZARDFS_STATUS_OK)?5:4+dleng);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIR,(status!=SAUNAFS_STATUS_OK)?5:4+dleng);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		fs_readdir_data(context,flags,custom,ptr);
@@ -2809,7 +2812,7 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	uint8_t status;
 	int allowcache;
 	if (length!=17) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_OPEN - wrong size (%" PRIu32 "/17)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_OPEN - wrong size (%" PRIu32 "/17)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2820,14 +2823,14 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	flags = get8bit(&data);
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = matoclserv_insert_openfile(eptr->sesdata,inode);
-		if (status==LIZARDFS_STATUS_OK) {
+		if (status==SAUNAFS_STATUS_OK) {
 			status = fs_opencheck(context,inode,flags,attr);
 		}
 	}
-	if (eptr->version>=0x010609 && status==LIZARDFS_STATUS_OK) {
+	if (eptr->version>=0x010609 && status==SAUNAFS_STATUS_OK) {
 		allowcache = dcm_open(inode,eptr->sesdata->sessionid);
 		if (allowcache==0) {
 			attr[1]&=(0xFF^(MATTR_ALLOWDATACACHE<<4));
@@ -2837,7 +2840,7 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_OPEN,5);
 	}
 	put32bit(&ptr,msgid);
-	if (eptr->version>=0x010609 && status==LIZARDFS_STATUS_OK) {
+	if (eptr->version>=0x010609 && status==SAUNAFS_STATUS_OK) {
 		memcpy(ptr, attr.data(), attr.size());
 	} else {
 		put8bit(&ptr,status);
@@ -2848,7 +2851,7 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 }
 
 void matoclserv_fuse_read_chunk(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
-	sassert(header.type == CLTOMA_FUSE_READ_CHUNK || header.type == LIZ_CLTOMA_FUSE_READ_CHUNK);
+	sassert(header.type == CLTOMA_FUSE_READ_CHUNK || header.type == SAU_CLTOMA_FUSE_READ_CHUNK);
 	uint8_t status;
 	uint64_t chunkid;
 	uint64_t fleng;
@@ -2864,7 +2867,7 @@ void matoclserv_fuse_read_chunk(matoclserventry *eptr, PacketHeader header, cons
 
 	status = fs_readchunk(inode, index, &chunkid, &fleng);
 	std::vector<ChunkTypeWithAddress> allChunkCopies;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		if (chunkid > 0) {
 			status = chunk_getversionandlocations(chunkid, eptr->peerip, version,
 					kMaxNumberOfChunkCopies, allChunkCopies);
@@ -2874,7 +2877,7 @@ void matoclserv_fuse_read_chunk(matoclserventry *eptr, PacketHeader header, cons
 		}
 	}
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		serializer->serializeFuseReadChunk(outMessage, messageId, status);
 		matoclserv_createpacket(eptr, outMessage);
 		return;
@@ -2898,7 +2901,7 @@ void matoclserv_chunks_info(matoclserventry *eptr, const uint8_t *data, uint32_t
 
 	deserializePacketVersionNoHeader(data, length, version);
 	if (version != cltoma::chunksInfo::kMultiChunk) {
-		matoclserv_createpacket(eptr, matocl::chunksInfo::build(message_id, (uint8_t)LIZARDFS_ERROR_EINVAL));
+		matoclserv_createpacket(eptr, matocl::chunksInfo::build(message_id, (uint8_t)SAUNAFS_ERROR_EINVAL));
 		return;
 	}
 
@@ -2908,12 +2911,12 @@ void matoclserv_chunks_info(matoclserventry *eptr, const uint8_t *data, uint32_t
 	chunk_count = std::min(chunk_count, matocl::chunksInfo::kMaxNumberOfResultEntries);
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_getchunksinfo(context, eptr->peerip, inode, chunk_index, chunk_count, chunks);
 	}
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		matoclserv_createpacket(eptr, matocl::chunksInfo::build(message_id, status));
 		return;
 	}
@@ -2928,7 +2931,7 @@ void matoclserv_tape_info(matoclserventry *eptr, const uint8_t *data, uint32_t l
 
 	std::vector<TapeCopyLocationInfo> tapeLocations;
 	uint8_t status = fs_get_tape_copy_locations(inode, tapeLocations);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		matoclserv_createpacket(eptr, matocl::tapeInfo::build(messageId, status));
 	} else {
 		matoclserv_createpacket(eptr, matocl::tapeInfo::build(messageId, tapeLocations));
@@ -2936,7 +2939,7 @@ void matoclserv_tape_info(matoclserventry *eptr, const uint8_t *data, uint32_t l
 }
 
 void matoclserv_fuse_write_chunk(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
-	sassert(header.type == CLTOMA_FUSE_WRITE_CHUNK || header.type == LIZ_CLTOMA_FUSE_WRITE_CHUNK);
+	sassert(header.type == CLTOMA_FUSE_WRITE_CHUNK || header.type == SAU_CLTOMA_FUSE_WRITE_CHUNK);
 	uint8_t status;
 	uint32_t inode;
 	uint32_t chunkIndex;
@@ -2953,14 +2956,14 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr, PacketHeader header, con
 	serializer->deserializeFuseWriteChunk(receivedData, messageId, inode, chunkIndex, lockId);
 
 	uint32_t min_server_version
-		= header.type == LIZ_CLTOMA_FUSE_WRITE_CHUNK ? kFirstXorVersion : 0;
+		= header.type == SAU_CLTOMA_FUSE_WRITE_CHUNK ? kFirstXorVersion : 0;
 
-	// Original MooseFS (1.6.27) does not use lock ID's
+	// Original XaunaFS (1.6.27) does not use lock ID's
 	bool useDummyLockId = (header.type == CLTOMA_FUSE_WRITE_CHUNK);
 	status = fs_writechunk(matoclserv_get_context(eptr), inode, chunkIndex, useDummyLockId,
 			&lockId, &chunkId, &opflag, &fileLength, min_server_version);
 
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		serializer->serializeFuseWriteChunk(outMessage, messageId, status);
 		matoclserv_createpacket(eptr, outMessage);
 		return;
@@ -2983,7 +2986,7 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr, PacketHeader header, con
 		dcm_modify(inode,eptr->sesdata->sessionid);
 		status = matoclserv_fuse_write_chunk_respond(eptr, serializer,
 				chunkId, messageId, fileLength, lockId);
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			fs_writeend(0, 0, chunkId, 0);  // ignore status - just do it.
 		}
 	}
@@ -2996,7 +2999,7 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr, PacketHeader header, con
 void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,
 		PacketHeader header, const uint8_t *data) {
 	sassert(header.type == CLTOMA_FUSE_WRITE_CHUNK_END
-			|| header.type == LIZ_CLTOMA_FUSE_WRITE_CHUNK_END);
+			|| header.type == SAU_CLTOMA_FUSE_WRITE_CHUNK_END);
 	uint32_t messageId;
 	uint64_t chunkId;
 	uint32_t lockId;
@@ -3010,9 +3013,9 @@ void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,
 	serializer->deserializeFuseWriteChunkEnd(request, messageId, chunkId, lockId, inode, fileLength);
 	if (lockId == 0) {
 		// this lock id passed to chunk_unlock would force chunk unlock
-		status = LIZARDFS_ERROR_WRONGLOCKID;
+		status = SAUNAFS_ERROR_WRONGLOCKID;
 	} else if (eptr->sesdata->sesflags & SESFLAG_READONLY) {
-		status = LIZARDFS_ERROR_EROFS;
+		status = SAUNAFS_ERROR_EROFS;
 	} else {
 		status = fs_writeend(inode, fileLength, chunkId, lockId);
 	}
@@ -3038,18 +3041,18 @@ void matoclserv_fuse_repair(matoclserventry *eptr, const uint8_t *data, uint32_t
 		}
 	}
 	else {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REPAIR - wrong package size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_REPAIR - wrong package size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_repair(context, inode, correct_only,
 				&chunksnotchanged, &chunkserased, &chunksrepaired);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REPAIR,(status!=LIZARDFS_STATUS_OK)?5:16);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REPAIR,(status!=SAUNAFS_STATUS_OK)?5:16);
 	put32bit(&ptr,msgid);
 	if (status!=0) {
 		put8bit(&ptr,status);
@@ -3067,14 +3070,14 @@ void matoclserv_fuse_check(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=8) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_CHECK - wrong size (%" PRIu32 "/8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_CHECK - wrong size (%" PRIu32 "/8)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	status = fs_checkfile(matoclserv_get_context(eptr),inode,chunkcount);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,5);
 		put32bit(&ptr,msgid);
 		put8bit(&ptr,status);
@@ -3127,7 +3130,7 @@ void matoclserv_fuse_gettrashtime(matoclserventry *eptr,const uint8_t *data,uint
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=9) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETTRASHTIME - wrong size (%" PRIu32 "/9)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETTRASHTIME - wrong size (%" PRIu32 "/9)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3139,9 +3142,9 @@ void matoclserv_fuse_gettrashtime(matoclserventry *eptr,const uint8_t *data,uint
 	dirTrashtimesSize = dirTrashtimes.size();
 	ptr = matoclserv_createpacket(eptr,
 				MATOCL_FUSE_GETTRASHTIME,
-				(status != LIZARDFS_STATUS_OK) ? 5 : 12 + 8 * (fileTrashtimesSize + dirTrashtimesSize));
+				(status != SAUNAFS_STATUS_OK) ? 5 : 12 + 8 * (fileTrashtimesSize + dirTrashtimesSize));
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr, fileTrashtimesSize);
@@ -3159,14 +3162,14 @@ void matoclserv_fuse_settrashtime_wake_up(uint32_t session_id, uint32_t msgid,
 	}
 
 	MessageBuffer reply;
-	if (status != LIZARDFS_STATUS_OK) {
-		serializeMooseFsPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, status);
+	if (status != SAUNAFS_STATUS_OK) {
+		serializeXaunaFsPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, status);
 	} else {
 		uint32_t changed, notchanged, notpermitted;
 		changed = (*settrashtime_stats)[SetTrashtimeTask::kChanged];
 		notchanged = (*settrashtime_stats)[SetTrashtimeTask::kNotChanged];
 		notpermitted = (*settrashtime_stats)[SetTrashtimeTask::kNotPermitted];
-		serializeMooseFsPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, changed,
+		serializeXaunaFsPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, changed,
 				       notchanged, notpermitted);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3176,24 +3179,24 @@ void matoclserv_fuse_settrashtime(matoclserventry *eptr, PacketHeader header, co
 	uint32_t inode, uid, trashtime, msgid;
 	uint8_t smode, status;
 
-	deserializeAllMooseFsPacketDataNoHeader(data, header.length, msgid, inode,
+	deserializeAllXaunaFsPacketDataNoHeader(data, header.length, msgid, inode,
 							uid, trashtime, smode);
 // limits check
-	status = LIZARDFS_STATUS_OK;
+	status = SAUNAFS_STATUS_OK;
 	switch (smode & SMODE_TMASK) {
 	case SMODE_SET:
 		if (trashtime < eptr->sesdata->mintrashtime || trashtime > eptr->sesdata->maxtrashtime) {
-			status = LIZARDFS_ERROR_EPERM;
+			status = SAUNAFS_ERROR_EPERM;
 		}
 		break;
 	case SMODE_INCREASE:
 		if (trashtime > eptr->sesdata->maxtrashtime) {
-			status = LIZARDFS_ERROR_EPERM;
+			status = SAUNAFS_ERROR_EPERM;
 		}
 		break;
 	case SMODE_DECREASE:
 		if (trashtime < eptr->sesdata->mintrashtime) {
-			status = LIZARDFS_ERROR_EPERM;
+			status = SAUNAFS_ERROR_EPERM;
 		}
 		break;
 	}
@@ -3201,14 +3204,14 @@ void matoclserv_fuse_settrashtime(matoclserventry *eptr, PacketHeader header, co
 	// array for settrashtime operation statistics
 	auto settrashtime_stats = std::make_shared<SetTrashtimeTask::StatsArray>();
 
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		status = fs_settrashtime(matoclserv_get_context(eptr, uid, 0), inode, trashtime,
 					 smode, settrashtime_stats,
 			   std::bind(matoclserv_fuse_settrashtime_wake_up, eptr->sesdata->sessionid,
 				     msgid, settrashtime_stats, std::placeholders::_1));
 	}
 
-	if (status != LIZARDFS_ERROR_WAITING) {
+	if (status != SAUNAFS_ERROR_WAITING) {
 		matoclserv_fuse_settrashtime_wake_up(eptr->sesdata->sessionid, msgid,
 						     settrashtime_stats, status);
 	}
@@ -3220,8 +3223,8 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr, PacketHeader header, const u
 	uint8_t gmode;
 
 	if (header.type == CLTOMA_FUSE_GETGOAL) {
-		deserializeAllMooseFsPacketDataNoHeader(data, header.length, msgid, inode, gmode);
-	} else if (header.type == LIZ_CLTOMA_FUSE_GETGOAL) {
+		deserializeAllXaunaFsPacketDataNoHeader(data, header.length, msgid, inode, gmode);
+	} else if (header.type == SAU_CLTOMA_FUSE_GETGOAL) {
 		cltoma::fuseGetGoal::deserialize(data, header.length, msgid, inode, gmode);
 	} else {
 		throw IncorrectDeserializationException(
@@ -3232,36 +3235,36 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr, PacketHeader header, const u
 	uint8_t status = fs_getgoal(matoclserv_get_context(eptr), inode, gmode, fgtab, dgtab);
 
 	MessageBuffer reply;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		const std::map<int, Goal>& goalDefinitions = fs_get_goal_definitions();
-		std::vector<FuseGetGoalStats> lizReply;
-		MooseFSVector<std::pair<uint8_t, uint32_t>> mooseFsReplyFiles, mooseFsReplyDirectories;
+		std::vector<FuseGetGoalStats> sauReply;
+		XaunaFSVector<std::pair<uint8_t, uint32_t>> xaunaFsReplyFiles, xaunaFsReplyDirectories;
 		for (const auto &goal : goalDefinitions) {
 			if (fgtab[goal.first] || dgtab[goal.first]) {
-				lizReply.emplace_back(goal.second.getName(), fgtab[goal.first], dgtab[goal.first]);
+				sauReply.emplace_back(goal.second.getName(), fgtab[goal.first], dgtab[goal.first]);
 			}
 			if (fgtab[goal.first] > 0) {
-				mooseFsReplyFiles.emplace_back(goal.first, fgtab[goal.first]);
+				xaunaFsReplyFiles.emplace_back(goal.first, fgtab[goal.first]);
 			}
 			if (dgtab[goal.first] > 0) {
-				mooseFsReplyDirectories.emplace_back(goal.first, dgtab[goal.first]);
+				xaunaFsReplyDirectories.emplace_back(goal.first, dgtab[goal.first]);
 			}
 		}
-		if (header.type == LIZ_CLTOMA_FUSE_GETGOAL) {
-			matocl::fuseGetGoal::serialize(reply, msgid, lizReply);
+		if (header.type == SAU_CLTOMA_FUSE_GETGOAL) {
+			matocl::fuseGetGoal::serialize(reply, msgid, sauReply);
 		} else {
-			serializeMooseFsPacket(reply, MATOCL_FUSE_GETGOAL,
+			serializeXaunaFsPacket(reply, MATOCL_FUSE_GETGOAL,
 					msgid,
-					uint8_t(mooseFsReplyFiles.size()),
-					uint8_t(mooseFsReplyDirectories.size()),
-					mooseFsReplyFiles,
-					mooseFsReplyDirectories);
+					uint8_t(xaunaFsReplyFiles.size()),
+					uint8_t(xaunaFsReplyDirectories.size()),
+					xaunaFsReplyFiles,
+					xaunaFsReplyDirectories);
 		}
 	} else {
-		if (header.type == LIZ_CLTOMA_FUSE_GETGOAL) {
+		if (header.type == SAU_CLTOMA_FUSE_GETGOAL) {
 			matocl::fuseGetGoal::serialize(reply, msgid, status);
 		} else {
-			serializeMooseFsPacket(reply, MATOCL_FUSE_GETGOAL, msgid, status);
+			serializeXaunaFsPacket(reply, MATOCL_FUSE_GETGOAL, msgid, status);
 		}
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3276,23 +3279,23 @@ void matoclserv_fuse_setgoal_wake_up(uint32_t session_id, uint32_t msgid, uint32
 	}
 
 	MessageBuffer reply;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		uint32_t changed, notchanged, notpermitted;
 		changed = (*setgoal_stats)[SetGoalTask::kChanged];
 		notchanged = (*setgoal_stats)[SetGoalTask::kNotChanged];
 		notpermitted = (*setgoal_stats)[SetGoalTask::kNotPermitted];
 
-		if (type == LIZ_CLTOMA_FUSE_SETGOAL) {
+		if (type == SAU_CLTOMA_FUSE_SETGOAL) {
 			matocl::fuseSetGoal::serialize(reply, msgid, changed, notchanged, notpermitted);
 		} else {
-			serializeMooseFsPacket(reply, MATOCL_FUSE_SETGOAL,
+			serializeXaunaFsPacket(reply, MATOCL_FUSE_SETGOAL,
 					msgid, changed, notchanged, notpermitted);
 		}
 	} else {
-		if (type == LIZ_CLTOMA_FUSE_SETGOAL) {
+		if (type == SAU_CLTOMA_FUSE_SETGOAL) {
 			matocl::fuseSetGoal::serialize(reply, msgid, status);
 		} else {
-			serializeMooseFsPacket(reply, MATOCL_FUSE_SETGOAL, msgid, status);
+			serializeXaunaFsPacket(reply, MATOCL_FUSE_SETGOAL, msgid, status);
 		}
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3301,12 +3304,12 @@ void matoclserv_fuse_setgoal_wake_up(uint32_t session_id, uint32_t msgid, uint32
 void matoclserv_fuse_setgoal(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
 	uint32_t inode, uid, msgid;
 	uint8_t goalId = 0, smode;
-	uint8_t status = LIZARDFS_STATUS_OK;
+	uint8_t status = SAUNAFS_STATUS_OK;
 
 	if (header.type == CLTOMA_FUSE_SETGOAL) {
-		deserializeAllMooseFsPacketDataNoHeader(data, header.length,
+		deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
 				msgid, inode, uid, goalId, smode);
-	} else if (header.type == LIZ_CLTOMA_FUSE_SETGOAL) {
+	} else if (header.type == SAU_CLTOMA_FUSE_SETGOAL) {
 		std::string goalName;
 		cltoma::fuseSetGoal::deserialize(data, header.length,
 				msgid, inode, uid, goalName, smode);
@@ -3321,7 +3324,7 @@ void matoclserv_fuse_setgoal(matoclserventry *eptr, PacketHeader header, const u
 			}
 		}
 		if (!goalFound) {
-			status = LIZARDFS_ERROR_EINVAL;
+			status = SAUNAFS_ERROR_EINVAL;
 		}
 	} else {
 		throw IncorrectDeserializationException(
@@ -3329,29 +3332,29 @@ void matoclserv_fuse_setgoal(matoclserventry *eptr, PacketHeader header, const u
 				std::to_string(header.type));
 	}
 
-	if (status == LIZARDFS_STATUS_OK && !GoalId::isValid(goalId)) {
-		status = LIZARDFS_ERROR_EINVAL;
+	if (status == SAUNAFS_STATUS_OK && !GoalId::isValid(goalId)) {
+		status = SAUNAFS_ERROR_EINVAL;
 	}
-	if (status == LIZARDFS_STATUS_OK) {
-		if (status == LIZARDFS_STATUS_OK && goalId < eptr->sesdata->mingoal) {
-			status = LIZARDFS_ERROR_EPERM;
+	if (status == SAUNAFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK && goalId < eptr->sesdata->mingoal) {
+			status = SAUNAFS_ERROR_EPERM;
 		}
-		if (status == LIZARDFS_STATUS_OK && goalId > eptr->sesdata->maxgoal) {
-			status = LIZARDFS_ERROR_EPERM;
+		if (status == SAUNAFS_STATUS_OK && goalId > eptr->sesdata->maxgoal) {
+			status = SAUNAFS_ERROR_EPERM;
 		}
 	}
 
 	// array for setgoal operation statistics
 	auto setgoal_stats = std::make_shared<SetGoalTask::StatsArray>();
 
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, 0);
 		status = fs_setgoal(context, inode, goalId, smode, setgoal_stats,
 			   std::bind(matoclserv_fuse_setgoal_wake_up, eptr->sesdata->sessionid,
 				     msgid, header.type, setgoal_stats, std::placeholders::_1));
 	}
 
-	if (status != LIZARDFS_ERROR_WAITING) {
+	if (status != SAUNAFS_ERROR_WAITING) {
 		matoclserv_fuse_setgoal_wake_up(eptr->sesdata->sessionid, msgid, header.type,
 						setgoal_stats, status);
 	}
@@ -3365,7 +3368,7 @@ void matoclserv_fuse_geteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=9) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETEATTR - wrong size (%" PRIu32 "/9)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETEATTR - wrong size (%" PRIu32 "/9)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3375,7 +3378,7 @@ void matoclserv_fuse_geteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	status = fs_geteattr(matoclserv_get_context(eptr),inode,gmode,feattrtab,deattrtab);
 	fn=0;
 	dn=0;
-	if (status==LIZARDFS_STATUS_OK) {
+	if (status==SAUNAFS_STATUS_OK) {
 		for (i=0 ; i<16 ; i++) {
 			if (feattrtab[i]) {
 				fn++;
@@ -3385,9 +3388,9 @@ void matoclserv_fuse_geteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 		}
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETEATTR,(status!=LIZARDFS_STATUS_OK)?5:6+5*(fn+dn));
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETEATTR,(status!=SAUNAFS_STATUS_OK)?5:6+5*(fn+dn));
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put8bit(&ptr,fn);
@@ -3415,7 +3418,7 @@ void matoclserv_fuse_seteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=14) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETEATTR - wrong size (%" PRIu32 "/14)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETEATTR - wrong size (%" PRIu32 "/14)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3425,9 +3428,9 @@ void matoclserv_fuse_seteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	eattr = get8bit(&data);
 	smode = get8bit(&data);
 	status = fs_seteattr(matoclserv_get_context(eptr, uid, 0), inode, eattr, smode, &changed, &notchanged, &notpermitted);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETEATTR,(status!=LIZARDFS_STATUS_OK)?5:16);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETEATTR,(status!=SAUNAFS_STATUS_OK)?5:16);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr,changed);
@@ -3446,7 +3449,7 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t anleng;
 	const uint8_t *attrname;
 	if (length<19) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETXATTR - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETXATTR - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3459,13 +3462,13 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	attrname = data;
 	data+=anleng;
 	if (length!=19U+anleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETXATTR - wrong size (%" PRIu32 ":anleng=%" PRIu8 ")",length,anleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETXATTR - wrong size (%" PRIu32 ":anleng=%" PRIu8 ")",length,anleng);
 		eptr->mode = KILL;
 		return;
 	}
 
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,5);
 		put32bit(&ptr,msgid);
 		put8bit(&ptr,status);
@@ -3478,14 +3481,14 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	if (mode!=XATTR_GMODE_GET_DATA && mode!=XATTR_GMODE_LENGTH_ONLY) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,5);
 		put32bit(&ptr,msgid);
-		put8bit(&ptr,LIZARDFS_ERROR_EINVAL);
+		put8bit(&ptr,SAUNAFS_ERROR_EINVAL);
 	} else if (anleng==0) {
 		void *xanode;
 		uint32_t xasize;
 		status = fs_listxattr_leng(context,inode,opened,&xanode,&xasize);
-		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,(status!=LIZARDFS_STATUS_OK)?5:8+((mode==XATTR_GMODE_GET_DATA)?xasize:0));
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,(status!=SAUNAFS_STATUS_OK)?5:8+((mode==XATTR_GMODE_GET_DATA)?xasize:0));
 		put32bit(&ptr,msgid);
-		if (status!=LIZARDFS_STATUS_OK) {
+		if (status!=SAUNAFS_STATUS_OK) {
 			put8bit(&ptr,status);
 		} else {
 			put32bit(&ptr,xasize);
@@ -3497,9 +3500,9 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 		uint8_t *attrvalue;
 		uint32_t avleng;
 		status = fs_getxattr(context,inode,opened,anleng,attrname,&avleng,&attrvalue);
-		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,(status!=LIZARDFS_STATUS_OK)?5:8+((mode==XATTR_GMODE_GET_DATA)?avleng:0));
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,(status!=SAUNAFS_STATUS_OK)?5:8+((mode==XATTR_GMODE_GET_DATA)?avleng:0));
 		put32bit(&ptr,msgid);
-		if (status!=LIZARDFS_STATUS_OK) {
+		if (status!=SAUNAFS_STATUS_OK) {
 			put8bit(&ptr,status);
 		} else {
 			put32bit(&ptr,avleng);
@@ -3521,7 +3524,7 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<23) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETXATTR - wrong size (%" PRIu32 ")",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETXATTR - wrong size (%" PRIu32 ")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3532,7 +3535,7 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	gid = get32bit(&data);
 	anleng = get8bit(&data);
 	if (length<23U+anleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETXATTR - wrong size (%" PRIu32 ":anleng=%" PRIu8 ")",length,anleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETXATTR - wrong size (%" PRIu32 ":anleng=%" PRIu8 ")",length,anleng);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3540,7 +3543,7 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	data += anleng;
 	avleng = get32bit(&data);
 	if (length!=23U+anleng+avleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETXATTR - wrong size (%" PRIu32 ":anleng=%" PRIu8 ":avleng=%" PRIu32 ")",length,anleng,avleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETXATTR - wrong size (%" PRIu32 ":anleng=%" PRIu8 ":avleng=%" PRIu32 ")",length,anleng,avleng);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3548,7 +3551,7 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	data += avleng;
 	mode = get8bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_setxattr(context,inode,opened,anleng,attrname,avleng,attrvalue,mode);
 	}
@@ -3563,7 +3566,7 @@ void matoclserv_fuse_append(matoclserventry *eptr, const uint8_t *data, uint32_t
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=20) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_APPEND - wrong size (%" PRIu32 "/20)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_APPEND - wrong size (%" PRIu32 "/20)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3573,7 +3576,7 @@ void matoclserv_fuse_append(matoclserventry *eptr, const uint8_t *data, uint32_t
 	uid = get32bit(&data);
 	gid = get32bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		auto context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_append(context, inode, inode_src);
 	}
@@ -3589,10 +3592,10 @@ void matoclserv_fuse_snapshot_wake_up(uint32_t type, uint32_t session_id, uint32
 	}
 
 	MessageBuffer buffer;
-	if (type == LIZ_CLTOMA_FUSE_SNAPSHOT) {
+	if (type == SAU_CLTOMA_FUSE_SNAPSHOT) {
 		matocl::snapshot::serialize(buffer, msgid, status);
 	} else {
-		serializeMooseFsPacket(buffer, MATOCL_FUSE_SNAPSHOT, msgid, status);
+		serializeXaunaFsPacket(buffer, MATOCL_FUSE_SNAPSHOT, msgid, status);
 	}
 	matoclserv_createpacket(eptr, std::move(buffer));
 }
@@ -3606,13 +3609,13 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr, PacketHeader header, const 
 	uint32_t job_id;
 	uint8_t ignore_missing_src = 0;
 	uint32_t initial_batch_size = 0;
-	MooseFsString<uint8_t> name_dst;
+	XaunaFsString<uint8_t> name_dst;
 
 	if (header.type == CLTOMA_FUSE_SNAPSHOT) {
-		deserializeAllMooseFsPacketDataNoHeader(data, header.length,
+		deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
 				msgid, inode, inode_dst, name_dst, uid, gid, canoverwrite);
 		job_id = fs_reserve_job_id();
-	} else if (header.type == LIZ_CLTOMA_FUSE_SNAPSHOT) {
+	} else if (header.type == SAU_CLTOMA_FUSE_SNAPSHOT) {
 		cltoma::snapshot::deserialize(data, header.length, msgid, job_id, inode,
 		                              inode_dst, name_dst, uid, gid, canoverwrite,
 		                              ignore_missing_src, initial_batch_size);
@@ -3622,35 +3625,35 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr, PacketHeader header, const 
 				std::to_string(header.type));
 	}
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_snapshot(context, inode, inode_dst, HString(std::move(name_dst)),
 		                     canoverwrite, ignore_missing_src, initial_batch_size,
 		                     std::bind(matoclserv_fuse_snapshot_wake_up, header.type,
 		                     eptr->sesdata->sessionid, msgid, std::placeholders::_1), job_id);
 	}
-	if (status != LIZARDFS_ERROR_WAITING) {
+	if (status != SAUNAFS_ERROR_WAITING) {
 		matoclserv_fuse_snapshot_wake_up(header.type, eptr->sesdata->sessionid, msgid, status);
 	}
 }
 
 void matoclserv_fuse_getdirstats_old(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode, inodes = 0, files = 0, dirs = 0, chunks = 0;
+	uint32_t inode = 0, inodes = 0, files = 0, dirs = 0, chunks = 0;
 	uint64_t leng = 0, size = 0, rsize = 0;
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=8) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIRSTATS - wrong size (%" PRIu32 "/8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIRSTATS - wrong size (%" PRIu32 "/8)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	status = fs_get_dir_stats(matoclserv_get_context(eptr),inode,&inodes,&dirs,&files,&chunks,&leng,&size,&rsize);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,(status!=LIZARDFS_STATUS_OK)?5:60);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,(status!=SAUNAFS_STATUS_OK)?5:60);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr,inodes);
@@ -3668,22 +3671,22 @@ void matoclserv_fuse_getdirstats_old(matoclserventry *eptr,const uint8_t *data,u
 }
 
 void matoclserv_fuse_getdirstats(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode, inodes = 0, files = 0, dirs = 0, chunks = 0;
+	uint32_t inode = 0, inodes = 0, files = 0, dirs = 0, chunks = 0;
 	uint64_t leng = 0, size = 0, rsize = 0;
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=8) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIRSTATS - wrong size (%" PRIu32 "/8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIRSTATS - wrong size (%" PRIu32 "/8)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	status = fs_get_dir_stats(matoclserv_get_context(eptr),inode,&inodes,&dirs,&files,&chunks,&leng,&size,&rsize);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,(status!=LIZARDFS_STATUS_OK)?5:44);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,(status!=SAUNAFS_STATUS_OK)?5:44);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr,inodes);
@@ -3702,15 +3705,15 @@ void matoclserv_fuse_gettrash(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t status;
 	uint32_t dleng;
 	if (length!=4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETTRASH - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETTRASH - wrong size (%" PRIu32 "/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	status = fs_readtrash_size(eptr->sesdata->rootinode,eptr->sesdata->sesflags,&dleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETTRASH,(status!=LIZARDFS_STATUS_OK)?5:(4+dleng));
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETTRASH,(status!=SAUNAFS_STATUS_OK)?5:(4+dleng));
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		fs_readtrash_data(eptr->sesdata->rootinode,eptr->sesdata->sesflags,ptr);
@@ -3733,7 +3736,7 @@ void matoclserv_fuse_getdetachedattr(matoclserventry *eptr,const uint8_t *data,u
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<8 || length>9) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDETACHEDATTR - wrong size (%" PRIu32 "/8,9)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDETACHEDATTR - wrong size (%" PRIu32 "/8,9)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3745,9 +3748,9 @@ void matoclserv_fuse_getdetachedattr(matoclserventry *eptr,const uint8_t *data,u
 		dtype = DTYPE_UNKNOWN;
 	}
 	status = fs_getdetachedattr(eptr->sesdata->rootinode,eptr->sesdata->sesflags,inode,attr,dtype);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDETACHEDATTR,(status!=LIZARDFS_STATUS_OK)?5:39);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDETACHEDATTR,(status!=SAUNAFS_STATUS_OK)?5:39);
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		memcpy(ptr, attr.data(), attr.size());
@@ -3761,7 +3764,7 @@ void matoclserv_fuse_gettrashpath(matoclserventry *eptr,const uint8_t *data,uint
 	uint8_t status;
 	std::string path;
 	if (length != 8) {
-		lzfs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_GETTRASHPATH - wrong size (%" PRIu32 "/8)", length);
+		safs_pretty_syslog(LOG_NOTICE, "CLTOMA_FUSE_GETTRASHPATH - wrong size (%" PRIu32 "/8)", length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3769,9 +3772,9 @@ void matoclserv_fuse_gettrashpath(matoclserventry *eptr,const uint8_t *data,uint
 	inode = get32bit(&data);
 	status = fs_gettrashpath(eptr->sesdata->rootinode, eptr->sesdata->sesflags, inode, path);
 	ptr = matoclserv_createpacket(eptr, MATOCL_FUSE_GETTRASHPATH,
-	                              (status != LIZARDFS_STATUS_OK) ? 5 : 8 + path.length() + 1);
+	                              (status != SAUNAFS_STATUS_OK) ? 5 : 8 + path.length() + 1);
 	put32bit(&ptr, msgid);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		put8bit(&ptr, status);
 	} else {
 		put32bit(&ptr, path.length() + 1);
@@ -3790,7 +3793,7 @@ void matoclserv_fuse_settrashpath(matoclserventry *eptr,const uint8_t *data,uint
 	uint8_t status;
 	uint8_t *ptr;
 	if (length<12) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETTRASHPATH - wrong size (%" PRIu32 "/>=12)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETTRASHPATH - wrong size (%" PRIu32 "/>=12)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3798,7 +3801,7 @@ void matoclserv_fuse_settrashpath(matoclserventry *eptr,const uint8_t *data,uint
 	inode = get32bit(&data);
 	pleng = get32bit(&data);
 	if (length!=12+pleng) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETTRASHPATH - wrong size (%" PRIu32 "/%" PRIu32 ")",length,12+pleng);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_SETTRASHPATH - wrong size (%" PRIu32 "/%" PRIu32 ")",length,12+pleng);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3819,7 +3822,7 @@ void matoclserv_fuse_undel(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uint8_t status;
 	uint8_t *ptr;
 	if (length!=8) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_UNDEL - wrong size (%" PRIu32 "/8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_UNDEL - wrong size (%" PRIu32 "/8)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3837,7 +3840,7 @@ void matoclserv_fuse_purge(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=8) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_PURGE - wrong size (%" PRIu32 "/8)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_PURGE - wrong size (%" PRIu32 "/8)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3856,15 +3859,15 @@ void matoclserv_fuse_getreserved(matoclserventry *eptr,const uint8_t *data,uint3
 	uint8_t status;
 	uint32_t dleng;
 	if (length!=4) {
-		lzfs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETRESERVED - wrong size (%" PRIu32 "/4)",length);
+		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETRESERVED - wrong size (%" PRIu32 "/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	status = fs_readreserved_size(eptr->sesdata->rootinode,eptr->sesdata->sesflags,&dleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETRESERVED,(status!=LIZARDFS_STATUS_OK)?5:(4+dleng));
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETRESERVED,(status!=SAUNAFS_STATUS_OK)?5:(4+dleng));
 	put32bit(&ptr,msgid);
-	if (status!=LIZARDFS_STATUS_OK) {
+	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		fs_readreserved_data(eptr->sesdata->rootinode,eptr->sesdata->sesflags,ptr);
@@ -3885,7 +3888,7 @@ void matoclserv_fuse_deleteacl(matoclserventry *eptr, const uint8_t *data, uint3
 	cltoma::fuseDeleteAcl::deserialize(data, length, messageId, inode, uid, gid, type);
 
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_deleteacl(context, inode, type);
 	}
@@ -3896,17 +3899,17 @@ void matoclserv_fuse_getacl(matoclserventry *eptr, const uint8_t *data, uint32_t
 	uint32_t messageId, inode, uid, gid;
 	AclType type;
 	cltoma::fuseGetAcl::deserialize(data, length, messageId, inode, uid, gid, type);
-	lzfs_silent_syslog(LOG_DEBUG, "master.cltoma_fuse_getacl: %u", inode);
+	safs_silent_syslog(LOG_DEBUG, "master.cltoma_fuse_getacl: %u", inode);
 
 	MessageBuffer reply;
 	RichACL acl;
 
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_getacl(context, inode, acl);
 	}
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		if (eptr->version >= kRichACLVersion) {
 			FSNode *node = fsnodes_id_to_node(inode);
 			uint32_t owner_id = node ? node->uid : RichACL::Ace::kInvalidId;
@@ -3927,18 +3930,18 @@ void matoclserv_fuse_getacl(matoclserventry *eptr, const uint8_t *data, uint32_t
 					matocl::fuseGetAcl::serialize(reply, messageId, legacy_acl);
 				}
 			} else {
-				status = LIZARDFS_ERROR_ENOATTR;
+				status = SAUNAFS_ERROR_ENOATTR;
 			}
 		}
 	}
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		matocl::fuseGetAcl::serialize(reply, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
 }
 
 static void matoclserv_lock_wake_up(uint32_t sessionid, uint32_t messageId,
-		lzfs_locks::Type type) {
+		safs_locks::Type type) {
 	matoclserventry *eptr;
 	MessageBuffer reply;
 
@@ -3949,21 +3952,21 @@ static void matoclserv_lock_wake_up(uint32_t sessionid, uint32_t messageId,
 	}
 
 	switch (type) {
-	case lzfs_locks::Type::kFlock:
-		matocl::fuseFlock::serialize(reply, messageId, LIZARDFS_STATUS_OK);
+	case safs_locks::Type::kFlock:
+		matocl::fuseFlock::serialize(reply, messageId, SAUNAFS_STATUS_OK);
 		break;
-	case lzfs_locks::Type::kPosix:
-		matocl::fuseSetlk::serialize(reply, messageId, LIZARDFS_STATUS_OK);
+	case safs_locks::Type::kPosix:
+		matocl::fuseSetlk::serialize(reply, messageId, SAUNAFS_STATUS_OK);
 		break;
 	default:
-		lzfs_pretty_syslog(LOG_ERR, "Incorrect lock type passed for lock wakeup: %u", (unsigned)type);
+		safs_pretty_syslog(LOG_ERR, "Incorrect lock type passed for lock wakeup: %u", (unsigned)type);
 		return;
 	}
 
 	matoclserv_createpacket(eptr, std::move(reply));
 }
 
-static void matoclserv_lock_wake_up(std::vector<FileLocks::Owner> &owners, lzfs_locks::Type type) {
+static void matoclserv_lock_wake_up(std::vector<FileLocks::Owner> &owners, safs_locks::Type type) {
 	for (auto owner : owners) {
 		matoclserv_lock_wake_up(owner.sessionid, owner.msgid, type);
 	}
@@ -3986,29 +3989,29 @@ void matoclserv_fuse_flock(matoclserventry *eptr, const uint8_t *data, uint32_t 
 	deserializePacketVersionNoHeader(data, length, version);
 
 	if (version != 0) {
-		lzfs_pretty_syslog(LOG_ERR, "flock wrong message version\n");
+		safs_pretty_syslog(LOG_ERR, "flock wrong message version\n");
 		return;
 	}
 	cltoma::fuseFlock::deserialize(data, length, messageId, inode, owner, requestId, op);
 
-	if (op & lzfs_locks::kNonblock) {
+	if (op & safs_locks::kNonblock) {
 		nonblocking = true;
-		op &= ~lzfs_locks::kNonblock;
+		op &= ~safs_locks::kNonblock;
 	}
 
 	std::vector<FileLocks::Owner> applied;
 	status = fs_flock_op(context, inode, owner, eptr->sesdata->sessionid, requestId, messageId,
 			op, nonblocking, applied);
 
-	matoclserv_lock_wake_up(applied, lzfs_locks::Type::kFlock);
+	matoclserv_lock_wake_up(applied, safs_locks::Type::kFlock);
 
 	// If it was a release request, do not respond
-	if (op == lzfs_locks::kRelease) {
+	if (op == safs_locks::kRelease) {
 		return;
 	}
 
 	// Do not respond only if operation is blocking and status is WAITING
-	if (nonblocking || status != LIZARDFS_ERROR_WAITING) {
+	if (nonblocking || status != SAUNAFS_ERROR_WAITING) {
 		matocl::fuseFlock::serialize(reply, messageId, status);
 		matoclserv_createpacket(eptr, std::move(reply));
 	}
@@ -4020,14 +4023,14 @@ void matoclserv_fuse_getlk(matoclserventry *eptr, const uint8_t *data, uint32_t 
 	uint32_t inode;
 	uint64_t owner;
 
-	lzfs_locks::FlockWrapper lock_info;
+	safs_locks::FlockWrapper lock_info;
 	uint8_t status;
 	uint64_t lock_end;
 
 	cltoma::fuseGetlk::deserialize(data, length, message_id, inode, owner, lock_info);
 
 	if (lock_info.l_start < 0 || lock_info.l_len < 0) {
-		matoclserv_createpacket(eptr, matocl::fuseGetlk::build(message_id, LIZARDFS_ERROR_EINVAL));
+		matoclserv_createpacket(eptr, matocl::fuseGetlk::build(message_id, SAUNAFS_ERROR_EINVAL));
 		return;
 	}
 
@@ -4046,7 +4049,7 @@ void matoclserv_fuse_getlk(matoclserventry *eptr, const uint8_t *data, uint32_t 
 		lock_info.l_len = 0;
 	}
 
-	if (status == LIZARDFS_ERROR_WAITING || status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_ERROR_WAITING || status == SAUNAFS_STATUS_OK) {
 		matoclserv_createpacket(eptr, matocl::fuseGetlk::build(message_id, lock_info));
 	} else {
 		matoclserv_createpacket(eptr, matocl::fuseGetlk::build(message_id, status));
@@ -4063,7 +4066,7 @@ void matoclserv_fuse_setlk(matoclserventry *eptr, const uint8_t *data, uint32_t 
 	uint16_t op;
 	PacketVersion version;
 	uint8_t status;
-	lzfs_locks::FlockWrapper lock_info;
+	safs_locks::FlockWrapper lock_info;
 	uint64_t lock_end;
 
 	bool nonblocking = false;
@@ -4072,15 +4075,15 @@ void matoclserv_fuse_setlk(matoclserventry *eptr, const uint8_t *data, uint32_t 
 	cltoma::fuseSetlk::deserialize(data, length, message_id, inode, owner, request_id, lock_info);
 
 	if (lock_info.l_start < 0 || lock_info.l_len < 0) {
-		matoclserv_createpacket(eptr, matocl::fuseSetlk::build(message_id, LIZARDFS_ERROR_EINVAL));
+		matoclserv_createpacket(eptr, matocl::fuseSetlk::build(message_id, SAUNAFS_ERROR_EINVAL));
 		return;
 	}
 
 	op = lock_info.l_type;
 
-	if (op & lzfs_locks::kNonblock) {
+	if (op & safs_locks::kNonblock) {
 		nonblocking = true;
-		op &= ~lzfs_locks::kNonblock;
+		op &= ~safs_locks::kNonblock;
 	}
 
 	// Standard states that lock of length 0 is a lock till EOF
@@ -4094,15 +4097,15 @@ void matoclserv_fuse_setlk(matoclserventry *eptr, const uint8_t *data, uint32_t 
 	status = fs_posixlock_op(context, inode, lock_info.l_start, lock_end,
 			owner, eptr->sesdata->sessionid, request_id, message_id, op, nonblocking, applied);
 
-	matoclserv_lock_wake_up(applied, lzfs_locks::Type::kPosix);
+	matoclserv_lock_wake_up(applied, safs_locks::Type::kPosix);
 
 	// If it was a release request, do not respond
-	if (op == lzfs_locks::kRelease) {
+	if (op == safs_locks::kRelease) {
 		return;
 	}
 
 	// Do not respond only if operation is blocking and status is WAITING
-	if (nonblocking || status != LIZARDFS_ERROR_WAITING) {
+	if (nonblocking || status != SAUNAFS_ERROR_WAITING) {
 		matoclserv_createpacket(eptr, matocl::fuseSetlk::build(message_id, status));
 	}
 }
@@ -4120,16 +4123,16 @@ void matoclserv_list_defective_files(matoclserventry *eptr, const uint8_t *data,
 void matoclserv_manage_locks_list(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
 	FsContext context = FsContext::getForMaster(eventloop_time());
 	uint32_t inode;
-	lzfs_locks::Type type;
+	safs_locks::Type type;
 	bool pending;
 	uint64_t start;
 	uint64_t max;
 	PacketVersion version;
-	std::vector<lzfs_locks::Info> locks;
+	std::vector<safs_locks::Info> locks;
 	int status;
 
 	if (eptr->registered != ClientState::kAdmin) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Listing file locks is available only for registered admins");
+		safs_pretty_syslog(LOG_NOTICE, "Listing file locks is available only for registered admins");
 		eptr->mode = KILL;
 		return;
 	}
@@ -4138,20 +4141,20 @@ void matoclserv_manage_locks_list(matoclserventry *eptr, const uint8_t *data, ui
 
 	if (version == cltoma::manageLocksList::kAll) {
 		cltoma::manageLocksList::deserialize(data, length, type, pending, start, max);
-		max = std::min(max, (uint64_t)LIZ_CLTOMA_MANAGE_LOCKS_LIST_LIMIT);
+		max = std::min(max, (uint64_t)SAU_CLTOMA_MANAGE_LOCKS_LIST_LIMIT);
 		status = fs_locks_list_all(context, (uint8_t)type, pending, start, max, locks);
 	} else if (version == cltoma::manageLocksList::kInode) {
 		cltoma::manageLocksList::deserialize(data, length, inode, type, pending, start, max);
-		max = std::min(max, (uint64_t)LIZ_CLTOMA_MANAGE_LOCKS_LIST_LIMIT);
+		max = std::min(max, (uint64_t)SAU_CLTOMA_MANAGE_LOCKS_LIST_LIMIT);
 		status = fs_locks_list_inode(context, (uint8_t)type, pending, inode, start, max, locks);
 	} else {
 		throw IncorrectDeserializationException(
-				"Unknown LIZ_CLTOMA_MANAGE_LOCKS_LIST version: " + std::to_string(version));
+				"Unknown SAU_CLTOMA_MANAGE_LOCKS_LIST version: " + std::to_string(version));
 	}
 
-	if (status != LIZARDFS_STATUS_OK) {
-		lzfs_pretty_syslog(LOG_WARNING, "Master received invalid lock type %" PRIu8
-		                                " from in LIZ_CLTOMA_MANAGE_LOCKS_LIST packet",
+	if (status != SAUNAFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_WARNING, "Master received invalid lock type %" PRIu8
+		                                " from in SAU_CLTOMA_MANAGE_LOCKS_LIST packet",
 		                   (uint8_t)type);
 	}
 
@@ -4165,15 +4168,15 @@ void matoclserv_manage_locks_unlock(matoclserventry *eptr, const uint8_t *data, 
 	uint32_t inode;
 	uint64_t owner;
 	uint32_t sessionid;
-	lzfs_locks::Type type;
+	safs_locks::Type type;
 	uint64_t start;
 	uint64_t end;
 	PacketVersion version;
-	uint8_t status = LIZARDFS_STATUS_OK;
+	uint8_t status = SAUNAFS_STATUS_OK;
 	std::vector<FileLocks::Owner> flocks_applied, posix_applied;
 
 	if (eptr->registered != ClientState::kAdmin) {
-		lzfs_pretty_syslog(LOG_NOTICE, "Removing file locks is available only for registered admins");
+		safs_pretty_syslog(LOG_NOTICE, "Removing file locks is available only for registered admins");
 		eptr->mode = KILL;
 		return;
 	}
@@ -4187,38 +4190,38 @@ void matoclserv_manage_locks_unlock(matoclserventry *eptr, const uint8_t *data, 
 		if (end == 0) {
 			end = std::numeric_limits<decltype(end)>::max();
 		}
-		if (type == lzfs_locks::Type::kAll || type == lzfs_locks::Type::kFlock) {
-			status = fs_flock_op(context, inode, owner, sessionid, 0, 0, lzfs_locks::kUnlock, true,
+		if (type == safs_locks::Type::kAll || type == safs_locks::Type::kFlock) {
+			status = fs_flock_op(context, inode, owner, sessionid, 0, 0, safs_locks::kUnlock, true,
 			                     flocks_applied);
 		}
-		if (status == LIZARDFS_STATUS_OK &&
-		    (type == lzfs_locks::Type::kAll || type == lzfs_locks::Type::kPosix)) {
+		if (status == SAUNAFS_STATUS_OK &&
+		    (type == safs_locks::Type::kAll || type == safs_locks::Type::kPosix)) {
 			status = fs_posixlock_op(context, inode, start, end, owner, sessionid, 0, 0,
-			                         lzfs_locks::kUnlock, true, posix_applied);
+			                         safs_locks::kUnlock, true, posix_applied);
 		}
 	} else if (version == cltoma::manageLocksUnlock::kInode) {
 		cltoma::manageLocksUnlock::deserialize(data, length, type, inode);
-		if (type == lzfs_locks::Type::kAll || type == lzfs_locks::Type::kFlock) {
-			status = fs_locks_unlock_inode(context, (uint8_t)lzfs_locks::Type::kFlock, inode,
+		if (type == safs_locks::Type::kAll || type == safs_locks::Type::kFlock) {
+			status = fs_locks_unlock_inode(context, (uint8_t)safs_locks::Type::kFlock, inode,
 			                               flocks_applied);
 		}
-		if (status == LIZARDFS_STATUS_OK &&
-		    (type == lzfs_locks::Type::kAll || type == lzfs_locks::Type::kPosix)) {
-			status = fs_locks_unlock_inode(context, (uint8_t)lzfs_locks::Type::kPosix, inode,
+		if (status == SAUNAFS_STATUS_OK &&
+		    (type == safs_locks::Type::kAll || type == safs_locks::Type::kPosix)) {
+			status = fs_locks_unlock_inode(context, (uint8_t)safs_locks::Type::kPosix, inode,
 			                               posix_applied);
 		}
 	} else {
-		throw IncorrectDeserializationException("Unknown LIZ_CLTOMA_MANAGE_LOCKS_UNLOCK version: " +
+		throw IncorrectDeserializationException("Unknown SAU_CLTOMA_MANAGE_LOCKS_UNLOCK version: " +
 		                                        std::to_string(version));
 	}
 
 	for (auto sessionAndMsg : flocks_applied) {
 		matoclserv_lock_wake_up(sessionAndMsg.sessionid, sessionAndMsg.msgid,
-		                        lzfs_locks::Type::kFlock);
+		                        safs_locks::Type::kFlock);
 	}
 	for (auto sessionAndMsg : posix_applied) {
 		matoclserv_lock_wake_up(sessionAndMsg.sessionid, sessionAndMsg.msgid,
-		                        lzfs_locks::Type::kPosix);
+		                        safs_locks::Type::kPosix);
 	}
 
 	MessageBuffer reply;
@@ -4243,13 +4246,13 @@ void matoclserv_fuse_locks_interrupt(matoclserventry *eptr, const uint8_t *data,
 				     uint8_t type) {
 	FsContext context = FsContext::getForMaster(eventloop_time());
 	uint32_t messageId;
-	lzfs_locks::InterruptData interruptData;
+	safs_locks::InterruptData interruptData;
 
 	PacketVersion version;
 	deserializePacketVersionNoHeader(data, length, version);
 
 	if (version != 0) {
-		lzfs_pretty_syslog(LOG_ERR, "fuse_flock_interrupt wrong message version\n");
+		safs_pretty_syslog(LOG_ERR, "fuse_flock_interrupt wrong message version\n");
 		return;
 	}
 
@@ -4277,7 +4280,7 @@ void matoclserv_update_credentials(matoclserventry *eptr, const uint8_t *data, u
 		eptr->sesdata->group_cache.insert(std::move(index), std::move(tmp));
 	}
 
-	matoclserv_createpacket(eptr, matocl::updateCredentials::build(messageId, LIZARDFS_STATUS_OK));
+	matoclserv_createpacket(eptr, matocl::updateCredentials::build(messageId, SAUNAFS_STATUS_OK));
 }
 
 void matoclserv_fuse_setacl(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
@@ -4301,13 +4304,13 @@ void matoclserv_fuse_setacl(matoclserventry *eptr, const uint8_t *data, uint32_t
 	} else if (version == cltoma::fuseSetAcl::kRichACL) {
 		cltoma::fuseSetAcl::deserialize(data, length, messageId, inode, uid, gid, rich_acl);
 	} else {
-		lzfs_pretty_syslog(LOG_WARNING, "LIZ_CLTOMA_FUSE_SET_ACL: unknown packet version");
+		safs_pretty_syslog(LOG_WARNING, "SAU_CLTOMA_FUSE_SET_ACL: unknown packet version");
 		eptr->mode = KILL;
 		return;
 	}
 
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		if (use_posix) {
 			status = fs_setacl(context, inode, type, posix_acl);
@@ -4324,7 +4327,7 @@ void matoclserv_fuse_setquota(matoclserventry *eptr, const uint8_t *data, uint32
 	cltoma::fuseSetQuota::deserialize(data, length, messageId, uid, gid, entries);
 
 	uint8_t status = matoclserv_check_group_cache(eptr, gid);
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_quota_set(context, entries);
 	}
@@ -4342,7 +4345,7 @@ void matoclserv_fuse_getquota(matoclserventry *eptr, const uint8_t *data, uint32
 	if (version == cltoma::fuseGetQuota::kAllLimits) {
 		cltoma::fuseGetQuota::deserialize(data, length, messageId, uid, gid);
 		status = matoclserv_check_group_cache(eptr, gid);
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			FsContext context = matoclserv_get_context(eptr, uid, gid);
 			status = fs_quota_get_all(context, results);
 		}
@@ -4350,19 +4353,19 @@ void matoclserv_fuse_getquota(matoclserventry *eptr, const uint8_t *data, uint32
 		std::vector<QuotaOwner> owners;
 		cltoma::fuseGetQuota::deserialize(data, length, messageId, uid, gid, owners);
 		status = matoclserv_check_group_cache(eptr, gid);
-		if (status == LIZARDFS_STATUS_OK) {
+		if (status == SAUNAFS_STATUS_OK) {
 			FsContext context = matoclserv_get_context(eptr, uid, gid);
 			status = fs_quota_get(context, owners, results);
 		}
 	} else {
 		throw IncorrectDeserializationException(
-				"Unknown LIZ_CLTOMA_FUSE_GET_QUOTA version: " + std::to_string(version));
+				"Unknown SAU_CLTOMA_FUSE_GET_QUOTA version: " + std::to_string(version));
 	}
 	MessageBuffer reply;
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		status = fs_quota_get_info(matoclserv_get_context(eptr), results, info);
 	}
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		matocl::fuseGetQuota::serialize(reply, messageId, results, info);
 	} else {
 		matocl::fuseGetQuota::serialize(reply, messageId, status);
@@ -4384,7 +4387,7 @@ void matoclserv_iolimit(matoclserventry *eptr, const uint8_t *data, uint32_t len
 			grantedBytes = gIoLimitsDatabase.request(
 					SteadyClock::now(), groupId, requestedBytes);
 		} catch (IoLimitsDatabase::InvalidGroupIdException&) {
-			lzfs_pretty_syslog(LOG_NOTICE, "LIZ_CLTOMA_IOLIMIT: Invalid group: %s", groupId.c_str());
+			safs_pretty_syslog(LOG_NOTICE, "SAU_CLTOMA_IOLIMIT: Invalid group: %s", groupId.c_str());
 			grantedBytes = 0;
 		}
 	}
@@ -4405,41 +4408,41 @@ void matoclserv_hostname(matoclserventry* eptr, const uint8_t* data, uint32_t le
 void matoclserv_admin_register(matoclserventry* eptr, const uint8_t* data, uint32_t length) {
 	cltoma::adminRegister::deserialize(data, length);
 	if (!eptr->adminChallenge) {
-		eptr->adminChallenge.reset(new LizMatoclAdminRegisterChallengeData());
+		eptr->adminChallenge.reset(new SauMatoclAdminRegisterChallengeData());
 		auto& array = *eptr->adminChallenge;
 		for (uint32_t i = 0; i < array.size(); ++i) {
 			array[i] = rnd<uint8_t>();
 		}
 		matoclserv_createpacket(eptr, matocl::adminRegisterChallenge::build(array));
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "LIZ_CLTOMA_ADMIN_REGISTER_CHALLENGE: retry not allowed");
+		safs_pretty_syslog(LOG_NOTICE, "SAU_CLTOMA_ADMIN_REGISTER_CHALLENGE: retry not allowed");
 		eptr->mode = KILL;
 	}
 }
 
 void matoclserv_admin_register_response(matoclserventry* eptr, const uint8_t* data,
 		uint32_t length) {
-	LizCltomaAdminRegisterResponseData receivedDigest;
+	SauCltomaAdminRegisterResponseData receivedDigest;
 	cltoma::adminRegisterResponse::deserialize(data, length, receivedDigest);
 	if (eptr->adminChallenge) {
 		std::string password = cfg_getstring("ADMIN_PASSWORD", "");
 		if (password == "") {
-			matoclserv_createpacket(eptr, matocl::adminRegisterResponse::build(LIZARDFS_ERROR_EPERM));
-			lzfs_pretty_syslog(LOG_WARNING, "admin access disabled");
+			matoclserv_createpacket(eptr, matocl::adminRegisterResponse::build(SAUNAFS_ERROR_EPERM));
+			safs_pretty_syslog(LOG_WARNING, "admin access disabled");
 			return;
 		}
 		auto digest = md5_challenge_response(*eptr->adminChallenge, password);
 		if (receivedDigest == digest) {
-			matoclserv_createpacket(eptr, matocl::adminRegisterResponse::build(LIZARDFS_STATUS_OK));
+			matoclserv_createpacket(eptr, matocl::adminRegisterResponse::build(SAUNAFS_STATUS_OK));
 			eptr->registered = ClientState::kAdmin;
 		} else {
-			matoclserv_createpacket(eptr, matocl::adminRegisterResponse::build(LIZARDFS_ERROR_BADPASSWORD));
-			lzfs_pretty_syslog(LOG_WARNING, "admin authentication error");
+			matoclserv_createpacket(eptr, matocl::adminRegisterResponse::build(SAUNAFS_ERROR_BADPASSWORD));
+			safs_pretty_syslog(LOG_WARNING, "admin authentication error");
 		}
 		eptr->adminChallenge.reset();
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,
-				"LIZ_CLTOMA_ADMIN_REGISTER_RESPONSE: response without previous challenge");
+		safs_pretty_syslog(LOG_NOTICE,
+				"SAU_CLTOMA_ADMIN_REGISTER_RESPONSE: response without previous challenge");
 		eptr->mode = KILL;
 	}
 }
@@ -4448,11 +4451,11 @@ void matoclserv_admin_become_master(matoclserventry* eptr, const uint8_t* data, 
 	cltoma::adminBecomeMaster::deserialize(data, length);
 	if (eptr->registered == ClientState::kAdmin) {
 		bool succ = metadataserver::promoteAutoToMaster();
-		uint8_t status = succ ? LIZARDFS_STATUS_OK : LIZARDFS_ERROR_NOTPOSSIBLE;
+		uint8_t status = succ ? SAUNAFS_STATUS_OK : SAUNAFS_ERROR_NOTPOSSIBLE;
 		matoclserv_createpacket(eptr, matocl::adminBecomeMaster::build(status));
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,
-				"LIZ_CLTOMA_ADMIN_BECOME_MASTER: available only for registered admins");
+		safs_pretty_syslog(LOG_NOTICE,
+				"SAU_CLTOMA_ADMIN_BECOME_MASTER: available only for registered admins");
 		eptr->mode = KILL;
 	}
 }
@@ -4463,14 +4466,14 @@ void matoclserv_admin_stop_without_metadata_dump(
 	if (eptr->registered == ClientState::kAdmin) {
 		if (metadataserver::isMaster()) {
 			if (matomlserv_shadows_count() == 0){
-				lzfs_pretty_syslog(LOG_WARNING, "LIZ_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP: Trying to stop"
+				safs_pretty_syslog(LOG_WARNING, "SAU_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP: Trying to stop"
 						" master server with disabled metadata dump when no shadow servers are "
 						"connected.");
 				matoclserv_createpacket(eptr, matocl::adminStopWithoutMetadataDump::build(EPERM));
 			} else {
 				fs_disable_metadata_dump_on_exit();
 				uint8_t status = eventloop_want_to_terminate();
-				if (status == LIZARDFS_STATUS_OK) {
+				if (status == SAUNAFS_STATUS_OK) {
 					eptr->adminTask = AdminTask::kTerminate;
 				} else {
 					matoclserv_createpacket(
@@ -4483,8 +4486,8 @@ void matoclserv_admin_stop_without_metadata_dump(
 			matoclserv_createpacket(eptr, matocl::adminStopWithoutMetadataDump::build(status));
 		}
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE,
-				"LIZ_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP:"
+		safs_pretty_syslog(LOG_NOTICE,
+				"SAU_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP:"
 				" available only for registered admins");
 		eptr->mode = KILL;
 	}
@@ -4495,29 +4498,49 @@ void matoclserv_admin_reload(matoclserventry* eptr, const uint8_t* data, uint32_
 	if (eptr->registered == ClientState::kAdmin) {
 		eptr->adminTask = AdminTask::kReload; // mark, that this admin waits for response
 		eventloop_want_to_reload();
-		lzfs_pretty_syslog(LOG_NOTICE, "reload of the config file requested using lizardfs-admin by %s",
+		safs_pretty_syslog(LOG_NOTICE, "reload of the config file requested using saunafs-admin by %s",
 				ipToString(eptr->peerip).c_str());
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "LIZ_CLTOMA_ADMIN_RELOAD: available only for registered admins");
+		safs_pretty_syslog(LOG_NOTICE, "SAU_CLTOMA_ADMIN_RELOAD: available only for registered admins");
 		eptr->mode = KILL;
 	}
+}
+
+void matoclserv_admin_dump_config(matoclserventry *eptr) {
+	if (eptr->registered != ClientState::kAdmin) {
+		safs_pretty_syslog(LOG_NOTICE,
+		                   "SAU_CLTOMA_ADMING_DUMP_CONFIG: available only for "
+		                   "registered admins");
+		eptr->mode = KILL;
+		return;
+	}
+	MessageBuffer reply;
+
+	auto master_config =
+	    cfg_yaml_string((metadataserver::isMaster() ? "master" : "shadow"));
+	auto chunkserver_configs = csdb_chunkserver_configs();
+	auto metalogger_configs = get_metaloggers_config();
+	matocl::adminDumpConfiguration::serialize(
+	    reply,
+	    master_config + "\n" + chunkserver_configs + "\n" + metalogger_configs);
+	matoclserv_createpacket(eptr, reply);
 }
 
 void matoclserv_admin_save_metadata(matoclserventry* eptr, const uint8_t* data, uint32_t length) {
 	bool asynchronous;
 	cltoma::adminSaveMetadata::deserialize(data, length, asynchronous);
 	if (eptr->registered == ClientState::kAdmin) {
-		lzfs_pretty_syslog(LOG_NOTICE, "saving metadata image requested using lizardfs-admin by %s",
+		safs_pretty_syslog(LOG_NOTICE, "saving metadata image requested using saunafs-admin by %s",
 				ipToString(eptr->peerip).c_str());
 		uint8_t status = fs_storeall(MetadataDumper::DumpType::kBackgroundDump);
-		if (status != LIZARDFS_STATUS_OK || asynchronous) {
+		if (status != SAUNAFS_STATUS_OK || asynchronous) {
 			matoclserv_createpacket(eptr, matocl::adminSaveMetadata::build(status));
 		} else {
 			// Mark the client; we will reply after metadata save process is finished
 			eptr->adminTask = AdminTask::kSaveMetadata;
 		}
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "LIZ_CLTOMA_ADMIN_SAVE_METADATA: available only for registered admins");
+		safs_pretty_syslog(LOG_NOTICE, "SAU_CLTOMA_ADMIN_SAVE_METADATA: available only for registered admins");
 		eptr->mode = KILL;
 	}
 }
@@ -4539,17 +4562,17 @@ void matoclserv_admin_recalculate_metadata_checksum(matoclserventry* eptr,
 	bool asynchronous;
 	cltoma::adminRecalculateMetadataChecksum::deserialize(data, length, asynchronous);
 	if (eptr->registered == ClientState::kAdmin) {
-		lzfs_pretty_syslog(LOG_NOTICE, "metadata checksum recalculation requested using lizardfs-admin by %s",
+		safs_pretty_syslog(LOG_NOTICE, "metadata checksum recalculation requested using saunafs-admin by %s",
 					ipToString(eptr->peerip).c_str());
 		uint8_t status = fs_start_checksum_recalculation();
-		if (status != LIZARDFS_STATUS_OK || asynchronous) {
+		if (status != SAUNAFS_STATUS_OK || asynchronous) {
 			matoclserv_createpacket(eptr, matocl::adminRecalculateMetadataChecksum::build(status));
 		} else {
 			// Mark the client; we will reply after checksum of metadata is recalculated
 			eptr->adminTask = AdminTask::kRecalculateChecksums;
 		}
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "LIZ_CLTOMA_ADMIN_RECALCULATE_METADATA_CHECKSUM: "
+		safs_pretty_syslog(LOG_NOTICE, "SAU_CLTOMA_ADMIN_RECALCULATE_METADATA_CHECKSUM: "
 				"available only for registered admins");
 		eptr->mode = KILL;
 	}
@@ -4570,33 +4593,105 @@ void matoclserv_broadcast_metadata_checksum_recalculated(uint8_t status) {
 void matocl_locks_release(const FsContext &context, uint32_t inode, uint32_t sessionid) {
 	std::vector<FileLocks::Owner> applied;
 
-	fs_locks_clear_session(context, (uint8_t)lzfs_locks::Type::kFlock, inode, sessionid, applied);
+	fs_locks_clear_session(context, (uint8_t)safs_locks::Type::kFlock, inode, sessionid, applied);
 	for (auto candidate : applied) {
-		matoclserv_lock_wake_up(candidate.sessionid, candidate.msgid, lzfs_locks::Type::kFlock);
+		matoclserv_lock_wake_up(candidate.sessionid, candidate.msgid, safs_locks::Type::kFlock);
 	}
 
 	applied.clear();
-	fs_locks_clear_session(context, (uint8_t)lzfs_locks::Type::kPosix, inode, sessionid, applied);
+	fs_locks_clear_session(context, (uint8_t)safs_locks::Type::kPosix, inode, sessionid, applied);
 	for (auto candidate : applied) {
-		matoclserv_lock_wake_up(candidate.sessionid, candidate.msgid, lzfs_locks::Type::kPosix);
+		matoclserv_lock_wake_up(candidate.sessionid, candidate.msgid, safs_locks::Type::kPosix);
 	}
 }
 
-void matocl_session_timedout(session *sesdata) {
-	filelist *fl,*afl;
-	fl=sesdata->openedfiles;
+void matocl_close_files(session *sesdata) {
+	filelist *fl = sesdata->openedfiles;
+	filelist *next_fl = fl;
 	FsContext context = FsContext::getForMaster(eventloop_time());
-	while (fl) {
-		afl = fl;
-		fl=fl->next;
-		fs_release(context, afl->inode, sesdata->sessionid);
-		matocl_locks_release(context, afl->inode, sesdata->sessionid);
-		free(afl);
+	while (next_fl) {
+		fl = next_fl;
+		next_fl = fl->next;
+		fs_release(context, fl->inode, sesdata->sessionid);
+		matocl_locks_release(context, fl->inode, sesdata->sessionid);
+		free(fl);
 	}
 	sesdata->openedfiles=NULL;
+}
+
+uint32_t session_number_of_files(session *sess) {
+	uint32_t count = 0;
+	for (auto *file = sess->openedfiles; file; file = file->next, count++) {}
+	return count;
+}
+
+void matoclserv_session_files(matoclserventry *eptr,
+                              [[maybe_unused]] const uint8_t *data,
+                              [[maybe_unused]] uint32_t length) {
+	matoclserventry *eaptr;
+	std::vector<SessionFiles> sessions;
+	MessageBuffer reply;
+
+	for (eaptr = matoclservhead; eaptr; eaptr = eaptr->next) {
+		if (eaptr->mode == KILL || !eaptr->sesdata ||
+		    eaptr->registered != ClientState::kRegistered) {
+			continue;
+		}
+
+		SessionFiles session;
+		session.sessionId = eaptr->sesdata->sessionid;
+		session.peerIp = eaptr->sesdata->peerip;
+		session.filesNumber = session_number_of_files(eaptr->sesdata);
+		sessions.push_back(session);
+	}
+
+	matocl::listSessions::serialize(reply, sessions);
+	matoclserv_createpacket(eptr, std::move(reply));
+}
+
+void matocl_session_timedout(session *sesdata) {
+	matocl_close_files(sesdata);
 	if (sesdata->info) {
 		free(sesdata->info);
 	}
+}
+
+void matoclserv_session_delete(matoclserventry *eptr, const uint8_t *data,
+                               uint32_t length) {
+	uint8_t status = SAUNAFS_STATUS_OK;
+	uint64_t sessionId = 0;
+
+	cltoma::deleteSession::deserialize(data, length, sessionId);
+
+	// Find the session with the given sessionId
+	matoclserventry *target = nullptr;
+
+	for (target = matoclservhead; target; target = target->next) {
+		if (target->sesdata && target->sesdata->sessionid == sessionId) {
+			break;
+		}
+	}
+
+	if (!target) {
+		safs_pretty_syslog(LOG_ERR,
+		                   "SAU_CLTOMA_DELETE_SESSION - "
+		                   "session not found "
+		                   "(session id: %" PRIu64 ")",
+		                   sessionId);
+		status = SAUNAFS_ERROR_BADSESSIONID;
+	} else {
+		matoclserv_close_session(sessionId);
+		target->mode = KILL;
+		// Force closure of files immediately.
+		// Otherwise, it will take a few moments before the session
+		// times out and the files are removed automatically, unless the
+		// peer reconnects during that time
+		matocl_close_files(target->sesdata);
+	}
+
+	MessageBuffer reply;
+	matocl::deleteSession::serialize(reply, status);
+	matoclserv_createpacket(eptr, reply);
 }
 
 void matocl_session_check(void) {
@@ -4667,32 +4762,35 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 	try {
 		if (!metadataserver::isMaster()) {     // shadow
 			switch (type) {
-				case LIZ_CLTOMA_METADATASERVER_STATUS:
+				case SAU_CLTOMA_METADATASERVER_STATUS:
 					matoclserv_metadataserver_status(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_HOSTNAME:
+				case SAU_CLTOMA_HOSTNAME:
 					matoclserv_hostname(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_REGISTER_CHALLENGE:
+				case SAU_CLTOMA_ADMIN_REGISTER_CHALLENGE:
 					matoclserv_admin_register(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_REGISTER_RESPONSE:
+				case SAU_CLTOMA_ADMIN_REGISTER_RESPONSE:
 					matoclserv_admin_register_response(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_BECOME_MASTER:
+				case SAU_CLTOMA_ADMIN_BECOME_MASTER:
 					matoclserv_admin_become_master(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP:
+				case SAU_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP:
 					matoclserv_admin_stop_without_metadata_dump(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_RELOAD:
+				case SAU_CLTOMA_ADMIN_RELOAD:
 					matoclserv_admin_reload(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_SAVE_METADATA:
+				case SAU_CLTOMA_ADMIN_SAVE_METADATA:
 					matoclserv_admin_save_metadata(eptr, data, length);
 					break;
+				case SAU_CLTOMA_ADMIN_DUMP_CONFIG:
+					matoclserv_admin_dump_config(eptr);
+					break;
 				default:
-					lzfs_pretty_syslog(LOG_NOTICE,"main master server module: got invalid message in shadow state (type:%" PRIu32 ")",type);
+					safs_pretty_syslog(LOG_NOTICE,"main master server module: got invalid message in shadow state (type:%" PRIu32 ")",type);
 					eptr->mode = KILL;
 			}
 		} else if (eptr->registered == ClientState::kUnregistered
@@ -4704,11 +4802,17 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_CSERV_LIST:
 					matoclserv_cserv_list(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_CSERV_LIST:
-					matoclserv_liz_cserv_list(eptr, data, length);
+				case SAU_CLTOMA_CSERV_LIST:
+					matoclserv_sau_cserv_list(eptr, data, length);
 					break;
 				case CLTOMA_SESSION_LIST:
 					matoclserv_session_list(eptr,data,length);
+					break;
+				case SAU_CLTOMA_SESSION_FILES:
+					matoclserv_session_files(eptr, data, length);
+					break;
+				case SAU_CLTOMA_DELETE_SESSION:
+					matoclserv_session_delete(eptr,data,length);
 					break;
 				case CLTOAN_CHART:
 					matoclserv_chart(eptr,data,length);
@@ -4737,67 +4841,70 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_CSSERV_REMOVESERV:
 					matoclserv_cserv_removeserv(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_IOLIMITS_STATUS:
+				case SAU_CLTOMA_IOLIMITS_STATUS:
 					matoclserv_iolimits_status(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_METADATASERVERS_LIST:
+				case SAU_CLTOMA_METADATASERVERS_LIST:
 					matoclserv_metadataservers_list(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_METADATASERVER_STATUS:
+				case SAU_CLTOMA_METADATASERVER_STATUS:
 					matoclserv_metadataserver_status(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_LIST_GOALS:
+				case SAU_CLTOMA_LIST_GOALS:
 					matoclserv_list_goals(eptr);
 					break;
-				case LIZ_CLTOMA_CHUNKS_HEALTH:
+				case SAU_CLTOMA_CHUNKS_HEALTH:
 					matoclserv_chunks_health(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_HOSTNAME:
+				case SAU_CLTOMA_HOSTNAME:
 					matoclserv_hostname(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_REGISTER_CHALLENGE:
+				case SAU_CLTOMA_ADMIN_REGISTER_CHALLENGE:
 					matoclserv_admin_register(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_REGISTER_RESPONSE:
+				case SAU_CLTOMA_ADMIN_REGISTER_RESPONSE:
 					matoclserv_admin_register_response(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP:
+				case SAU_CLTOMA_ADMIN_STOP_WITHOUT_METADATA_DUMP:
 					matoclserv_admin_stop_without_metadata_dump(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_RELOAD:
+				case SAU_CLTOMA_ADMIN_RELOAD:
 					matoclserv_admin_reload(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_SAVE_METADATA:
+				case SAU_CLTOMA_ADMIN_DUMP_CONFIG:
+					matoclserv_admin_dump_config(eptr);
+					break;
+				case SAU_CLTOMA_ADMIN_SAVE_METADATA:
 					matoclserv_admin_save_metadata(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_ADMIN_RECALCULATE_METADATA_CHECKSUM:
+				case SAU_CLTOMA_ADMIN_RECALCULATE_METADATA_CHECKSUM:
 					matoclserv_admin_recalculate_metadata_checksum(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_LIST_TAPESERVERS:
+				case SAU_CLTOMA_LIST_TAPESERVERS:
 					matoclserv_list_tapeservers(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_LIST_DEFECTIVE_FILES:
+				case SAU_CLTOMA_LIST_DEFECTIVE_FILES:
 					matoclserv_list_defective_files(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_MANAGE_LOCKS_LIST:
+				case SAU_CLTOMA_MANAGE_LOCKS_LIST:
 					matoclserv_manage_locks_list(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_MANAGE_LOCKS_UNLOCK:
+				case SAU_CLTOMA_MANAGE_LOCKS_UNLOCK:
 					matoclserv_manage_locks_unlock(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_LIST_TASKS:
+				case SAU_CLTOMA_LIST_TASKS:
 					matoclserv_list_tasks(eptr);
 					break;
-				case LIZ_CLTOMA_STOP_TASK:
+				case SAU_CLTOMA_STOP_TASK:
 					matoclserv_stop_task(eptr, data, length);
 					break;
 				default:
-					lzfs_pretty_syslog(LOG_NOTICE,"main master server module: got unknown message from unregistered (type:%" PRIu32 ")",type);
+					safs_pretty_syslog(LOG_NOTICE,"main master server module: got unknown message from unregistered (type:%" PRIu32 ")",type);
 					eptr->mode=KILL;
 			}
 		} else if (eptr->registered == ClientState::kRegistered) {      // mounts and new tools
 			if (eptr->sesdata==NULL) {
-				lzfs_pretty_syslog(LOG_ERR,"registered connection without sesdata !!!");
+				safs_pretty_syslog(LOG_ERR,"registered connection without sesdata !!!");
 				eptr->mode=KILL;
 				return;
 			}
@@ -4830,11 +4937,11 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					matoclserv_fuse_symlink(eptr,data,length);
 					break;
 				case CLTOMA_FUSE_MKNOD:
-				case LIZ_CLTOMA_FUSE_MKNOD:
+				case SAU_CLTOMA_FUSE_MKNOD:
 					matoclserv_fuse_mknod(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_MKDIR:
-				case LIZ_CLTOMA_FUSE_MKDIR:
+				case SAU_CLTOMA_FUSE_MKDIR:
 					matoclserv_fuse_mkdir(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_UNLINK:
@@ -4852,27 +4959,27 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_FUSE_GETDIR:
 					matoclserv_fuse_getdir(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_GETDIR:
+				case SAU_CLTOMA_FUSE_GETDIR:
 					matoclserv_fuse_getdir(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_OPEN:
 					matoclserv_fuse_open(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_READ_CHUNK:
+				case SAU_CLTOMA_FUSE_READ_CHUNK:
 				case CLTOMA_FUSE_READ_CHUNK:
 					matoclserv_fuse_read_chunk(eptr, PacketHeader(type, length), data);
 					break;
-				case LIZ_CLTOMA_CHUNKS_INFO:
+				case SAU_CLTOMA_CHUNKS_INFO:
 					matoclserv_chunks_info(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_TAPE_INFO:
+				case SAU_CLTOMA_TAPE_INFO:
 					matoclserv_tape_info(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_FUSE_WRITE_CHUNK:
+				case SAU_CLTOMA_FUSE_WRITE_CHUNK:
 				case CLTOMA_FUSE_WRITE_CHUNK:
 					matoclserv_fuse_write_chunk(eptr, PacketHeader(type, length), data);
 					break;
-				case LIZ_CLTOMA_FUSE_WRITE_CHUNK_END:
+				case SAU_CLTOMA_FUSE_WRITE_CHUNK_END:
 				case CLTOMA_FUSE_WRITE_CHUNK_END:
 					matoclserv_fuse_write_chunk_end(eptr, PacketHeader(type, length), data);
 					break;
@@ -4880,7 +4987,7 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_FUSE_GETTRASH:
 					matoclserv_fuse_gettrash(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_GETTRASH:
+				case SAU_CLTOMA_FUSE_GETTRASH:
 					matoclserv_fuse_gettrash(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_GETDETACHEDATTR:
@@ -4901,7 +5008,7 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_FUSE_GETRESERVED:
 					matoclserv_fuse_getreserved(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_GETRESERVED:
+				case SAU_CLTOMA_FUSE_GETRESERVED:
 					matoclserv_fuse_getreserved(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_CHECK:
@@ -4914,11 +5021,11 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					matoclserv_fuse_settrashtime(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_GETGOAL:
-				case LIZ_CLTOMA_FUSE_GETGOAL:
+				case SAU_CLTOMA_FUSE_GETGOAL:
 					matoclserv_fuse_getgoal(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_SETGOAL:
-				case LIZ_CLTOMA_FUSE_SETGOAL:
+				case SAU_CLTOMA_FUSE_SETGOAL:
 					matoclserv_fuse_setgoal(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_APPEND:
@@ -4927,8 +5034,8 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_FUSE_GETDIRSTATS:
 					matoclserv_fuse_getdirstats_old(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_TRUNCATE_END:
-				case LIZ_CLTOMA_FUSE_TRUNCATE:
+				case SAU_CLTOMA_FUSE_TRUNCATE_END:
+				case SAU_CLTOMA_FUSE_TRUNCATE:
 				case CLTOMA_FUSE_TRUNCATE:
 					matoclserv_fuse_truncate(eptr, PacketHeader(type, length), data);
 					break;
@@ -4936,7 +5043,7 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					matoclserv_fuse_repair(eptr,data,length);
 					break;
 				case CLTOMA_FUSE_SNAPSHOT:
-				case LIZ_CLTOMA_FUSE_SNAPSHOT:
+				case SAU_CLTOMA_FUSE_SNAPSHOT:
 					matoclserv_fuse_snapshot(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_GETEATTR:
@@ -4945,19 +5052,19 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_FUSE_SETEATTR:
 					matoclserv_fuse_seteattr(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_DELETE_ACL:
+				case SAU_CLTOMA_FUSE_DELETE_ACL:
 					matoclserv_fuse_deleteacl(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_FUSE_GET_ACL:
+				case SAU_CLTOMA_FUSE_GET_ACL:
 					matoclserv_fuse_getacl(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_FUSE_SET_ACL:
+				case SAU_CLTOMA_FUSE_SET_ACL:
 					matoclserv_fuse_setacl(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_FUSE_SET_QUOTA:
+				case SAU_CLTOMA_FUSE_SET_QUOTA:
 					matoclserv_fuse_setquota(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_FUSE_GET_QUOTA:
+				case SAU_CLTOMA_FUSE_GET_QUOTA:
 					matoclserv_fuse_getquota(eptr, data, length);
 					break;
 					/* do not use in version before 1.7.x */
@@ -5001,53 +5108,53 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_CSSERV_REMOVESERV:
 					matoclserv_cserv_removeserv(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_IOLIMIT:
+				case SAU_CLTOMA_IOLIMIT:
 					matoclserv_iolimit(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_SETLK:
+				case SAU_CLTOMA_FUSE_SETLK:
 					matoclserv_fuse_setlk(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_GETLK:
+				case SAU_CLTOMA_FUSE_GETLK:
 					matoclserv_fuse_getlk(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_FLOCK:
+				case SAU_CLTOMA_FUSE_FLOCK:
 					matoclserv_fuse_flock(eptr,data,length);
 					break;
-				case LIZ_CLTOMA_FUSE_FLOCK_INTERRUPT:
+				case SAU_CLTOMA_FUSE_FLOCK_INTERRUPT:
 					matoclserv_fuse_locks_interrupt(
 						eptr, data, length,
-						(uint8_t)lzfs_locks::Type::kFlock);
+						(uint8_t)safs_locks::Type::kFlock);
 					break;
-				case LIZ_CLTOMA_FUSE_SETLK_INTERRUPT:
+				case SAU_CLTOMA_FUSE_SETLK_INTERRUPT:
 					matoclserv_fuse_locks_interrupt(
 						eptr, data, length,
-						(uint8_t)lzfs_locks::Type::kPosix);
+						(uint8_t)safs_locks::Type::kPosix);
 					break;
-				case LIZ_CLTOMA_RECURSIVE_REMOVE:
+				case SAU_CLTOMA_RECURSIVE_REMOVE:
 					matoclserv_fuse_recursive_remove(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_REQUEST_TASK_ID:
+				case SAU_CLTOMA_REQUEST_TASK_ID:
 					matoclserv_fuse_request_task_id(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_STOP_TASK:
+				case SAU_CLTOMA_STOP_TASK:
 					matoclserv_stop_task(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_UPDATE_CREDENTIALS:
+				case SAU_CLTOMA_UPDATE_CREDENTIALS:
 					matoclserv_update_credentials(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_WHOLE_PATH_LOOKUP:
-					matoclserv_liz_whole_path_lookup(eptr, data, length);
+				case SAU_CLTOMA_WHOLE_PATH_LOOKUP:
+					matoclserv_sau_whole_path_lookup(eptr, data, length);
 					break;
-				case LIZ_CLTOMA_CSERV_LIST:
-					matoclserv_liz_cserv_list(eptr, data, length);
+				case SAU_CLTOMA_CSERV_LIST:
+					matoclserv_sau_cserv_list(eptr, data, length);
 					break;
 				default:
-					lzfs_pretty_syslog(LOG_NOTICE,"main master server module: got unknown message from mfsmount (type:%" PRIu32 ")",type);
+					safs_pretty_syslog(LOG_NOTICE,"main master server module: got unknown message from sfsmount (type:%" PRIu32 ")",type);
 					eptr->mode=KILL;
 			}
-		} else if (eptr->registered == ClientState::kOldTools) {        // old mfstools
+		} else if (eptr->registered == ClientState::kOldTools) {        // old sfstools
 			if (eptr->sesdata==NULL) {
-				lzfs_pretty_syslog(LOG_ERR,"registered connection (tools) without sesdata !!!");
+				safs_pretty_syslog(LOG_ERR,"registered connection (tools) without sesdata !!!");
 				eptr->mode=KILL;
 				return;
 			}
@@ -5056,7 +5163,7 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case CLTOMA_FUSE_REGISTER:
 					matoclserv_fuse_register(eptr,data,length);
 					break;
-				case CLTOMA_FUSE_READ_CHUNK: // used in mfsfileinfo
+				case CLTOMA_FUSE_READ_CHUNK: // used in sfsfileinfo
 					matoclserv_fuse_read_chunk(eptr, PacketHeader(type, length), data);
 					break;
 				case CLTOMA_FUSE_CHECK:
@@ -5096,12 +5203,12 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					matoclserv_fuse_seteattr(eptr,data,length);
 					break;
 				default:
-					lzfs_pretty_syslog(LOG_NOTICE,"main master server module: got unknown message from mfstools (type:%" PRIu32 ")",type);
+					safs_pretty_syslog(LOG_NOTICE,"main master server module: got unknown message from sfstools (type:%" PRIu32 ")",type);
 					eptr->mode=KILL;
 			}
 		}
 	} catch (IncorrectDeserializationException& e) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 				"main master server module: got inconsistent message from mount "
 				"(type:%" PRIu32 ", length:%" PRIu32"), %s", type, length, e.what());
 		eptr->mode = KILL;
@@ -5113,7 +5220,7 @@ void matoclserv_term(void) {
 	packetstruct *pptr,*pptrn;
 	chunklist *cl,*cln;
 
-	lzfs_pretty_syslog(LOG_NOTICE,"main master server module: closing %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"main master server module: closing %s:%s",ListenHost,ListenPort);
 	tcpclose(lsock);
 
 	for (eptr = matoclservhead ; eptr ; eptr = eptrn) {
@@ -5151,7 +5258,7 @@ void matoclserv_read(matoclserventry *eptr) {
 		i=read(eptr->sock,eptr->inputpacket.startptr,eptr->inputpacket.bytesleft);
 		if (i==0) {
 			if (eptr->registered == ClientState::kRegistered) {       // show this message only for standard, registered clients
-				lzfs_pretty_syslog(LOG_NOTICE,"connection with client(ip:%u.%u.%u.%u) has been closed by peer",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF);
+				safs_pretty_syslog(LOG_NOTICE,"connection with client(ip:%u.%u.%u.%u) has been closed by peer",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF);
 			}
 			eptr->mode = KILL;
 			return;
@@ -5161,7 +5268,7 @@ void matoclserv_read(matoclserventry *eptr) {
 #ifdef ECONNRESET
 				if (errno!=ECONNRESET) {
 #endif
-					lzfs_silent_errlog(LOG_NOTICE,"main master server module: (ip:%u.%u.%u.%u) read error",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF);
+					safs_silent_errlog(LOG_NOTICE,"main master server module: (ip:%u.%u.%u.%u) read error",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF);
 #ifdef ECONNRESET
 				}
 #endif
@@ -5182,7 +5289,7 @@ void matoclserv_read(matoclserventry *eptr) {
 			size = get32bit(&ptr);
 			if (size>0) {
 				if (size>MaxPacketSize) {
-					lzfs_pretty_syslog(LOG_WARNING,"main master server module: packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
+					safs_pretty_syslog(LOG_WARNING,"main master server module: packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
 					eptr->mode = KILL;
 					return;
 				}
@@ -5234,7 +5341,7 @@ void matoclserv_write(matoclserventry *eptr) {
 		i=write(eptr->sock,pack->startptr,pack->bytesleft);
 		if (i<0) {
 			if (errno!=EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,"main master server module: (ip:%u.%u.%u.%u) write error",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF);
+				safs_silent_errlog(LOG_NOTICE,"main master server module: (ip:%u.%u.%u.%u) write error",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF);
 				eptr->mode = KILL;
 			}
 			return;
@@ -5280,11 +5387,11 @@ int matoclserv_canexit(void) {
 	if (adminTerminator != NULL && !terminatorPacketSent) {
 		// Are we replying to termination request?
 		if (!matomlserv_canexit()){  // make sure there are no ml connected
-			lzfs_pretty_syslog(LOG_INFO, "Waiting for ml connections to close...");
+			safs_pretty_syslog(LOG_INFO, "Waiting for ml connections to close...");
 			return 0;
 		} else {  // Reply to admin
 			matoclserv_createpacket(adminTerminator,
-					matocl::adminStopWithoutMetadataDump::build(LIZARDFS_STATUS_OK));
+					matocl::adminStopWithoutMetadataDump::build(SAUNAFS_STATUS_OK));
 			terminatorPacketSent = true;
 		}
 	}
@@ -5329,7 +5436,7 @@ void matoclserv_serve(const std::vector<pollfd> &pdesc) {
 	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN)) {
 		ns=tcpaccept(lsock);
 		if (ns<0) {
-			lzfs_silent_errlog(LOG_NOTICE,"main master server module: accept error");
+			safs_silent_errlog(LOG_NOTICE,"main master server module: accept error");
 		} else {
 			tcpnonblock(ns);
 			tcpnodelay(ns);
@@ -5433,17 +5540,17 @@ int matoclserv_sessionsinit(void) {
 
 	switch (matoclserv_load_sessions()) {
 		case 0: // no file
-			lzfs_pretty_syslog(LOG_WARNING,"sessions file %s/%s not found;"
+			safs_pretty_syslog(LOG_WARNING,"sessions file %s/%s not found;"
 					" if it is not a fresh installation you have to restart all active mounts",
 					fs::getCurrentWorkingDirectoryNoThrow().c_str(), kSessionsFilename);
 			matoclserv_store_sessions();
 			break;
 		case 1: // file loaded
-			lzfs_pretty_syslog(LOG_INFO,"initialized sessions from file %s/%s",
+			safs_pretty_syslog(LOG_INFO,"initialized sessions from file %s/%s",
 					fs::getCurrentWorkingDirectoryNoThrow().c_str(), kSessionsFilename);
 			break;
 		default:
-			lzfs_pretty_syslog(LOG_ERR,"due to missing sessions (%s/%s)"
+			safs_pretty_syslog(LOG_ERR,"due to missing sessions (%s/%s)"
 					" you have to restart all active mounts",
 					fs::getCurrentWorkingDirectoryNoThrow().c_str(), kSessionsFilename);
 			break;
@@ -5451,11 +5558,11 @@ int matoclserv_sessionsinit(void) {
 	SessionSustainTime = cfg_getuint32("SESSION_SUSTAIN_TIME",86400);
 	if (SessionSustainTime>7*86400) {
 		SessionSustainTime=7*86400;
-		lzfs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too big (more than week) - setting this value to one week");
+		safs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too big (more than week) - setting this value to one week");
 	}
 	if (SessionSustainTime<60) {
 		SessionSustainTime=60;
-		lzfs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too low (less than minute) - setting this value to one minute");
+		safs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too low (less than minute) - setting this value to one minute");
 	}
 	return 0;
 }
@@ -5472,7 +5579,7 @@ int matoclserv_iolimits_reload() {
 			gIoLimitsDatabase.setLimits(
 					SteadyClock::now(), configLoader.limits(), gIoLimitsAccumulate_ms);
 		} catch (Exception& ex) {
-			lzfs_pretty_syslog(LOG_ERR, "failed to process global I/O limits configuration "
+			safs_pretty_syslog(LOG_ERR, "failed to process global I/O limits configuration "
 					"file (%s): %s", configFile.c_str(), ex.message().c_str());
 			return -1;
 		}
@@ -5508,7 +5615,7 @@ void matoclserv_reload(void) {
 	// Notify admins that reload was performed - put responses in their packet queues
 	for (matoclserventry* eptr = matoclservhead; eptr != nullptr; eptr = eptr->next) {
 		if (eptr->adminTask == AdminTask::kReload) {
-			matoclserv_createpacket(eptr, matocl::adminReload::build(LIZARDFS_STATUS_OK));
+			matoclserv_createpacket(eptr, matocl::adminReload::build(SAUNAFS_STATUS_OK));
 			eptr->adminTask = AdminTask::kNone;
 		}
 	}
@@ -5517,11 +5624,11 @@ void matoclserv_reload(void) {
 	SessionSustainTime = cfg_getuint32("SESSION_SUSTAIN_TIME",86400);
 	if (SessionSustainTime>7*86400) {
 		SessionSustainTime=7*86400;
-		lzfs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too big (more than week) - setting this value to one week");
+		safs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too big (more than week) - setting this value to one week");
 	}
 	if (SessionSustainTime<60) {
 		SessionSustainTime=60;
-		lzfs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too low (less than minute) - setting this value to one minute");
+		safs_pretty_syslog(LOG_WARNING,"SESSION_SUSTAIN_TIME too low (less than minute) - setting this value to one minute");
 	}
 
 	matoclserv_iolimits_reload();
@@ -5538,13 +5645,13 @@ void matoclserv_reload(void) {
 	if (strcmp(oldListenHost,ListenHost)==0 && strcmp(oldListenPort,ListenPort)==0) {
 		free(oldListenHost);
 		free(oldListenPort);
-		lzfs_pretty_syslog(LOG_NOTICE,"main master server module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
+		safs_pretty_syslog(LOG_NOTICE,"main master server module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
 		return;
 	}
 
 	int newlsock = tcpsocket();
 	if (newlsock<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"main master server module: socket address has changed, but can't create new socket");
+		safs_pretty_errlog(LOG_WARNING,"main master server module: socket address has changed, but can't create new socket");
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -5555,10 +5662,10 @@ void matoclserv_reload(void) {
 	tcpnodelay(newlsock);
 	tcpreuseaddr(newlsock);
 	if (tcpsetacceptfilter(newlsock)<0 && errno!=ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"main master server module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"main master server module: can't set accept filter");
 	}
 	if (tcpstrlisten(newlsock,ListenHost,ListenPort,100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,"main master server module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
+		safs_pretty_errlog(LOG_ERR,"main master server module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -5566,7 +5673,7 @@ void matoclserv_reload(void) {
 		tcpclose(newlsock);
 		return;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,"main master server module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"main master server module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
 	free(oldListenHost);
 	free(oldListenPort);
 	tcpclose(lsock);
@@ -5578,7 +5685,7 @@ int matoclserv_networkinit(void) {
 		ListenHost = cfg_getstr("MATOCL_LISTEN_HOST","*");
 		ListenPort = cfg_getstr("MATOCL_LISTEN_PORT","9421");
 	} else {
-		lzfs_pretty_syslog(LOG_WARNING, "options MATOCU_LISTEN_* are deprecated -- use "
+		safs_pretty_syslog(LOG_WARNING, "options MATOCU_LISTEN_* are deprecated -- use "
 				"MATOCL_LISTEN_* instead");
 		ListenHost = cfg_getstr("MATOCU_LISTEN_HOST","*");
 		ListenPort = cfg_getstr("MATOCU_LISTEN_PORT","9421");
@@ -5592,20 +5699,20 @@ int matoclserv_networkinit(void) {
 	exiting = 0;
 	lsock = tcpsocket();
 	if (lsock<0) {
-		lzfs_pretty_errlog(LOG_ERR,"main master server module: can't create socket");
+		safs_pretty_errlog(LOG_ERR,"main master server module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
 	tcpnodelay(lsock);
 	tcpreuseaddr(lsock);
 	if (tcpsetacceptfilter(lsock)<0 && errno!=ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"main master server module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"main master server module: can't set accept filter");
 	}
 	if (tcpstrlisten(lsock,ListenHost,ListenPort,100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,"main master server module: can't listen on %s:%s",ListenHost,ListenPort);
+		safs_pretty_errlog(LOG_ERR,"main master server module: can't listen on %s:%s",ListenHost,ListenPort);
 		return -1;
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,"main master server module: listen on %s:%s",ListenHost,ListenPort);
+	safs_pretty_syslog(LOG_NOTICE,"main master server module: listen on %s:%s",ListenHost,ListenPort);
 
 	matoclservhead = NULL;
 

@@ -2,7 +2,7 @@ timeout_set 1 minute
 
 count_chunks_on_chunkservers() {
 	for i in $@; do
-		find_chunkserver_chunks $i
+		find_chunkserver_metadata_chunks $i
 	done | wc -l
 }
 
@@ -16,33 +16,33 @@ USE_RAMDISK=YES \
 			`|CHUNKS_WRITE_REP_LIMIT = 10`
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|OPERATIONS_DELAY_DISCONNECT = 0"\
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 
 # Create some chunks on non-labeled chunkservers only
 for i in {3..8}; do
-	lizardfs_chunkserver_daemon $i stop &
+	saunafs_chunkserver_daemon $i stop &
 done
 wait
-lizardfs_wait_for_ready_chunkservers 3
+saunafs_wait_for_ready_chunkservers 3
 mkdir dir
-lizardfs setgoal 2 dir
+saunafs setgoal 2 dir
 FILE_SIZE=1K file-generate dir/file{1..10}
 
 # Turn on all chunkservers
 for i in {3..8}; do
-	lizardfs_chunkserver_daemon $i start &
+	saunafs_chunkserver_daemon $i start &
 done
 wait
 
 # Change goal of all files, verify
-lizardfs setgoal two_hdds dir/file*
+saunafs setgoal two_hdds dir/file*
 expect_eventually_prints 20 'count_chunks_on_chunkservers {3..5}'
-assert_eventually_prints 20 'find_all_chunks | wc -l'
+assert_eventually_prints 20 'find_all_metadata_chunks | wc -l'
 
 # Change goal of some files, verify
-lizardfs setgoal two_flops dir/file{1..4}
+saunafs setgoal two_flops dir/file{1..4}
 expect_eventually_prints 8 'count_chunks_on_chunkservers {6..8}'
 expect_eventually_prints 12 'count_chunks_on_chunkservers {3..5}'
-assert_eventually_prints 20 'find_all_chunks | wc -l'
+assert_eventually_prints 20 'find_all_metadata_chunks | wc -l'

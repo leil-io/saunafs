@@ -3,18 +3,18 @@ CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \
 	MASTER_EXTRA_CONFIG="MAGIC_DISABLE_METADATA_DUMPS = 1 | MAGIC_DEBUG_LOG = ${TEMP_DIR}/log`
 	`|LOG_FLUSH_ON=DEBUG" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 touch "${info[mount0]}"/file
 
 # Corrupt the changelog, start a shadow master and see if it can deal with it.
-sed -i 's/file/fool/g' "${info[master_data_path]}"/changelog.mfs
-lizardfs_master_n 1 start
-assert_eventually "lizardfs_shadow_synchronized 1"
+sed -i 's/file/fool/g' "${info[master_data_path]}"/changelog.sfs
+saunafs_master_n 1 start
+assert_eventually "saunafs_shadow_synchronized 1"
 
 # Check if the shadow stays synchronized after the error recovery.
 touch "${info[mount0]}"/filefilefile
-assert_eventually "lizardfs_shadow_synchronized 1"
+assert_eventually "saunafs_shadow_synchronized 1"
 
 # Verify that it worked the way we expected, not due to bugs or a blind luck.
 assert_success awk '

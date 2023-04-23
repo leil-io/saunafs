@@ -1,28 +1,30 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "gsh_config.h"
 #include "pnfs_utils.h"
 
 #include "context_wrap.h"
-#include "lzfs_fsal_methods.h"
-#include "mount/client/lizardfs_c_api.h"
-#include "protocol/MFSCommunication.h"
+#include "safs_fsal_methods.h"
+#include "mount/client/saunafs_c_api.h"
+#include "protocol/SFSCommunication.h"
 
 const int MaxBufferSize = 0x100;
 const int ChunkAddressSizeInBytes = 40;
@@ -44,9 +46,9 @@ const int ChunkDataOverhead = 32;
  */
 static int ascendingIpCompare(const void *chunkserverA,
                               const void *chunkserverB) {
-	uint32_t ipFromChunkserverA = ((const liz_chunkserver_info_t *)
+	uint32_t ipFromChunkserverA = ((const sau_chunkserver_info_t *)
 	                               chunkserverA)->ip;
-	uint32_t ipFromChunkserverB = ((const liz_chunkserver_info_t *)
+	uint32_t ipFromChunkserverB = ((const sau_chunkserver_info_t *)
 	                               chunkserverB)->ip;
 
 	return ipFromChunkserverA - ipFromChunkserverB;
@@ -65,7 +67,7 @@ static int ascendingIpCompare(const void *chunkserverA,
 static int isChunkserverDisconnected(const void *chunkserver, void *unused) {
 	(void) unused;
 
-	return ((const liz_chunkserver_info_t *)chunkserver)->version ==
+	return ((const sau_chunkserver_info_t *)chunkserver)->version ==
 	        kDisconnectedChunkServerVersion;
 }
 
@@ -87,8 +89,8 @@ static int adjacentChunkserversWithSameIp(const void *chunkserver, void *base) {
 		return 0;
 	}
 
-	return ((const liz_chunkserver_info_t *)chunkserver)->ip ==
-	        ((const liz_chunkserver_info_t *)chunkserver - 1)->ip;
+	return ((const sau_chunkserver_info_t *)chunkserver)->ip ==
+	        ((const sau_chunkserver_info_t *)chunkserver - 1)->ip;
 }
 
 /**
@@ -153,16 +155,16 @@ static void shuffle(void *data, size_t size, size_t itemSize) {
  *
  * @returns: Randomized chunkservers list.
  */
-static liz_chunkserver_info_t *randomizedChunkserverList(
+static sau_chunkserver_info_t *randomizedChunkserverList(
         struct FSExport *export, uint32_t *chunkserverCount) {
-	liz_chunkserver_info_t *chunkserverInfo = NULL;
+	sau_chunkserver_info_t *chunkserverInfo = NULL;
 
-	chunkserverInfo = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT *
-	                             sizeof(liz_chunkserver_info_t));
+	chunkserverInfo = gsh_malloc(SAFS_BIGGEST_STRIPE_COUNT *
+	                             sizeof(sau_chunkserver_info_t));
 
 	int retvalue =
-	    liz_get_chunkservers_info(export->fsInstance, chunkserverInfo,
-	                              LZFS_BIGGEST_STRIPE_COUNT, chunkserverCount);
+	    sau_get_chunkservers_info(export->fsInstance, chunkserverInfo,
+	                              SAFS_BIGGEST_STRIPE_COUNT, chunkserverCount);
 
 	if (retvalue < 0) {
 		*chunkserverCount = 0;
@@ -171,25 +173,25 @@ static liz_chunkserver_info_t *randomizedChunkserverList(
 	}
 
 	// Free labels, we don't need them.
-	liz_destroy_chunkservers_info(chunkserverInfo);
+	sau_destroy_chunkservers_info(chunkserverInfo);
 
 	// remove disconnected
 	*chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
-	                              sizeof(liz_chunkserver_info_t),
+	                              sizeof(sau_chunkserver_info_t),
 	                              isChunkserverDisconnected, NULL);
 
 	// sorting chunkservers based on its ip attribute
 	qsort(chunkserverInfo, *chunkserverCount,
-	      sizeof(liz_chunkserver_info_t), ascendingIpCompare);
+	      sizeof(sau_chunkserver_info_t), ascendingIpCompare);
 
 	// remove entries with the same ip
 	*chunkserverCount = remove_if(chunkserverInfo, *chunkserverCount,
-	                              sizeof(liz_chunkserver_info_t),
+	                              sizeof(sau_chunkserver_info_t),
 	                              adjacentChunkserversWithSameIp,
 	                              chunkserverInfo);
 
 	// randomize
-	shuffle(chunkserverInfo, *chunkserverCount, sizeof(liz_chunkserver_info_t));
+	shuffle(chunkserverInfo, *chunkserverCount, sizeof(sau_chunkserver_info_t));
 
 	return chunkserverInfo;
 }
@@ -206,19 +208,19 @@ static liz_chunkserver_info_t *randomizedChunkserverList(
  * @retval  -1: Failing operation
  */
 static int fillChunkDataServerList(XDR *da_addr_body,
-                                   liz_chunk_info_t *chunkInfo,
-                                   liz_chunkserver_info_t *chunkserverInfo,
+                                   sau_chunk_info_t *chunkInfo,
+                                   sau_chunkserver_info_t *chunkserverInfo,
                                    uint32_t chunkCount, uint32_t stripeCount,
                                    uint32_t chunkserverCount,
                                    uint32_t *chunkserverIndex) {
-	fsal_multipath_member_t host[LZFS_EXPECTED_BACKUP_DS_COUNT];
+	fsal_multipath_member_t host[SAFS_EXPECTED_BACKUP_DS_COUNT];
 
 	uint32_t size = MIN(chunkCount, stripeCount);
 
-	const int upperBound = LZFS_EXPECTED_BACKUP_DS_COUNT;
+	const int upperBound = SAFS_EXPECTED_BACKUP_DS_COUNT;
 
 	for (uint32_t chunkIndex = 0; chunkIndex < size; ++chunkIndex) {
-		liz_chunk_info_t *chunk = &chunkInfo[chunkIndex];
+		sau_chunk_info_t *chunk = &chunkInfo[chunkIndex];
 		int serverCount = 0;
 
 		memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
@@ -226,7 +228,7 @@ static int fillChunkDataServerList(XDR *da_addr_body,
 		// prefer std chunk part type
 		for (size_t i = 0; i < chunk->parts_size &&
 		     serverCount < upperBound; ++i) {
-			if (chunk->parts[i].part_type_id != LZFS_STD_CHUNK_PART_TYPE) {
+			if (chunk->parts[i].part_type_id != SAFS_STD_CHUNK_PART_TYPE) {
 				continue;
 			}
 
@@ -238,7 +240,7 @@ static int fillChunkDataServerList(XDR *da_addr_body,
 
 		for (size_t i = 0; i < chunk->parts_size
 		     && serverCount < upperBound; ++i) {
-			if (chunk->parts[i].part_type_id == LZFS_STD_CHUNK_PART_TYPE) {
+			if (chunk->parts[i].part_type_id == SAFS_STD_CHUNK_PART_TYPE) {
 				continue;
 			}
 
@@ -286,16 +288,16 @@ static int fillChunkDataServerList(XDR *da_addr_body,
  * @retval  -1: Failing operation
  */
 static int fillUnusedDataServerList(XDR *xdrStream,
-                                    liz_chunkserver_info_t *chunkserverInfo,
+                                    sau_chunkserver_info_t *chunkserverInfo,
                                     uint32_t chunkCount,
                                     uint32_t stripeCount,
                                     uint32_t chunkserverCount,
                                     uint32_t *chunkserverIndex) {
-	fsal_multipath_member_t host[LZFS_EXPECTED_BACKUP_DS_COUNT];
+	fsal_multipath_member_t host[SAFS_EXPECTED_BACKUP_DS_COUNT];
 
 	uint32_t size = MIN(chunkCount, stripeCount);
 
-	const int upperBound = LZFS_EXPECTED_BACKUP_DS_COUNT;
+	const int upperBound = SAFS_EXPECTED_BACKUP_DS_COUNT;
 
 	for (uint32_t chunkIndex = size; chunkIndex < stripeCount; ++chunkIndex) {
 		int serverCount = 0;
@@ -303,7 +305,7 @@ static int fillUnusedDataServerList(XDR *xdrStream,
 
 		memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
 
-		while (serverCount < LZFS_EXPECTED_BACKUP_DS_COUNT) {
+		while (serverCount < SAFS_EXPECTED_BACKUP_DS_COUNT) {
 			index = (*chunkserverIndex + serverCount) % chunkserverCount;
 
 			host[serverCount].proto = TCP_PROTO_NUMBER;
@@ -330,9 +332,9 @@ static int fillUnusedDataServerList(XDR *xdrStream,
  * pNFS functions. When this function is called, the FSAL should write device
  * information to the da_addr_body stream.
  *
- * The function converts LizardFS file's chunk information to pNFS device info.
+ * The function converts SaunaFS file's chunk information to pNFS device info.
  *
- * Linux pNFS client imposes limit on stripe size (LZFS_BIGGEST_STRIPE_COUNT = 4096).
+ * Linux pNFS client imposes limit on stripe size (SAFS_BIGGEST_STRIPE_COUNT = 4096).
  * If we would use straight forward approach of converting each chunk to stripe entry,
  * we would be limited to file size of 256 GB (4096 * 64MB).
  *
@@ -344,11 +346,11 @@ static int fillUnusedDataServerList(XDR *xdrStream,
  *
  * First we prepare randomized list of all chunkservers (RCSL).
  * Then for each chunk we fill multipath DS list entry with addresses of chunkservers storing
- * this chunk. If there is less chunkservers than LZFS_EXPECTED_BACKUP_DS_COUNT then
+ * this chunk. If there is less chunkservers than SAFS_EXPECTED_BACKUP_DS_COUNT then
  * we use chunkservers from RCSL.
  *
- * If we didn't use all the possible space in DS list (LZFS_BIGGEST_STRIPE_COUNT), then we fill
- * rest of the stripe entries with addresses from RCSL (again LZFS_EXPECTED_BACKUP_DS_COUNT
+ * If we didn't use all the possible space in DS list (SAFS_BIGGEST_STRIPE_COUNT), then we fill
+ * rest of the stripe entries with addresses from RCSL (again SAFS_EXPECTED_BACKUP_DS_COUNT
  * addresses for each stripe entry).
  *
  * @param[in] FSALModule      FSAL module
@@ -365,8 +367,8 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 	struct fsal_export *exportHandle = NULL;
 	struct FSExport *export = NULL;
 
-	liz_chunk_info_t *chunkInfo = NULL;
-	liz_chunkserver_info_t *chunkserverInfo = NULL;
+	sau_chunk_info_t *chunkInfo = NULL;
+	sau_chunkserver_info_t *chunkserverInfo = NULL;
 
 	uint32_t chunkCount = 0;
 	uint32_t chunkserverCount = 0;
@@ -400,15 +402,15 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 	}
 
 	// get the chunk list for file
-	chunkInfo = gsh_malloc(LZFS_BIGGEST_STRIPE_COUNT * sizeof(liz_chunk_info_t));
+	chunkInfo = gsh_malloc(SAFS_BIGGEST_STRIPE_COUNT * sizeof(sau_chunk_info_t));
 
 	int retvalue = fs_get_chunks_info(export->fsInstance, &op_ctx->creds,
 	                                  deviceid->devid, 0, chunkInfo,
-	                                  LZFS_BIGGEST_STRIPE_COUNT, &chunkCount);
+	                                  SAFS_BIGGEST_STRIPE_COUNT, &chunkCount);
 
 	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS,
-		        "Failed to get LizardFS layout for export = %"
+		        "Failed to get SaunaFS layout for export = %"
 		        PRIu16 " inode = %" PRIu64, export_id, deviceid->devid);
 
 		goto generic_err;
@@ -418,14 +420,14 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 
 	if (chunkserverInfo == NULL || chunkserverCount == 0) {
 		LogCrit(COMPONENT_PNFS,
-		        "Failed to get LizardFS layout for export = %" PRIu16
+		        "Failed to get SaunaFS layout for export = %" PRIu16
 		        " inode = %" PRIu64, export_id, deviceid->devid);
 
 		goto generic_err;
 	}
 
 	chunkserverIndex = 0;
-	stripeCount = MIN(chunkCount + chunkserverCount, LZFS_BIGGEST_STRIPE_COUNT);
+	stripeCount = MIN(chunkCount + chunkserverCount, SAFS_BIGGEST_STRIPE_COUNT);
 
 	if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
 		goto encode_err;
@@ -457,7 +459,7 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 		goto encode_err;
 	}
 
-	liz_destroy_chunks_info(chunkInfo);
+	sau_destroy_chunks_info(chunkInfo);
 
 	gsh_free(chunkInfo);
 	gsh_free(chunkserverInfo);
@@ -471,7 +473,7 @@ encode_err:
 
 generic_err:
 	if (chunkInfo) {
-		liz_destroy_chunks_info(chunkInfo);
+		sau_destroy_chunks_info(chunkInfo);
 		gsh_free(chunkInfo);
 	}
 
@@ -555,7 +557,7 @@ static void fs_layouttypes(struct fsal_export *exportHandle, int32_t *count,
 static uint32_t fs_layout_blocksize(struct fsal_export *exportHandle) {
 	(void)exportHandle;
 
-	return MFSCHUNKSIZE;
+	return SFSCHUNKSIZE;
 }
 
 /**
@@ -609,11 +611,11 @@ static size_t fs_da_addr_size(struct fsal_module *FSALModule) {
 	(void)FSALModule;
 
 	// one stripe index + number of addresses +
-	// LZFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes
+	// SAFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes
 	// 37 bytes (we use 40 for safety) we add 32 bytes of overhead
 	// (includes stripe count and DS count)
-	return LZFS_BIGGEST_STRIPE_COUNT *
-	        (4 + (4 + LZFS_EXPECTED_BACKUP_DS_COUNT * ChunkAddressSizeInBytes))
+	return SAFS_BIGGEST_STRIPE_COUNT *
+	        (4 + (4 + SAFS_EXPECTED_BACKUP_DS_COUNT * ChunkAddressSizeInBytes))
 	       + ChunkDataOverhead;
 }
 

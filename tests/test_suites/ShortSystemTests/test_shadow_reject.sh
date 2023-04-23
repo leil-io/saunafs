@@ -3,10 +3,10 @@ assert_program_installed nc
 
 MASTERSERVERS=2 \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
-lizardfs_master_n 1 start
-assert_eventually 'lizardfs_shadow_synchronized 1'
+saunafs_master_n 1 start
+assert_eventually 'saunafs_shadow_synchronized 1'
 
 my_client() {
 	local metaserver="$1"
@@ -43,9 +43,9 @@ run_my_client assert_success 0 1 matots
 run_my_client assert_success 0 1 matoml
 
 rm ${TEMP_DIR}/mato*_exit_status
-lizardfs_master_daemon stop
-lizardfs_make_conf_for_master 1
-lizardfs_admin_shadow 1 reload-config
+saunafs_master_daemon stop
+saunafs_make_conf_for_master 1
+saunafs_admin_shadow 1 reload-config
 
 sleep 1
 run_my_client assert_failure 1 0 matocl

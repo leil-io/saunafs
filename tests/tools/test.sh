@@ -47,23 +47,28 @@ test_end() {
 		set +x
 	fi
 	test_freeze_result
-	# some tests may leave pwd at mfs mount point, causing a lockup when we stop mfs
+	# some tests may leave pwd at sfs mount point, causing a lockup when we stop sfs
 	cd
 	if valgrind_enabled; then
 		valgrind_terminate
 	fi
-	# terminate all LizardFS daemons if requested (eg. to collect some code coverage data)
+	# terminate all SaunaFS daemons if requested (eg. to collect some code coverage data)
 	if [[ ${GENTLY_KILL:-} ]]; then
 		for i in {1..50}; do
-			local pattern='mfs|lizardfs-polo|polonaise-'
-			pkill -USR1 -u lizardfstest "$pattern" || true
-			if ! pgrep -u lizardfstest "$pattern" >/dev/null; then
-				echo "All LizardFS processes terminated"
+			local pattern='sfs|saunafs-polo|polonaise-'
+			pkill -USR1 -u saunafstest "$pattern" || true
+			if ! pgrep -u saunafstest "$pattern" >/dev/null; then
+				echo "All SaunaFS processes terminated"
 				break
 			fi
 			sleep 0.2
 		done
 	fi
+
+	if parse_true "${ZONED_DISKS:-}" ; then
+		remove_all_emulated_zoned_disks
+	fi
+
 	local errors=$(cat "$test_result_file")
 	if [[ $errors ]]; then
 		exit 1
@@ -110,6 +115,7 @@ test_begin() {
 	test_end_file=$test_result_file.end
 	check_configuration
 	test_cleanup
+	remove_all_emulated_zoned_disks
 	touch "$test_result_file"
 	trap 'trap - ERR; set +eE; catch_error_ "${BASH_SOURCE:-}" "${LINENO:-}" "${FUNCNAME:-}"; exit 1' ERR
 	set -E
@@ -137,12 +143,12 @@ mass_chmod_777() {
 # Do not use directly
 # This removes all temporary files and unmounts filesystems
 test_cleanup() {
-	# Unmount all mfsmounts
+	# Unmount all sfsmounts
 	local retries=0
-	pkill -KILL -u lizardfstest mfsmount || true
-	pkill -KILL -u lizardfstest memcheck || true
-	# Search for all fuse filesystems mounted by user lizardfstest and umount them
-	local uid=$(id -u lizardfstest)
+	pkill -KILL -u saunafstest sfsmount || true
+	pkill -KILL -u saunafstest memcheck || true
+	# Search for all fuse filesystems mounted by user saunafstest and umount them
+	local uid=$(id -u saunafstest)
 	while list_of_mounts=$(cat /proc/mounts | awk '$3 ~ /^fuse/' | grep "user_id=$uid[^0-9]"); do
 		echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 fusermount -u || sleep 1
 		if ((++retries == 30)); then
@@ -167,8 +173,9 @@ test_cleanup() {
 			rm -rf "$RAMDISK_DIR"/*
 		fi
 	fi
+
 	# Clean the disks used by chunkservers
-	for d in $LIZARDFS_DISKS $LIZARDFS_LOOP_DISKS; do
+	for d in $SAUNAFS_DISKS $SAUNAFS_LOOP_DISKS; do
 		rm -rf "$d"/chunks[0-9A-F][0-9A-F]
 		rm -f "$d"/.lock
 	done

@@ -1,5 +1,5 @@
 start_proxy() {
-	# Accept one connection from mfsmount on the fake port
+	# Accept one connection from sfsmount on the fake port
 	socat tcp-listen:$1,reuseaddr system:"
 		socat stdio tcp\:$(get_ip_addr)\:$2 |  # connect to real server
 		{
@@ -16,13 +16,13 @@ timeout_set 1 minute
 
 CHUNKSERVERS=4 \
 	DISK_PER_CHUNKSERVER=1 \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 dir="${info[mount0]}/dir"
 mkdir "$dir"
-lizardfs setgoal xor3 "$dir"
+saunafs setgoal xor3 "$dir"
 FILE_SIZE=123456789 file-generate "$dir/file"
 
 # Find any chunkserver serving part 1 of some chunk
@@ -31,9 +31,9 @@ port=${info[chunkserver${csid}_port]}
 
 # Limit data transfer from this chunkserver
 start_proxy $port $((port + 1000))
-lizardfs_chunkserver_daemon $csid stop
-LD_PRELOAD="${LIZARDFS_INSTALL_FULL_LIBDIR}/libredirect_bind.so" lizardfs_chunkserver_daemon $csid start
-lizardfs_wait_for_all_ready_chunkservers
+saunafs_chunkserver_daemon $csid stop
+LD_PRELOAD="${SAUNAFS_INSTALL_FULL_LIBDIR}/libredirect_bind.so" saunafs_chunkserver_daemon $csid start
+saunafs_wait_for_all_ready_chunkservers
 
 if ! file-validate "$dir/file"; then
 	test_add_failure "Data read from file is different than written"

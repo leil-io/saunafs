@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -22,7 +24,7 @@
 #include <iostream>
 #include <boost/program_options.hpp>
 
-#include "mount/lizard_client.h"
+#include "mount/sauna_client.h"
 #include "mount/polonaise/setup.h"
 
 std::istream& operator >> (std::istream& in, SugidClearMode& scm) {
@@ -38,8 +40,8 @@ std::istream& operator >> (std::istream& in, SugidClearMode& scm) {
 		scm = SugidClearMode::kBsd;
 	} else if (token == "ext") {
 		scm = SugidClearMode::kExt;
-	} else if (token == "xfs") {
-		scm = SugidClearMode::kXfs;
+	} else if (token == "sfs") {
+		scm = SugidClearMode::kSfs;
 	} else {
 		namespace po = boost::program_options;
 		throw po::validation_error(po::validation_error::invalid_option_value,
@@ -66,8 +68,8 @@ std::ostream& operator << (std::ostream& out, SugidClearMode scm) {
 		case SugidClearMode::kExt:
 			s = "ext";
 			break;
-		case SugidClearMode::kXfs:
-			s = "xfs";
+		case SugidClearMode::kSfs:
+			s = "sfs";
 			break;
 	}
 	out << s;
@@ -81,7 +83,7 @@ void parse_command_line(int argc, char** argv, Setup& setup) {
 		desc.add_options()
 			("help", "print help message")
 			("master-host,H",
-				po::value<std::string>(&setup.master_host)->default_value("mfsmaster"),
+				po::value<std::string>(&setup.master_host)->default_value("sfsmaster"),
 				"master host name")
 			("master-port,P",
 				po::value<std::string>(&setup.master_port)->default_value("9421"),
@@ -98,42 +100,42 @@ void parse_command_line(int argc, char** argv, Setup& setup) {
 				"mount point reported to master")
 			("password",
 				po::value<std::string>(&setup.password),
-				"password for lizardfs instance")
+				"password for saunafs instance")
 			("io-retries",
-				po::value<uint32_t>(&setup.io_retries)->default_value((unsigned)LizardClient::FsInitParams::kDefaultIoRetries),
+				po::value<uint32_t>(&setup.io_retries)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultIoRetries),
 				"number of retries for I/O failres")
 			("write-buffer-size",
-				po::value<uint32_t>(&setup.write_buffer_size)->default_value((unsigned)LizardClient::FsInitParams::kDefaultWriteCacheSize),
+				po::value<uint32_t>(&setup.write_buffer_size)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultWriteCacheSize),
 				"size of global write buffer in MiB")
 			("report-reserved-period",
-				po::value<uint32_t>(&setup.report_reserved_period)->default_value((unsigned)LizardClient::FsInitParams::kDefaultReportReservedPeriod),
+				po::value<uint32_t>(&setup.report_reserved_period)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultReportReservedPeriod),
 				"period between reporting of reserved inodes expressed in seconds")
 			("forget-password",
-				po::bool_switch(&setup.forget_password)->default_value((bool)LizardClient::FsInitParams::kDefaultDoNotRememberPassword),
+				po::bool_switch(&setup.forget_password)->default_value((bool)SaunaClient::FsInitParams::kDefaultDoNotRememberPassword),
 				"forget password after successful registration")
 			("subfolder,S",
-				po::value<std::string>(&setup.subfolder)->default_value((const char *)LizardClient::FsInitParams::kDefaultSubfolder),
+				po::value<std::string>(&setup.subfolder)->default_value((const char *)SaunaClient::FsInitParams::kDefaultSubfolder),
 				"mount only given subfolder of the file system")
 			("debug",
-				po::bool_switch(&setup.debug)->default_value((bool)LizardClient::FsInitParams::kDefaultDebugMode),
+				po::bool_switch(&setup.debug)->default_value((bool)SaunaClient::FsInitParams::kDefaultDebugMode),
 				"enable debug mode")
 			("direntry-cache-timeout",
-				po::value<double>(&setup.direntry_cache_timeout)->default_value((unsigned)LizardClient::FsInitParams::kDefaultDirentryCacheTimeout),
+				po::value<double>(&setup.direntry_cache_timeout)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultDirentryCacheTimeout),
 				"timeout for direntry cache")
 			("direntry-cache-size",
-				po::value<unsigned>(&setup.direntry_cache_size)->default_value((unsigned)LizardClient::FsInitParams::kDefaultDirentryCacheSize),
+				po::value<unsigned>(&setup.direntry_cache_size)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultDirentryCacheSize),
 				"size of direntry cache in number of elements")
 			("entry-cache-timeout",
-				po::value<double>(&setup.entry_cache_timeout)->default_value((unsigned)LizardClient::FsInitParams::kDefaultEntryCacheTimeout),
+				po::value<double>(&setup.entry_cache_timeout)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultEntryCacheTimeout),
 				"timeout for enty cache")
 			("attr-cache-timeout",
-				po::value<double>(&setup.attr_cache_timeout)->default_value((unsigned)LizardClient::FsInitParams::kDefaultAttrCacheTimeout),
+				po::value<double>(&setup.attr_cache_timeout)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultAttrCacheTimeout),
 				"timeout for attribute cache")
 			("no-mkdir-copy-sgid",
-				po::bool_switch(&setup.no_mkdir_copy_sgid)->default_value((bool)LizardClient::FsInitParams::kDefaultMkdirCopySgid),
+				po::bool_switch(&setup.no_mkdir_copy_sgid)->default_value((bool)SaunaClient::FsInitParams::kDefaultMkdirCopySgid),
 				"sgid bit should NOT be copied during mkdir operation")
 			("sugid-clear-mode",
-				po::value<SugidClearMode>(&setup.sugid_clear_mode)->default_value((SugidClearMode)LizardClient::FsInitParams::kDefaultSugidClearMode),
+				po::value<SugidClearMode>(&setup.sugid_clear_mode)->default_value((SugidClearMode)SaunaClient::FsInitParams::kDefaultSugidClearMode),
 				"set sugid clear mode")
 			("daemonize",
 				po::bool_switch(&setup.make_daemon)->default_value(false),
@@ -151,7 +153,7 @@ void parse_command_line(int argc, char** argv, Setup& setup) {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
 		po::notify(vm);
 		if (vm.count("help") > 0) {
-			std::cout << "lizardfs-polonaise-server OPTIONS" << std::endl;
+			std::cout << "saunafs-polonaise-server OPTIONS" << std::endl;
 			std::cout << desc << std::endl;
 			exit(0);
 		}

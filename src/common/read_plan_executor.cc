@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -27,9 +28,9 @@
 #include "common/chunkserver_stats.h"
 #include "common/exceptions.h"
 #include "common/lambda_guard.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/massert.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/read_operation_executor.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
@@ -348,7 +349,7 @@ void ReadPlanExecutor::checkPlan(uint8_t *buffer_start) {
 		assert(type_and_op.first.isValid());
 		const ReadPlan::ReadOperation &op(type_and_op.second);
 		assert(op.request_offset >= 0 && op.request_size >= 0);
-		assert((op.request_offset + op.request_size) <= MFSCHUNKSIZE);
+		assert((op.request_offset + op.request_size) <= SFSCHUNKSIZE);
 		assert(op.buffer_offset >= 0 &&
 		       (op.buffer_offset + op.request_size) <= plan_->read_buffer_size);
 
@@ -385,10 +386,8 @@ void ReadPlanExecutor::checkPlan(uint8_t *buffer_start) {
 		}
 	}
 
-	int post_size = 0;
 	for (const auto &post : plan_->postprocess_operations) {
 		assert(post.first >= 0);
-		post_size += post.first;
 	}
 
 	plan_->buffer_start = buffer_start;

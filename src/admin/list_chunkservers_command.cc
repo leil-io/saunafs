@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -24,7 +26,7 @@
 
 #include "protocol/cltoma.h"
 #include "common/human_readable_format.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "protocol/matocl.h"
 #include "common/server_connection.h"
 
@@ -32,7 +34,7 @@ std::string ListChunkserversCommand::name() const {
 	return "list-chunkservers";
 }
 
-LizardFsProbeCommand::SupportedOptions ListChunkserversCommand::supportedOptions() const {
+SaunaFsProbeCommand::SupportedOptions ListChunkserversCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 	};
@@ -58,7 +60,7 @@ void ListChunkserversCommand::run(const Options& options) const {
 		} else {
 			if (options.isSet(kPorcelainMode)) {
 				std::cout << address.toString()
-						<< ' ' << lizardfsVersionToString(cs.version)
+						<< ' ' << saunafsVersionToString(cs.version)
 						<< ' ' << cs.chunkscount
 						<< ' ' << cs.usedspace
 						<< ' ' << cs.totalspace
@@ -70,7 +72,7 @@ void ListChunkserversCommand::run(const Options& options) const {
 						<< std::endl;
 			} else {
 				std::cout << "Server " << address.toString() << ":"
-						<< "\n\tversion: " << lizardfsVersionToString(cs.version)
+						<< "\n\tversion: " << saunafsVersionToString(cs.version)
 						<< "\n\tlabel: " << cs.label
 						<< "\n\tchunks: " << convertToSi(cs.chunkscount)
 						<< "\n\tused space: " << convertToIec(cs.usedspace) << "B"
@@ -90,7 +92,7 @@ std::vector<ChunkserverListEntry> ListChunkserversCommand::getChunkserversList (
 		const std::string& masterHost, const std::string& masterPort) {
 	ServerConnection connection(masterHost, masterPort);
 	auto request = cltoma::cservList::build(true);
-	auto response = connection.sendAndReceive(request, LIZ_MATOCL_CSERV_LIST);
+	auto response = connection.sendAndReceive(request, SAU_MATOCL_CSERV_LIST);
 	std::vector<ChunkserverListEntry> result;
 	matocl::cservList::deserialize(response, result);
 	return result;

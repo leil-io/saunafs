@@ -1,8 +1,8 @@
 CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
 	MOUNTS=2 \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 # This test uses 2 mounts. We will use mount 0 to write files and mount 1 to query
 # for their size to get the real information from the master server, not a size cached
@@ -10,8 +10,8 @@ CHUNKSERVERS=4 \
 
 # Create a directory with a goal of xor3
 mkdir "${info[mount0]}/dir"
-lizardfs setgoal xor3 "${info[mount0]}/dir"
-stripe_size=$((3 * LIZARDFS_BLOCK_SIZE))
+saunafs setgoal xor3 "${info[mount0]}/dir"
+stripe_size=$((3 * SAUNAFS_BLOCK_SIZE))
 
 # Create a background process which writes 1.5 stripes to some file and then sleeps forever
 # Expect the first stripe to be written immediately and the rest to be written after some time.

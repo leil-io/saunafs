@@ -3,15 +3,15 @@ timeout_set 60 seconds
 CHUNKSERVERS=3 \
 	MOUNTS=2 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	MOUNT_1_EXTRA_CONFIG="mfsprefetchxorstripes" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_1_EXTRA_CONFIG="sfsprefetchxorstripes" \
 	CHUNKSERVER_EXTRA_CONFIG="MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=DEBUG" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 mkdir dir
 cd dir
-lizardfs setgoal xor2 .
+saunafs setgoal xor2 .
 FILE_SIZE=129M BLOCK_SIZE=12345 file-generate file
 
 file-validate file

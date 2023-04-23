@@ -25,25 +25,25 @@ timeout_set 10 minutes
 assert_program_installed socat
 CHUNKSERVERS=4 \
 	MOUNTS=10 \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
-libredirect_bind_path="${LIZARDFS_INSTALL_FULL_LIBDIR}/libredirect_bind.so"
+libredirect_bind_path="${SAUNAFS_INSTALL_FULL_LIBDIR}/libredirect_bind.so"
 
 # Start failproxies on each chunkserver with different 'initial counter' parameters
 for csid in {0..3}; do
 	port=${info[chunkserver${csid}_port]}
-	lizardfs_chunkserver_daemon $csid stop
+	saunafs_chunkserver_daemon $csid stop
 	start_proxy $port $((port + 1000)) $((1883 * (4 + csid)))
 	sleep 2
-	LD_PRELOAD=${libredirect_bind_path} lizardfs_chunkserver_daemon $csid start
+	LD_PRELOAD=${libredirect_bind_path} saunafs_chunkserver_daemon $csid start
 done
-lizardfs_wait_for_all_ready_chunkservers
+saunafs_wait_for_all_ready_chunkservers
 
 # Create a xor3 directory for tests
 mkdir "${info[mount0]}/dir"
-lizardfs setgoal xor3 "${info[mount0]}/dir"
+saunafs setgoal xor3 "${info[mount0]}/dir"
 
 # Create a small file by writing it using 10 clients concurrently
 src="$RAMDISK_DIR/src"
@@ -61,8 +61,8 @@ FILE_SIZE=200M file-generate "${info[mount1]}/dir/big"
 # Validate all parts (including parity parts)
 MESSAGE="Validating data" expect_success file-validate "${info[mount2]}"/dir/*
 for csid in 0 1; do
-	lizardfs_chunkserver_daemon $csid stop
+	saunafs_chunkserver_daemon $csid stop
 	MESSAGE="Validating data (CS$csid is down)" expect_success file-validate "${info[mount3]}"/dir/*
-	LD_PRELOAD=${libredirect_bind_path} lizardfs_chunkserver_daemon $csid start
-	lizardfs_wait_for_all_ready_chunkservers
+	LD_PRELOAD=${libredirect_bind_path} saunafs_chunkserver_daemon $csid start
+	saunafs_wait_for_all_ready_chunkservers
 done

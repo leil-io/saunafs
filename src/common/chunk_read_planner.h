@@ -1,19 +1,22 @@
 /*
+
+
  Copyright 2016 Skytechnology sp. z o.o.
+ Copyright 2023 Leil Storage OÜ
 
- This file is part of LizardFS.
+ This file is part of SaunaFS.
 
- LizardFS is free software: you can redistribute it and/or modify
+ SaunaFS is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, version 3.
 
- LizardFS is distributed in the hope that it will be useful,
+ SaunaFS is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+ along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -49,11 +52,11 @@ protected:
 
 				assert(block >= 0);
 
-				assert(dst >= plan->buffer_start && (dst + MFSBLOCKSIZE) <= plan->buffer_read);
-				assert(src >= plan->buffer_read && (src + MFSBLOCKSIZE) <= plan->buffer_end);
-				std::memcpy(dst, src + (part * part_block_count + block) * MFSBLOCKSIZE,
-				            MFSBLOCKSIZE);
-				dst += MFSBLOCKSIZE;
+				assert(dst >= plan->buffer_start && (dst + SFSBLOCKSIZE) <= plan->buffer_read);
+				assert(src >= plan->buffer_read && (src + SFSBLOCKSIZE) <= plan->buffer_end);
+				std::memcpy(dst, src + (part * part_block_count + block) * SFSBLOCKSIZE,
+				            SFSBLOCKSIZE);
+				dst += SFSBLOCKSIZE;
 			}
 		}
 
@@ -156,7 +159,7 @@ public:
 #endif
 
 		plan->postprocess_operations.push_back(
-		    std::make_pair(chunk_block_count_ * MFSBLOCKSIZE, std::move(conv)));
+		    std::make_pair(chunk_block_count_ * SFSBLOCKSIZE, std::move(conv)));
 
 		return plan;
 	}

@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -31,7 +32,7 @@
 #include <string.h>
 
 #include "common/human_readable_format.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/server_connection.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
@@ -61,10 +62,10 @@ void signalHandler(uint32_t job_id) {
 		try {
 			auto request = cltoma::stopTask::build(msgid, job_id);
 			auto response = ServerConnection::sendAndReceive(fd, request,
-					LIZ_MATOCL_STOP_TASK);
+					SAU_MATOCL_STOP_TASK);
 			uint8_t status;
 			matocl::stopTask::deserialize(response, msgid, status);
-			if (status == LIZARDFS_STATUS_OK) {
+			if (status == SAUNAFS_STATUS_OK) {
 				printf("Task has been cancelled\n");
 			} else {
 				printf("Task could not be found\n");
@@ -92,7 +93,7 @@ bool check_usage(std::function<void()> f, bool expressionExpectedToBeFalse, cons
 
 void set_humode() {
 	char *hrformat;
-	hrformat = getenv("MFSHRFORMAT");
+	hrformat = getenv("SFSHRFORMAT");
 	if (hrformat) {
 		if (hrformat[0] >= '0' && hrformat[0] <= '4') {
 			humode = hrformat[0] - '0';
@@ -184,7 +185,7 @@ void print_number(const char *prefix, const char *suffix, uint64_t number, uint8
 	}
 }
 
-int my_get_number(const char *str, uint64_t *ret, double max, uint8_t bytesflag) {
+int my_get_number(const char *str, uint64_t *ret, uint64_t max, uint8_t bytesflag) {
 	uint64_t val, frac, fracdiv;
 	double drval, mult;
 	int f;
@@ -266,7 +267,7 @@ int my_get_number(const char *str, uint64_t *ret, double max, uint8_t bytesflag)
 		return -1;
 	}
 	drval = round(((double)frac / (double)fracdiv + (double)val) * mult);
-	if (drval > max) {
+	if (drval > static_cast<double>(max)) {
 		return -2;
 	} else {
 		*ret = drval;

@@ -1,0 +1,212 @@
+#!/bin/bash
+
+SAUNAFS_URAFT_OK=0
+SAUNAFS_URAFT_ERROR=1
+SAUNAFS_DATA_DIR="@DATA_PATH@"
+METADATA_LOCK="@DATA_PATH@/metadata.sfs.lock"
+SAUNAFS_URAFT_CONFIG="@ETC_PATH@/saunafs-uraft.cfg"
+SAUNAFS_MASTER_CONFIG="@ETC_PATH@/sfsmaster.cfg"
+
+metadata_location=
+
+
+print_missing_config() {
+	echo "$1 file is missing, it looks like a clean installation."
+	echo "You can use example configuration and fill it with appropriate data:"
+	echo "cp '@URAFT_EXAMPLES_SUBDIR@/$1' '@ETC_PATH@/$1'"
+	exit $SAUNAFS_URAFT_ERROR
+}
+
+load_config() {
+	if [ -f $SAUNAFS_MASTER_CONFIG ] ; then
+		. <(sed "s:\ *=\ *:=:g" $SAUNAFS_MASTER_CONFIG | grep "ADMIN_PASSWORD")
+		. <(sed "s:\ *=\ *:=:g" $SAUNAFS_MASTER_CONFIG | grep "DATA_PATH")
+	else
+		print_missing_config $SAUNAFS_MASTER_CONFIG
+	fi
+
+	if [ -f $SAUNAFS_URAFT_CONFIG ] ; then
+		. <(sed "s:\ *=\ *:=:g" $SAUNAFS_URAFT_CONFIG)
+	else
+		print_missing_config $SAUNAFS_URAFT_CONFIG
+	fi
+
+	matocl_host=${LOCAL_MASTER_ADDRESS:=0}
+	matocl_port=${LOCAL_MASTER_MATOCL_PORT:=9421}
+
+	ipaddr=$(getent hosts ${URAFT_FLOATING_IP} | awk '{print $1}')
+	netmask=${URAFT_FLOATING_NETMASK}
+	iface=${URAFT_FLOATING_IFACE}
+
+	ipaddr2=${URAFT_FLOATING_IP_SECONDARY:=}
+	netmask2=${URAFT_FLOATING_NETMASK_SECONDARY:=}
+	iface2=${URAFT_FLOATING_IFACE_SECONDARY:=}
+
+	SAUNAFS_DATA_DIR=${DATA_PATH:="@DATA_PATH@"}
+
+	if [[ $ipaddr == "" || $netmask == "" || $iface == "" ]] ; then
+		echo "Configuration file $SAUNAFS_URAFT_CONFIG does not contain valid network information."
+		echo "See example @URAFT_EXAMPLES_SUBDIR@/saunafs-uraft.cfg file for reference."
+		exit $SAUNAFS_URAFT_ERROR
+	fi
+
+	if [[ ! $ADMIN_PASSWORD ]] ; then
+		echo "SaunaFS admin password must be set in order to authenticate to master server."
+		echo "See example @SFSMASTER_EXAMPLES_SUBDIR@/sfsmaster.cfg file for reference."
+		exit $SAUNAFS_URAFT_ERROR
+	fi
+}
+
+log() {
+	logger -t saunafs-uraft $@
+}
+
+saunafs_master() {
+	sfsmaster -o ha-cluster-managed "$@"
+}
+
+saunafs_admin() {
+	saunafs-admin "$@"
+}
+
+get_metadata_version_from_file() {
+	local version=$(@SBIN_PATH@/sfsmetarestore -g -d "${SAUNAFS_DATA_DIR}" | grep -v warn 2> /dev/null)
+	if [[ $? == 0 && ${version} =~ ^[0-9]+$ ]]; then
+		echo -n "${version}"
+	else
+		echo -n 0
+	fi
+}
+
+saunafs_promote() {
+	saunafs_metadata_version 2> /dev/null
+	if [[ ${metadata_location} == "disk" ]] ; then
+		log "metadata is on disk instead of ram"
+		saunafs_master stop
+		unlink "${METADATA_LOCK}"
+		saunafs_master -o initial-personality=master -o auto-recovery restart
+		if [[ $? != 0 ]]; then
+			log "promotion to master failed"
+			exit $SAUNAFS_URAFT_ERROR
+		fi
+	else
+		echo -n "${ADMIN_PASSWORD}" | \
+			saunafs_admin promote-shadow "${matocl_host}" ${matocl_port}
+	fi
+	saunafs_assign_ip
+}
+
+saunafs_demote() {
+	# drop ip
+	saunafs_drop_ip
+	# restart shadow
+	saunafs_master -o initial-personality=shadow restart
+}
+
+saunafs_quick_stop() {
+	echo -n "${ADMIN_PASSWORD}" | \
+			saunafs_admin stop-master-without-saving-metadata "${matocl_host}" ${matocl_port}
+}
+
+saunafs_metadata_version() {
+	# metadata-version can take arguments or read config file
+	if [[ $# == 3 ]] ; then
+		matocl_host=$2
+		matocl_port=$3
+	else
+		load_config
+	fi
+	local probe_result=$(saunafs_admin metadataserver-status --porcelain "${matocl_host}" "$matocl_port")
+	if [[ $? != 0 ]] ; then
+		log "failed to query SaunaFS master status"
+		return $SAUNAFS_URAFT_ERROR
+	fi
+	local personality=$(echo "$probe_result" | cut -f1)
+	local connection=$(echo "$probe_result" | cut -f2)
+	local metadata_version_in_ram=$(echo "$probe_result" | cut -f3)
+	case "$personality/$connection" in
+		master/running)
+			metadata_location="ram"
+			echo -n ${metadata_version_in_ram}
+			return $SAUNAFS_URAFT_OK
+		;;
+		shadow/connected|shadow/disconnected)
+			if (( metadata_version_in_ram > 0 )) ; then
+				metadata_location="ram"
+				echo -n ${metadata_version_in_ram}
+				return $SAUNAFS_URAFT_OK
+			else
+				local metadata_version_on_disk=$(get_metadata_version_from_file)
+				# Failing to read version from file results in metadata version 0,
+				# which means that no metadata is available.
+				metadata_location="disk"
+				echo -n ${metadata_version_on_disk}
+				return $SAUNAFS_URAFT_OK
+			fi
+		;;
+		*)
+			log "unexpected output from saunafs-admin: $probe_result"
+			return $SAUNAFS_URAFT_OK
+		;;
+	esac
+}
+
+saunafs_isalive() {
+	saunafs_master isalive
+	if [[ $? == 0 ]] ; then
+		echo -n alive
+	else
+		echo -n dead
+	fi
+}
+
+saunafs_assign_ip() {
+	load_config
+	sudo ip -f inet addr add $ipaddr/$netmask dev $iface
+	iface_base=$(echo $iface | cut -f1 -d':') # for alias handling
+	arping -q -U -c5 -w1 $ipaddr -I $iface_base
+
+	if [[ "$ipaddr2" != "" ]]; then
+		sudo ip -f inet addr add $ipaddr2/$netmask2 dev $iface2
+		iface_base2=$(echo $iface2 | cut -f1 -d':') # for alias handling
+		arping -q -U -c5 -w1 $ipaddr2 -I $iface_base2
+	fi
+}
+
+saunafs_drop_ip() {
+	load_config
+	sudo ip -f inet addr delete $ipaddr/$netmask dev $iface
+	if [[ "$ipaddr2" != "" ]]; then
+		sudo ip -f inet addr delete $ipaddr2/$netmask2 dev $iface2
+	fi
+}
+
+saunafs_dead() {
+	saunafs_drop_ip
+}
+
+print_help() {
+	echo "SaunaFS uraft helper script"
+	echo "Available commands:"
+	echo "isalive"
+	echo "metadata-version"
+	echo "quick-stop"
+	echo "promote"
+	echo "demote"
+	echo "assign-ip"
+	echo "drop-ip"
+	echo "dead"
+}
+
+case "$1" in
+	isalive)           saunafs_isalive;;
+	metadata-version)  saunafs_metadata_version $@;;
+	quick-stop)        saunafs_quick_stop;;
+	promote)           saunafs_promote;;
+	demote)            saunafs_demote;;
+	assign-ip)         saunafs_assign_ip;;
+	drop-ip)           saunafs_drop_ip;;
+	dead)              saunafs_dead;;
+	*)                 print_help;;
+
+esac

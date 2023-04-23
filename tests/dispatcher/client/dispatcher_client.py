@@ -55,7 +55,7 @@ def _call(url: str, params: Optional[Any] = None, method: str = "get") -> Any:
 def push_list(arguments: Namespace) -> Any:
     action_url = slash_join(TESTS_DISPATCHER_URL, "push_list")
     test_list = get_gtest_testlist(
-        arguments.lizardfs_tests_path, arguments.test_suite, arguments.excluded_tests
+        arguments.saunafs_tests_path, arguments.test_suite, arguments.excluded_tests
     )
     request_payload = {
         "build_id": arguments.build_id,
@@ -94,9 +94,9 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--build_id", type=str, help="Id of the current build")
     parser.add_argument(
         "-p",
-        "--lizardfs_tests_path",
+        "--saunafs_tests_path",
         type=str,
-        help="Path to lizardfs-tests binary file",
+        help="Path to saunafs-tests binary file",
     )
     parser.add_argument("-s", "--test_suite", type=str, help="Name of test_suite")
     parser.add_argument(
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         not args.build_id
         or not args.test_suite
         or not args.action
-        or (not args.lizardfs_tests_path and args.action == "push_list")
+        or (not args.saunafs_tests_path and args.action == "push_list")
     ):
         parser.print_help(sys.stderr)
         sys.exit(1)

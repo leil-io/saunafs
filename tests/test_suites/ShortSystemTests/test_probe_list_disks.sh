@@ -1,18 +1,18 @@
 CHUNKSERVERS=4 \
 	DISK_PER_CHUNKSERVER=3 \
 	MASTER_EXTRA_CONFIG="OPERATIONS_DELAY_INIT = 100000" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 for goal in xor3 3; do
 	mkdir dir_$goal
-	lizardfs setgoal $goal dir_$goal
+	saunafs setgoal $goal dir_$goal
 	FILE_SIZE=60M file-generate dir_$goal/file
 done
 
-disks=$(lizardfs-probe list-disks --porcelain localhost "${info[matocl]}")
+disks=$(saunafs-probe list-disks --porcelain localhost "${info[matocl]}")
 expect_equals 12 $(wc -l <<< "$disks")
 for i in {0..3}; do
 	cs_data="$(grep ":${info[chunkserver${i}_port]} " <<< "$disks")"

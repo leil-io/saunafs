@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
 END_OF_SOURCE
 chmod +x "$TEMP_DIR/test.cc"
 
-USE_RAMDISK=YES setup_local_empty_lizardfs info
+USE_RAMDISK=YES setup_local_empty_saunafs info
 for i in {1..10}; do    # Run the test binary 10 times to detect races with a higher probability
 	export MESSAGE="Veryfing values returned by getattr on file$i"
 	assert_empty "$("$TEMP_DIR/test.cc" "${info[mount0]}/file$i" 2>&1)"

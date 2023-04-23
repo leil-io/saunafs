@@ -1,19 +1,22 @@
 /*
+
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -40,7 +43,7 @@ public:
 	static constexpr uint16_t kMasked = 0x80;
 	static constexpr uint16_t kAutoSetMode = 0x20;
 
-	LIZARDFS_CREATE_EXCEPTION_CLASS(FormatException, Exception);
+	SAUNAFS_CREATE_EXCEPTION_CLASS(FormatException, Exception);
 
 	struct Ace {
 		static constexpr uint32_t kInvalidId = 0xFFFFFFFF;
@@ -58,7 +61,7 @@ public:
 		static constexpr uint32_t kFailedAccessAceFlag = 0x00000020;
 		static constexpr uint32_t kIdentifierGroup = 0x0040;
 		static constexpr uint32_t kInheritedAce = 0x0080;  // non nfs4
-		static constexpr uint32_t kSpecialWho = 0x0100;    // lizardfs
+		static constexpr uint32_t kSpecialWho = 0x0100;    // saunafs
 
 		/* mask bitflags */
 		static constexpr uint32_t kReadData = 0x00000001;
@@ -461,7 +464,7 @@ public:
 	 */
 	uint32_t allowedToWho(const Ace &who) const;
 
-	LIZARDFS_DEFINE_SERIALIZE_METHODS(owner_mask_, group_mask_, other_mask_, flags_, ace_list_)
+	SAUNAFS_DEFINE_SERIALIZE_METHODS(owner_mask_, group_mask_, other_mask_, flags_, ace_list_)
 
 protected:
 	iterator changeMask(iterator ace, uint32_t mask);

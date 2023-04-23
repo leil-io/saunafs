@@ -2,7 +2,7 @@ CHUNKSERVERS=1 \
 	MOUNTS=2 \
 	USE_RAMDISK=YES \
 	MOUNT_EXTRA_CONFIG="symlinkcachetimeout=60" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 

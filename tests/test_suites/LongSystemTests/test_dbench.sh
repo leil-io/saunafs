@@ -10,13 +10,13 @@ dbench_tester() {
 
 CHUNKSERVERS=3 \
 	MOUNTS=1 \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 for goal in 1 2 xor2; do
 	mkdir "goal_$goal"
-	lizardfs setgoal "$goal" "goal_$goal"
+	saunafs setgoal "$goal" "goal_$goal"
 	dbench_tester "goal_$goal" &
 done
 wait

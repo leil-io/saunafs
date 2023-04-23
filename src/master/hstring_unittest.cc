@@ -1,6 +1,6 @@
 #include "common/platform.h"
 
-#ifdef LIZARDFS_HAVE_DB
+#ifdef SAUNAFS_HAVE_DB
 #include "master/hstring_bdbstorage.h"
 #endif
 
@@ -93,7 +93,7 @@ TEST(HStringTest, MemCopy) {
 /*
  * BDBStorage tests
  */
-#ifdef LIZARDFS_HAVE_DB
+#ifdef SAUNAFS_HAVE_DB
 TEST(HStringTest, BDBComparison) {
 	const char DB_FILEPATH[] = "/tmp/db.db";
 	{

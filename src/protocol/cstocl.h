@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -32,7 +33,7 @@ inline void serializePrefix(std::vector<uint8_t>& destination,
 	// This prefix requires CRC (uint32_t) and data (readSize * uint8_t) to be appended
 	uint32_t extraSpace = serializedSize(uint32_t()) + readSize;
 	serializePacketPrefix(destination, extraSpace,
-			LIZ_CSTOCL_READ_DATA, 0, chunkId, readOffset, readSize);
+			SAU_CSTOCL_READ_DATA, 0, chunkId, readOffset, readSize);
 }
 
 inline void deserializePrefix(const std::vector<uint8_t>& source,
@@ -51,7 +52,7 @@ static const uint32_t kLegacyPrefixSize = 8 + 4 + 4 + 4;
 namespace readStatus {
 
 inline void serialize(std::vector<uint8_t>& destination, uint64_t chunkId, uint8_t status) {
-	serializePacket(destination, LIZ_CSTOCL_READ_STATUS, 0, chunkId, status);
+	serializePacket(destination, SAU_CSTOCL_READ_STATUS, 0, chunkId, status);
 }
 
 inline void deserialize(const std::vector<uint8_t>& source, uint64_t& chunkId, uint8_t& status) {
@@ -65,7 +66,7 @@ namespace writeStatus {
 
 inline void serialize(std::vector<uint8_t>& destination,
 		uint64_t chunkId, uint32_t writeId, uint8_t status) {
-	serializePacket(destination, LIZ_CSTOCL_WRITE_STATUS, 0, chunkId, writeId, status);
+	serializePacket(destination, SAU_CSTOCL_WRITE_STATUS, 0, chunkId, writeId, status);
 }
 
 inline void deserialize(const std::vector<uint8_t>& source,

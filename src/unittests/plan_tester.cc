@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -42,7 +43,7 @@ int ReadPlanTester::readDataFromChunkServer(std::vector<uint8_t> &output, int ou
 		const std::vector<uint8_t> &data, int offset, int size) {
 	for (int i = 0; i < size; ++i) {
 		assert(output_offset < (int)output.size());
-		if (offset >= MFSCHUNKSIZE) {
+		if (offset >= SFSCHUNKSIZE) {
 			return -1;
 		}
 
@@ -103,7 +104,7 @@ void ReadPlanTester::checkPlan(const std::unique_ptr<ReadPlan> &plan, uint8_t *b
 		assert(type_and_op.first.isValid());
 		const ReadPlan::ReadOperation &op(type_and_op.second);
 		assert(op.request_offset >= 0 && op.request_size >= 0);
-		assert((op.request_offset + op.request_size) <= MFSCHUNKSIZE);
+		assert((op.request_offset + op.request_size) <= SFSCHUNKSIZE);
 		assert(op.buffer_offset >= 0 &&
 		       (op.buffer_offset + op.request_size) <= plan->read_buffer_size);
 
@@ -193,16 +194,16 @@ void ReadPlanTester::buildXorData(std::map<ChunkPartType, std::vector<uint8_t>> 
 		}
 
 		int block_count = slice_traits::getNumberOfBlocks(
-		    slice_traits::xors::ChunkPartType(level, part), MFSBLOCKSINCHUNK);
+		    slice_traits::xors::ChunkPartType(level, part), SFSBLOCKSINCHUNK);
 
 		buffer.clear();
 		for (int block = 0; block < block_count; ++block) {
-			for (int offset = 0; offset < MFSBLOCKSIZE; offset += 4) {
+			for (int offset = 0; offset < SFSBLOCKSIZE; offset += 4) {
 				union conv {
 					int32_t value;
 					uint8_t data[4];
 				} c;
-				c.value = (block * level + part - 1) * MFSBLOCKSIZE + offset;
+				c.value = (block * level + part - 1) * SFSBLOCKSIZE + offset;
 				buffer.insert(buffer.end(), c.data, c.data + 4);
 			}
 		}
@@ -215,8 +216,8 @@ void ReadPlanTester::buildXorData(std::map<ChunkPartType, std::vector<uint8_t>> 
 
 	// compute parity block
 	int block_count = slice_traits::getNumberOfBlocks(slice_traits::xors::ChunkPartType(level, 0),
-	                                                  MFSBLOCKSINCHUNK);
-	buffer.resize(block_count * MFSBLOCKSIZE, 0);
+	                                                  SFSBLOCKSINCHUNK);
+	buffer.resize(block_count * SFSBLOCKSIZE, 0);
 	for (int part = 1; part <= level; ++part) {
 		int size =
 		    std::min(buffer.size(), result[slice_traits::xors::ChunkPartType(level, part)].size());
@@ -234,13 +235,13 @@ void ReadPlanTester::buildStdData(std::map<ChunkPartType, std::vector<uint8_t>> 
 		return;
 	}
 
-	for (int block = 0; block < MFSBLOCKSINCHUNK; ++block) {
-		for (int offset = 0; offset < MFSBLOCKSIZE; offset += 4) {
+	for (int block = 0; block < SFSBLOCKSINCHUNK; ++block) {
+		for (int offset = 0; offset < SFSBLOCKSIZE; offset += 4) {
 			union conv {
 				int32_t value;
 				uint8_t data[4];
 			} c;
-			c.value = block * MFSBLOCKSIZE + offset;
+			c.value = block * SFSBLOCKSIZE + offset;
 			buffer.insert(buffer.end(), c.data, c.data + 4);
 		}
 	}
@@ -258,28 +259,28 @@ void ReadPlanTester::buildECData(std::map<ChunkPartType, std::vector<uint8_t>> &
 		}
 
 		int block_count = slice_traits::getNumberOfBlocks(
-		    slice_traits::ec::ChunkPartType(k, m, part), MFSBLOCKSINCHUNK);
+		    slice_traits::ec::ChunkPartType(k, m, part), SFSBLOCKSINCHUNK);
 
 		buffer.clear();
 		for (int block = 0; block < block_count; ++block) {
-			for (int offset = 0; offset < MFSBLOCKSIZE; offset += 4) {
+			for (int offset = 0; offset < SFSBLOCKSIZE; offset += 4) {
 				union conv {
 					int32_t value;
 					uint8_t data[4];
 				} c;
-				c.value = (block * k + part) * MFSBLOCKSIZE + offset;
+				c.value = (block * k + part) * SFSBLOCKSIZE + offset;
 				buffer.insert(buffer.end(), c.data, c.data + 4);
 			}
 		}
 		if (block_count <
 		    (int)slice_traits::getNumberOfBlocks(slice_traits::ec::ChunkPartType(k, m, 0))) {
-			buffer.insert(buffer.end(), MFSBLOCKSIZE, 0);
+			buffer.insert(buffer.end(), SFSBLOCKSIZE, 0);
 		}
 		result.insert({slice_traits::ec::ChunkPartType(k, m, part), std::move(buffer)});
 	}
 
 	int block_count =
-	    slice_traits::getNumberOfBlocks(slice_traits::ec::ChunkPartType(k, m, k), MFSBLOCKSINCHUNK);
+	    slice_traits::getNumberOfBlocks(slice_traits::ec::ChunkPartType(k, m, k), SFSBLOCKSINCHUNK);
 
 	typedef ReedSolomon<slice_traits::ec::kMaxDataCount, slice_traits::ec::kMaxParityCount> RS;
 	std::vector<std::vector<uint8_t>> parity_buffers;
@@ -290,14 +291,14 @@ void ReadPlanTester::buildECData(std::map<ChunkPartType, std::vector<uint8_t>> &
 	parity_buffers.resize(m);
 
 	for (int i = 0; i < m; ++i) {
-		parity_buffers[i].resize(block_count * MFSBLOCKSIZE, 0);
+		parity_buffers[i].resize(block_count * SFSBLOCKSIZE, 0);
 		parity_parts[i] = parity_buffers[i].data();
 	}
 	for (int i = 0; i < k; ++i) {
 		data_parts[i] = result[slice_traits::ec::ChunkPartType(k, m, i)].data();
 	}
 
-	rs.encode(data_parts, parity_parts, block_count * MFSBLOCKSIZE);
+	rs.encode(data_parts, parity_parts, block_count * SFSBLOCKSIZE);
 
 	for (int i = 0; i < m; ++i) {
 		result[slice_traits::ec::ChunkPartType(k, m, k + i)] = std::move(parity_buffers[i]);
@@ -307,7 +308,7 @@ void ReadPlanTester::buildECData(std::map<ChunkPartType, std::vector<uint8_t>> &
 bool ReadPlanTester::compareBlocks(const std::vector<uint8_t> &a, int a_offset,
 		const std::vector<uint8_t> &b, int b_offset, int block_count) {
 	for (int block = 0; block < block_count; ++block) {
-		for (int offset = 0; offset < MFSBLOCKSIZE; offset += 4) {
+		for (int offset = 0; offset < SFSBLOCKSIZE; offset += 4) {
 			union conv {
 				int32_t value;
 				uint8_t data[4];

@@ -1,19 +1,20 @@
 /*
    Copyright 2016-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -23,7 +24,7 @@
 #include "common/loop_watchdog.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_node.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
 void TaskManager::Job::finalize(int status) {
 	if (finish_callback_) {
@@ -57,7 +58,7 @@ int TaskManager::submitTask(uint32_t taskid, uint32_t ts, int initial_batch_size
 	Job new_job(taskid, description);
 
 	int done = 0;
-	int status = LIZARDFS_STATUS_OK;
+	int status = SAUNAFS_STATUS_OK;
 
 	new_job.setFinishCallback([&done, &status](int code) {
 		status = code;
@@ -80,7 +81,7 @@ int TaskManager::submitTask(uint32_t taskid, uint32_t ts, int initial_batch_size
 	new_job.setFinishCallback(callback);
 	job_list_.push_back(std::move(new_job));
 
-	return LIZARDFS_ERROR_WAITING;
+	return SAUNAFS_ERROR_WAITING;
 }
 
 int TaskManager::submitTask(uint32_t ts, int initial_batch_size, Task *task,
@@ -120,7 +121,7 @@ TaskManager::JobsInfoContainer TaskManager::getCurrentJobsInfo() const {
 bool TaskManager::cancelJob(uint32_t job_id) {
 	for (auto it = job_list_.begin(); it != job_list_.end(); ++it) {
 		if (it->getId() == job_id) {
-			it->finalize(LIZARDFS_ERROR_NOTDONE);
+			it->finalize(SAUNAFS_ERROR_NOTDONE);
 			return true;
 		}
 	}

@@ -1,19 +1,21 @@
 /*
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -23,7 +25,7 @@
 #include <iostream>
 
 #include "admin/registered_admin_connection.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/server_connection.h"
 #include "master/locks.h"
 #include "protocol/cltoma.h"
@@ -39,7 +41,7 @@ void ManageLocksCommand::usage() const {
 	std::cerr << "    Manages file locks" << std::endl;
 }
 
-LizardFsProbeCommand::SupportedOptions ManageLocksCommand::supportedOptions() const {
+SaunaFsProbeCommand::SupportedOptions ManageLocksCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{"--active", "Print only active locks"},
@@ -52,13 +54,13 @@ LizardFsProbeCommand::SupportedOptions ManageLocksCommand::supportedOptions() co
 	};
 }
 
-static lzfs_locks::Type parseType(const std::string &str) {
+static safs_locks::Type parseType(const std::string &str) {
 	if (str == "flock") {
-		return lzfs_locks::Type::kFlock;
+		return safs_locks::Type::kFlock;
 	} else if (str == "posix") {
-		return lzfs_locks::Type::kPosix;
+		return safs_locks::Type::kPosix;
 	} else if (str == "all") {
-		return lzfs_locks::Type::kAll;
+		return safs_locks::Type::kAll;
 	} else {
 		throw WrongUsageException(str + " is not a valid lock type(flock, posix, all) ");
 	}
@@ -97,12 +99,12 @@ static void processUnlock(RegisteredAdminConnection &conn, const Options &option
 	} else {
 		msg = cltoma::manageLocksUnlock::build(type, inode);
 	}
-	auto response = conn.sendAndReceive(msg, LIZ_MATOCL_MANAGE_LOCKS_UNLOCK);
+	auto response = conn.sendAndReceive(msg, SAU_MATOCL_MANAGE_LOCKS_UNLOCK);
 
 	uint8_t status;
 	matocl::manageLocksUnlock::deserialize(response, status);
-	std::cerr << "Status: " << lizardfs_error_string(status) << std::endl;
-	if (status == LIZARDFS_ERROR_EPERM) {
+	std::cerr << "Status: " << saunafs_error_string(status) << std::endl;
+	if (status == SAUNAFS_ERROR_EPERM) {
 		std::cerr << "This error might be caused by unmatched owner, sessionid, start or end"
 			" parameters." << std::endl;
 		exit(1);
@@ -110,8 +112,8 @@ static void processUnlock(RegisteredAdminConnection &conn, const Options &option
 }
 
 static void processListType(uint32_t inode, RegisteredAdminConnection &conn, const Options &options,
-		lzfs_locks::Type type, bool pending) {
-	const uint64_t kDataPortion = LIZ_CLTOMA_MANAGE_LOCKS_LIST_LIMIT;
+		safs_locks::Type type, bool pending) {
+	const uint64_t kDataPortion = SAU_CLTOMA_MANAGE_LOCKS_LIST_LIMIT;
 	for (uint64_t begin = 0; true; begin += kDataPortion) {
 		MessageBuffer msg;
 		if (inode) {
@@ -119,8 +121,8 @@ static void processListType(uint32_t inode, RegisteredAdminConnection &conn, con
 		} else {
 			msg = cltoma::manageLocksList::build(type, pending, begin, kDataPortion);
 		}
-		auto response = conn.sendAndReceive(msg, LIZ_MATOCL_MANAGE_LOCKS_LIST);
-		std::vector<lzfs_locks::Info> locks;
+		auto response = conn.sendAndReceive(msg, SAU_MATOCL_MANAGE_LOCKS_LIST);
+		std::vector<safs_locks::Info> locks;
 		matocl::manageLocksList::deserialize(response, locks);
 
 		if (locks.size() > kDataPortion) {
@@ -129,7 +131,7 @@ static void processListType(uint32_t inode, RegisteredAdminConnection &conn, con
 		}
 
 		for (auto &lock : locks) {
-			if (options.isSet(LizardFsProbeCommand::kPorcelainMode)) {
+			if (options.isSet(SaunaFsProbeCommand::kPorcelainMode)) {
 				std::cout << lock.inode
 				<< " " << lock.owner
 				<< " " << lock.sessionid
@@ -154,24 +156,24 @@ static void processListType(uint32_t inode, RegisteredAdminConnection &conn, con
 static void processList(RegisteredAdminConnection &conn, const Options &options) {
 	auto type = parseType(options.argument(3));
 	uint32_t inode = options.getValue("--inode", 0UL);
-	if (type == lzfs_locks::Type::kFlock || type == lzfs_locks::Type::kAll) {
+	if (type == safs_locks::Type::kFlock || type == safs_locks::Type::kAll) {
 		if (options.isSet("--active") || !options.isSet("--pending")) {
 			std::cout << "Active flocks:" << std::endl;
-			processListType(inode, conn, options, lzfs_locks::Type::kFlock, false);
+			processListType(inode, conn, options, safs_locks::Type::kFlock, false);
 		}
 		if (options.isSet("--pending") || !options.isSet("--active")) {
 			std::cout << "Pending flocks:" << std::endl;
-			processListType(inode, conn, options, lzfs_locks::Type::kFlock, true);
+			processListType(inode, conn, options, safs_locks::Type::kFlock, true);
 		}
 	}
-	if (type == lzfs_locks::Type::kPosix || type == lzfs_locks::Type::kAll) {
+	if (type == safs_locks::Type::kPosix || type == safs_locks::Type::kAll) {
 		if (options.isSet("--active") || !options.isSet("--pending")) {
 			std::cout << "Active POSIX locks:" << std::endl;
-			processListType(inode, conn, options, lzfs_locks::Type::kPosix, false);
+			processListType(inode, conn, options, safs_locks::Type::kPosix, false);
 		}
 		if (options.isSet("--pending") || !options.isSet("--active")) {
 			std::cout << "Pending POSIX locks:" << std::endl;
-			processListType(inode, conn, options, lzfs_locks::Type::kPosix, true);
+			processListType(inode, conn, options, safs_locks::Type::kPosix, true);
 		}
 	}
 }

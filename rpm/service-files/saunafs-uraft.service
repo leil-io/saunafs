@@ -1,0 +1,17 @@
+[Unit]
+Description=SaunaFS uraft high availability daemon
+Requires=saunafs-ha-master.service
+After=network.target
+After=saunafs-ha-master.service
+
+[Service]
+Type=simple
+PIDFile=/var/run/saunafs-uraft.pid
+TimeoutSec=0
+ExecStart=/usr/sbin/saunafs-uraft
+ExecStopPost=/usr/sbin/saunafs-uraft-helper demote
+Restart=no
+User=saunafs
+
+[Install]
+WantedBy=multi-user.target

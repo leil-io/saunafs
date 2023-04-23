@@ -1,0 +1,14 @@
+[Unit]
+Description=SaunaFS metalogger server daemon
+Documentation=man:sfsmetalogger
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/sfsmetalogger start
+ExecStop=/usr/sbin/sfsmetalogger stop
+ExecReload=/usr/sbin/sfsmetalogger reload
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

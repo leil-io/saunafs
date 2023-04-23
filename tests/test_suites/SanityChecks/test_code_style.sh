@@ -58,9 +58,9 @@ fi
 
 git ls-tree -r --name-only HEAD \
 		| egrep '[.](cmake|txt|cc|c|h|sh|inc|in|cfg|py)$' \
-		| grep -v 'mfs[.]cgi[.]in' \
-		| grep -v 'lizardfs_c_api[.]h' \
-		| grep -v 'lizardfs_error_codes[.]h' \
+		| grep -v 'sfs[.]cgi[.]in' \
+		| grep -v 'saunafs_c_api[.]h' \
+		| grep -v 'saunafs_error_codes[.]h' \
 		| grep -v '^external/' \
 		| grep -v 'src/nfs-ganesha' \
 		| while read file; do verify_file "$file"; done

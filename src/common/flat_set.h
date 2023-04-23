@@ -1,19 +1,22 @@
 /*
+
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
@@ -40,26 +43,26 @@
 template <typename T, typename C = std::vector<T>, class Compare = std::less<T>>
 class flat_set : private Compare {
 private:
-	typedef Compare base;
+	using base = Compare;
 
 public:
-	typedef C container_type;
+	using container_type = C;
 
-	typedef T key_type;
-	typedef T value_type;
-	typedef typename container_type::size_type size_type;
-	typedef std::ptrdiff_t difference_type;
-	typedef Compare key_compare;
-	typedef Compare value_compare;
-	typedef value_type& reference;
-	typedef const value_type& const_reference;
-	typedef T* pointer;
-	typedef const T* const_pointer;
-	typedef typename container_type::allocator_type allocator_type;
-	typedef typename container_type::iterator iterator;
-	typedef typename container_type::const_iterator const_iterator;
-	typedef typename container_type::reverse_iterator reverse_iterator;
-	typedef typename container_type::const_reverse_iterator const_reverse_iterator;
+	using key_type = T;
+	using value_type = T;
+	using size_type = typename std::vector<T>::size_type;
+	using difference_type = std::ptrdiff_t;
+	using key_compare = Compare;
+	using value_compare = Compare;
+	using reference = value_type&;
+	using const_reference = const value_type&;
+	using pointer = T*;
+	using const_pointer = const T*;
+	using allocator_type = typename container_type::allocator_type;
+	using iterator = typename container_type::iterator;
+	using const_iterator = typename container_type::const_iterator;
+	using reverse_iterator = typename container_type::reverse_iterator;
+	using const_reverse_iterator = typename container_type::const_reverse_iterator;
 
 	// constructors
 	flat_set() noexcept(std::is_nothrow_constructible<base>::value

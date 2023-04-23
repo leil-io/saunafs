@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -111,13 +113,13 @@
 		}
 
 // One macro which creates a whole class
-#define LIZARDFS_DEFINE_SERIALIZABLE_CLASS(ClassName, ...) \
+#define SAUNAFS_DEFINE_SERIALIZABLE_CLASS(ClassName, ...) \
 		SERIALIZABLE_CLASS_BEGIN(ClassName) \
 		SERIALIZABLE_CLASS_BODY(ClassName, __VA_ARGS__) \
 		SERIALIZABLE_CLASS_END
 
 // Macro which creates a serializable enum
-#define LIZARDFS_DEFINE_SERIALIZABLE_ENUM_CLASS(EnumClassName, ... /*values*/) \
+#define SAUNAFS_DEFINE_SERIALIZABLE_ENUM_CLASS(EnumClassName, ... /*values*/) \
 		enum class EnumClassName : uint8_t { __VA_ARGS__ }; \
 		inline uint32_t serializedSize(const EnumClassName& value) { \
 			return ::serializedSize(static_cast<uint8_t>(value)); \
@@ -137,7 +139,7 @@
 		}
 
 // One macro which creates serialize, deserialize and serializedSize methods
-#define LIZARDFS_DEFINE_SERIALIZE_METHODS(...) \
+#define SAUNAFS_DEFINE_SERIALIZE_METHODS(...) \
 		uint32_t serializedSize() const { \
 			return ::serializedSize(__VA_ARGS__); \
 		} \
@@ -149,16 +151,16 @@
 		}
 
 // One macro which creates serialize and deserialize functions for network communicates.
-// Internally it calls LIZARDFS_DEFINE_PACKET_SERIALIZATION_<NONEMPTY|EMPTY>, depending on whether
+// Internally it calls SAUNAFS_DEFINE_PACKET_SERIALIZATION_<NONEMPTY|EMPTY>, depending on whether
 // additional arguments were passed.
 // Usage:
-//   LIZARDFS_DEFINE_PACKET_SERIALIZATION(
+//   SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 //       <NAMESPACE1>, <NAMESPACE2>, <ID>, <VERSION>[, <TYPE>, <PARAMETER>]*)
-#define LIZARDFS_DEFINE_PACKET_SERIALIZATION(NAMESPACE1, NAMESPACE2, ID, /*VERSION, */...) \
-		PASTE_B(LIZARDFS_DEFINE_PACKET_SERIALIZATION_, MORE_THEN_ONE_ARG(EMPTY, NONEMPTY, __VA_ARGS__)) \
+#define SAUNAFS_DEFINE_PACKET_SERIALIZATION(NAMESPACE1, NAMESPACE2, ID, /*VERSION, */...) \
+		PASTE_B(SAUNAFS_DEFINE_PACKET_SERIALIZATION_, MORE_THEN_ONE_ARG(EMPTY, NONEMPTY, __VA_ARGS__)) \
 				(NAMESPACE1, NAMESPACE2, ID, /*VERSION, */__VA_ARGS__)
 // with arguments:
-#define LIZARDFS_DEFINE_PACKET_SERIALIZATION_NONEMPTY(NAMESPACE1, NAMESPACE2, ID, VERSION, \
+#define SAUNAFS_DEFINE_PACKET_SERIALIZATION_NONEMPTY(NAMESPACE1, NAMESPACE2, ID, VERSION, \
 		... /* [class, parameter]* */) \
 namespace NAMESPACE1 { \
 	namespace NAMESPACE2 { \
@@ -182,7 +184,7 @@ namespace NAMESPACE1 { \
 	} \
 }
 // without arguments:
-#define LIZARDFS_DEFINE_PACKET_SERIALIZATION_EMPTY(NAMESPACE1, NAMESPACE2, ID, VERSION) \
+#define SAUNAFS_DEFINE_PACKET_SERIALIZATION_EMPTY(NAMESPACE1, NAMESPACE2, ID, VERSION) \
 namespace NAMESPACE1 { \
 	namespace NAMESPACE2 { \
 		inline void serialize(std::vector<uint8_t>& destination) { \
@@ -200,7 +202,7 @@ namespace NAMESPACE1 { \
 	} \
 }
 
-#define LIZARDFS_DEFINE_PACKET_VERSION(NAMESPACE1, NAMESPACE2, NAME, VALUE) \
+#define SAUNAFS_DEFINE_PACKET_VERSION(NAMESPACE1, NAMESPACE2, NAME, VALUE) \
 namespace NAMESPACE1 { \
 	namespace NAMESPACE2 { \
 		const PacketVersion NAME = VALUE; \

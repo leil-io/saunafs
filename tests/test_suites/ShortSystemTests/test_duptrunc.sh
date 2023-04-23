@@ -2,8 +2,8 @@ timeout_set '1 minute'
 
 CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 block_size=65536
 cd ${info[mount0]}
@@ -15,10 +15,10 @@ for filesize in 30 90 $((9 * block_size)) $((15 * block_size - 30)) $((15 * bloc
 			echo "$MESSAGE"
 			# Create a file and its two snapshots. File will not be modified in this test
 			touch file
-			lizardfs setgoal $goal file >/dev/null
+			saunafs setgoal $goal file >/dev/null
 			FILE_SIZE=$filesize file-generate file
-			lizardfs makesnapshot file snapshot1
-			lizardfs makesnapshot file snapshot2
+			saunafs makesnapshot file snapshot1
+			saunafs makesnapshot file snapshot2
 			assert_success file-validate file snapshot1 snapshot2
 
 			# Truncate one of these snapshots up and check if there were zeros added

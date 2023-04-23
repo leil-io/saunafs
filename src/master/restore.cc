@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -24,8 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "protocol/MFSCommunication.h"
-#include "common/lizardfs_error_codes.h"
+#include "protocol/SFSCommunication.h"
+#include "common/saunafs_error_codes.h"
 #include "common/slogger.h"
 #include "master/filesystem.h"
 #include "master/filesystem_snapshot.h"
@@ -33,7 +35,7 @@
 
 #define EAT(clptr,fn,vno,c) { \
 	if (*(clptr)!=(c)) { \
-		lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": '%c' expected", (fn), (vno), (c)); \
+		safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": '%c' expected", (fn), (vno), (c)); \
 		return -1; \
 	} \
 	(clptr)++; \
@@ -53,7 +55,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -61,7 +63,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -85,7 +87,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -93,7 +95,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -110,7 +112,7 @@
 				} \
 			} \
 			if ((path)==NULL) { \
-				lzfs_pretty_syslog(LOG_ERR, "out of memory"); \
+				safs_pretty_syslog(LOG_ERR, "out of memory"); \
 				exit(1); \
 			} \
 		} \
@@ -128,7 +130,7 @@
 			} \
 		} \
 		if ((path)==NULL) { \
-			lzfs_pretty_syslog(LOG_ERR, "out of memory"); \
+			safs_pretty_syslog(LOG_ERR, "out of memory"); \
 			exit(1); \
 		} \
 	} \
@@ -148,7 +150,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -156,7 +158,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": hex expected", (fn), (vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -173,7 +175,7 @@
 				} \
 			} \
 			if ((buff)==NULL) { \
-				lzfs_pretty_syslog(LOG_ERR, "out of memory"); \
+				safs_pretty_syslog(LOG_ERR, "out of memory"); \
 				exit(1); \
 			} \
 		} \
@@ -388,24 +390,24 @@ int do_lock_op(const char *filename, uint64_t lv, uint32_t ts, const char *ptr) 
 	GETU32(op, ptr);
 	EAT(ptr,filename,lv,')');
 
-	int status = LIZARDFS_STATUS_OK;
+	int status = SAUNAFS_STATUS_OK;
 
-	switch (static_cast<lzfs_locks::Type>(lock_type)) {
-	case lzfs_locks::Type::kFlock:
+	switch (static_cast<safs_locks::Type>(lock_type)) {
+	case safs_locks::Type::kFlock:
 		status = fs_flock_op(FsContext::getForRestore(ts), inode, owner, sessionid, 0, 0,
 				op, nonblocking, dummy_applied);
 		break;
-	case lzfs_locks::Type::kPosix:
+	case safs_locks::Type::kPosix:
 		status = fs_posixlock_op(FsContext::getForRestore(ts), inode, start, end, owner, sessionid, 0, 0,
 				op, nonblocking, dummy_applied);
 		break;
 	default:
-		lzfs_pretty_syslog(LOG_ERR, "Invalid lock type passed to restore: %u", lock_type);
-		return LIZARDFS_ERROR_EINVAL;
+		safs_pretty_syslog(LOG_ERR, "Invalid lock type passed to restore: %u", lock_type);
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
-	if (status==LIZARDFS_ERROR_WAITING) {
-		return LIZARDFS_STATUS_OK;
+	if (status==SAUNAFS_ERROR_WAITING) {
+		return SAUNAFS_STATUS_OK;
 	}
 	return status;
 }
@@ -625,7 +627,7 @@ int do_deleteacl(const char *filename, uint64_t lv, uint32_t ts, const char *ptr
 	} else if (aclTypeRaw == 'r') {
 		aclType = AclType::kRichACL;
 	} else {
-		lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": corrupted ACL type", filename, lv);
+		safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": corrupted ACL type", filename, lv);
 		return -1;
 	}
 	return fs_deleteacl(FsContext::getForRestore(ts), inode, aclType);
@@ -683,7 +685,7 @@ int do_setquota(const char *filename, uint64_t lv, uint32_t, const char *ptr) {
 }
 
 int do_snapshot(const char* /*filename*/, uint64_t /*lv*/, uint32_t /*ts*/, const char* /*ptr*/) {
-	lzfs_pretty_syslog(LOG_ERR, "Trying to execute deprecated do_snapshot");
+	safs_pretty_syslog(LOG_ERR, "Trying to execute deprecated do_snapshot");
 	return -1;
 }
 
@@ -816,7 +818,7 @@ int restore_line(const char* filename, uint64_t lv, const char* line) {
 	uint32_t ts;
 	int status;
 
-	status = LIZARDFS_ERROR_MAX;
+	status = SAUNAFS_ERROR_MAX;
 	const char* ptr = line;
 
 	EAT(ptr,filename,lv,':');
@@ -955,19 +957,19 @@ int restore_line(const char* filename, uint64_t lv, const char* line) {
 			break;
 	}
 
-	if (status == LIZARDFS_ERROR_MAX) {
+	if (status == SAUNAFS_ERROR_MAX) {
 #ifndef METARESTORE
-		lzfs_silent_syslog(LOG_DEBUG, "master.mismatch File %s, %" PRIu64 ", %s -- unknown entry",
+		safs_silent_syslog(LOG_DEBUG, "master.mismatch File %s, %" PRIu64 ", %s -- unknown entry",
 			   filename, lv, line);
 #endif
-		lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": unknown entry '%s'", filename, lv, ptr);
-	} else if (status != LIZARDFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": unknown entry '%s'", filename, lv, ptr);
+	} else if (status != SAUNAFS_STATUS_OK) {
 #ifndef METARESTORE
-		lzfs_silent_syslog(LOG_DEBUG, "master.mismatch File %s, %" PRIu64 ", %s -- %s",
-			   filename, lv, line, lizardfs_error_string(status));
+		safs_silent_syslog(LOG_DEBUG, "master.mismatch File %s, %" PRIu64 ", %s -- %s",
+			   filename, lv, line, saunafs_error_string(status));
 #endif
-		lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": error: %d (%s)", filename, lv, status,
-			lizardfs_error_string(status));
+		safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ": error: %d (%s)", filename, lv, status,
+			saunafs_error_string(status));
 	}
 	return status;
 }
@@ -1003,35 +1005,35 @@ uint8_t restore(const char* filename, uint64_t newLogVersion, const char *ptr, R
 		lastfn = "(no file)";
 	}
 	if (verbosity > 1) {
-		lzfs_pretty_syslog(LOG_NOTICE, "filename: %s ; current meta version: %" PRIu64 " ; previous changeid: %"
+		safs_pretty_syslog(LOG_NOTICE, "filename: %s ; current meta version: %" PRIu64 " ; previous changeid: %"
 				PRIu64 " ; current changeid: %" PRIu64 " ; change data%s",
 				filename, nextFsVersion, currentFsVersion, newLogVersion, ptr);
 	}
 	if (newLogVersion < currentFsVersion) {
-		lzfs_pretty_syslog(LOG_ERR,
+		safs_pretty_syslog(LOG_ERR,
 				"merge error - possibly corrupted input file - ignore entry"
 				" (filename: %s, versions: %" PRIu64 ", %" PRIu64 ")",
 				filename, newLogVersion, currentFsVersion);
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	} else if (newLogVersion >= nextFsVersion) {
 		if (newLogVersion == currentFsVersion) {
 			if (verbosity > 1) {
-				lzfs_pretty_syslog(LOG_WARNING, "duplicated entry: %" PRIu64 " (previous file: %s, current file: %s)",
+				safs_pretty_syslog(LOG_WARNING, "duplicated entry: %" PRIu64 " (previous file: %s, current file: %s)",
 						newLogVersion, lastfn, filename);
 			}
 		} else if (newLogVersion > currentFsVersion + 1) {
-			lzfs_pretty_syslog(LOG_ERR, "hole in change files (entries from %s:%" PRIu64 " to %s:%" PRIu64
+			safs_pretty_syslog(LOG_ERR, "hole in change files (entries from %s:%" PRIu64 " to %s:%" PRIu64
 					" are missing) - add more files", lastfn, currentFsVersion + 1, filename, newLogVersion - 1);
-			return LIZARDFS_ERROR_CHANGELOGINCONSISTENT;
+			return SAUNAFS_ERROR_CHANGELOGINCONSISTENT;
 		} else {
 			if (verbosity > 0) {
-				lzfs_pretty_syslog(LOG_NOTICE, "%s: change %s", filename, ptr);
+				safs_pretty_syslog(LOG_NOTICE, "%s: change %s", filename, ptr);
 			}
 			int status = restore_line(filename,newLogVersion,ptr);
 			if (status<0) { // parse error - stop processing if requested
-				return (rigor == RestoreRigor::kIgnoreParseErrors ? 0 : LIZARDFS_ERROR_PARSE);
+				return (rigor == RestoreRigor::kIgnoreParseErrors ? 0 : SAUNAFS_ERROR_PARSE);
 			}
-			if (status != LIZARDFS_STATUS_OK) { // other errors - stop processing data
+			if (status != SAUNAFS_STATUS_OK) { // other errors - stop processing data
 				return status;
 			}
 			nextFsVersion = fs_getversion();
@@ -1039,14 +1041,14 @@ uint8_t restore(const char* filename, uint64_t newLogVersion, const char *ptr, R
 				/*
 				 * restore_line() should bump nextFsVersion by exactly 1, but it didn't.
 				 */
-				lzfs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ":%" PRIu64 " version mismatch", filename, newLogVersion, nextFsVersion);
-				return LIZARDFS_ERROR_METADATAVERSIONMISMATCH;
+				safs_pretty_syslog(LOG_ERR, "%s:%" PRIu64 ":%" PRIu64 " version mismatch", filename, newLogVersion, nextFsVersion);
+				return SAUNAFS_ERROR_METADATAVERSIONMISMATCH;
 			}
 		}
 	}
 	currentFsVersion = newLogVersion;
 	lastfn = filename;
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void restore_setverblevel(uint8_t _vlevel) {

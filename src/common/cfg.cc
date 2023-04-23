@@ -1,40 +1,33 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
 #include "common/cfg.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <string>
+#include <map>
+#include <yaml-cpp/yaml.h>
 
 #include "common/massert.h"
-#include "common/slogger.h"
-
-typedef struct paramsstr {
-	char *name;
-	char *value;
-	struct paramsstr *next;
-} paramstr;
 
 static char *cfgfname;
-static paramstr *paramhead=NULL;
+static std::map<std::string, std::string> configParameters;
 static int logundefined=0;
 
 int cfg_reload(void) {
@@ -48,12 +41,10 @@ static int cfg_do_load(void) {
 	constexpr size_t MAX_LINE_LEN = 1000;
 	char linebuff[MAX_LINE_LEN];
 	uint32_t nps, npe, vps, vpe, i;
-	uint8_t found;
-	paramstr *tmp;
 	FILE *fd = fopen(cfgfname, "r");
 
 	if (!fd) {
-		lzfs_silent_syslog(LOG_ERR, "can't load config file: %s", cfgfname);
+		safs_silent_syslog(LOG_ERR, "can't load config file: %s", cfgfname);
 		return 1;
 	}
 
@@ -71,7 +62,7 @@ static int cfg_do_load(void) {
 
 		if (linebuff[i] != '=' || npe <= nps) {
 			if (linebuff[i] > ' ')
-				lzfs_pretty_syslog(LOG_WARNING, "bad "
+				safs_pretty_syslog(LOG_WARNING, "bad "
 						"definition in config file "
 						"'%s': %s", cfgfname, linebuff);
 			continue;
@@ -87,65 +78,30 @@ static int cfg_do_load(void) {
 
 		if ((linebuff[i] != '\0' && linebuff[i] != '\r' &&
 		     linebuff[i] != '\n' && linebuff[i] != '#') || vps == vpe) {
-
-			lzfs_pretty_syslog(LOG_WARNING, "bad definition in "
+			safs_pretty_syslog(LOG_WARNING, "bad definition in "
 					"config file '%s': %s", cfgfname,
 					linebuff);
 			continue;
 		}
-
 		linebuff[npe] = 0;
 		linebuff[vpe] = 0;
-		found = 0;
 
-		for (tmp = paramhead; tmp && !found; tmp = tmp->next) {
-			if (strcmp(tmp->name, linebuff + nps))
-				continue;
-
-			free(tmp->value);
-			tmp->value = (char*)malloc(vpe - vps + 1);
-			if (!tmp->value)
-				goto err_exit;
-			memcpy(tmp->value, linebuff + vps, vpe - vps + 1);
-			found = 1;
+		try {
+			std::string key(linebuff + nps, linebuff + npe);
+			std::string value(linebuff + vps, linebuff + vpe);
+			configParameters[key] = value;
+		} catch (const std::exception& e) {
+			safs_pretty_syslog(LOG_ERR, "could not set config file %s values in key map: %s", cfgfname, e.what());
+			fclose(fd);
+			cfg_term();
+			return -1;
 		}
-
-		if (found)
-			continue;
-
-		if (!(tmp = (paramstr*)malloc(sizeof(paramstr))))
-			goto err_malloc_tmp;
-
-		if (!(tmp->name = (char*)malloc(npe - nps + 1)))
-			goto err_malloc_tmp_name;
-
-		if (!(tmp->value = (char*)malloc(vpe - vps + 1)))
-			goto err_malloc_tmp_value;
-
-		memcpy(tmp->name, linebuff + nps, npe - nps + 1);
-		memcpy(tmp->value, linebuff + vps, vpe - vps + 1);
-		tmp->next = paramhead;
-		paramhead = tmp;
 	}
-
 	fclose(fd);
 	return 0;
-
-err_malloc_tmp_value:
-	free(tmp->name);
-err_malloc_tmp_name:
-	free(tmp);
-err_malloc_tmp:
-	if (found)
-		free(tmp->value);
-err_exit:
-	fclose(fd);
-	cfg_term();
-	return -1;
 }
 
-int cfg_load (const char *configfname,int _lu) {
-	paramhead = NULL;
+int cfg_load(const char *configfname,int _lu) {
 	logundefined = _lu;
 	cfgfname = strdup(configfname);
 
@@ -157,24 +113,71 @@ std::string cfg_filename() {
 }
 
 int cfg_isdefined(const char *name) {
-	paramstr *_cfg_tmp;
-	for (_cfg_tmp = paramhead ; _cfg_tmp ; _cfg_tmp=_cfg_tmp->next) {
-		if (strcmp(name,_cfg_tmp->name)==0) {
-			return 1;
-		}
-	}
-	return 0;
+	return configParameters.count(name);
 }
 
 void cfg_term(void) {
-	paramstr *i, *in;
-	for (i = paramhead; i; i = in) {
-		in = i->next;
-		free(i->value);
-		free(i->name);
-		free(i);
-	}
+	configParameters.clear();
 	free(cfgfname);
+}
+
+// Helper function to setup an initial YAML map of maps for a particular
+// service_name. After calling this function, config should be ended with
+// YAML::EndMap once done before returning it as a string.
+void start_yaml_emitter(std::string &service_name, YAML::Emitter &config) {
+	config << YAML::BeginMap;
+	config << YAML::Key << service_name;
+	config << YAML::Value;
+}
+
+// Helper function to finish up a YAML configuration as a string.
+std::string end_yaml_emitter(YAML::Emitter &config) {
+	config << YAML::EndMap;
+	assert(config.good());
+	return config.c_str();
+}
+
+// Modifies an already existing YAML::Emitter to include the raw configuration
+// values. You might want to setup some extra data, for example the service name
+// of the configuration before calling this. The parameters are by default the
+// configParameters, but you may provide your own map to use.
+// You should set the loadValues to true if the values of the map are YAML
+// key-value strings already.
+// N.B! Configuration should be initialized before calling this function if you
+// don't provide your own map.
+void cfg_emitter_add_parameters(
+    YAML::Emitter &config,
+    const std::map<std::string, std::string> &parameters = configParameters,
+    bool yamlValues = false) {
+	config << YAML::BeginMap;
+	for (const auto &[key, val] : parameters) {
+		config << YAML::Key << key;
+		yamlValues ? (config << YAML::Value << YAML::Load(val))
+		           : (config << YAML::Value << val);
+	}
+	config << YAML::EndMap;
+}
+
+std::string cfg_yaml_string(std::string service_name) {
+	YAML::Emitter config;
+	start_yaml_emitter(service_name, config);
+	cfg_emitter_add_parameters(config);
+	return end_yaml_emitter(config);
+}
+
+std::string cfg_yaml_string() {
+	YAML::Emitter config;
+	cfg_emitter_add_parameters(config);
+	assert(config.good());
+	return config.c_str();
+}
+
+std::string cfg_yaml_list(std::string service_name,
+                          std::map<std::string, std::string> &services) {
+	YAML::Emitter config;
+	start_yaml_emitter(service_name, config);
+	cfg_emitter_add_parameters(config, services, true);
+	return end_yaml_emitter(config);
 }
 
 #define STR_TO_int(x) return strtol(x,NULL,0)
@@ -214,14 +217,11 @@ void cfg_term(void) {
 
 #define _CONFIG_GEN_FUNCTION(fname,type,convname,format) \
 type cfg_get##fname(const char *name, const type def) { \
-	paramstr *_cfg_tmp; \
-	for (_cfg_tmp = paramhead ; _cfg_tmp ; _cfg_tmp=_cfg_tmp->next) { \
-		if (strcmp(name,_cfg_tmp->name)==0) { \
-			STR_TO_##convname(_cfg_tmp->value); \
-		} \
+	if (configParameters.count(name) > 0) { \
+		STR_TO_##convname(configParameters[name].c_str()); \
 	} \
 	if (logundefined) { \
-		lzfs_pretty_syslog(LOG_NOTICE,"config: using default value for option '%s' - '" format "'", \
+		safs_pretty_syslog(LOG_NOTICE,"config: using default value for option '%s' - '" format "'", \
 				name,TOPRINTF_##convname(def)); \
 	} \
 	COPY_##convname(def) \

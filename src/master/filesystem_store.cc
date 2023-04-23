@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -27,7 +28,7 @@
 #include "common/cwrap.h"
 #include "common/event_loop.h"
 #include "common/setup.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
 #include "common/setup.h"
@@ -48,8 +49,8 @@
 #include "master/metadata_dumper.h"
 #include "master/restore.h"
 
-constexpr uint8_t kMetadataVersionMooseFS = 0x15;
-constexpr uint8_t kMetadataVersionLizardFS = 0x16;
+constexpr uint8_t kMetadataVersionXaunaFS = 0x15;
+constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
 constexpr uint8_t kMetadataVersionWithSections = 0x20;
 constexpr uint8_t kMetadataVersionWithLockIds = 0x29;
 
@@ -68,17 +69,17 @@ void xattr_store(FILE *fd) {
 			put8bit(&ptr, xa->anleng);
 			put32bit(&ptr, xa->avleng);
 			if (fwrite(hdrbuff, 1, 4 + 1 + 4, fd) != (size_t)(4 + 1 + 4)) {
-				lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
 			if (fwrite(xa->attrname, 1, xa->anleng, fd) != (size_t)(xa->anleng)) {
-				lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
 			if (xa->avleng > 0) {
 				if (fwrite(xa->attrvalue, 1, xa->avleng, fd) !=
 				    (size_t)(xa->avleng)) {
-					lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+					safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 					return;
 				}
 			}
@@ -86,7 +87,7 @@ void xattr_store(FILE *fd) {
 	}
 	memset(hdrbuff, 0, 4 + 1 + 4);
 	if (fwrite(hdrbuff, 1, 4 + 1 + 4, fd) != (size_t)(4 + 1 + 4)) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 }
@@ -103,7 +104,7 @@ int xattr_load(FILE *fd, int ignoreflag) {
 
 	while (1) {
 		if (fread(hdrbuff, 1, 4 + 1 + 4, fd) != 4 + 1 + 4) {
-			lzfs_pretty_errlog(LOG_ERR, "loading xattr: read error");
+			safs_pretty_errlog(LOG_ERR, "loading xattr: read error");
 			return -1;
 		}
 		ptr = hdrbuff;
@@ -114,7 +115,7 @@ int xattr_load(FILE *fd, int ignoreflag) {
 			return 1;
 		}
 		if (anleng == 0) {
-			lzfs_pretty_syslog(LOG_ERR, "loading xattr: empty name");
+			safs_pretty_syslog(LOG_ERR, "loading xattr: empty name");
 			if (ignoreflag) {
 				fseek(fd, anleng + avleng, SEEK_CUR);
 				continue;
@@ -122,8 +123,8 @@ int xattr_load(FILE *fd, int ignoreflag) {
 				return -1;
 			}
 		}
-		if (avleng > MFS_XATTR_SIZE_MAX) {
-			lzfs_pretty_syslog(LOG_ERR, "loading xattr: value oversized");
+		if (avleng > SFS_XATTR_SIZE_MAX) {
+			safs_pretty_syslog(LOG_ERR, "loading xattr: value oversized");
 			if (ignoreflag) {
 				fseek(fd, anleng + avleng, SEEK_CUR);
 				continue;
@@ -137,8 +138,8 @@ int xattr_load(FILE *fd, int ignoreflag) {
 			ih = ih->next) {
 		}
 
-		if (ih && ih->anleng + anleng + 1 > MFS_XATTR_LIST_MAX) {
-			lzfs_pretty_syslog(LOG_ERR, "loading xattr: name list too long");
+		if (ih && ih->anleng + anleng + 1 > SFS_XATTR_LIST_MAX) {
+			safs_pretty_syslog(LOG_ERR, "loading xattr: name list too long");
 			if (ignoreflag) {
 				fseek(fd, anleng + avleng, SEEK_CUR);
 				continue;
@@ -155,7 +156,7 @@ int xattr_load(FILE *fd, int ignoreflag) {
 			int err = errno;
 			delete xa;
 			errno = err;
-			lzfs_pretty_errlog(LOG_ERR, "loading xattr: read error");
+			safs_pretty_errlog(LOG_ERR, "loading xattr: read error");
 			return -1;
 		}
 		xa->anleng = anleng;
@@ -166,7 +167,7 @@ int xattr_load(FILE *fd, int ignoreflag) {
 				int err = errno;
 				delete xa;
 				errno = err;
-				lzfs_pretty_errlog(LOG_ERR, "loading xattr: read error");
+				safs_pretty_errlog(LOG_ERR, "loading xattr: read error");
 				return -1;
 			}
 		} else {
@@ -212,7 +213,7 @@ static void fs_store_generic(FILE *fd, Args &&... args) {
 	const uint32_t size = serializedSize(std::forward<Args>(args)...);
 	serialize(buffer, size, std::forward<Args>(args)...);
 	if (fwrite(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 }
@@ -244,7 +245,7 @@ void fs_storeedge(FSNodeDirectory* parent, FSNode* child, const std::string &nam
 	if (child == nullptr) {  // last edge
 		memset(uedgebuff, 0, 4 + 4 + 2);
 		if (fwrite(uedgebuff, 1, 4 + 4 + 2, fd) != (size_t)(4 + 4 + 2)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		return;
@@ -259,7 +260,7 @@ void fs_storeedge(FSNodeDirectory* parent, FSNode* child, const std::string &nam
 	put16bit(&ptr, name.length());
 	memcpy(ptr, name.c_str(), name.length());
 	if (fwrite(uedgebuff, 1, 4 + 4 + 2 + name.length(), fd) != (size_t)(4 + 4 + 2 + name.length())) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 }
@@ -278,7 +279,7 @@ int fs_loadedge(FILE *fd, int ignoreflag) {
 	}
 
 	if (fread(uedgebuff, 1, 4 + 4 + 2, fd) != 4 + 4 + 2) {
-		lzfs_pretty_errlog(LOG_ERR, "loading edge: read error");
+		safs_pretty_errlog(LOG_ERR, "loading edge: read error");
 		return -1;
 	}
 	ptr = uedgebuff;
@@ -289,14 +290,14 @@ int fs_loadedge(FILE *fd, int ignoreflag) {
 	}
 	auto nleng = get16bit(&ptr);
 	if (nleng == 0) {
-		lzfs_pretty_syslog(LOG_ERR,
+		safs_pretty_syslog(LOG_ERR,
 		                   "loading edge: %" PRIu32 "->%" PRIu32 " error: empty name",
 		                   parent_id, child_id);
 		return -1;
 	}
 	std::vector<char> name_buffer(nleng);
 	if (fread(name_buffer.data(), 1, nleng, fd) != nleng) {
-		lzfs_pretty_errlog(LOG_ERR, "loading edge: read error");
+		safs_pretty_errlog(LOG_ERR, "loading edge: read error");
 		return -1;
 	}
 
@@ -305,7 +306,7 @@ int fs_loadedge(FILE *fd, int ignoreflag) {
 	FSNode* child = fsnodes_id_to_node(child_id);
 
 	if (child == nullptr) {
-		lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+		safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 		                            " error: child not found",
 		                   parent_id, fsnodes_escape_name(name).c_str(), child_id);
 		if (ignoreflag) {
@@ -326,7 +327,7 @@ int fs_loadedge(FILE *fd, int ignoreflag) {
 			gMetadata->reservedspace += static_cast<FSNodeFile*>(child)->length;
 			gMetadata->reservednodes++;
 		} else {
-			lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+			safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 			                            " error: bad child type (%c)\n",
 			                   parent_id, fsnodes_escape_name(name).c_str(),
 			                   child_id, child->type);
@@ -336,64 +337,64 @@ int fs_loadedge(FILE *fd, int ignoreflag) {
 		FSNodeDirectory *parent = fsnodes_id_to_node<FSNodeDirectory>(parent_id);
 
 		if (parent == NULL) {
-			lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+			safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 			                            " error: parent not found",
 			                   parent_id, fsnodes_escape_name(name).c_str(),
 			                   child_id);
 			if (ignoreflag) {
 				parent = fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
 				if (parent == NULL || parent->type != FSNode::kDirectory) {
-					lzfs_pretty_syslog(
+					safs_pretty_syslog(
 					        LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 					                 " root dir not found !!!",
 					        parent_id, fsnodes_escape_name(name).c_str(),
 					        child_id);
 					return -1;
 				}
-				lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+				safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 				                            " attaching node to root dir",
 				                   parent_id,
 				                   fsnodes_escape_name(name).c_str(),
 				                   child_id);
 				parent_id = SPECIAL_INODE_ROOT;
 			} else {
-				lzfs_pretty_syslog(LOG_ERR,
-				                   "use mfsmetarestore (option -i) to attach this "
+				safs_pretty_syslog(LOG_ERR,
+				                   "use sfsmetarestore (option -i) to attach this "
 				                   "node to root dir\n");
 				return -1;
 			}
 		}
 		if (parent->type != FSNode::kDirectory) {
-			lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+			safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 			                            " error: bad parent type (%c)",
 			                   parent_id, fsnodes_escape_name(name).c_str(),
 			                   child_id, parent->type);
 			if (ignoreflag) {
 				parent = fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
 				if (parent == NULL || parent->type != FSNode::kDirectory) {
-					lzfs_pretty_syslog(
+					safs_pretty_syslog(
 					        LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 					                 " root dir not found !!!",
 					        parent_id, fsnodes_escape_name(name).c_str(),
 					        child_id);
 					return -1;
 				}
-				lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+				safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 				                            " attaching node to root dir",
 				                   parent_id,
 				                   fsnodes_escape_name(name).c_str(),
 				                   child_id);
 				parent_id = SPECIAL_INODE_ROOT;
 			} else {
-				lzfs_pretty_syslog(LOG_ERR,
-				                   "use mfsmetarestore (option -i) to attach this "
+				safs_pretty_syslog(LOG_ERR,
+				                   "use sfsmetarestore (option -i) to attach this "
 				                   "node to root dir\n");
 				return -1;
 			}
 		}
 		if (current_parent_id != parent_id) {
 			if (parent->entries.size() > 0) {
-				lzfs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
+				safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
 				                " error: parent node sequence error",
 				       parent_id, fsnodes_escape_name(name).c_str(), child_id);
 				return -1;
@@ -448,7 +449,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	case FSNode::kFifo:
 		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
 		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		break;
@@ -457,7 +458,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		put32bit(&ptr, static_cast<FSNodeDevice*>(f)->rdev);
 		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
 		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		break;
@@ -466,12 +467,12 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		put32bit(&ptr, name.length());
 		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
 		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		if (fwrite(name.c_str(), 1, name.length(), fd) !=
 		    (size_t)(static_cast<FSNodeSymlink*>(f)->path_length)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		break;
@@ -486,7 +487,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 
 		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
 		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 
@@ -498,7 +499,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 				indx++;
 			}
 			if (fwrite(ptr, 1, 8 * 65536, fd) != (size_t)(8 * 65536)) {
-				lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
 			ch -= 65536;
@@ -521,7 +522,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 
 		if (fwrite(ptr, 1, 8 * ch + 4 * sessionids, fd) !=
 		    (size_t)(8 * ch + 4 * sessionids)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 	}
@@ -551,7 +552,7 @@ int fs_loadnode(FILE *fd) {
 	case FSNode::kSocket:
 		if (fread(unodebuff, 1, 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
 		    4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4) {
-			lzfs_pretty_errlog(LOG_ERR, "loading node: read error");
+			safs_pretty_errlog(LOG_ERR, "loading node: read error");
 			return -1;
 		}
 		break;
@@ -560,7 +561,7 @@ int fs_loadnode(FILE *fd) {
 	case FSNode::kSymlink:
 		if (fread(unodebuff, 1, 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
 		    4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4) {
-			lzfs_pretty_errlog(LOG_ERR, "loading node: read error");
+			safs_pretty_errlog(LOG_ERR, "loading node: read error");
 			return -1;
 		}
 		break;
@@ -569,12 +570,12 @@ int fs_loadnode(FILE *fd) {
 	case FSNode::kReserved:
 		if (fread(unodebuff, 1, 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
 		    4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2) {
-			lzfs_pretty_errlog(LOG_ERR, "loading node: read error");
+			safs_pretty_errlog(LOG_ERR, "loading node: read error");
 			return -1;
 		}
 		break;
 	default:
-		lzfs_pretty_syslog(LOG_ERR, "loading node: unrecognized node type: %c", type);
+		safs_pretty_syslog(LOG_ERR, "loading node: unrecognized node type: %c", type);
 		return -1;
 	}
 	p = FSNode::create(type);
@@ -606,7 +607,7 @@ int fs_loadnode(FILE *fd) {
 		if (pleng > 0) {
 			name_buffer.resize(pleng);
 			if (fread(name_buffer.data(), 1, pleng, fd) != pleng) {
-				lzfs_pretty_errlog(LOG_ERR, "loading node: read error");
+				safs_pretty_errlog(LOG_ERR, "loading node: read error");
 				FSNode::destroy(p);
 				return -1;
 			}
@@ -625,7 +626,7 @@ int fs_loadnode(FILE *fd) {
 		while (ch > 65536) {
 			chptr = ptr;
 			if (fread((uint8_t *)ptr, 1, 8 * 65536, fd) != 8 * 65536) {
-				lzfs_pretty_errlog(LOG_ERR, "loading node: read error");
+				safs_pretty_errlog(LOG_ERR, "loading node: read error");
 				FSNode::destroy(p);
 				return -1;
 			}
@@ -637,7 +638,7 @@ int fs_loadnode(FILE *fd) {
 		}
 		if (fread((uint8_t *)ptr, 1, 8 * ch + 4 * sessionids, fd) !=
 		    8 * ch + 4 * sessionids) {
-			lzfs_pretty_errlog(LOG_ERR, "loading node: read error");
+			safs_pretty_errlog(LOG_ERR, "loading node: read error");
 			FSNode::destroy(p);
 			return -1;
 		}
@@ -754,15 +755,15 @@ int fs_checknodes(int ignoreflag) {
 	for (i = 0; i < NODEHASHSIZE; i++) {
 		for (p = gMetadata->nodehash[i]; p; p = p->next) {
 			if (p->parent.empty() && p != gMetadata->root && (p->type != FSNode::kTrash) && (p->type != FSNode::kReserved)) {
-				lzfs_pretty_syslog(LOG_ERR, "found orphaned inode: %" PRIu32,
+				safs_pretty_syslog(LOG_ERR, "found orphaned inode: %" PRIu32,
 				                   p->id);
 				if (ignoreflag) {
 					if (fs_lostnode(p) < 0) {
 						return -1;
 					}
 				} else {
-					lzfs_pretty_syslog(LOG_ERR,
-					                   "use mfsmetarestore (option -i) to "
+					safs_pretty_syslog(LOG_ERR,
+					                   "use sfsmetarestore (option -i) to "
 					                   "attach this node to root dir\n");
 					return -1;
 				}
@@ -807,8 +808,8 @@ static int fs_loadquotas(FILE *fd, int ignoreflag) {
 		}
 		gMetadata->quota_checksum = gMetadata->quota_database.checksum();
 	} catch (Exception &ex) {
-		lzfs_pretty_syslog(LOG_ERR, "loading quotas: %s", ex.what());
-		if (!ignoreflag || ex.status() != LIZARDFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_ERR, "loading quotas: %s", ex.what());
+		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		}
 	}
@@ -820,8 +821,8 @@ static int fs_loadlocks(FILE *fd, int ignoreflag) {
 		gMetadata->flock_locks.load(fd);
 		gMetadata->posix_locks.load(fd);
 	} catch (Exception &ex) {
-		lzfs_pretty_syslog(LOG_ERR, "loading locks: %s", ex.what());
-		if (!ignoreflag || ex.status() != LIZARDFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_ERR, "loading locks: %s", ex.what());
+		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		}
 	}
@@ -836,7 +837,7 @@ void fs_storefree(FILE *fd) {
 	ptr = wbuff;
 	put32bit(&ptr, l);
 	if (fwrite(wbuff, 1, 4, fd) != (size_t)4) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 	l = 0;
@@ -845,7 +846,7 @@ void fs_storefree(FILE *fd) {
 	for (const auto &n : gMetadata->inode_pool) {
 		if (l == 1024) {
 			if (fwrite(wbuff, 1, 8 * 1024, fd) != (size_t)(8 * 1024)) {
-				lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
 			l = 0;
@@ -857,7 +858,7 @@ void fs_storefree(FILE *fd) {
 	}
 	if (l > 0) {
 		if (fwrite(wbuff, 1, 8 * l, fd) != (size_t)(8 * l)) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 	}
@@ -869,14 +870,14 @@ int fs_loadfree(FILE *fd, uint64_t section_size = 0) {
 	uint32_t l, t;
 
 	if (fread(rbuff, 1, 4, fd) != 4) {
-		lzfs_pretty_errlog(LOG_ERR, "loading free nodes: read error");
+		safs_pretty_errlog(LOG_ERR, "loading free nodes: read error");
 		return -1;
 	}
 	ptr = rbuff;
 	t = get32bit(&ptr);
 
 	if (section_size && t != (section_size - 4) / 8) {
-		lzfs_pretty_errlog(LOG_INFO, "loading free nodes: section size doesn't match number of free nodes");
+		safs_pretty_errlog(LOG_INFO, "loading free nodes: section size doesn't match number of free nodes");
 		t = (section_size - 4) / 8;
 	}
 
@@ -885,14 +886,14 @@ int fs_loadfree(FILE *fd, uint64_t section_size = 0) {
 		if (l == 0) {
 			if (t > 1024) {
 				if (fread(rbuff, 1, 8 * 1024, fd) != 8 * 1024) {
-					lzfs_pretty_errlog(LOG_ERR,
+					safs_pretty_errlog(LOG_ERR,
 					                   "loading free nodes: read error");
 					return -1;
 				}
 				l = 1024;
 			} else {
 				if (fread(rbuff, 1, 8 * t, fd) != 8 * t) {
-					lzfs_pretty_errlog(LOG_ERR,
+					safs_pretty_errlog(LOG_ERR,
 					                   "loading free nodes: read error");
 					return -1;
 				}
@@ -920,12 +921,12 @@ static int process_section(const char *label, uint8_t (&hdr)[16], uint8_t *&ptr,
 	put64bit(&ptr, offend - offbegin - 16);
 	fseeko(fd, offbegin, SEEK_SET);
 	if (fwrite(hdr, 1, 16, fd) != (size_t)16) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
-		return LIZARDFS_ERROR_IO;
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		return SAUNAFS_ERROR_IO;
 	}
 	offbegin = offend;
 	fseeko(fd, offbegin + 16, SEEK_SET);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void fs_store(FILE *fd, uint8_t fver) {
@@ -938,7 +939,7 @@ void fs_store(FILE *fd, uint8_t fver) {
 	put64bit(&ptr, gMetadata->metaversion);
 	put32bit(&ptr, gMetadata->nextsessionid);
 	if (fwrite(hdr, 1, 16, fd) != (size_t)16) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 	if (fver >= kMetadataVersionWithSections) {
@@ -949,68 +950,68 @@ void fs_store(FILE *fd, uint8_t fver) {
 	}
 	fs_storenodes(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("NODE 1.0", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("NODE 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	fs_storeedges(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("EDGE 1.0", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("EDGE 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	fs_storefree(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("FREE 1.0", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("FREE 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 		xattr_store(fd);
-		if (process_section("XATR 1.0", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("XATR 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_store_acls(fd);
-		if (process_section("ACLS 1.2", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("ACLS 1.2", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_storequotas(fd);
-		if (process_section("QUOT 1.1", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("QUOT 1.1", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_storelocks(fd);
-		if (process_section("FLCK 1.0", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("FLCK 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	chunk_store(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("CHNK 1.0", hdr, ptr, offbegin, offend, fd) != LIZARDFS_STATUS_OK) {
+		if (process_section("CHNK 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
 			return;
 		}
 
 		fseeko(fd, offend, SEEK_SET);
-		memcpy(hdr, "[MFS EOF MARKER]", 16);
+		memcpy(hdr, "[SFS EOF MARKER]", 16);
 		if (fwrite(hdr, 1, 16, fd) != (size_t)16) {
-			lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 	}
 }
 
 void fs_store_fd(FILE *fd) {
-#if LIZARDFS_VERSHEX >= LIZARDFS_VERSION(2, 9, 0)
-	/* Note LIZARDFSSIGNATURE instead of MFSSIGNATURE! */
-	const char hdr[] = LIZARDFSSIGNATURE "M 2.9";
+#if SAUNAFS_VERSHEX >= SAUNAFS_VERSION(2, 9, 0)
+	/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
+	const char hdr[] = SAUNAFSSIGNATURE "M 2.9";
 	const uint8_t metadataVersion = kMetadataVersionWithLockIds;
-#elif LIZARDFS_VERSHEX >= LIZARDFS_VERSION(1, 6, 29)
-	const char hdr[] = MFSSIGNATURE "M 2.0";
+#elif SAUNAFS_VERSHEX >= SAUNAFS_VERSION(1, 6, 29)
+	const char hdr[] = SFSSIGNATURE "M 2.0";
 	const uint8_t metadataVersion = kMetadataVersionWithSections;
 #else
-	const char hdr[] = MFSSIGNATURE "M 1.6";
-	const uint8_t metadataVersion = kMetadataVersionLizardFS;
+	const char hdr[] = SFSSIGNATURE "M 1.6";
+	const uint8_t metadataVersion = kMetadataVersionSaunaFS;
 #endif
 
 	if (fwrite(&hdr, 1, sizeof(hdr) - 1, fd) != sizeof(hdr) - 1) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 	} else {
 		fs_store(fd, metadataVersion);
 	}
@@ -1036,7 +1037,7 @@ int fs_load(FILE *fd, int ignoreflag, uint8_t fver) {
 	uint64_t sleng;
 
 	if (fread(hdr, 1, 16, fd) != 16) {
-		lzfs_pretty_syslog(LOG_ERR, "error loading header");
+		safs_pretty_syslog(LOG_ERR, "error loading header");
 		return -1;
 	}
 	ptr = hdr;
@@ -1045,175 +1046,175 @@ int fs_load(FILE *fd, int ignoreflag, uint8_t fver) {
 	gMetadata->nextsessionid = get32bit(&ptr);
 
 	if (fver < kMetadataVersionWithSections) {
-		lzfs_pretty_syslog_attempt(
+		safs_pretty_syslog_attempt(
 		    LOG_INFO, "loading objects (files,directories,etc.) from the metadata file");
 		fflush(stderr);
 		if (fs_loadnodes(fd) < 0) {
 #ifndef METARESTORE
-			lzfs_pretty_syslog(LOG_ERR, "error reading metadata (node)");
+			safs_pretty_syslog(LOG_ERR, "error reading metadata (node)");
 #endif
 			return -1;
 		}
-		lzfs_pretty_syslog_attempt(LOG_INFO, "loading names");
+		safs_pretty_syslog_attempt(LOG_INFO, "loading names");
 		fflush(stderr);
 		if (fs_loadedges(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-			lzfs_pretty_syslog(LOG_ERR, "error reading metadata (edge)");
+			safs_pretty_syslog(LOG_ERR, "error reading metadata (edge)");
 #endif
 			return -1;
 		}
-		lzfs_pretty_syslog_attempt(LOG_INFO, "loading deletion timestamps from the metadata file");
+		safs_pretty_syslog_attempt(LOG_INFO, "loading deletion timestamps from the metadata file");
 		fflush(stderr);
 		if (fs_loadfree(fd) < 0) {
 #ifndef METARESTORE
-			lzfs_pretty_syslog(LOG_ERR, "error reading metadata (free)");
+			safs_pretty_syslog(LOG_ERR, "error reading metadata (free)");
 #endif
 			return -1;
 		}
-		lzfs_pretty_syslog_attempt(LOG_INFO, "loading chunks data from the metadata file");
+		safs_pretty_syslog_attempt(LOG_INFO, "loading chunks data from the metadata file");
 		fflush(stderr);
 		if (chunk_load(fd, false) < 0) {
 #ifndef METARESTORE
-			lzfs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
+			safs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
 #endif
 			return -1;
 		}
 	} else { // metadata with sections
 		while (1) {
 			if (fread(hdr, 1, 16, fd) != 16) {
-				lzfs_pretty_syslog(LOG_ERR, "error reading section header from the metadata file");
+				safs_pretty_syslog(LOG_ERR, "error reading section header from the metadata file");
 				return -1;
 			}
-			if (memcmp(hdr, "[MFS EOF MARKER]", 16) == 0) {
+			if (memcmp(hdr, "[SFS EOF MARKER]", 16) == 0) {
 				break;
 			}
 			ptr = hdr + 8;
 			sleng = get64bit(&ptr);
 			offbegin = ftello(fd);
 			if (memcmp(hdr, "NODE 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_INFO,
+				safs_pretty_syslog_attempt(LOG_INFO,
 				                           "loading objects "
 				                           "(files,directories,etc.) from the "
 				                           "metadata file");
 				fflush(stderr);
 				if (fs_loadnodes(fd) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading metadata (node)");
+					safs_pretty_syslog(LOG_ERR, "error reading metadata (node)");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "EDGE 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_INFO, "loading names from the metadata file");
+				safs_pretty_syslog_attempt(LOG_INFO, "loading names from the metadata file");
 				fflush(stderr);
 				if (fs_loadedges(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading metadata (edge)");
+					safs_pretty_syslog(LOG_ERR, "error reading metadata (edge)");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "FREE 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_INFO,
+				safs_pretty_syslog_attempt(LOG_INFO,
 				                           "loading deletion timestamps from the metadata file");
 				fflush(stderr);
 				if (fs_loadfree(fd, sleng) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading metadata (free)");
+					safs_pretty_syslog(LOG_ERR, "error reading metadata (free)");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "XATR 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(
+				safs_pretty_syslog_attempt(
 				    LOG_INFO, "loading extra attributes (xattr) from the metadata file");
 				fflush(stderr);
 				if (xattr_load(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading metadata (xattr)");
+					safs_pretty_syslog(LOG_ERR, "error reading metadata (xattr)");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "ACLS 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_INFO,
+				safs_pretty_syslog_attempt(LOG_INFO,
 				                           "loading access control lists from the metadata file");
 				fflush(stderr);
 				if (fs_load_legacy_acls(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR,
+					safs_pretty_syslog(LOG_ERR,
 					                   "error reading access control lists");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "ACLS 1.1", 8) == 0) {
-				lzfs_pretty_syslog_attempt(
+				safs_pretty_syslog_attempt(
 				        LOG_INFO,
 				        "loading access control lists from the metadata file");
 				fflush(stderr);
 				if (fs_load_posix_acls(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading access control lists");
+					safs_pretty_syslog(LOG_ERR, "error reading access control lists");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "ACLS 1.2", 8) == 0) {
-				lzfs_pretty_syslog_attempt(
+				safs_pretty_syslog_attempt(
 				        LOG_INFO,
 				        "loading access control lists from the metadata file");
 				fflush(stderr);
 				if (fs_load_acls(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading access control lists");
+					safs_pretty_syslog(LOG_ERR, "error reading access control lists");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "QUOT 1.0", 8) == 0) {
-				lzfs_pretty_syslog(LOG_WARNING, "old quota entries found, ignoring");
+				safs_pretty_syslog(LOG_WARNING, "old quota entries found, ignoring");
 				fseeko(fd, sleng, SEEK_CUR);
 			} else if (memcmp(hdr, "QUOT 1.1", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_INFO,
+				safs_pretty_syslog_attempt(LOG_INFO,
 				                           "loading quota entries from the metadata file");
 				fflush(stderr);
 				if (fs_loadquotas(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading quota entries");
+					safs_pretty_syslog(LOG_ERR, "error reading quota entries");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "LOCK 1.0", 8) == 0) {
 				fseeko(fd, sleng, SEEK_CUR);
 			} else if (memcmp(hdr, "FLCK 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_ERR, "loading file locks from the metadata file");
+				safs_pretty_syslog_attempt(LOG_ERR, "loading file locks from the metadata file");
 				if (fs_loadlocks(fd, ignoreflag) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
+					safs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
 #endif
 					return -1;
 				}
 			} else if (memcmp(hdr, "CHNK 1.0", 8) == 0) {
-				lzfs_pretty_syslog_attempt(LOG_INFO, "loading chunks data from the metadata file");
+				safs_pretty_syslog_attempt(LOG_INFO, "loading chunks data from the metadata file");
 				fflush(stderr);
 				bool loadLockIds = (fver == kMetadataVersionWithLockIds);
 				if (chunk_load(fd, loadLockIds) < 0) {
 #ifndef METARESTORE
-					lzfs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
+					safs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
 #endif
 					return -1;
 				}
 			} else {
 				hdr[8] = 0;
 				if (ignoreflag) {
-					lzfs_pretty_syslog(LOG_WARNING, "unknown section found (leng:%" PRIu64
+					safs_pretty_syslog(LOG_WARNING, "unknown section found (leng:%" PRIu64
 					                                ",name:%s) - all data from this section "
 					                                "will be lost",
 					                   sleng, hdr);
 					fseeko(fd, sleng, SEEK_CUR);
 				} else {
-					lzfs_pretty_syslog(LOG_ERR,
+					safs_pretty_syslog(LOG_ERR,
 					                   "error: unknown section found (leng:%" PRIu64 ",name:%s)",
 					                   sleng, hdr);
 					return -1;
 				}
 			}
 			if ((off_t)(offbegin + sleng) != ftello(fd)) {
-				lzfs_pretty_syslog(LOG_WARNING, "not all section has been read - file corrupted");
+				safs_pretty_syslog(LOG_WARNING, "not all section has been read - file corrupted");
 				if (ignoreflag == 0) {
 					return -1;
 				}
@@ -1221,16 +1222,16 @@ int fs_load(FILE *fd, int ignoreflag, uint8_t fver) {
 		}
 	}
 
-	lzfs_pretty_syslog_attempt(LOG_INFO,
+	safs_pretty_syslog_attempt(LOG_INFO,
 	                           "checking filesystem consistency of the metadata file");
 	fflush(stderr);
 	gMetadata->root = fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
 	if (gMetadata->root == NULL) {
-		lzfs_pretty_syslog(LOG_ERR, "error reading metadata (root node not found)");
+		safs_pretty_syslog(LOG_ERR, "error reading metadata (root node not found)");
 		return -1;
 	}
 	if (gMetadata->root->type != FSNode::kDirectory) {
-		lzfs_pretty_syslog(LOG_ERR, "error reading metadata (root node not a directory)");
+		safs_pretty_syslog(LOG_ERR, "error reading metadata (root node not a directory)");
 		return -1;
 	}
 	if (fs_checknodes(ignoreflag) < 0) {
@@ -1277,7 +1278,7 @@ int fs_emergency_storeall(const std::string &fname) {
 	if (ferror(fd.get()) != 0) {
 		return -1;
 	}
-	lzfs_pretty_syslog(LOG_WARNING,
+	safs_pretty_syslog(LOG_WARNING,
 	                   "metadata were stored to emergency file: %s - please copy this file to "
 	                   "your default location as '%s'",
 	                   fname.c_str(), kMetadataFilename);
@@ -1285,13 +1286,13 @@ int fs_emergency_storeall(const std::string &fname) {
 }
 
 int fs_emergency_saves() {
-#if defined(LIZARDFS_HAVE_PWD_H) && defined(LIZARDFS_HAVE_GETPWUID)
+#if defined(SAUNAFS_HAVE_PWD_H) && defined(SAUNAFS_HAVE_GETPWUID)
 	struct passwd *p;
 #endif
 	if (fs_emergency_storeall(kMetadataEmergencyFilename) == 0) {
 		return 0;
 	}
-#if defined(LIZARDFS_HAVE_PWD_H) && defined(LIZARDFS_HAVE_GETPWUID)
+#if defined(SAUNAFS_HAVE_PWD_H) && defined(SAUNAFS_HAVE_GETPWUID)
 	p = getpwuid(getuid());
 	if (p) {
 		std::string fname = p->pw_dir;
@@ -1341,14 +1342,14 @@ void fs_load_changelogs() {
 	 * We need to load 3 changelog files in extreme case.
 	 * If we are being run as Shadow we need to download two
 	 * changelog files:
-	 * 1 - current changelog => "changelog.mfs.1"
+	 * 1 - current changelog => "changelog.sfs.1"
 	 * 2 - previous changelog in case Shadow connects during metadata dump,
-	 *     that is "changelog.mfs.2"
+	 *     that is "changelog.sfs.2"
 	 * Beside this we received changelog lines that we stored in
-	 * yet another changelog file => "changelog.mfs"
+	 * yet another changelog file => "changelog.sfs"
 	 *
 	 * If we are master we only really care for:
-	 * "changelog.mfs.1" and "changelog.mfs" files.
+	 * "changelog.sfs.1" and "changelog.sfs" files.
 	 */
 	static const std::string changelogs[]{std::string(kChangelogFilename) + ".2",
 	                                      std::string(kChangelogFilename) + ".1",
@@ -1371,14 +1372,14 @@ void fs_load_changelogs() {
 					throw InitializeException(
 					        "changelog " + fullFileName +
 					        " inconsistent, "
-					        "use mfsmetarestore to recover the filesystem; "
+					        "use sfsmetarestore to recover the filesystem; "
 					        "current fs version: " +
 					        std::to_string(fs_getversion()) +
 					        ", first change in the file: " +
 					        std::to_string(first));
 				}
 			} else if (oldExists && s != kChangelogFilename) {
-				lzfs_pretty_syslog(LOG_WARNING, "changelog `%s' missing",
+				safs_pretty_syslog(LOG_WARNING, "changelog `%s' missing",
 				                   fullFileName.c_str());
 			}
 		}
@@ -1414,21 +1415,21 @@ void fs_load_changelog(const std::string &path) {
 		++appliedEntries;
 		uint8_t status = restore(path.c_str(), id, line.c_str() + end,
 		                         RestoreRigor::kIgnoreParseErrors);
-		if (status != LIZARDFS_STATUS_OK) {
+		if (status != SAUNAFS_STATUS_OK) {
 			throw MetadataConsistencyException("can't apply changelog " + fullFileName,
 			                                   status);
 		}
 	}
 	if (appliedEntries > 0) {
-		lzfs_pretty_syslog_attempt(LOG_NOTICE, "%s: %" PRIu64 " changes applied (%" PRIu64
+		safs_pretty_syslog_attempt(LOG_NOTICE, "%s: %" PRIu64 " changes applied (%" PRIu64
 		                                       " to %" PRIu64 "), %" PRIu64 " skipped",
 		                           fullFileName.c_str(), appliedEntries, first, id,
 		                           skippedEntries);
 	} else if (skippedEntries > 0) {
-		lzfs_pretty_syslog_attempt(LOG_NOTICE, "%s: skipped all %" PRIu64 " entries",
+		safs_pretty_syslog_attempt(LOG_NOTICE, "%s: skipped all %" PRIu64 " entries",
 		                           fullFileName.c_str(), skippedEntries);
 	} else {
-		lzfs_pretty_syslog_attempt(LOG_NOTICE, "%s: file empty (ignored)",
+		safs_pretty_syslog_attempt(LOG_NOTICE, "%s: file empty (ignored)",
 		                           fullFileName.c_str());
 	}
 }
@@ -1446,16 +1447,16 @@ void fs_loadall(const std::string& fname,int ignoreflag) {
 	if (fd == nullptr) {
 		throw FilesystemException("can't open metadata file: " + errorString(errno));
 	}
-	lzfs_pretty_syslog(LOG_INFO,"opened metadata file %s", fnameWithPath.c_str());
+	safs_pretty_syslog(LOG_INFO,"opened metadata file %s", fnameWithPath.c_str());
 	uint8_t hdr[8];
 	if (fread(hdr,1,8,fd.get())!=8) {
 		throw MetadataConsistencyException("can't read metadata header");
 	}
 #ifndef METARESTORE
 	if (metadataserver::isMaster()) {
-		if (memcmp(hdr, "MFSM NEW", 8) == 0) {    // special case - create new file system
+		if (memcmp(hdr, "SFSM NEW", 8) == 0) {    // special case - create new file system
 			fs_new();
-			lzfs_pretty_syslog(LOG_NOTICE, "empty filesystem created");
+			safs_pretty_syslog(LOG_NOTICE, "empty filesystem created");
 			// after creating new filesystem always create "back" file for using in metarestore
 			fs_storeall(MetadataDumper::kForegroundDump);
 			return;
@@ -1463,14 +1464,14 @@ void fs_loadall(const std::string& fname,int ignoreflag) {
 	}
 #endif /* #ifndef METARESTORE */
 	uint8_t metadataVersion;
-	if (memcmp(hdr,MFSSIGNATURE "M 1.5",8)==0) {
-		metadataVersion = kMetadataVersionMooseFS;
-	} else if (memcmp(hdr,MFSSIGNATURE "M 1.6",8)==0) {
-		metadataVersion = kMetadataVersionLizardFS;
-	} else if (memcmp(hdr,MFSSIGNATURE "M 2.0",8)==0) {
+	if (memcmp(hdr,SFSSIGNATURE "M 1.5",8)==0) {
+		metadataVersion = kMetadataVersionXaunaFS;
+	} else if (memcmp(hdr,SFSSIGNATURE "M 1.6",8)==0) {
+		metadataVersion = kMetadataVersionSaunaFS;
+	} else if (memcmp(hdr,SFSSIGNATURE "M 2.0",8)==0) {
 		metadataVersion = kMetadataVersionWithSections;
-		/* Note LIZARDFSSIGNATURE instead of MFSSIGNATURE! */
-	} else if (memcmp(hdr, LIZARDFSSIGNATURE "M 2.9", 8) == 0) {
+		/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
+	} else if (memcmp(hdr, SAUNAFSSIGNATURE "M 2.9", 8) == 0) {
 		metadataVersion = kMetadataVersionWithLockIds;
 	} else {
 		throw MetadataConsistencyException("wrong metadata header version");
@@ -1482,13 +1483,13 @@ void fs_loadall(const std::string& fname,int ignoreflag) {
 	if (ferror(fd.get())!=0) {
 		throw MetadataConsistencyException(MetadataStructureReadErrorMsg);
 	}
-	lzfs_pretty_syslog_attempt(LOG_INFO,"connecting files and chunks");
+	safs_pretty_syslog_attempt(LOG_INFO,"connecting files and chunks");
 	fs_add_files_to_chunks();
 	unlink(kMetadataTmpFilename);
-	lzfs_pretty_syslog_attempt(LOG_INFO, "calculating checksum of the metadata");
+	safs_pretty_syslog_attempt(LOG_INFO, "calculating checksum of the metadata");
 	fs_checksum(ChecksumMode::kForceRecalculate);
 #ifndef METARESTORE
-	lzfs_pretty_syslog(LOG_INFO,
+	safs_pretty_syslog(LOG_INFO,
 			"metadata file %s read ("
 			"%" PRIu32 " inodes including "
 			"%" PRIu32 " directory inodes and "
@@ -1497,7 +1498,7 @@ void fs_loadall(const std::string& fname,int ignoreflag) {
 			fnameWithPath.c_str(),
 			gMetadata->nodes, gMetadata->dirnodes, gMetadata->filenodes, chunk_count());
 #else
-	lzfs_pretty_syslog(LOG_INFO, "metadata file %s read", fnameWithPath.c_str());
+	safs_pretty_syslog(LOG_INFO, "metadata file %s read", fnameWithPath.c_str());
 #endif
 	return;
 }
@@ -1514,16 +1515,16 @@ void fs_broadcast_metadata_saved(uint8_t status) {
 /*!
  * Commits successful metadata dump by renaming files.
  *
- * \return true iff up to date metadata.mfs file was created
+ * \return true iff up to date metadata.sfs file was created
  */
 bool fs_commit_metadata_dump() {
 	rotateFiles(kMetadataFilename, gStoredPreviousBackMetaCopies);
 	try {
 		fs::rename(kMetadataTmpFilename, kMetadataFilename);
-		lzfs_silent_syslog(LOG_DEBUG, "master.fs.stored");
+		safs_silent_syslog(LOG_DEBUG, "master.fs.stored");
 		return true;
 	} catch (Exception& ex) {
-		lzfs_pretty_syslog(LOG_ERR, "renaming %s to %s failed: %s",
+		safs_pretty_syslog(LOG_ERR, "renaming %s to %s failed: %s",
 				kMetadataTmpFilename, kMetadataFilename, ex.what());
 	}
 
@@ -1531,15 +1532,15 @@ bool fs_commit_metadata_dump() {
 	std::string alternativeName = kMetadataFilename + std::to_string(eventloop_time());
 	try {
 		fs::rename(kMetadataTmpFilename, alternativeName);
-		lzfs_pretty_syslog(LOG_ERR, "emergency metadata file created as %s", alternativeName.c_str());
+		safs_pretty_syslog(LOG_ERR, "emergency metadata file created as %s", alternativeName.c_str());
 		return false;
 	} catch (Exception& ex) {
-		lzfs_pretty_syslog(LOG_ERR, "renaming %s to %s failed: %s",
+		safs_pretty_syslog(LOG_ERR, "renaming %s to %s failed: %s",
 				kMetadataTmpFilename, alternativeName.c_str(), ex.what());
 	}
 
 	// Nothing can be done...
-	lzfs_pretty_syslog_attempt(LOG_ERR, "trying to create emergency metadata file in foreground");
+	safs_pretty_syslog_attempt(LOG_ERR, "trying to create emergency metadata file in foreground");
 	fs_emergency_saves();
 	return false;
 }
@@ -1547,13 +1548,13 @@ bool fs_commit_metadata_dump() {
 // returns false in case of an error
 uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 	if (gMetadata == nullptr) {
-		// Periodic dump in shadow master or a request from lizardfs-admin
-		lzfs_pretty_syslog(LOG_INFO, "Can't save metadata because no metadata is loaded");
-		return LIZARDFS_ERROR_NOTPOSSIBLE;
+		// Periodic dump in shadow master or a request from saunafs-admin
+		safs_pretty_syslog(LOG_INFO, "Can't save metadata because no metadata is loaded");
+		return SAUNAFS_ERROR_NOTPOSSIBLE;
 	}
 	if (metadataDumper.inProgress()) {
-		lzfs_pretty_syslog(LOG_ERR, "previous metadata save process hasn't finished yet - do not start another one");
-		return LIZARDFS_ERROR_TEMP_NOTPOSSIBLE;
+		safs_pretty_syslog(LOG_ERR, "previous metadata save process hasn't finished yet - do not start another one");
+		return SAUNAFS_ERROR_TEMP_NOTPOSSIBLE;
 	}
 
 	fs_erase_message_from_lockfile(); // We are going to do some changes in the data dir right now
@@ -1562,25 +1563,25 @@ uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 	// child == true says that we forked
 	// bg may be changed to dump in foreground in case of a fork error
 	bool child = metadataDumper.start(dumpType, fs_checksum(ChecksumMode::kGetCurrent));
-	uint8_t status = LIZARDFS_STATUS_OK;
+	uint8_t status = SAUNAFS_STATUS_OK;
 
 	if (dumpType == MetadataDumper::kForegroundDump) {
 		cstream_t fd(fopen(kMetadataTmpFilename, "w"));
 		if (fd == nullptr) {
-			lzfs_pretty_syslog(LOG_ERR, "can't open metadata file");
+			safs_pretty_syslog(LOG_ERR, "can't open metadata file");
 			// try to save in alternative location - just in case
 			fs_emergency_saves();
 			if (child) {
 				exit(1);
 			}
-			fs_broadcast_metadata_saved(LIZARDFS_ERROR_IO);
-			return LIZARDFS_ERROR_IO;
+			fs_broadcast_metadata_saved(SAUNAFS_ERROR_IO);
+			return SAUNAFS_ERROR_IO;
 		}
 
 		fs_store_fd(fd.get());
 
 		if (ferror(fd.get()) != 0) {
-			lzfs_pretty_syslog(LOG_ERR, "can't write metadata");
+			safs_pretty_syslog(LOG_ERR, "can't write metadata");
 			fd.reset();
 			unlink(kMetadataTmpFilename);
 			// try to save in alternative location - just in case
@@ -1588,22 +1589,22 @@ uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 			if (child) {
 				exit(1);
 			}
-			fs_broadcast_metadata_saved(LIZARDFS_ERROR_IO);
-			return LIZARDFS_ERROR_IO;
+			fs_broadcast_metadata_saved(SAUNAFS_ERROR_IO);
+			return SAUNAFS_ERROR_IO;
 		} else {
 			if (fflush(fd.get()) == EOF) {
-				lzfs_pretty_errlog(LOG_ERR, "metadata fflush failed");
+				safs_pretty_errlog(LOG_ERR, "metadata fflush failed");
 			} else if (fsync(fileno(fd.get())) == -1) {
-				lzfs_pretty_errlog(LOG_ERR, "metadata fsync failed");
+				safs_pretty_errlog(LOG_ERR, "metadata fsync failed");
 			}
 			fd.reset();
 			if (!child) {
 				// rename backups if no child was created, otherwise this is handled by pollServe
-				status = fs_commit_metadata_dump() ? LIZARDFS_STATUS_OK : LIZARDFS_ERROR_IO;
+				status = fs_commit_metadata_dump() ? SAUNAFS_STATUS_OK : SAUNAFS_ERROR_IO;
 			}
 		}
 		if (child) {
-			printf("OK\n"); // give mfsmetarestore another chance
+			printf("OK\n"); // give sfsmetarestore another chance
 			exit(0);
 		}
 		fs_broadcast_metadata_saved(status);

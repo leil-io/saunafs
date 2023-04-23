@@ -1,12 +1,11 @@
-Source: lizardfs
+Source: saunafs
 Section: admin
 Priority: extra
-Maintainer: LizardFS <contact@lizardfs.org>
+Maintainer: SaunaFS <contact@saunafs.com>
 Build-Depends: asciidoc (>= 8.6.6),
                debhelper (>= 9),
                cmake (>= 2.8),
                libfuse3-dev,
-               libfuse-dev,
                pkg-config,
                zlib1g-dev,
                libspdlog-dev,
@@ -16,114 +15,114 @@ Build-Depends: asciidoc (>= 8.6.6),
                python3,
 Rules-Requires-Root: no
 Standards-Version: 3.9.3
-Homepage: https://lizardfs.org/
+Homepage: https://saunafs.org/
 
-Package: lizardfs-dbg
+Package: saunafs-dbg
 Architecture: any
 Section: debug
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Debugging symbols for LizardFS
- Debugging symbols for all LizardFS binaries
+Description: Debugging symbols for SaunaFS
+ Debugging symbols for all SaunaFS binaries
 
-Package: lizardfs-common
+Package: saunafs-common
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
          adduser
-Conflicts: mfs-common
-Replaces: mfs-common
-Provides: mfs-common
-Description: LizardFS common files
- Files and services common for all LizardFS daemons.
+Conflicts: sfs-common
+Replaces: sfs-common
+Provides: sfs-common
+Description: SaunaFS common files
+ Files and services common for all SaunaFS daemons.
 
-Package: lizardfs-master
+Package: saunafs-master
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, lizardfs-common
-Conflicts: mfs-master
-Replaces: mfs-master
-Provides: mfs-master
-Description: LizardFS master server
- LizardFS master (metadata) server.
+Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-common
+Conflicts: sfs-master
+Replaces: sfs-master
+Provides: sfs-master
+Description: SaunaFS master server
+ SaunaFS master (metadata) server.
 
-Package: lizardfs-metalogger
+Package: saunafs-metalogger
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, lizardfs-common
-Conflicts: mfs-metalogger
-Replaces: mfs-metalogger
-Provides: mfs-metalogger
-Description: LizardFS metalogger server
- LizardFS metalogger (metadata replication) server.
+Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-common
+Conflicts: sfs-metalogger
+Replaces: sfs-metalogger
+Provides: sfs-metalogger
+Description: SaunaFS metalogger server
+ SaunaFS metalogger (metadata replication) server.
 
-Package: lizardfs-chunkserver
+Package: saunafs-chunkserver
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, lizardfs-common
-Conflicts: mfs-chunkserver
-Replaces: mfs-chunkserver
-Provides: mfs-chunkserver
-Description: LizardFS data server
- LizardFS data server.
+Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-common
+Conflicts: sfs-chunkserver
+Replaces: sfs-chunkserver
+Provides: sfs-chunkserver
+Description: SaunaFS data server
+ SaunaFS data server.
 
-Package: lizardfs-client
+#Package: saunafs-chunkserver-zonefs-disk-plugin
+#Architecture: any
+#Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-chunkserver
+#Description: Chunkserver plugin for SMR Host-Managed drives
+# Chunkserver plugin for SMR Host-Managed drives.
+
+Package: saunafs-client
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, bash-completion
-Conflicts: mfs-client
-Replaces: mfs-client
-Provides: mfs-client
-Description: LizardFS client
- LizardFS clients: mfsmount and mfstools.
+Conflicts: sfs-client
+Replaces: sfs-client
+Provides: sfs-client
+Description: SaunaFS client
+ SaunaFS clients: sfsmount and sfstools.
 
-Package: lizardfs-client3
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, lizardfs-client, fuse3
-Description: LizardFS client using FUSE3
- LizardFS client: mfsmount3.
-
-Package: lizardfs-lib-client
+Package: saunafs-lib-client
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: LizardFS client C/C++ library
- LizardFS client library for C/C++ bindings.
+Description: SaunaFS client C/C++ library
+ SaunaFS client library for C/C++ bindings.
 
-Package: lizardfs-nfs-ganesha
+Package: saunafs-nfs-ganesha
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, lizardfs-lib-client
-Description: LizardFS plugin for nfs-ganesha
- LizardFS fsal plugin for nfs-ganesha.
+Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-lib-client
+Description: SaunaFS plugin for nfs-ganesha
+ SaunaFS fsal plugin for nfs-ganesha.
 
-Package: lizardfs-adm
+Package: saunafs-adm
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: LizardFS administration tools
- LizardFS administration tools: lizardfs-admin
+Description: SaunaFS administration tools
+ SaunaFS administration tools: saunafs-admin
 
-Package: lizardfs-cgi
+Package: saunafs-cgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
          python3
-Conflicts: mfs-cgi
-Replaces: mfs-cgi
-Provides: mfs-cgi
-Description: LizardFS CGI Monitor
- LizardFS CGI Monitor.
+Conflicts: sfs-cgi
+Replaces: sfs-cgi
+Provides: sfs-cgi
+Description: SaunaFS CGI Monitor
+ SaunaFS CGI Monitor.
 
-Package: lizardfs-cgiserv
+Package: saunafs-cgiserv
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, lizardfs-cgi,
+Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-cgi,
          python3
-Conflicts: mfs-cgiserv
-Replaces: mfs-cgiserv
-Provides: mfs-cgiserv
-Description: Simple CGI-capable HTTP server to run LizardFS CGI Monitor
- Simple CGI-capable HTTP server to run LizardFS CGI Monitor.
+Conflicts: sfs-cgiserv
+Replaces: sfs-cgiserv
+Provides: sfs-cgiserv
+Description: Simple CGI-capable HTTP server to run SaunaFS CGI Monitor
+ Simple CGI-capable HTTP server to run SaunaFS CGI Monitor.
 
-Package: lizardfs-uraft
+Package: saunafs-uraft
 Architecture: any
-Depends: lizardfs-master,
-         lizardfs-adm,
+Depends: saunafs-master,
+         saunafs-adm,
          iputils-arping,
          sudo,
          ${shlibs:Depends},
-Description: LizardFS cluster management tool
- LizardFS is a distributed filesystem.
+Description: SaunaFS cluster management tool
+ SaunaFS is a distributed filesystem.
  .
- This package offers means for simplified LizardFS deployment
+ This package offers means for simplified SaunaFS deployment
  on cluster infrastructure.

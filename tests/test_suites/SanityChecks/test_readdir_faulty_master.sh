@@ -2,7 +2,7 @@ timeout_set 1 minute
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # FILE_COUNT has to be greater than ~128 to effectively test readdir
 FILE_COUNT=200
@@ -17,7 +17,7 @@ slice_size = int(${FILE_COUNT}) // 2
 dirents = 0
 with os.scandir("${info[mount0]}") as dir:
 	dirents += len(list(itertools.islice(dir, slice_size)))
-	os.system("mfsmaster -c ${MASTER_CFG_FILE} restart")
+	os.system("sfsmaster -c ${MASTER_CFG_FILE} restart")
 	dirents += len(list(itertools.islice(dir, slice_size)))
 print(dirents)
 END_OF_SCRIPT

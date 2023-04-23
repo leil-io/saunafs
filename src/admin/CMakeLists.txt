@@ -1,16 +1,16 @@
-collect_sources(LIZARDFS_ADMIN)
+collect_sources(SAUNAFS_ADMIN)
 
-add_library(lizardfs-admin-lib ${LIZARDFS_ADMIN_SOURCES})
-target_link_libraries(lizardfs-admin-lib mfscommon)
-create_unittest(lizardfs-admin-lib ${LIZARDFS_ADMIN_TESTS})
-link_unittest(lizardfs-admin-lib mfscommon)
+add_library(saunafs-admin-lib ${SAUNAFS_ADMIN_SOURCES})
+target_link_libraries(saunafs-admin-lib sfscommon)
+create_unittest(saunafs-admin-lib ${SAUNAFS_ADMIN_TESTS})
+link_unittest(saunafs-admin-lib sfscommon)
 
-add_executable(lizardfs-admin ${LIZARDFS_ADMIN_MAIN})
-target_link_libraries(lizardfs-admin lizardfs-admin-lib)
-install(TARGETS lizardfs-admin RUNTIME DESTINATION ${BIN_SUBDIR})
+add_executable(saunafs-admin ${SAUNAFS_ADMIN_MAIN})
+target_link_libraries(saunafs-admin saunafs-admin-lib)
+install(TARGETS saunafs-admin RUNTIME DESTINATION ${BIN_SUBDIR})
 
-add_custom_target(lizardfs-probe ALL
-    COMMAND ln -sf lizardfs-admin lizardfs-probe
+add_custom_target(saunafs-probe ALL
+    COMMAND ln -sf saunafs-admin saunafs-probe
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS lizardfs-admin)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lizardfs-probe DESTINATION ${BIN_SUBDIR})
+    DEPENDS saunafs-admin)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/saunafs-probe DESTINATION ${BIN_SUBDIR})

@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -328,13 +330,13 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 		p++;
 	}
 	if (*p==0 || *p=='\r' || *p=='\n') {
-		lzfs_pretty_syslog(LOG_WARNING,"mfstopology: incomplete definition in line: %" PRIu32,lineno);
+		safs_pretty_syslog(LOG_WARNING,"sfstopology: incomplete definition in line: %" PRIu32,lineno);
 		return -1;
 	}
 	*p=0;
 	p++;
 	if (topology_parsenet(net,fip,tip)<0) {
-		lzfs_pretty_syslog(LOG_WARNING,"mfstopology: incorrect ip/network definition in line: %" PRIu32,lineno);
+		safs_pretty_syslog(LOG_WARNING,"sfstopology: incorrect ip/network definition in line: %" PRIu32,lineno);
 		return -1;
 	}
 
@@ -343,7 +345,7 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 	}
 
 	if (*p<'0' || *p>'9') {
-		lzfs_pretty_syslog(LOG_WARNING,"mfstopology: incorrect rack id in line: %" PRIu32,lineno);
+		safs_pretty_syslog(LOG_WARNING,"sfstopology: incorrect rack id in line: %" PRIu32,lineno);
 		return -1;
 	}
 
@@ -354,7 +356,7 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 	}
 
 	if (*p && *p!='\r' && *p!='\n' && *p!='#') {
-		lzfs_pretty_syslog(LOG_WARNING,"mfstopology: garbage found at the end of line: %" PRIu32,lineno);
+		safs_pretty_syslog(LOG_WARNING,"sfstopology: garbage found at the end of line: %" PRIu32,lineno);
 		return -1;
 	}
 	return 0;
@@ -372,13 +374,13 @@ void topology_load(void) {
 		if (errno==ENOENT) {
 
 			if (racktree) {
-				lzfs_pretty_syslog(LOG_WARNING,
+				safs_pretty_syslog(LOG_WARNING,
 						"topology file %s not found - network topology not changed; "
 						"if you don't want to define network topology create an empty file %s "
 						"to disable this warning.",
 						TopologyFileName, TopologyFileName);
 			} else {
-				lzfs_pretty_syslog(LOG_WARNING,
+				safs_pretty_syslog(LOG_WARNING,
 						"topology file %s not found - network topology feature will be disabled; "
 						"if you don't want to define network topology create an empty file %s "
 						"to disable this warning.",
@@ -386,11 +388,11 @@ void topology_load(void) {
 			}
 		} else {
 			if (racktree) {
-				lzfs_pretty_syslog(LOG_WARNING,
+				safs_pretty_syslog(LOG_WARNING,
 						"can't open topology file %s: %s - network topology not changed",
 						TopologyFileName, strerr(errno));
 			} else {
-				lzfs_pretty_syslog(LOG_WARNING,
+				safs_pretty_syslog(LOG_WARNING,
 						"can't open topology file %s: %s - network topology feature will be disabled",
 						TopologyFileName, strerr(errno));
 			}
@@ -409,11 +411,11 @@ void topology_load(void) {
 	if (ferror(fd)) {
 		fclose(fd);
 		if (racktree) {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 					"error reading topology file %s - network topology not changed",
 					TopologyFileName);
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 					"error reading topology file %s - network topology feature will be disabled",
 					TopologyFileName);
 		}
@@ -426,14 +428,14 @@ void topology_load(void) {
 	if (racktree) {
 		racktree = itree_rebalance(racktree);
 	}
-	lzfs_pretty_syslog(LOG_INFO, "initialized topology from file %s", TopologyFileName);
+	safs_pretty_syslog(LOG_INFO, "initialized topology from file %s", TopologyFileName);
 }
 
 void topology_reload(void) {
 	if (TopologyFileName) {
 		free(TopologyFileName);
 	}
-	TopologyFileName = cfg_getstr("TOPOLOGY_FILENAME", ETC_PATH "/mfstopology.cfg");
+	TopologyFileName = cfg_getstr("TOPOLOGY_FILENAME", ETC_PATH "/sfstopology.cfg");
 	topology_load();
 
 	gPreferLocalChunkserver = cfg_getnum("PREFER_LOCAL_CHUNKSERVER", 1);

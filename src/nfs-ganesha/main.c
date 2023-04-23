@@ -1,19 +1,21 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "fsal_types.h"
@@ -22,13 +24,13 @@
 #include "fsal_api.h"
 #include "pnfs_utils.h"
 
-#include "lzfs_fsal_types.h"
-#include "lzfs_fsal_methods.h"
+#include "safs_fsal_types.h"
+#include "safs_fsal_methods.h"
 
 #include "context_wrap.h"
 
 /* FSAL name determines name of shared library: libfsal<name>.so */
-static const char *module_name = "LizardFS";
+static const char *module_name = "SaunaFS";
 
 static const int millisecondsInOneSecond = 1000;
 
@@ -36,12 +38,12 @@ static const int millisecondsInOneSecond = 1000;
  * my module private storage
  */
 
-struct FSModule LizardFS = {
+struct FSModule SaunaFS = {
     .module = {.fs_info =
                    {
                        .maxfilesize = UINT64_MAX,
                        .maxlink = _POSIX_LINK_MAX,
-                       .maxnamelen = MFS_NAME_MAX,
+                       .maxnamelen = SFS_NAME_MAX,
                        .maxpathlen = MAXPATHLEN,
                        .no_trunc = true,
                        .chown_restricted = false,
@@ -61,7 +63,7 @@ struct FSModule LizardFS = {
 #endif
                        .cansettime = true,
                        .homogenous = true,
-                       .supported_attrs = LZFS_SUPPORTED_ATTRS,
+                       .supported_attrs = SAFS_SUPPORTED_ATTRS,
                        .maxread = (uint64_t)FSAL_MAXIOSIZE,
                        .maxwrite = (uint64_t)FSAL_MAXIOSIZE,
                        .umask = 0,
@@ -95,8 +97,8 @@ static struct config_item export_params[] = {
     CONFIG_EOL};
 
 static struct config_block export_param = {
-	.dbus_interface_name = "org.ganesha.nfsd.config.fsal.lizardfs",
-	.blk_desc.name = "LizardFS",
+	.dbus_interface_name = "org.ganesha.nfsd.config.fsal.saunafs",
+	.blk_desc.name = "SaunaFS",
 	.blk_desc.type = CONFIG_BLOCK,
 	.blk_desc.u.blk.init = noop_conf_init,
 	.blk_desc.u.blk.params = export_params,
@@ -156,7 +158,7 @@ static struct config_item fsal_export_params[] = {
     CONFIG_EOL};
 
 static struct config_block fsal_export_param_block = {
-	.dbus_interface_name = "org.ganesha.nfsd.config.fsal.lizardfs-export%d",
+	.dbus_interface_name = "org.ganesha.nfsd.config.fsal.saunafs-export%d",
 	.blk_desc.name = "FSAL",
 	.blk_desc.type = CONFIG_BLOCK,
 	.blk_desc.u.blk.init = noop_conf_init,
@@ -194,7 +196,7 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 	initializeExportOperations(&export->export.exp_ops);
 
 	// parse parameters for this export
-	liz_set_default_init_params(&export->initialParameters, "", "", "");
+	sau_set_default_init_params(&export->initialParameters, "", "", "");
 
 	if (parseNode) {
 		retvalue = load_config_from_node(parseNode, &fsal_export_param_block,
@@ -211,10 +213,10 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 	}
 
 	export->initialParameters.subfolder = gsh_strdup(CTX_FULLPATH(op_ctx));
-	export->fsInstance = liz_init_with_params(&export->initialParameters);
+	export->fsInstance = sau_init_with_params(&export->initialParameters);
 
 	if (export->fsInstance == NULL) {
-		LogCrit(COMPONENT_FSAL, "Unable to mount LizardFS cluster for %s.",
+		LogCrit(COMPONENT_FSAL, "Unable to mount SaunaFS cluster for %s.",
 		        CTX_FULLPATH(op_ctx));
 
 		status = fsalstat(ERR_FSAL_SERVERFAULT, 0);
@@ -286,7 +288,7 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 	}
 
 	// get attributes for root inode
-	liz_attr_reply_t reply;
+	sau_attr_reply_t reply;
 	retvalue = fs_getattr(export->fsInstance, &op_ctx->creds,
 	                SPECIAL_INODE_ROOT, &reply);
 
@@ -304,7 +306,7 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 	export->rootHandle = allocateNewHandle(&reply.attr, export);
 	op_ctx->fsal_export = &export->export;
 
-	LogDebug(COMPONENT_FSAL, "LizardFS module export %s.",
+	LogDebug(COMPONENT_FSAL, "SaunaFS module export %s.",
 	         CTX_FULLPATH(op_ctx));
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
@@ -318,7 +320,7 @@ error_pds:
 error:
 	if (export) {
 		if (export->fsInstance) {
-			liz_destroy(export->fsInstance);
+			sau_destroy(export->fsInstance);
 		}
 
 		if (export->fileinfoCache) {
@@ -368,7 +370,7 @@ static fsal_status_t init_config(struct fsal_module *FSALModule,
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-// Internal LizardFS method linkage to export object
+// Internal SaunaFS method linkage to export object
 
 /**
  * @brief Initialize and register the FSAL
@@ -380,14 +382,14 @@ static fsal_status_t init_config(struct fsal_module *FSALModule,
 
 // Linkage to the exports and handle operations initializers
 
-MODULE_INIT void lizardfs_init(void) {
-	struct fsal_module *myself = &LizardFS.module;
+MODULE_INIT void saunafs_init(void) {
+	struct fsal_module *myself = &SaunaFS.module;
 
 	int retval = register_fsal(myself, module_name, FSAL_MAJOR_VERSION,
-	                           FSAL_MINOR_VERSION, FSAL_ID_LIZARDFS);
+	                           FSAL_MINOR_VERSION, FSAL_ID_EXPERIMENTAL);
 
 	if (retval) {
-		LogCrit(COMPONENT_FSAL, "LizardFS module failed to register.");
+		LogCrit(COMPONENT_FSAL, "SaunaFS module failed to register.");
 		return;
 	}
 
@@ -398,8 +400,8 @@ MODULE_INIT void lizardfs_init(void) {
 
 	initializePnfsOperations(&myself->m_ops);
 
-	// Initialize fsal_obj_handle ops for FSAL LizardFS
-	initializeFilesystemOperations(&LizardFS.operations);
+	// Initialize fsal_obj_handle ops for FSAL SaunaFS
+	initializeFilesystemOperations(&SaunaFS.operations);
 }
 
 /**
@@ -410,7 +412,7 @@ MODULE_INIT void lizardfs_init(void) {
  */
 
 MODULE_FINI void finish(void) {
-	int retval = unregister_fsal(&LizardFS.module);
+	int retval = unregister_fsal(&SaunaFS.module);
 
 	if (retval != 0) {
 		LogCrit(COMPONENT_FSAL, "Unable to unload Fuse FSAL. Dying with "

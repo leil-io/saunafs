@@ -3,19 +3,20 @@ unalias -a
 shopt -s expand_aliases extdebug
 
 command_prefix=
-for i in mfsmaster mfschunkserver mfsmount mfsmetarestore mfsmetalogger \
-		lizardfs-polonaise-server; do
+for i in sfsmaster sfschunkserver sfsmount sfsmetarestore sfsmetalogger \
+		saunafs-polonaise-server; do
 	alias $i="\${command_prefix} $i"
 done
 
 . tools/config.sh # This has to be the first one
-. $(which set_lizardfs_constants.sh)
+. $(which set_saunafs_constants.sh)
 . tools/stack_trace.sh
 . tools/assert.sh
-. tools/moosefs.sh
+. tools/xaunafs.sh
 . tools/string.sh
-. tools/lizardfs.sh
-. tools/lizardfsXX.sh
+. tools/nullblk_zoned.sh
+. tools/saunafs.sh
+. tools/saunafsXX.sh
 . tools/network.sh
 . tools/permissions.sh
 . tools/random.sh

@@ -3,8 +3,8 @@ timeout_killer_thread() {
 	assert_program_installed python3
 
 	local machine_environment_multiplier=1
-	if [[ ! -z "${LIZARDFS_TEST_TIMEOUT_MULTIPLIER:-}" ]]; then
-		machine_environment_multiplier="$LIZARDFS_TEST_TIMEOUT_MULTIPLIER"
+	if [[ ! -z "${SAUNAFS_TEST_TIMEOUT_MULTIPLIER:-}" ]]; then
+		machine_environment_multiplier="$SAUNAFS_TEST_TIMEOUT_MULTIPLIER"
 	fi
 
 	while ! test_frozen; do

@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -137,7 +139,7 @@ static void matotsserv_createpacket(matotsserventry* eptr, MessageBuffer message
 
 /// Disconnects a tapeserver.
 static void matotsserv_kill(matotsserventry* eptr) {
-	lzfs_pretty_syslog(LOG_WARNING,
+	safs_pretty_syslog(LOG_WARNING,
 			"disconnecting tapeserver %s due to an error",
 			eptr->address.toString().c_str());
 	eptr->mode = matotsserventry::Mode::kKill;
@@ -146,7 +148,7 @@ static void matotsserv_kill(matotsserventry* eptr) {
 /// Handler for tstoma::registerServer.
 static void matotsserv_register_tapeserver(matotsserventry* eptr, const MessageBuffer& message) {
 	if (eptr->isRegistered()) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 				"got register message from a registered tapeserver");
 		matotsserv_kill(eptr);
 		return;
@@ -156,23 +158,23 @@ static void matotsserv_register_tapeserver(matotsserventry* eptr, const MessageB
 	std::string name;
 	tstoma::registerTapeserver::deserialize(message, version, name);
 	if (version == 0) {
-		lzfs_pretty_syslog(LOG_INFO,
+		safs_pretty_syslog(LOG_INFO,
 				"tapeserver  %s(%s) failed to register",
 				name.c_str(), eptr->address.toString().c_str());
-		uint8_t status = LIZARDFS_ERROR_EPERM;
+		uint8_t status = SAUNAFS_ERROR_EPERM;
 		matotsserv_createpacket(eptr, matots::registerTapeserver::build(status));
 	} else {
-		lzfs_pretty_syslog(LOG_INFO,
+		safs_pretty_syslog(LOG_INFO,
 				"tapeserver %s(%s) registered",
 				name.c_str(), eptr->address.toString().c_str());
 		if (!eptr->registerServer(name, version)) {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 					"tapeserver with id %" PRIu32 "(%s) already exists.",
 					eptr->id, eptr->name.c_str());
 			matotsserv_kill(eptr);
 		}
 		eptr->label = MediaLabel::kWildcard;
-		uint32_t myVersion = LIZARDFS_VERSHEX;
+		uint32_t myVersion = SAUNAFS_VERSHEX;
 		matotsserv_createpacket(eptr, matots::registerTapeserver::build(myVersion));
 	}
 }
@@ -189,7 +191,7 @@ static void matotsserv_has_files(matotsserventry* eptr, const MessageBuffer& mes
 /// Handler for tstoma::endOfFiles
 static void matotsserv_end_of_files(matotsserventry* eptr, const MessageBuffer& message) {
 	tstoma::endOfFiles::deserialize(message);
-	lzfs_pretty_syslog(LOG_INFO,
+	safs_pretty_syslog(LOG_INFO,
 			"tapeserver %s has finished registration",
 			eptr->address.toString().c_str());
 	eptr->filesRegistered = true;
@@ -203,17 +205,17 @@ static void matotsserv_gotpacket(matotsserventry* eptr,
 		switch (header.type) {
 			case ANTOAN_NOP:
 				break;
-			case LIZ_TSTOMA_REGISTER_TAPESERVER:
+			case SAU_TSTOMA_REGISTER_TAPESERVER:
 				matotsserv_register_tapeserver(eptr, data);
 				break;
-			case LIZ_TSTOMA_HAS_FILES:
+			case SAU_TSTOMA_HAS_FILES:
 				matotsserv_has_files(eptr, data);
 				break;
-			case LIZ_TSTOMA_END_OF_FILES:
+			case SAU_TSTOMA_END_OF_FILES:
 				matotsserv_end_of_files(eptr, data);
 				break;
 			default:
-				lzfs_pretty_syslog(LOG_NOTICE,
+				safs_pretty_syslog(LOG_NOTICE,
 						"master <-> tapeservers module: got unknown message from %s, type:%" PRIu32,
 						eptr->address.toString().c_str(),
 						header.type);
@@ -221,7 +223,7 @@ static void matotsserv_gotpacket(matotsserventry* eptr,
 				break;
 		}
 	} catch (IncorrectDeserializationException& e) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 				"master <-> tapeservers module: got inconsistent message from %s"
 				"(type:%" PRIu32 ", length:%" PRIu32"), %s",
 				eptr->address.toString().c_str(), header.type, header.length, e.what());
@@ -238,13 +240,13 @@ static void matotsserv_read(matotsserventry* eptr) {
 		uint32_t bytesToRead = eptr->inputPacket.bytesToBeRead();
 		ssize_t ret = read(eptr->sock, eptr->inputPacket.pointerToBeReadInto(), bytesToRead);
 		if (ret == 0) {
-			lzfs_silent_syslog(LOG_NOTICE, "connection with TS(%s) has been closed by peer",
+			safs_silent_syslog(LOG_NOTICE, "connection with TS(%s) has been closed by peer",
 					eptr->address.toString().c_str());
 			eptr->mode = matotsserventry::Mode::kKill;
 			return;
 		} else if (ret < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE, "read from TS(%s) error",
+				safs_silent_errlog(LOG_NOTICE, "read from TS(%s) error",
 						eptr->address.toString().c_str());
 				matotsserv_kill(eptr);
 			}
@@ -254,7 +256,7 @@ static void matotsserv_read(matotsserventry* eptr) {
 		try {
 			eptr->inputPacket.increaseBytesRead(ret);
 		} catch (InputPacketTooLongException& ex) {
-			lzfs_silent_syslog(LOG_WARNING, "reading from TS(%s): %s",
+			safs_silent_syslog(LOG_WARNING, "reading from TS(%s): %s",
 					eptr->address.toString().c_str(), ex.what());
 			matotsserv_kill(eptr);
 			return;
@@ -287,7 +289,7 @@ static void matotsserv_write(matotsserventry* eptr) {
 				pack.packet.size() - pack.bytesSent);
 		if (ret < 0) {
 			if (errno != EAGAIN) {
-				lzfs_silent_errlog(LOG_NOTICE,
+				safs_silent_errlog(LOG_NOTICE,
 						"write to TS(%s) error",
 						eptr->address.toString().c_str());
 				matotsserv_kill(eptr);
@@ -325,7 +327,7 @@ static void matotsserv_serve(const std::vector<pollfd> &pdesc) {
 	if (gListenSocketPosition >= 0 && (pdesc[gListenSocketPosition].revents & POLLIN)) {
 		int newSocket = tcpaccept(gListenSocket);
 		if (newSocket < 0) {
-			lzfs_silent_errlog(LOG_NOTICE, "master <-> tapeservers module: accept error");
+			safs_silent_errlog(LOG_NOTICE, "master <-> tapeservers module: accept error");
 		} else if (metadataserver::isMaster()) {
 			uint32_t ip = 0;
 			tcpnonblock(newSocket);
@@ -354,14 +356,14 @@ static void matotsserv_serve(const std::vector<pollfd> &pdesc) {
 			}
 		}
 		if (eptr->lastRead.elapsed_ms() > kTapeserverTimeout_ms) {
-			lzfs_pretty_syslog(LOG_INFO,
+			safs_pretty_syslog(LOG_INFO,
 					"master <-> tapeservers module: TS(%s) timed out",
 					eptr->address.toString().c_str());
 			matotsserv_kill(eptr.get());
 		}
 		if (eptr->lastWrite.elapsed_ms() > (kTapeserverTimeout_ms / 4)
 				&& eptr->outputPackets.empty()) {
-			matotsserv_createpacket(eptr.get(), buildMooseFsPacket(ANTOAN_NOP));
+			matotsserv_createpacket(eptr.get(), buildXaunaFsPacket(ANTOAN_NOP));
 		}
 	}
 
@@ -393,7 +395,7 @@ static void matotsserv_periodic_put_files() {
 
 /// Terminates the module.
 static void matotsserv_term() {
-	lzfs_pretty_syslog(LOG_INFO,
+	safs_pretty_syslog(LOG_INFO,
 			"master <-> tapeservers module: closing socket %s:%s",
 			gListenHost.c_str(),
 			gListenPort.c_str());
@@ -414,7 +416,7 @@ static void matotsserv_reload() {
 	std::string listenHost = cfg_getstring("MATOTS_LISTEN_HOST", "*");
 	std::string listenPort = cfg_getstring("MATOTS_LISTEN_PORT", "9424");
 	if (listenHost == gListenHost && listenPort == gListenPort) {
-		lzfs_pretty_syslog(LOG_NOTICE,
+		safs_pretty_syslog(LOG_NOTICE,
 				"master <-> tapeservers module: socket address hasn't changed (%s:%s)",
 				listenHost.c_str(), listenPort.c_str());
 		return;
@@ -422,7 +424,7 @@ static void matotsserv_reload() {
 
 	int newSocket = tcpsocket();
 	if (newSocket < 0) {
-		lzfs_pretty_errlog(LOG_WARNING,
+		safs_pretty_errlog(LOG_WARNING,
 				"master <-> tapeservers module: socket address has changed to (%s:%s), "
 				"but can't create new socket",
 				listenHost.c_str(), listenPort.c_str());
@@ -432,10 +434,10 @@ static void matotsserv_reload() {
 	tcpnodelay(newSocket);
 	tcpreuseaddr(newSocket);
 	if (tcpsetacceptfilter(newSocket) < 0 && errno != ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE,"master <-> tapeservers module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE,"master <-> tapeservers module: can't set accept filter");
 	}
 	if (tcpstrlisten(newSocket, listenHost.c_str(), listenPort.c_str(),100)<0) {
-		lzfs_pretty_errlog(LOG_ERR,
+		safs_pretty_errlog(LOG_ERR,
 				"master <-> tapeservers module: socket address has changed, "
 				"but can't listen on the new socket (%s:%s)",
 				listenHost.c_str(), listenPort.c_str());
@@ -446,7 +448,7 @@ static void matotsserv_reload() {
 	gListenSocket = newSocket;
 	gListenHost = listenHost;
 	gListenPort = listenPort;
-	lzfs_pretty_syslog(LOG_NOTICE,
+	safs_pretty_syslog(LOG_NOTICE,
 			"master <-> tapeservers module: socket address has changed, now listen on %s:%s",
 			listenHost.c_str(), listenPort.c_str());
 }
@@ -471,14 +473,14 @@ int matotsserv_init() {
 	tcpnodelay(gListenSocket);
 	tcpreuseaddr(gListenSocket);
 	if (tcpsetacceptfilter(gListenSocket) < 0 && errno != ENOTSUP) {
-		lzfs_silent_errlog(LOG_NOTICE, "master <-> tapeservers module: can't set accept filter");
+		safs_silent_errlog(LOG_NOTICE, "master <-> tapeservers module: can't set accept filter");
 	}
 	if (tcpstrlisten(gListenSocket, gListenHost.c_str(), gListenPort.c_str(), 100) < 0) {
 		throw InitializeException(
 				"master <-> tapeservers module: can't listen on " +
 				gListenHost + ":" + gListenPort + ": " + errorString(errno));
 	}
-	lzfs_pretty_syslog(LOG_NOTICE,
+	safs_pretty_syslog(LOG_NOTICE,
 			"master <-> tapeservers module: listen on (%s:%s)",
 			gListenHost.c_str(),
 			gListenPort.c_str());
@@ -516,10 +518,10 @@ uint8_t matotsserv_get_tapeserver_info(TapeserverId id, TapeserverListEntry& tap
 			tapeserverInfo.server = tapeserver->name;
 			tapeserverInfo.label = static_cast<std::string>(tapeserver->label);
 			tapeserverInfo.address = tapeserver->address;
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		}
 	}
-	return LIZARDFS_ERROR_ENOENT;
+	return SAUNAFS_ERROR_ENOENT;
 }
 
 std::vector<TapeserverListEntry> matotsserv_get_tapeservers() {

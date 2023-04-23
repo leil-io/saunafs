@@ -1,19 +1,21 @@
 /*
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -74,7 +76,7 @@ static RichACL::Ace convertOsxEntryToRichACL(acl_entry_t entry) {
 	uuid_t *uu;
 	ret = acl_get_tag_type(entry, &tag);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to get tag type from ACL entry");
+		safs_pretty_syslog(LOG_WARNING, "Failed to get tag type from ACL entry");
 		return ace;
 	}
 	uu = (uuid_t *)acl_get_qualifier(entry);
@@ -84,7 +86,7 @@ static RichACL::Ace convertOsxEntryToRichACL(acl_entry_t entry) {
 	} else if (tag == ACL_EXTENDED_DENY) {
 		ace.type = RichACL::Ace::kAccessDeniedAceType;
 	} else {
-		lzfs_pretty_syslog(LOG_WARNING, "Only allow and deny entries are supported");
+		safs_pretty_syslog(LOG_WARNING, "Only allow and deny entries are supported");
 		goto free_acl_entry;
 	}
 
@@ -92,13 +94,13 @@ static RichACL::Ace convertOsxEntryToRichACL(acl_entry_t entry) {
 	int id_type;
 	ret = mbr_uuid_to_id(*uu, &uid_or_gid, &id_type);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to translate uuid to id");
+		safs_pretty_syslog(LOG_WARNING, "Failed to translate uuid to id");
 		goto free_acl_entry;
 	}
 
 	ret = acl_get_permset(entry, &permset);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to get permset from ACL entry");
+		safs_pretty_syslog(LOG_WARNING, "Failed to get permset from ACL entry");
 		goto free_acl_entry;
 	}
 	ace.mask = osxPermsetToRichACLMask(permset);
@@ -106,7 +108,7 @@ static RichACL::Ace convertOsxEntryToRichACL(acl_entry_t entry) {
 	if (id_type == ID_TYPE_GID) {
 		ace.flags |= RichACL::Ace::kIdentifierGroup;
 	} else if (id_type != ID_TYPE_UID) {
-		lzfs_pretty_syslog(LOG_WARNING, "Unsupported id type for RichACL: %u", id_type);
+		safs_pretty_syslog(LOG_WARNING, "Unsupported id type for RichACL: %u", id_type);
 		goto free_acl_entry;
 	}
 
@@ -166,12 +168,12 @@ static int createOsxEntry(acl_t osx_acl, const RichACL::Ace &ace) {
 
 	ret = acl_create_entry(&osx_acl, &osx_entry);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to create ACL entry");
+		safs_pretty_syslog(LOG_WARNING, "Failed to create ACL entry");
 		return ret;
 	}
 	ret = acl_get_permset(osx_entry, &permset);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to get ACL permset");
+		safs_pretty_syslog(LOG_WARNING, "Failed to get ACL permset");
 		acl_delete_entry(osx_acl, osx_entry);
 		return ret;
 	}
@@ -179,7 +181,7 @@ static int createOsxEntry(acl_t osx_acl, const RichACL::Ace &ace) {
 		if (ace.mask & perm_entry.first) {
 			ret = acl_add_perm(permset, perm_entry.second);
 			if (ret < 0) {
-				lzfs_pretty_syslog(LOG_WARNING, "Failed to add permission to permset");
+				safs_pretty_syslog(LOG_WARNING, "Failed to add permission to permset");
 				acl_delete_entry(osx_acl, osx_entry);
 				return ret;
 			}
@@ -188,7 +190,7 @@ static int createOsxEntry(acl_t osx_acl, const RichACL::Ace &ace) {
 	acl_tag_t tag = ace.isAllow() ? ACL_EXTENDED_ALLOW : ACL_EXTENDED_DENY;
 	ret = acl_set_tag_type(osx_entry, tag);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to set tag type for ACL");
+		safs_pretty_syslog(LOG_WARNING, "Failed to set tag type for ACL");
 		acl_delete_entry(osx_acl, osx_entry);
 		return ret;
 	}
@@ -207,20 +209,20 @@ static int createOsxEntry(acl_t osx_acl, const RichACL::Ace &ace) {
 	}
 
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to translate uid/gid to uuid");
+		safs_pretty_syslog(LOG_WARNING, "Failed to translate uid/gid to uuid");
 		acl_delete_entry(osx_acl, osx_entry);
 		return ret;
 	}
 	ret = acl_set_qualifier(osx_entry, (void *)uu);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to set ACL qualifier");
+		safs_pretty_syslog(LOG_WARNING, "Failed to set ACL qualifier");
 		acl_delete_entry(osx_acl, osx_entry);
 		return ret;
 	}
 	acl_flagset_t flagset;
 	ret = acl_get_flagset_np(osx_entry, &flagset);
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to get ACL flagset");
+		safs_pretty_syslog(LOG_WARNING, "Failed to get ACL flagset");
 		acl_delete_entry(osx_acl, osx_entry);
 		return ret;
 	}
@@ -240,7 +242,7 @@ static int createOsxEntry(acl_t osx_acl, const RichACL::Ace &ace) {
 		ret = acl_add_flag_np(flagset, ACL_FLAG_DEFER_INHERIT);
 	}
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to add flags to ACL flagset");
+		safs_pretty_syslog(LOG_WARNING, "Failed to add flags to ACL flagset");
 		acl_delete_entry(osx_acl, osx_entry);
 		return ret;
 	}
@@ -254,7 +256,7 @@ static acl_t convertRichACLToOsx(const RichACL &acl) {
 	for (const RichACL::Ace &ace : acl) {
 		ret = createOsxEntry(osx_acl, ace);
 		if (ret < 0) {
-			lzfs_pretty_syslog(LOG_ERR, "Failed to create OSX entry");
+			safs_pretty_syslog(LOG_ERR, "Failed to create OSX entry");
 			acl_free(osx_acl);
 			return nullptr;
 		}
@@ -277,7 +279,7 @@ std::vector<uint8_t> osxAclConverter::objectToOsxXattr(const RichACL &acl) {
 	out.resize(size);
 	ret = acl_copy_ext(out.data(), osx_acl, out.size());
 	if (ret < 0) {
-		lzfs_pretty_syslog(LOG_WARNING, "Failed to serialize ACL to OSX xattr");
+		safs_pretty_syslog(LOG_WARNING, "Failed to serialize ACL to OSX xattr");
 		acl_free(osx_acl);
 		throw AclConversionException("Serializing RichACL to OSX xattr failed");
 	}

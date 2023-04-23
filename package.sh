@@ -16,7 +16,7 @@ get_cvs_branch() {
 }
 
 get_last_header() {
-	grep -Eie '(^lizardfs|mfs).*urgency' debian/changelog | head -n1
+	grep -Eie '(^saunafs|sfs).*urgency' debian/changelog | head -n1
 }
 export -f get_last_header
 
@@ -42,12 +42,12 @@ WORKSPACE="${WORKSPACE:-"${script_dir}"}"
 OSNAME=$(lsb_release -si)
 RELEASE=$(lsb_release -sr | sed 's@n/a@testing@')
 VERSION_LONG_STRING="$(get_version_metadata_string)"
-BUNDLE="lizardfs-bundle-${OSNAME}-${RELEASE}-${VERSION_LONG_STRING}"
+BUNDLE="saunafs-bundle-${OSNAME}-${RELEASE}-${VERSION_LONG_STRING}"
 
 MAKEFLAGS="-j$(nproc)"
 export MAKEFLAGS VERSION_LONG_STRING WORKSPACE
 
-rm -rf lizardfs-bundle-*
+rm -rf saunafs-bundle-*
 mkdir "${BUNDLE}"
 cd "${BUNDLE}"
 

@@ -1,19 +1,21 @@
 /*
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -22,7 +24,7 @@
 
 #include "common/serialization_macros.h"
 
-namespace lzfs_locks {
+namespace safs_locks {
 enum {
 	kInvalid   = 0,
 	kUnlock    = 1,
@@ -33,9 +35,9 @@ enum {
 	kRelease   = 32
 };
 
-LIZARDFS_DEFINE_SERIALIZABLE_ENUM_CLASS(Type, kFlock, kPosix, kAll)
+SAUNAFS_DEFINE_SERIALIZABLE_ENUM_CLASS(Type, kFlock, kPosix, kAll)
 
-LIZARDFS_DEFINE_SERIALIZABLE_CLASS(Info,
+SAUNAFS_DEFINE_SERIALIZABLE_CLASS(Info,
 	uint32_t, version,
 	uint32_t, inode,
 	uint64_t, owner,
@@ -50,7 +52,7 @@ struct InterruptData {
 	InterruptData(uint64_t o, uint32_t i, uint32_t r)
 		: owner(o), ino(i), reqid(r) {}
 
-	LIZARDFS_DEFINE_SERIALIZE_METHODS(owner, ino, reqid);
+	SAUNAFS_DEFINE_SERIALIZE_METHODS(owner, ino, reqid);
 
 	uint64_t owner;
 	uint32_t ino;
@@ -72,7 +74,7 @@ struct FlockWrapper {
 		l_pid(l_pid) {
 	}
 
-	LIZARDFS_DEFINE_SERIALIZE_METHODS(l_type, l_start, l_len, l_pid);
+	SAUNAFS_DEFINE_SERIALIZE_METHODS(l_type, l_start, l_len, l_pid);
 
 	int16_t l_type;   // Type of lock: F_RDLCK, F_WRLCK, or F_UNLCK.
 	int64_t l_start;  // Offset where the lock begins.
@@ -80,4 +82,4 @@ struct FlockWrapper {
 	int32_t l_pid;    // Process holding the lock.
 };
 
-} // namespace lzfs_locks
+} // namespace safs_locks

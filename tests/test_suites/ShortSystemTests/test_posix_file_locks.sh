@@ -2,7 +2,7 @@ timeout_set 1 minutes
 
 USE_RAMDISK=YES \
 	MOUNT_EXTRA_CONFIG="enablefilelocks=1" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 
 # Create files

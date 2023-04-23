@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -25,7 +26,7 @@
 #include "common/crc.h"
 #include "common/exceptions.h"
 #include "common/network_address.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/sockets.h"
 #include "devtools/request_log.h"
 #include "protocol/cltocs.h"
@@ -158,7 +159,7 @@ std::vector<WriteExecutor::Status> WriteExecutor::receiveData() {
 		std::vector<uint8_t> messageData(receiveBuffer_.getMessageData(),
 				receiveBuffer_.getMessageData() + header.length);
 		switch (header.type) {
-			case LIZ_CSTOCL_WRITE_STATUS:
+			case SAU_CSTOCL_WRITE_STATUS:
 				statuses.push_back(processStatusMessage(messageData));
 				if (unconfirmedPackets_ == 0) {
 					throw RecoverableWriteException("Received too many statuses from chunkservers");

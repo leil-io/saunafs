@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -26,7 +28,7 @@
 #include <vector>
 
 #include "common/datapack.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
 #include "common/sockets.h"
 #include "mount/mastercomm.h"
@@ -87,10 +89,10 @@ static void* masterproxy_server(void *args) {
 			}
 
 			buffer.clear();
-			serializeMooseFsPacket(buffer, MATOCL_FUSE_REGISTER, uint8_t(LIZARDFS_STATUS_OK));
+			serializeXaunaFsPacket(buffer, MATOCL_FUSE_REGISTER, uint8_t(SAUNAFS_STATUS_OK));
 
 		} else {
-			if (fs_custom(buffer) != LIZARDFS_STATUS_OK) {
+			if (fs_custom(buffer) != SAUNAFS_STATUS_OK) {
 				tcpclose(sock);
 				return NULL;
 			}
@@ -142,16 +144,16 @@ int masterproxy_init(void) {
 
 	lsock = tcpsocket();
 	if (lsock<0) {
-		//lzfs_pretty_errlog(LOG_ERR,"main master server module: can't create socket");
+		//safs_pretty_errlog(LOG_ERR,"main master server module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
 	tcpnodelay(lsock);
 	if (tcpsetacceptfilter(lsock)<0 && tcpgetlasterror() != TCPENOTSUP) {
-		// lzfs_silent_errlog(LOG_NOTICE,"master proxy: can't set accept filter");
+		// safs_silent_errlog(LOG_NOTICE,"master proxy: can't set accept filter");
 	}
 	if (tcpstrlisten(lsock,"127.0.0.1",0,100)<0) {
-		// lzfs_pretty_errlog(LOG_ERR,"main master server module: can't listen on socket");
+		// safs_pretty_errlog(LOG_ERR,"main master server module: can't listen on socket");
 		tcpclose(lsock);
 		lsock = -1;
 		return -1;

@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2016
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -32,7 +33,7 @@
 #include "common/goal.h"
 #include "common/compact_vector.h"
 
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 #  include "common/judy_map.h"
 #else
 #  include <map>
@@ -192,7 +193,7 @@ struct FSNodeDevice : public FSNode {
  * Avg size (10 files) ~ 280B (28B per file)
  */
 struct FSNodeDirectory : public FSNode {
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 	typedef judy_map<hstorage::Handle, FSNode *> EntriesContainer;
 #else
 	struct HandleCompare {
@@ -341,7 +342,7 @@ struct TrashPathKey {
 #endif
 };
 
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 typedef judy_map<TrashPathKey, hstorage::Handle> TrashPathContainer;
 typedef judy_map<uint32_t, hstorage::Handle> ReservedPathContainer;
 #else

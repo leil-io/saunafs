@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -33,7 +34,7 @@ static int kInfiniteTimeout = 10 * 24 * 3600 * 1000; // simulate infinite timeou
 static void file_info_usage() {
 	fprintf(stderr,
 	        "show files info (shows detailed info of each file chunk)\n\nusage:\n"
-	        " lizardfs fileinfo name [name ...]\n");
+	        " saunafs fileinfo name [name ...]\n");
 	fprintf(stderr, " -l - wait until fileinfo will finish (otherwise there is a 10s timeout)\n");
 }
 
@@ -73,7 +74,7 @@ static int chunks_info(const char *file_name, int fd, uint32_t inode, bool long_
 		PacketHeader header;
 		deserializePacketHeader(buffer, header);
 
-		if (header.type != LIZ_MATOCL_CHUNKS_INFO) {
+		if (header.type != SAU_MATOCL_CHUNKS_INFO) {
 			printf("%s [%" PRIu32 "]: master query: wrong answer (type)\n", file_name,
 					chunk_index);
 			return -1;
@@ -95,7 +96,7 @@ static int chunks_info(const char *file_name, int fd, uint32_t inode, bool long_
 			return -1;
 		}
 
-		uint8_t status = LIZARDFS_STATUS_OK;
+		uint8_t status = SAUNAFS_STATUS_OK;
 		if (version == matocl::chunksInfo::kStatusPacketVersion) {
 			matocl::chunksInfo::deserialize(buffer, message_id, status);
 		} else if (version != matocl::chunksInfo::kResponsePacketVersion) {
@@ -103,8 +104,8 @@ static int chunks_info(const char *file_name, int fd, uint32_t inode, bool long_
 					chunk_index);
 			return -1;
 		}
-		if (status != LIZARDFS_STATUS_OK) {
-			printf("%s [%" PRIu32 "]: %s\n", file_name, chunk_index, lizardfs_error_string(status));
+		if (status != SAUNAFS_STATUS_OK) {
+			printf("%s [%" PRIu32 "]: %s\n", file_name, chunk_index, saunafs_error_string(status));
 			return -1;
 		}
 
@@ -178,7 +179,7 @@ static int file_info(const char *fileName, bool long_wait) {
 		PacketHeader header;
 		deserializePacketHeader(buffer, header);
 
-		if (header.type != LIZ_MATOCL_TAPE_INFO) {
+		if (header.type != SAU_MATOCL_TAPE_INFO) {
 			printf("%s [tape info]: master query: wrong answer (type)\n", fileName);
 			close_master_conn(1);
 			return -1;
@@ -201,7 +202,7 @@ static int file_info(const char *fileName, bool long_wait) {
 			return -1;
 		}
 
-		uint8_t status = LIZARDFS_STATUS_OK;
+		uint8_t status = SAUNAFS_STATUS_OK;
 		if (version == matocl::tapeInfo::kStatusPacketVersion) {
 			matocl::tapeInfo::deserialize(buffer, messageId, status);
 		} else if (version != matocl::tapeInfo::kResponsePacketVersion) {
@@ -209,8 +210,8 @@ static int file_info(const char *fileName, bool long_wait) {
 			close_master_conn(1);
 			return -1;
 		}
-		if (status != LIZARDFS_STATUS_OK) {
-			printf("%s [tape info]: %s\n", fileName, lizardfs_error_string(status));
+		if (status != SAUNAFS_STATUS_OK) {
+			printf("%s [tape info]: %s\n", fileName, saunafs_error_string(status));
 			close_master_conn(1);
 			return -1;
 		}

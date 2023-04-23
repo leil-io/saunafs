@@ -58,10 +58,10 @@ check_members("struct stat" "${ST_MEMBERS_CHECKED}" "sys/stat.h")
 check_members("struct tm" "tm_gmtoff" "time.h")
 check_members("struct rusage" "ru_maxrss" "sys/resource.h")
 
-CHECK_FUNCTION_EXISTS(fork     LIZARDFS_HAVE_WORKING_FORK)
-CHECK_FUNCTION_EXISTS(vfork    LIZARDFS_HAVE_WORKING_VFORK)
-CHECK_TEMPLATE_FUNCTION_EXISTS("string" "std::to_string(0)" LIZARDFS_HAVE_STD_TO_STRING)
-CHECK_TEMPLATE_FUNCTION_EXISTS("string" "std::stoull(\"0\")" LIZARDFS_HAVE_STD_STOULL)
+CHECK_FUNCTION_EXISTS(fork     SAUNAFS_HAVE_WORKING_FORK)
+CHECK_FUNCTION_EXISTS(vfork    SAUNAFS_HAVE_WORKING_VFORK)
+CHECK_TEMPLATE_FUNCTION_EXISTS("string" "std::to_string(0)" SAUNAFS_HAVE_STD_TO_STRING)
+CHECK_TEMPLATE_FUNCTION_EXISTS("string" "std::stoull(\"0\")" SAUNAFS_HAVE_STD_STOULL)
 
 set(REQUIRED_FUNCTIONS atexit ftruncate gettimeofday memmove memset mkdir strchr strdup strtol
     strtoul ftello fseeko)
@@ -74,16 +74,16 @@ set(OPTIONAL_FUNCTIONS strerror perror pread pwrite readv writev getrusage
   setitimer posix_fadvise fallocate)
 check_functions("${OPTIONAL_FUNCTIONS}" false)
 
-CHECK_LIBRARY_EXISTS(rt clock_gettime "time.h" LIZARDFS_HAVE_CLOCK_GETTIME)
+CHECK_LIBRARY_EXISTS(rt clock_gettime "time.h" SAUNAFS_HAVE_CLOCK_GETTIME)
 
 set(CMAKE_REQUIRED_INCLUDES "sys/mman.h")
 set(OPTIONAL_FUNCTIONS2 dup2 mlockall getcwd)
 check_functions("${OPTIONAL_FUNCTIONS2}" false)
 
 set(CMAKE_REQUIRED_FLAGS "-std=c++11")
-check_cxx_expression(::std::chrono::steady_clock::is_steady chrono LIZARDFS_HAVE_STD_CHRONO_STEADY_CLOCK)
-check_cxx_expression("sizeof(::std::allocator_traits<std::allocator<int*>>::pointer)" memory LIZARDFS_HAVE_STD_ALLOCATOR_TRAITS)
-check_cxx_source_compiles("thread_local int i; int main(){}" LIZARDFS_HAVE_THREAD_LOCAL)
+check_cxx_expression(::std::chrono::steady_clock::is_steady chrono SAUNAFS_HAVE_STD_CHRONO_STEADY_CLOCK)
+check_cxx_expression("sizeof(::std::allocator_traits<std::allocator<int*>>::pointer)" memory SAUNAFS_HAVE_STD_ALLOCATOR_TRAITS)
+check_cxx_source_compiles("thread_local int i; int main(){}" SAUNAFS_HAVE_THREAD_LOCAL)
 unset(CMAKE_REQUIRED_FLAGS)
 
 check_cxx_compiler_flag(-mcrc32    CXX_HAS_MCRC32)
@@ -94,16 +94,16 @@ __attribute__ ((target (\"sse\"))) int test_sse() { return 1; }
 __attribute__ ((target (\"ssse3\"))) int test_ssse3() { return 2; }
 int main() { if (__builtin_cpu_supports(\"ssse3\")) return test_ssse3(); else return test_default(); }
 ")
-check_cxx_source_compiles("${_CHECK_CXX_CPU_CHECK_CODE}" LIZARDFS_HAVE_CPU_CHECK)
+check_cxx_source_compiles("${_CHECK_CXX_CPU_CHECK_CODE}" SAUNAFS_HAVE_CPU_CHECK)
 
 if(APPLE)
     set(SOCKET_CONVERT_POLL_TO_SELECT 1)
 endif()
 
 set(CMAKE_REQUIRED_FLAGS "-D_GNU_SOURCE")
-check_symbol_exists(FALLOC_FL_PUNCH_HOLE "fcntl.h" LIZARDFS_HAVE_FALLOC_FL_PUNCH_HOLE)
-if(NOT LIZARDFS_HAVE_FALLOC_FL_PUNCH_HOLE)
-    check_symbol_exists(FALLOC_FL_PUNCH_HOLE "linux/falloc.h" LIZARDFS_HAVE_FALLOC_FL_PUNCH_HOLE_IN_LINUX_FALLOC_H)
+check_symbol_exists(FALLOC_FL_PUNCH_HOLE "fcntl.h" SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE)
+if(NOT SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE)
+    check_symbol_exists(FALLOC_FL_PUNCH_HOLE "linux/falloc.h" SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE_IN_LINUX_FALLOC_H)
 endif()
 unset(CMAKE_REQUIRED_FLAGS)
 
@@ -113,5 +113,5 @@ set(_CHECK_CXX_STD_FUTURE_CODE "
 std::future<void> test_future;
 int main() { return 0; }
 ")
-check_cxx_source_compiles("${_CHECK_CXX_STD_FUTURE_CODE}" LIZARDFS_HAVE_STD_FUTURE)
+check_cxx_source_compiles("${_CHECK_CXX_STD_FUTURE_CODE}" SAUNAFS_HAVE_STD_FUTURE)
 unset(CMAKE_REQUIRED_FLAGS)

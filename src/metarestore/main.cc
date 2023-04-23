@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -34,7 +36,7 @@
 
 #include "common/cfg.h"
 #include "common/metadata.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/rotate_files.h"
 #include "common/setup.h"
 #include "common/slogger.h"
@@ -88,7 +90,7 @@ int changelog_checkname(const char *fname) {
 				while (isdigit(*ptr)) {
 					++ ptr;
 				}
-				if (strcmp(ptr, ".mfs") == 0) {
+				if (strcmp(ptr, ".sfs") == 0) {
 					return 1;
 				}
 			}
@@ -98,7 +100,7 @@ int changelog_checkname(const char *fname) {
 }
 
 void usage(const char* appname) {
-	lzfs_pretty_syslog(LOG_ERR, "invalid/missing arguments");
+	safs_pretty_syslog(LOG_ERR, "invalid/missing arguments");
 	fprintf(stderr, "restore metadata:\n"
 			"\t%s [-c] [-k <checksum>] [-z] [-f] [-b] [-i] [-x [-x]] [-B n] -m <meta data file> -o "
 			"<restored meta data file> [ <change log file> [ <change log file> [ .... ]]\n"
@@ -143,7 +145,7 @@ void meta_version_on_disk(std::string path) {
 			return;
 		}
 	} catch (MetadataCheckException& ex) {
-		lzfs_pretty_syslog(LOG_WARNING, "malformed metadata file: %s", ex.what());
+		safs_pretty_syslog(LOG_WARNING, "malformed metadata file: %s", ex.what());
 		printf("0\n");
 		return;
 	}
@@ -167,10 +169,10 @@ void meta_version_on_disk(std::string path) {
 					return;
 				}
 			} else if (oldExists && fullFileName != kChangelogFilename) {
-				lzfs_pretty_syslog(LOG_WARNING, "changelog `%s' missing", fullFileName.c_str());
+				safs_pretty_syslog(LOG_WARNING, "changelog `%s' missing", fullFileName.c_str());
 			}
 		} catch (FilesystemException& ex) {
-			lzfs_pretty_syslog(LOG_WARNING, "exception while fs:exists: %s", ex.what());
+			safs_pretty_syslog(LOG_WARNING, "exception while fs:exists: %s", ex.what());
 			printf("0\n");
 			return;
 		}
@@ -207,7 +209,7 @@ int main(int argc,char **argv) {
 				versionRecovery = true;
 				break;
 			case 'v':
-				printf("version: %s\n", LIZARDFS_PACKAGE_VERSION);
+				printf("version: %s\n", SAUNAFS_PACKAGE_VERSION);
 				return 0;
 			case 'o':
 				metaout = optarg;
@@ -249,7 +251,7 @@ int main(int argc,char **argv) {
 				char* endPtr;
 				*expectedChecksum = strtoull(optarg, &endPtr, 10);
 				if (*endPtr != '\0') {
-					lzfs_pretty_syslog(LOG_ERR, "invalid checksum: %s", optarg);
+					safs_pretty_syslog(LOG_ERR, "invalid checksum: %s", optarg);
 					return 1;
 				}
 				break;
@@ -298,8 +300,8 @@ int main(int argc,char **argv) {
 			datapath = DATA_PATH;
 		}
 		// All candidates from the least to the most preferred one
-		// We still load metadata.mfs.back for scenarios where metaretore
-		// is started during migration to lizardfs version with new naming scheme.
+		// We still load metadata.sfs.back for scenarios where metaretore
+		// is started during migration to saunafs version with new naming scheme.
 		std::string candidates[] {
 			std::string(kMetadataMlFilename) + ".back.1",
 			std::string(kMetadataFilename) + ".back.1",
@@ -321,40 +323,40 @@ int main(int argc,char **argv) {
 					bestmetadata = metadata_candidate;
 				}
 			} catch (MetadataCheckException& ex) {
-				lzfs_pretty_syslog(LOG_NOTICE, "skipping malformed metadata file %s: %s", candidate.c_str(), ex.what());
+				safs_pretty_syslog(LOG_NOTICE, "skipping malformed metadata file %s: %s", candidate.c_str(), ex.what());
 			}
 		}
 		if (bestmetadata.empty()) {
-			lzfs_pretty_syslog(LOG_ERR, "can't find backed up metadata file");
+			safs_pretty_syslog(LOG_ERR, "can't find backed up metadata file");
 			return 1;
 		}
 		metadata = bestmetadata;
 		metaout =  datapath + "/" + kMetadataFilename;
-		lzfs_pretty_syslog(LOG_INFO, "file %s will be used to restore the most recent metadata",
+		safs_pretty_syslog(LOG_INFO, "file %s will be used to restore the most recent metadata",
 				metadata.c_str());
 	}
 	try {
 		if (fs_init(metadata.c_str(), ignoreflag, noLock) != 0) {
-			lzfs_pretty_syslog(LOG_NOTICE, "error: can't read metadata from file: %s", metadata.c_str());
+			safs_pretty_syslog(LOG_NOTICE, "error: can't read metadata from file: %s", metadata.c_str());
 			return 1;
 		}
 	} catch (const std::exception& e) {
-		lzfs_pretty_syslog(LOG_ERR, "error: can't read metadata from file: %s, %s", metadata.c_str(), e.what());
+		safs_pretty_syslog(LOG_ERR, "error: can't read metadata from file: %s, %s", metadata.c_str(), e.what());
 		return 1;
 	}
 	if (fs_getversion() == 0) {
-		lzfs_pretty_syslog(LOG_ERR, "invalid metadata version (0)");
+		safs_pretty_syslog(LOG_ERR, "invalid metadata version (0)");
 		return 1;
 	}
 	if (vl > 0) {
-		lzfs_pretty_syslog(LOG_NOTICE, "loaded metadata with version %" PRIu64 "", fs_getversion());
+		safs_pretty_syslog(LOG_NOTICE, "loaded metadata with version %" PRIu64 "", fs_getversion());
 	}
 
 	if (autorestore) {
 		std::vector<std::string> filenames;
 		DIR *dd = opendir(datapath.c_str());
 		if (!dd) {
-			lzfs_pretty_syslog(LOG_ERR, "can't open data directory");
+			safs_pretty_syslog(LOG_ERR, "can't open data directory");
 			return 1;
 		}
 		rewinddir(dd);
@@ -366,7 +368,7 @@ int main(int argc,char **argv) {
 				try {
 					lastlv = changelogGetLastLogVersion(filenames.back());
 				} catch (const Exception& ex) {
-					lzfs_pretty_syslog(LOG_WARNING, "%s", ex.what());
+					safs_pretty_syslog(LOG_WARNING, "%s", ex.what());
 					lastlv = 0;
 				}
 				skip = ((lastlv<fs_getversion() || firstlv==0) && forcealllogs==0)?1:0;
@@ -390,7 +392,7 @@ int main(int argc,char **argv) {
 						oss << "???";
 					}
 					oss << ")";
-					lzfs_pretty_syslog(LOG_NOTICE, "%s", oss.str().c_str());
+					safs_pretty_syslog(LOG_NOTICE, "%s", oss.str().c_str());
 				}
 				if (skip) {
 					filenames.pop_back();
@@ -399,7 +401,7 @@ int main(int argc,char **argv) {
 		}
 		closedir(dd);
 		if (filenames.empty() && metadata == metaout) {
-			lzfs_pretty_syslog(LOG_NOTICE, "nothing to do, exiting without changing anything");
+			safs_pretty_syslog(LOG_NOTICE, "nothing to do, exiting without changing anything");
 			if (!noLock) {
 				fs_unlock();
 			}
@@ -415,7 +417,7 @@ int main(int argc,char **argv) {
 			try {
 				lastlv = changelogGetLastLogVersion(argv[pos]);
 			} catch (const Exception& ex) {
-				lzfs_pretty_syslog(LOG_WARNING, "%s", ex.what());
+				safs_pretty_syslog(LOG_WARNING, "%s", ex.what());
 				lastlv = 0;
 			}
 			skip = ((lastlv<fs_getversion() || firstlv==0) && forcealllogs==0)?1:0;
@@ -439,7 +441,7 @@ int main(int argc,char **argv) {
 					oss << "???";
 				}
 				oss << ")";
-				lzfs_pretty_syslog(LOG_NOTICE, "%s", oss.str().c_str());
+				safs_pretty_syslog(LOG_NOTICE, "%s", oss.str().c_str());
 			}
 			if (skip==0) {
 				filenames.push_back(argv[pos]);
@@ -450,7 +452,7 @@ int main(int argc,char **argv) {
 
 	uint8_t status = merger_loop();
 
-	if (status != LIZARDFS_STATUS_OK && savebest==0) {
+	if (status != SAUNAFS_STATUS_OK && savebest==0) {
 		return 1;
 	}
 
@@ -467,7 +469,7 @@ int main(int argc,char **argv) {
 		fs_dump();
 		chunk_dump();
 	} else {
-		lzfs_pretty_syslog(LOG_NOTICE, "store metadata into file: %s", metaout.c_str());
+		safs_pretty_syslog(LOG_NOTICE, "store metadata into file: %s", metaout.c_str());
 		if (metaout == metadata) {
 			rotateFiles(metaout, storedPreviousBackMetaCopies);
 		}

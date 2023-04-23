@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -26,9 +28,9 @@
 
 #include "common/goal.h"
 #include "common/human_readable_format.h"
-#include "common/lizardfs_version.h"
-#include "common/moosefs_string.h"
-#include "common/moosefs_vector.h"
+#include "common/saunafs_version.h"
+#include "common/xaunafs_string.h"
+#include "common/xaunafs_vector.h"
 #include "protocol/packet.h"
 #include "common/serialization.h"
 #include "common/serialization_macros.h"
@@ -41,8 +43,8 @@ SERIALIZABLE_CLASS_BODY(MountEntry,
 		uint32_t, sessionId,
 		uint32_t, peerIp,
 		uint32_t, version,
-		MooseFsString<uint32_t>, info,
-		MooseFsString<uint32_t>, path,
+		XaunaFsString<uint32_t>, info,
+		XaunaFsString<uint32_t>, path,
 		uint8_t, flags,
 		uint32_t, rootuid,
 		uint32_t, rootgid,
@@ -60,7 +62,7 @@ std::string ListMountsCommand::name() const {
 	return "list-mounts";
 }
 
-LizardFsProbeCommand::SupportedOptions ListMountsCommand::supportedOptions() const {
+SaunaFsProbeCommand::SupportedOptions ListMountsCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{kVerboseMode,   "Be a little more verbose and show goal and trash time limits."},
@@ -78,13 +80,13 @@ void ListMountsCommand::run(const Options& options) const {
 	}
 
 	ServerConnection connection(options.argument(0), options.argument(1));
-	MooseFSVector<MountEntry> mounts;
+	XaunaFSVector<MountEntry> mounts;
 	std::vector<uint8_t> request, response;
-	serializeMooseFsPacket(request, CLTOMA_SESSION_LIST, true);
+	serializeXaunaFsPacket(request, CLTOMA_SESSION_LIST, true);
 	response = connection.sendAndReceive(request, MATOCL_SESSION_LIST);
 	// There is uint16_t SESSION_STATS = 16 at the beginning of response
 	uint16_t dummy;
-	deserializeAllMooseFsPacketDataNoHeader(response, dummy, mounts);
+	deserializeAllXaunaFsPacketDataNoHeader(response, dummy, mounts);
 
 	std::sort(mounts.begin(), mounts.end(),
 			[](const MountEntry& a, const MountEntry& b) -> bool
@@ -104,7 +106,7 @@ void ListMountsCommand::run(const Options& options) const {
 			std::cout << "session " << mount.sessionId << ": " << '\n'
 					<< "\tip: " << ipToString(mount.peerIp) << '\n'
 					<< "\tmount point: " << mount.info << '\n'
-					<< "\tversion: " << lizardfsVersionToString(mount.version) << '\n'
+					<< "\tversion: " << saunafsVersionToString(mount.version) << '\n'
 					<< "\troot dir: " << mount.path << '\n'
 					<< "\troot uid: " << mount.rootuid << '\n'
 					<< "\troot gid: " << mount.rootgid << '\n'
@@ -135,7 +137,7 @@ void ListMountsCommand::run(const Options& options) const {
 			std::cout << mount.sessionId
 					<< ' ' << ipToString(mount.peerIp)
 					<< ' ' << mount.info
-					<< ' ' << lizardfsVersionToString(mount.version)
+					<< ' ' << saunafsVersionToString(mount.version)
 					<< ' ' << mount.path
 					<< ' ' << mount.rootuid
 					<< ' ' << mount.rootgid

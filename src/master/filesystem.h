@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -43,7 +45,7 @@
 #include "protocol/named_inode_entry.h"
 #include "protocol/quota.h"
 
-LIZARDFS_CREATE_EXCEPTION_CLASS_MSG(NoMetadataException, Exception, "no metadata");
+SAUNAFS_CREATE_EXCEPTION_CLASS_MSG(NoMetadataException, Exception, "no metadata");
 
 uint8_t fs_cancel_job(uint32_t job_id);
 uint32_t fs_reserve_job_id();
@@ -55,7 +57,7 @@ uint64_t fs_getversion();
 uint64_t fs_checksum(ChecksumMode mode);
 
 /// Starts recalculating metadata checksum in background.
-/// \return LIZARDFS_STATUS_OK iff dump started successfully, otherwise cause of the failure.
+/// \return SAUNAFS_STATUS_OK iff dump started successfully, otherwise cause of the failure.
 uint8_t fs_start_checksum_recalculation();
 
 /// Load and apply changelogs.
@@ -67,7 +69,7 @@ int fs_loadall();
 /*! \brief Dump current state of file system metadata.
  *
  * \param dumpType - choose between foreground and background dumping.
- * \return LIZARDFS_STATUS_OK iff dump started/completed successfully, otherwise cause of the failure.
+ * \return SAUNAFS_STATUS_OK iff dump started/completed successfully, otherwise cause of the failure.
  */
 uint8_t fs_storeall(MetadataDumper::DumpType dumpType);
 

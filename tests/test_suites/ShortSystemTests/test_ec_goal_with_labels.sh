@@ -7,14 +7,14 @@ timeout_set 4 minutes
 # '6 ec(3,2)' -- 6 ec(3,2) parts (each is different)
 chunks_state() {
 	{
-		find_all_chunks | grep -o chunk_.* | grep -o chunk_00000 | sed -e 's/.*/standard/'
-		find_all_chunks | grep -o chunk_.* | sort -u | grep -o '_of_[2-9]_[1-9]' | sed -e 's/_of_/ec/'
+		find_all_metadata_chunks | grep -o chunk_.* | grep -o chunk_00000 | sed -e 's/.*/standard/'
+		find_all_metadata_chunks | grep -o chunk_.* | sort -u | grep -o '_of_[2-9]_[1-9]' | sed -e 's/_of_/ec/'
 	} | sort | uniq -c | tr '\n' ' ' | trim_hard
 }
 
 count_chunks_on_chunkservers() {
 	for i in $@; do
-		find_chunkserver_chunks $i
+		find_chunkserver_metadata_chunks $i
 	done | wc -l
 }
 
@@ -32,31 +32,31 @@ USE_RAMDISK=YES \
 			`|REPLICATIONS_DELAY_INIT = 0`
 			`|CHUNKS_REBALANCING_BETWEEN_LABELS=1`
 			`|REPLICATIONS_DELAY_DISCONNECT = 0"\
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 mkdir dir
-lizardfs setgoal ec21_ssd dir
+saunafs setgoal ec21_ssd dir
 FILE_SIZE=1K file-generate dir/file
 
 assert_equals "3 ec2_1" "$(chunks_state)"
 assert_equals 3 "$(count_chunks_on_chunkservers {6..8})"
 assert_equals 3 "$(count_chunks_on_chunkservers {0..11})"
 
-lizardfs setgoal ec33_hdd dir/file
+saunafs setgoal ec33_hdd dir/file
 assert_eventually_prints '6 ec3_3' 'chunks_state' '2 minutes'
 assert_equals 3 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 6 "$(count_chunks_on_chunkservers {0..11})"
 
-lizardfs setgoal ec22_mix dir/file
+saunafs setgoal ec22_mix dir/file
 assert_eventually_prints '4 ec2_2' 'chunks_state' '2 minutes'
 assert_equals 2 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 2 "$(count_chunks_on_chunkservers {6..8})"
 
-lizardfs setgoal ec36_mix dir/file
-lizardfs fileinfo dir/*
+saunafs setgoal ec36_mix dir/file
+saunafs fileinfo dir/*
 assert_eventually_prints '9 ec3_6' 'chunks_state' '2 minutes'
-lizardfs fileinfo dir/*
+saunafs fileinfo dir/*
 assert_equals 3 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 3 "$(count_chunks_on_chunkservers {6..8})"
 assert_equals 3 "$(count_chunks_on_chunkservers {9..11})"

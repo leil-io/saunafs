@@ -1,13 +1,13 @@
 goal=9
 CHUNKSERVERS=9 \
-		MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+		MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 		CHUNKSERVER_EXTRA_CONFIG="HDD_TEST_FREQ = 10000" \
 		USE_RAMDISK=YES \
-		setup_local_empty_lizardfs info
+		setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 touch file
-lizardfs setgoal $goal file
+saunafs setgoal $goal file
 FILE_SIZE=1234567 file-generate file
 
 hdds=()

@@ -1,19 +1,22 @@
 /*
+
+
  Copyright 2015 Skytechnology sp. z o.o.
+ Copyright 2023 Leil Storage OÜ
 
- This file is part of LizardFS.
+ This file is part of SaunaFS.
 
- LizardFS is free software: you can redistribute it and/or modify
+ SaunaFS is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, version 3.
 
- LizardFS is distributed in the hope that it will be useful,
+ SaunaFS is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+ along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -86,16 +89,16 @@ int SliceReadPlanner::addParts(SliceReadPlan *plan, int first_block, int block_c
 	int end = std::min<int>(ops + parts_count, weighted_parts_to_use_.size());
 
 	for (; ops < end; ++ops) {
-		ReadPlan::ReadOperation op{first_block * MFSBLOCKSIZE, 0, 0, wave};
-		op.request_size = MFSBLOCKSIZE * std::min(
+		ReadPlan::ReadOperation op{first_block * SFSBLOCKSIZE, 0, 0, wave};
+		op.request_size = SFSBLOCKSIZE * std::min(
 				(int)slice_traits::getNumberOfBlocks(weighted_parts_to_use_[ops].type) - first_block,
 				block_count);
 		int index = part_indices_[weighted_parts_to_use_[ops].type.getSlicePart()];
 		if (index < 0) {
 			op.buffer_offset = buffer_offset;
-			buffer_offset += block_count * MFSBLOCKSIZE;
+			buffer_offset += block_count * SFSBLOCKSIZE;
 		} else {
-			op.buffer_offset = index * MFSBLOCKSIZE * block_count;
+			op.buffer_offset = index * SFSBLOCKSIZE * block_count;
 		}
 		plan->read_operations.push_back({weighted_parts_to_use_[ops].type, op});
 	}
@@ -167,7 +170,7 @@ bool SliceReadPlanner::shouldReadPartsRequiredForRecovery() const {
 std::unique_ptr<ReadPlan> SliceReadPlanner::buildPlanFor(uint32_t first_block,
 		uint32_t block_count) {
 	std::unique_ptr<SliceReadPlan> plan = getPlan();
-	plan->buffer_part_size = block_count * MFSBLOCKSIZE;
+	plan->buffer_part_size = block_count * SFSBLOCKSIZE;
 
 	// Count occurrences
 	std::bitset<Goal::Slice::kMaxPartsCount> part_bitset;
@@ -180,7 +183,7 @@ std::unique_ptr<ReadPlan> SliceReadPlanner::buildPlanFor(uint32_t first_block,
 	int next_index = 0;
 	part_indices_.fill(-1);
 	for (const auto &part : slice_parts_) {
-		int size = MFSBLOCKSIZE * std::min<int>(
+		int size = SFSBLOCKSIZE * std::min<int>(
 			slice_traits::getNumberOfBlocks(ChunkPartType(slice_type_, part)) - first_block,
 			block_count);
 		plan->requested_parts.push_back({part, size});

@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
@@ -97,7 +98,7 @@ int fs_posixlock_op(const FsContext &context, uint32_t inode, uint64_t start,
  */
 int fs_posixlock_probe(const FsContext &context, uint32_t inode, uint64_t start, uint64_t end,
 		uint64_t owner, uint32_t sessionid, uint32_t reqid, uint32_t msgid, uint16_t op,
-		lzfs_locks::FlockWrapper &info);
+		safs_locks::FlockWrapper &info);
 
 /*! \brief Release (unlock + unqueue) all locks from a given session
  */
@@ -106,9 +107,9 @@ int fs_locks_clear_session(const FsContext &context, uint8_t type, uint32_t inod
 
 /*! \brief Perform a lock management operation on inode */
 int fs_locks_list_all(const FsContext &context, uint8_t type, bool pending,
-		uint64_t start, uint64_t max, std::vector<lzfs_locks::Info> &locks);
+		uint64_t start, uint64_t max, std::vector<safs_locks::Info> &locks);
 int fs_locks_list_inode(const FsContext &context, uint8_t type, bool pending,
-		uint32_t inode, uint64_t start, uint64_t max, std::vector<lzfs_locks::Info> &locks);
+		uint32_t inode, uint64_t start, uint64_t max, std::vector<safs_locks::Info> &locks);
 int fs_locks_unlock_inode(const FsContext &context, uint8_t type, uint32_t inode,
 		std::vector<FileLocks::Owner> &applied);
 int fs_locks_remove_pending(const FsContext &context, uint8_t type, uint64_t ownerid,

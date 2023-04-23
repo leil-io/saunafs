@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2017
-   Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -98,8 +99,8 @@ void FSNode::destroy(FSNode *node) {
 // number of blocks in the last chunk before EOF
 static uint32_t last_chunk_blocks(FSNodeFile *node) {
 	const uint64_t last_byte = node->length - 1;
-	const uint32_t last_byte_offset = last_byte % MFSCHUNKSIZE;
-	const uint32_t last_block = last_byte_offset / MFSBLOCKSIZE;
+	const uint32_t last_byte_offset = last_byte % SFSCHUNKSIZE;
+	const uint32_t last_block = last_byte_offset / SFSBLOCKSIZE;
 	const uint32_t block_count = last_block + 1;
 	return block_count;
 }
@@ -114,7 +115,7 @@ static bool last_chunk_nonempty(FSNodeFile *node) {
 
 	// file has non-zero length and contains at least one chunk
 	const uint64_t last_byte = node->length - 1;
-	const uint32_t last_chunk = last_byte / MFSCHUNKSIZE;
+	const uint32_t last_chunk = last_byte / SFSCHUNKSIZE;
 	if (last_chunk < chunks) {
 		// last chunk exists, check if it isn't the zero chunk
 		return node->chunks[last_chunk] != 0;
@@ -131,10 +132,10 @@ static uint32_t file_chunks(FSNodeFile *node) {
 
 // compute the "size" statistic for a file node
 static uint64_t file_size(FSNodeFile *node, uint32_t nonzero_chunks) {
-	uint64_t size = (uint64_t)nonzero_chunks * (MFSCHUNKSIZE + MFSHDRSIZE);
+	uint64_t size = (uint64_t)nonzero_chunks * (SFSCHUNKSIZE + SFSHDRSIZE);
 	if (last_chunk_nonempty(node)) {
-		size -= MFSCHUNKSIZE;
-		size += last_chunk_blocks(node) * MFSBLOCKSIZE;
+		size -= SFSCHUNKSIZE;
+		size += last_chunk_blocks(node) * SFSBLOCKSIZE;
 	}
 	return size;
 }
@@ -143,8 +144,8 @@ static uint64_t file_size(FSNodeFile *node, uint32_t nonzero_chunks) {
 // compute the disk space cost of all parts of a xor/ec chunk of given size
 static uint32_t ec_chunk_realsize(uint32_t blocks, uint32_t data_part_count, uint32_t parity_part_count) {
 	const uint32_t stripes = (blocks + data_part_count - 1) / data_part_count;
-	uint32_t size = blocks * MFSBLOCKSIZE;                 // file data
-	size += parity_part_count * stripes * MFSBLOCKSIZE;     // parity data
+	uint32_t size = blocks * SFSBLOCKSIZE;                 // file data
+	size += parity_part_count * stripes * SFSBLOCKSIZE;     // parity data
 	size += 4096 * (data_part_count + parity_part_count);  // headers of data and parity parts
 	return size;
 }
@@ -170,7 +171,7 @@ static uint64_t file_realsize(FSNodeFile *node, uint32_t nonzero_chunks, uint64_
 			int parity_part_count = slice_traits::getNumberOfParityParts(slice);
 
 			uint32_t full_chunk_realsize =
-			    ec_chunk_realsize(MFSBLOCKSINCHUNK, data_part_count, parity_part_count);
+			    ec_chunk_realsize(SFSBLOCKSINCHUNK, data_part_count, parity_part_count);
 			uint64_t size = (uint64_t)nonzero_chunks * full_chunk_realsize;
 			if (last_chunk_nonempty(node)) {
 				size -= full_chunk_realsize;
@@ -179,7 +180,7 @@ static uint64_t file_realsize(FSNodeFile *node, uint32_t nonzero_chunks, uint64_
 			}
 			full_size += size;
 		} else {
-			lzfs_pretty_syslog(LOG_ERR, "file_realsize: inode %" PRIu32 " has unknown goal 0x%" PRIx8, node->id,
+			safs_pretty_syslog(LOG_ERR, "file_realsize: inode %" PRIu32 " has unknown goal 0x%" PRIx8, node->id,
 			       node->goal);
 			return 0;
 		}
@@ -656,7 +657,7 @@ void fsnodes_getpath(FSNodeDirectory *parent, FSNode *child, std::string &path) 
 	uint32_t size = fsnodes_getpath_size(parent, child);
 
 	if (size > 65535) {
-		lzfs_pretty_syslog(LOG_WARNING, "path too long !!! - truncate");
+		safs_pretty_syslog(LOG_WARNING, "path too long !!! - truncate");
 		size = 65535;
 	}
 
@@ -748,7 +749,7 @@ void fsnodes_getdetacheddata(const TrashPathContainer &data, uint8_t *dbuff)
 }
 
 void fsnodes_getdetacheddata(const TrashPathContainer &data, uint32_t off, uint32_t max_entries, std::vector<NamedInodeEntry> &entries) {
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 	auto it = data.find_nth(off);
 #else
 	auto it = off < data.size() ? std::next(data.begin(), off) : data.end();
@@ -767,7 +768,7 @@ void fsnodes_getdetacheddata(const ReservedPathContainer &data, uint8_t *dbuff) 
 }
 
 void fsnodes_getdetacheddata(const ReservedPathContainer &data, uint32_t off, uint32_t max_entries, std::vector<NamedInodeEntry> &entries) {
-#ifdef LIZARDFS_HAVE_64BIT_JUDY
+#ifdef SAUNAFS_HAVE_64BIT_JUDY
 	auto it = data.find_nth(off);
 #else
 	auto it = off < data.size() ? std::next(data.begin(), off) : data.end();
@@ -879,8 +880,8 @@ namespace legacy {
 /**
  * Behaves incorrectly when interleaving readdir and unlink calls.
  *
- * This implementation was not removed so as to support pre-3.13 client (mfsmount) using
- * old LIZ_FUSE_GETDIR packet version (0 = kLegacyClient).
+ * This implementation was not removed so as to support pre-3.13 client (sfsmount) using
+ * old SAU_FUSE_GETDIR packet version (0 = kLegacyClient).
  */
 void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t auid, uint32_t agid,
 		uint8_t sesflags, FSNodeDirectory *p, uint64_t first_entry,
@@ -1069,14 +1070,14 @@ void fsnodes_checkfile(FSNodeFile *p, uint32_t chunk_count[CHUNK_MATRIX_SIZE]) {
 
 uint8_t fsnodes_appendchunks(uint32_t ts, FSNodeFile *dst, FSNodeFile *src) {
 	if (src->chunks.empty()) {
-		return LIZARDFS_STATUS_OK;
+		return SAUNAFS_STATUS_OK;
 	}
 
 	uint32_t src_chunks = src->chunkCount();
 	uint32_t dst_chunks = dst->chunkCount();
 
 	if (((uint64_t)src_chunks + (uint64_t)dst_chunks) > ((uint64_t)MAX_INDEX + 1)) {
-		return LIZARDFS_ERROR_INDEXTOOBIG;
+		return SAUNAFS_ERROR_INDEXTOOBIG;
 	}
 
 	statsrecord psr, nsr;
@@ -1102,15 +1103,15 @@ uint8_t fsnodes_appendchunks(uint32_t ts, FSNodeFile *dst, FSNodeFile *src) {
 	for(uint32_t i = 0; i < src_chunks; ++i) {
 		auto chunkid = src->chunks[i];
 		if (chunkid > 0) {
-			if (chunk_add_file(chunkid, dst->goal) != LIZARDFS_STATUS_OK) {
-				lzfs_pretty_syslog(LOG_ERR, "structure error - chunk %016" PRIX64 " not found (inode: %" PRIu32
+			if (chunk_add_file(chunkid, dst->goal) != SAUNAFS_STATUS_OK) {
+				safs_pretty_syslog(LOG_ERR, "structure error - chunk %016" PRIX64 " not found (inode: %" PRIu32
 				                " ; index: %" PRIu32 ")",
 				       chunkid, src->id, i);
 			}
 		}
 	}
 
-	uint64_t length = (dst_chunks << MFSCHUNKBITS) + src->length;
+	uint64_t length = (dst_chunks << SFSCHUNKBITS) + src->length;
 	if (dst->type == FSNode::kTrash) {
 		gMetadata->trashspace -= dst->length;
 		gMetadata->trashspace += length;
@@ -1130,7 +1131,7 @@ uint8_t fsnodes_appendchunks(uint32_t ts, FSNodeFile *dst, FSNodeFile *src) {
 	src->atime = ts;
 	fsnodes_update_checksum(src);
 	fsnodes_update_checksum(dst);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 void fsnodes_changefilegoal(FSNodeFile *obj, uint8_t goal) {
@@ -1166,15 +1167,15 @@ void fsnodes_setlength(FSNodeFile *obj, uint64_t length) {
 	}
 	obj->length = length;
 	if (length > 0) {
-		chunks = ((length - 1) >> MFSCHUNKBITS) + 1;
+		chunks = ((length - 1) >> SFSCHUNKBITS) + 1;
 	} else {
 		chunks = 0;
 	}
 	for (uint32_t i = chunks; i < obj->chunks.size(); i++) {
 		uint64_t chunkid = obj->chunks[i];
 		if (chunkid > 0) {
-			if (chunk_delete_file(chunkid, obj->goal) != LIZARDFS_STATUS_OK) {
-				lzfs_pretty_syslog(LOG_ERR, "structure error - chunk %016" PRIX64 " not found (inode: %" PRIu32
+			if (chunk_delete_file(chunkid, obj->goal) != SAUNAFS_STATUS_OK) {
+				safs_pretty_syslog(LOG_ERR, "structure error - chunk %016" PRIX64 " not found (inode: %" PRIu32
 				                " ; index: %" PRIu32 ")",
 				       chunkid, obj->id, i);
 			}
@@ -1240,8 +1241,8 @@ static inline void fsnodes_remove_node(uint32_t ts, FSNode *toremove) {
 		for (uint32_t i = 0; i < static_cast<FSNodeFile*>(toremove)->chunks.size(); ++i) {
 			uint64_t chunkid = static_cast<FSNodeFile*>(toremove)->chunks[i];
 			if (chunkid > 0) {
-				if (chunk_delete_file(chunkid, toremove->goal) != LIZARDFS_STATUS_OK) {
-					lzfs_pretty_syslog(LOG_ERR, "structure error - chunk %016" PRIX64
+				if (chunk_delete_file(chunkid, toremove->goal) != SAUNAFS_STATUS_OK) {
+					safs_pretty_syslog(LOG_ERR, "structure error - chunk %016" PRIX64
 					                " not found (inode: %" PRIu32
 					                " ; index: %" PRIu32 ")",
 					       chunkid, toremove->id, i);
@@ -1362,26 +1363,26 @@ uint8_t fsnodes_undel(uint32_t ts, FSNodeFile *node) {
 	unsigned pleng = path_str.length();
 
 	if (path_str.empty()) {
-		return LIZARDFS_ERROR_CANTCREATEPATH;
+		return SAUNAFS_ERROR_CANTCREATEPATH;
 	}
 	while (*path == '/' && pleng > 0) {
 		path++;
 		pleng--;
 	}
 	if (pleng == 0) {
-		return LIZARDFS_ERROR_CANTCREATEPATH;
+		return SAUNAFS_ERROR_CANTCREATEPATH;
 	}
 	partleng = 0;
 	dots = 0;
 	for (i = 0; i < pleng; i++) {
 		if (path[i] == 0) {  // incorrect name character
-			return LIZARDFS_ERROR_CANTCREATEPATH;
+			return SAUNAFS_ERROR_CANTCREATEPATH;
 		} else if (path[i] == '/') {
 			if (partleng == 0) {  // "//" in path
-				return LIZARDFS_ERROR_CANTCREATEPATH;
+				return SAUNAFS_ERROR_CANTCREATEPATH;
 			}
 			if (partleng == dots && partleng <= 2) {  // '.' or '..' in path
-				return LIZARDFS_ERROR_CANTCREATEPATH;
+				return SAUNAFS_ERROR_CANTCREATEPATH;
 			}
 			partleng = 0;
 			dots = 0;
@@ -1391,15 +1392,15 @@ uint8_t fsnodes_undel(uint32_t ts, FSNodeFile *node) {
 			}
 			partleng++;
 			if (partleng > MAXFNAMELENG) {
-				return LIZARDFS_ERROR_CANTCREATEPATH;
+				return SAUNAFS_ERROR_CANTCREATEPATH;
 			}
 		}
 	}
 	if (partleng == 0) {  // last part canot be empty - it's the name of undeleted file
-		return LIZARDFS_ERROR_CANTCREATEPATH;
+		return SAUNAFS_ERROR_CANTCREATEPATH;
 	}
 	if (partleng == dots && partleng <= 2) {  // '.' or '..' in path
-		return LIZARDFS_ERROR_CANTCREATEPATH;
+		return SAUNAFS_ERROR_CANTCREATEPATH;
 	}
 
 	// create path
@@ -1414,7 +1415,7 @@ uint8_t fsnodes_undel(uint32_t ts, FSNodeFile *node) {
 		HString name(path, partleng);
 		if (partleng == pleng) {  // last name
 			if (fsnodes_nameisused(p, name)) {
-				return LIZARDFS_ERROR_EEXIST;
+				return SAUNAFS_ERROR_EEXIST;
 			}
 			// remove from trash and link to new parent
 			if (node->type == FSNode::kTrash) {
@@ -1429,7 +1430,7 @@ uint8_t fsnodes_undel(uint32_t ts, FSNodeFile *node) {
 			fsnodes_link(ts, p, node, name);
 			gMetadata->trashspace -= node->length;
 			gMetadata->trashnodes--;
-			return LIZARDFS_STATUS_OK;
+			return SAUNAFS_STATUS_OK;
 		} else {
 			if (is_new == 0) {
 				n = fsnodes_lookup(p, name);
@@ -1437,7 +1438,7 @@ uint8_t fsnodes_undel(uint32_t ts, FSNodeFile *node) {
 					is_new = 1;
 				} else {
 					if (n->type != FSNode::kDirectory) {
-						return LIZARDFS_ERROR_CANTCREATEPATH;
+						return SAUNAFS_ERROR_CANTCREATEPATH;
 					}
 				}
 			}
@@ -1470,14 +1471,14 @@ void fsnodes_getgoal_recursive(FSNode *node, uint8_t gmode, GoalStatistics &fgta
 		GoalStatistics &dgtab) {
 	if (node->type == FSNode::kFile || node->type == FSNode::kTrash || node->type == FSNode::kReserved) {
 		if (!GoalId::isValid(node->goal)) {
-			lzfs_pretty_syslog(LOG_WARNING, "file inode %" PRIu32 ": unknown goal !!! - fixing",
+			safs_pretty_syslog(LOG_WARNING, "file inode %" PRIu32 ": unknown goal !!! - fixing",
 			       node->id);
 			fsnodes_changefilegoal(static_cast<FSNodeFile*>(node), DEFAULT_GOAL);
 		}
 		fgtab[node->goal]++;
 	} else if (node->type == FSNode::kDirectory) {
 		if (!GoalId::isValid(node->goal)) {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 			       "directory inode %" PRIu32 ": unknown goal !!! - fixing", node->id);
 			node->goal = DEFAULT_GOAL;
 		}
@@ -1707,7 +1708,7 @@ uint8_t fsnodes_deleteacl(FSNode *p, AclType type, uint32_t ts) {
 		gMetadata->acl_storage.erase(p->id);
 	} else if (type == AclType::kDefault) {
 		if (p->type != FSNode::kDirectory) {
-			return LIZARDFS_ERROR_ENOTSUP;
+			return SAUNAFS_ERROR_ENOTSUP;
 		}
 		const RichACL *node_acl = gMetadata->acl_storage.get(p->id);
 		if (node_acl) {
@@ -1733,28 +1734,28 @@ uint8_t fsnodes_deleteacl(FSNode *p, AclType type, uint32_t ts) {
 			}
 		}
 	} else {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	fsnodes_update_ctime(p, ts);
 	fsnodes_update_checksum(p);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
 uint8_t fsnodes_getacl(FSNode *p, RichACL &acl) {
 	const RichACL *richacl = gMetadata->acl_storage.get(p->id);
 	if (!richacl) {
-		return LIZARDFS_ERROR_ENOATTR;
+		return SAUNAFS_ERROR_ENOATTR;
 	}
 	acl = *richacl;
 	assert((p->mode & 0777) == richacl->getMode());
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
 uint8_t fsnodes_setacl(FSNode *p, const RichACL &acl, uint32_t ts) {
 	if (!acl.checkInheritFlags(p->type == FSNode::kDirectory)) {
-		return LIZARDFS_ERROR_ENOTSUP;
+		return SAUNAFS_ERROR_ENOTSUP;
 	}
 
 	uint16_t mode = p->mode;
@@ -1775,16 +1776,16 @@ uint8_t fsnodes_setacl(FSNode *p, const RichACL &acl, uint32_t ts) {
 
 	fsnodes_update_ctime(p, ts);
 	fsnodes_update_checksum(p);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fsnodes_setacl(FSNode *p, AclType type, const AccessControlList &acl, uint32_t ts) {
 	if (type != AclType::kDefault && type != AclType::kAccess) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	if (type == AclType::kDefault && p->type != FSNode::kDirectory) {
-		return LIZARDFS_ERROR_ENOTSUP;
+		return SAUNAFS_ERROR_ENOTSUP;
 	}
 
 	const RichACL *node_acl = gMetadata->acl_storage.get(p->id);
@@ -1807,7 +1808,7 @@ uint8_t fsnodes_setacl(FSNode *p, AclType type, const AccessControlList &acl, ui
 
 	fsnodes_update_ctime(p, ts);
 	fsnodes_update_checksum(p);
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 int fsnodes_namecheck(const std::string &name) {
@@ -1877,17 +1878,17 @@ uint8_t verify_session(const FsContext &context, OperationMode operationMode,
 			SessionType sessionType) {
 	if (context.hasSessionData() && (context.sesflags() & SESFLAG_READONLY) &&
 	    (operationMode == OperationMode::kReadWrite)) {
-		return LIZARDFS_ERROR_EROFS;
+		return SAUNAFS_ERROR_EROFS;
 	}
 	if (context.hasSessionData() && (context.rootinode() == 0) &&
 	    (sessionType == SessionType::kNotMeta)) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (context.hasSessionData() && (context.rootinode() != 0) &&
 	    (sessionType == SessionType::kOnlyMeta)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 /*
@@ -1906,57 +1907,57 @@ uint8_t fsnodes_get_node_for_operation(const FsContext &context, ExpectedNodeTyp
 		rn = nullptr;
 		p = fsnodes_id_to_node(inode);
 		if (!p) {
-			return LIZARDFS_ERROR_ENOENT;
+			return SAUNAFS_ERROR_ENOENT;
 		}
 	} else if (context.rootinode() == SPECIAL_INODE_ROOT || (context.rootinode() == 0)) {
 		rn = gMetadata->root;
 		p = fsnodes_id_to_node(inode);
 		if (!p) {
-			return LIZARDFS_ERROR_ENOENT;
+			return SAUNAFS_ERROR_ENOENT;
 		}
 		if (context.rootinode() == 0 && p->type != FSNode::kTrash && p->type != FSNode::kReserved) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 	} else {
 		rn = fsnodes_id_to_node<FSNodeDirectory>(context.rootinode());
 		if (!rn || rn->type != FSNode::kDirectory) {
-			return LIZARDFS_ERROR_ENOENT;
+			return SAUNAFS_ERROR_ENOENT;
 		}
 		if (inode == SPECIAL_INODE_ROOT) {
 			p = rn;
 		} else {
 			p = fsnodes_id_to_node(inode);
 			if (!p) {
-				return LIZARDFS_ERROR_ENOENT;
+				return SAUNAFS_ERROR_ENOENT;
 			}
 			if (!fsnodes_isancestor_or_node_reserved_or_trash(rn, p)) {
-				return LIZARDFS_ERROR_EPERM;
+				return SAUNAFS_ERROR_EPERM;
 			}
 		}
 	}
 	if ((expectedNodeType == ExpectedNodeType::kDirectory) && (p->type != FSNode::kDirectory)) {
-		return LIZARDFS_ERROR_ENOTDIR;
+		return SAUNAFS_ERROR_ENOTDIR;
 	}
 	if ((expectedNodeType == ExpectedNodeType::kNotDirectory) && (p->type == FSNode::kDirectory)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if ((expectedNodeType == ExpectedNodeType::kFile) && (p->type != FSNode::kFile) &&
 	    (p->type != FSNode::kReserved) && (p->type != FSNode::kTrash)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if ((expectedNodeType == ExpectedNodeType::kFileOrDirectory) && (p->type != FSNode::kDirectory)
 		&& (p->type != FSNode::kFile) && (p->type != FSNode::kReserved) && (p->type != FSNode::kTrash)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	if (context.canCheckPermissions() &&
 	    !fsnodes_access(context, p, modemask)) {
-		return LIZARDFS_ERROR_EACCES;
+		return SAUNAFS_ERROR_EACCES;
 	}
 	*ret = p;
 	if (ret_rn) {
 		*ret_rn = rn;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE

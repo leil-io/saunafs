@@ -1,19 +1,21 @@
 /*
-   Copyright 2017 Skytechnology sp. z o.o..
 
-   This file is part of LizardFS.
+   Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   LizardFS is free software: you can redistribute it and/or modify
+   This file is part of SaunaFS.
+
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -26,7 +28,7 @@
 #include "client_error_code.h"
 #include "common/richacl_converter.h"
 
-#define LIZARDFS_LINK_FUNCTION(function_name) do { \
+#define SAUNAFS_LINK_FUNCTION(function_name) do { \
 	void *function_name##_ptr = dlsym(dl_handle_, #function_name); \
 	function_name##_ = *(decltype(function_name##_)*)&function_name##_ptr; \
 	if (function_name##_ == nullptr) { \
@@ -34,7 +36,7 @@
 	} \
 } while (0)
 
-using namespace lizardfs;
+using namespace saunafs;
 
 static const char *kRichAclXattrName = "system.richacl";
 
@@ -53,7 +55,7 @@ void *Client::linkLibrary() {
 		return ret;
 	}
 
-	char pattern[] = "/tmp/liblizardfsmount_shared.so.XXXXXX";
+	char pattern[] = "/tmp/libsaunafsmount_shared.so.XXXXXX";
 	int out_fd = ::mkstemp(pattern);
 	if (out_fd < 0) {
 		instance_count_--;
@@ -96,7 +98,7 @@ Client::~Client() {
 		release(std::addressof(fileinfos_.front()));
 	}
 
-	lizardfs_fs_term_();
+	saunafs_fs_term_();
 	dlclose(dl_handle_);
 	instance_count_--;
 }
@@ -104,55 +106,55 @@ Client::~Client() {
 void Client::init(FsInitParams &params) {
 	dl_handle_ = linkLibrary();
 	try {
-		LIZARDFS_LINK_FUNCTION(lizardfs_fs_init);
-		LIZARDFS_LINK_FUNCTION(lizardfs_fs_term);
-		LIZARDFS_LINK_FUNCTION(lizardfs_lookup);
-		LIZARDFS_LINK_FUNCTION(lizardfs_mknod);
-		LIZARDFS_LINK_FUNCTION(lizardfs_link);
-		LIZARDFS_LINK_FUNCTION(lizardfs_symlink);
-		LIZARDFS_LINK_FUNCTION(lizardfs_mkdir);
-		LIZARDFS_LINK_FUNCTION(lizardfs_rmdir);
-		LIZARDFS_LINK_FUNCTION(lizardfs_readdir);
-		LIZARDFS_LINK_FUNCTION(lizardfs_readlink);
-		LIZARDFS_LINK_FUNCTION(lizardfs_readreserved);
-		LIZARDFS_LINK_FUNCTION(lizardfs_readtrash);
-		LIZARDFS_LINK_FUNCTION(lizardfs_opendir);
-		LIZARDFS_LINK_FUNCTION(lizardfs_releasedir);
-		LIZARDFS_LINK_FUNCTION(lizardfs_unlink);
-		LIZARDFS_LINK_FUNCTION(lizardfs_undel);
-		LIZARDFS_LINK_FUNCTION(lizardfs_open);
-		LIZARDFS_LINK_FUNCTION(lizardfs_setattr);
-		LIZARDFS_LINK_FUNCTION(lizardfs_getattr);
-		LIZARDFS_LINK_FUNCTION(lizardfs_read);
-		LIZARDFS_LINK_FUNCTION(lizardfs_read_special_inode);
-		LIZARDFS_LINK_FUNCTION(lizardfs_write);
-		LIZARDFS_LINK_FUNCTION(lizardfs_release);
-		LIZARDFS_LINK_FUNCTION(lizardfs_flush);
-		LIZARDFS_LINK_FUNCTION(lizardfs_isSpecialInode);
-		LIZARDFS_LINK_FUNCTION(lizardfs_update_groups);
-		LIZARDFS_LINK_FUNCTION(lizardfs_makesnapshot);
-		LIZARDFS_LINK_FUNCTION(lizardfs_getgoal);
-		LIZARDFS_LINK_FUNCTION(lizardfs_setgoal);
-		LIZARDFS_LINK_FUNCTION(lizardfs_fsync);
-		LIZARDFS_LINK_FUNCTION(lizardfs_rename);
-		LIZARDFS_LINK_FUNCTION(lizardfs_statfs);
-		LIZARDFS_LINK_FUNCTION(lizardfs_setxattr);
-		LIZARDFS_LINK_FUNCTION(lizardfs_getxattr);
-		LIZARDFS_LINK_FUNCTION(lizardfs_listxattr);
-		LIZARDFS_LINK_FUNCTION(lizardfs_removexattr);
-		LIZARDFS_LINK_FUNCTION(lizardfs_getchunksinfo);
-		LIZARDFS_LINK_FUNCTION(lizardfs_getchunkservers);
-		LIZARDFS_LINK_FUNCTION(lizardfs_getlk);
-		LIZARDFS_LINK_FUNCTION(lizardfs_setlk_send);
-		LIZARDFS_LINK_FUNCTION(lizardfs_setlk_recv);
-		LIZARDFS_LINK_FUNCTION(lizardfs_setlk_interrupt);
+		SAUNAFS_LINK_FUNCTION(saunafs_fs_init);
+		SAUNAFS_LINK_FUNCTION(saunafs_fs_term);
+		SAUNAFS_LINK_FUNCTION(saunafs_lookup);
+		SAUNAFS_LINK_FUNCTION(saunafs_mknod);
+		SAUNAFS_LINK_FUNCTION(saunafs_link);
+		SAUNAFS_LINK_FUNCTION(saunafs_symlink);
+		SAUNAFS_LINK_FUNCTION(saunafs_mkdir);
+		SAUNAFS_LINK_FUNCTION(saunafs_rmdir);
+		SAUNAFS_LINK_FUNCTION(saunafs_readdir);
+		SAUNAFS_LINK_FUNCTION(saunafs_readlink);
+		SAUNAFS_LINK_FUNCTION(saunafs_readreserved);
+		SAUNAFS_LINK_FUNCTION(saunafs_readtrash);
+		SAUNAFS_LINK_FUNCTION(saunafs_opendir);
+		SAUNAFS_LINK_FUNCTION(saunafs_releasedir);
+		SAUNAFS_LINK_FUNCTION(saunafs_unlink);
+		SAUNAFS_LINK_FUNCTION(saunafs_undel);
+		SAUNAFS_LINK_FUNCTION(saunafs_open);
+		SAUNAFS_LINK_FUNCTION(saunafs_setattr);
+		SAUNAFS_LINK_FUNCTION(saunafs_getattr);
+		SAUNAFS_LINK_FUNCTION(saunafs_read);
+		SAUNAFS_LINK_FUNCTION(saunafs_read_special_inode);
+		SAUNAFS_LINK_FUNCTION(saunafs_write);
+		SAUNAFS_LINK_FUNCTION(saunafs_release);
+		SAUNAFS_LINK_FUNCTION(saunafs_flush);
+		SAUNAFS_LINK_FUNCTION(saunafs_isSpecialInode);
+		SAUNAFS_LINK_FUNCTION(saunafs_update_groups);
+		SAUNAFS_LINK_FUNCTION(saunafs_makesnapshot);
+		SAUNAFS_LINK_FUNCTION(saunafs_getgoal);
+		SAUNAFS_LINK_FUNCTION(saunafs_setgoal);
+		SAUNAFS_LINK_FUNCTION(saunafs_fsync);
+		SAUNAFS_LINK_FUNCTION(saunafs_rename);
+		SAUNAFS_LINK_FUNCTION(saunafs_statfs);
+		SAUNAFS_LINK_FUNCTION(saunafs_setxattr);
+		SAUNAFS_LINK_FUNCTION(saunafs_getxattr);
+		SAUNAFS_LINK_FUNCTION(saunafs_listxattr);
+		SAUNAFS_LINK_FUNCTION(saunafs_removexattr);
+		SAUNAFS_LINK_FUNCTION(saunafs_getchunksinfo);
+		SAUNAFS_LINK_FUNCTION(saunafs_getchunkservers);
+		SAUNAFS_LINK_FUNCTION(saunafs_getlk);
+		SAUNAFS_LINK_FUNCTION(saunafs_setlk_send);
+		SAUNAFS_LINK_FUNCTION(saunafs_setlk_recv);
+		SAUNAFS_LINK_FUNCTION(saunafs_setlk_interrupt);
 	} catch (const std::runtime_error &e) {
 		dlclose(dl_handle_);
 		instance_count_--;
 		throw e;
 	}
 
-	if (lizardfs_fs_init_(params) != 0) {
+	if (saunafs_fs_init_(params) != 0) {
 		assert(dl_handle_);
 		dlclose(dl_handle_);
 		instance_count_--;
@@ -169,7 +171,7 @@ void Client::updateGroups(Context &ctx) {
 }
 
 void Client::updateGroups(Context &ctx, std::error_code &ec) {
-	auto ret = lizardfs_update_groups_(ctx);
+	auto ret = saunafs_update_groups_(ctx);
 	ec = make_error_code(ret);
 }
 
@@ -184,7 +186,7 @@ void Client::lookup(Context &ctx, Inode parent, const std::string &path, EntryPa
 
 void Client::lookup(Context &ctx, Inode parent, const std::string &path, EntryParam &param,
 		std::error_code &ec) {
-	int ret = lizardfs_lookup_(ctx, parent, path.c_str(), param);
+	int ret = saunafs_lookup_(ctx, parent, path.c_str(), param);
 	ec = make_error_code(ret);
 }
 
@@ -199,7 +201,7 @@ void Client::mknod(Context &ctx, Inode parent, const std::string &path, mode_t m
 
 void Client::mknod(Context &ctx, Inode parent, const std::string &path, mode_t mode,
 		dev_t rdev, EntryParam &param, std::error_code &ec) {
-	int ret = lizardfs_mknod_(ctx, parent, path.c_str(), mode, rdev, param);
+	int ret = saunafs_mknod_(ctx, parent, path.c_str(), mode, rdev, param);
 	ec = make_error_code(ret);
 }
 
@@ -214,7 +216,7 @@ void Client::link(Context &ctx, Inode inode, Inode parent,
 
 void Client::link(Context &ctx, Inode inode, Inode parent,
 		const std::string &name, EntryParam &param, std::error_code &ec) {
-	int ret = lizardfs_link_(ctx, inode, parent, name.c_str(), param);
+	int ret = saunafs_link_(ctx, inode, parent, name.c_str(), param);
 	ec = make_error_code(ret);
 }
 
@@ -229,7 +231,7 @@ void Client::symlink(Context &ctx, const std::string &link, Inode parent,
 
 void Client::symlink(Context &ctx, const std::string &link, Inode parent,
 		const std::string &name, EntryParam &param, std::error_code &ec) {
-	int ret = lizardfs_symlink_(ctx, link.c_str(), parent, name.c_str(), param);
+	int ret = saunafs_symlink_(ctx, link.c_str(), parent, name.c_str(), param);
 	ec = make_error_code(ret);
 }
 
@@ -245,7 +247,7 @@ Client::ReadDirReply Client::readdir(Context &ctx, FileInfo* fileinfo, off_t off
 
 Client::ReadDirReply Client::readdir(Context &ctx, FileInfo* fileinfo, off_t offset,
 		size_t max_entries, std::error_code &ec) {
-	auto ret = lizardfs_readdir_(ctx, fileinfo->opendirSessionID, fileinfo->inode, offset, max_entries);
+	auto ret = saunafs_readdir_(ctx, fileinfo->opendirSessionID, fileinfo->inode, offset, max_entries);
 	ec = make_error_code(ret.first);
 	return ret.second;
 }
@@ -261,7 +263,7 @@ std::string Client::readlink(Context &ctx, Inode inode) {
 
 std::string Client::readlink(Context &ctx, Inode inode, std::error_code &ec) {
 	std::string link;
-	int ret = lizardfs_readlink_(ctx, inode, link);
+	int ret = saunafs_readlink_(ctx, inode, link);
 	ec = make_error_code(ret);
 	return link;
 }
@@ -278,7 +280,7 @@ Client::ReadReservedReply Client::readreserved(Context &ctx, NamedInodeOffset of
 
 Client::ReadReservedReply Client::readreserved(Context &ctx, NamedInodeOffset offset,
 	                                       NamedInodeOffset max_entries, std::error_code &ec) {
-	auto ret = lizardfs_readreserved_(ctx, offset, max_entries);
+	auto ret = saunafs_readreserved_(ctx, offset, max_entries);
 	ec = make_error_code(ret.first);
 	return ret.second;
 }
@@ -295,7 +297,7 @@ Client::ReadTrashReply Client::readtrash(Context &ctx, NamedInodeOffset offset,
 
 Client::ReadTrashReply Client::readtrash(Context &ctx, NamedInodeOffset offset,
 	                                 NamedInodeOffset max_entries, std::error_code &ec) {
-	auto ret = lizardfs_readtrash_(ctx, offset, max_entries);
+	auto ret = saunafs_readtrash_(ctx, offset, max_entries);
 	ec = make_error_code(ret.first);
 	return ret.second;
 }
@@ -311,13 +313,13 @@ Client::FileInfo *Client::opendir(Context &ctx, Inode inode) {
 }
 
 Client::FileInfo *Client::opendir(Context &ctx, Inode inode, std::error_code &ec) {
-	int ret = lizardfs_opendir_(ctx, inode);
+	int ret = saunafs_opendir_(ctx, inode);
 	ec = make_error_code(ret);
 	if (ec) {
 		return nullptr;
 	}
 	FileInfo *fileinfo = new FileInfo(inode, nextOpendirSessionID_++);
-	LizardClient::update_readdir_session(fileinfo->opendirSessionID, 0);
+	SaunaClient::update_readdir_session(fileinfo->opendirSessionID, 0);
 	std::lock_guard<std::mutex> guard(mutex_);
 	fileinfos_.push_front(*fileinfo);
 	return fileinfo;
@@ -333,7 +335,7 @@ void Client::releasedir(FileInfo* fileinfo) {
 
 void Client::releasedir(FileInfo* fileinfo, std::error_code &ec) {
 	assert(fileinfo != nullptr);
-	int ret = lizardfs_releasedir_(fileinfo->inode, fileinfo->opendirSessionID);
+	int ret = saunafs_releasedir_(fileinfo->inode, fileinfo->opendirSessionID);
 	ec = make_error_code(ret);
 	{
 		std::lock_guard<std::mutex> guard(mutex_);
@@ -351,7 +353,7 @@ void Client::rmdir(Context &ctx, Inode parent, const std::string &path) {
 }
 
 void Client::rmdir(Context &ctx, Inode parent, const std::string &path, std::error_code &ec) {
-	int ret = lizardfs_rmdir_(ctx, parent, path.c_str());
+	int ret = saunafs_rmdir_(ctx, parent, path.c_str());
 	ec = make_error_code(ret);
 }
 
@@ -363,7 +365,7 @@ void Client::mkdir(Context &ctx, Inode parent, const std::string &path, mode_t m
 
 void Client::mkdir(Context &ctx, Inode parent, const std::string &path, mode_t mode,
 	          Client::EntryParam &entry_param, std::error_code &ec) {
-	int ret = lizardfs_mkdir_(ctx, parent, path.c_str(), mode, entry_param);
+	int ret = saunafs_mkdir_(ctx, parent, path.c_str(), mode, entry_param);
 	ec = make_error_code(ret);
 }
 
@@ -376,7 +378,7 @@ void Client::unlink(Context &ctx, Inode parent, const std::string &path) {
 }
 
 void Client::unlink(Context &ctx, Inode parent, const std::string &path, std::error_code &ec) {
-	int ret = lizardfs_unlink_(ctx, parent, path.c_str());
+	int ret = saunafs_unlink_(ctx, parent, path.c_str());
 	ec = make_error_code(ret);
 }
 
@@ -389,7 +391,7 @@ void Client::undel(Context &ctx, Inode ino) {
 }
 
 void Client::undel(Context &ctx, Inode ino, std::error_code &ec) {
-	int ret = lizardfs_undel_(ctx, ino);
+	int ret = saunafs_undel_(ctx, ino);
 	ec = make_error_code(ret);
 }
 
@@ -404,7 +406,7 @@ void Client::rename(Context &ctx, Inode parent, const std::string &path, Inode n
 
 void Client::rename(Context &ctx, Inode parent, const std::string &path, Inode newparent,
 	            const std::string &new_path, std::error_code &ec) {
-	int ret = lizardfs_rename_(ctx, parent, path.c_str(), newparent, new_path.c_str());
+	int ret = saunafs_rename_(ctx, parent, path.c_str(), newparent, new_path.c_str());
 	ec = make_error_code(ret);
 }
 
@@ -422,7 +424,7 @@ Client::FileInfo *Client::open(Context &ctx, Inode inode, int flags, std::error_
 	FileInfo *fileinfo = new FileInfo(inode);
 	fileinfo->flags = flags;
 
-	int ret = lizardfs_open_(ctx, inode, fileinfo);
+	int ret = saunafs_open_(ctx, inode, fileinfo);
 	ec = make_error_code(ret);
 	if (ec) {
 		delete fileinfo;
@@ -443,7 +445,7 @@ void Client::getattr(Context &ctx, Inode inode, AttrReply &attr_reply) {
 
 void Client::getattr(Context &ctx, Inode inode, AttrReply &attr_reply,
 		std::error_code &ec) {
-	int ret = lizardfs_getattr_(ctx, inode, attr_reply);
+	int ret = saunafs_getattr_(ctx, inode, attr_reply);
 	ec = make_error_code(ret);
 }
 
@@ -458,7 +460,7 @@ void Client::setattr(Context &ctx, Inode ino, struct stat *stbuf, int to_set,
 
 void Client::setattr(Context &ctx, Inode ino, struct stat *stbuf, int to_set,
 	             AttrReply &attr_reply, std::error_code &ec) {
-	int ret = lizardfs_setattr_(ctx, ino, stbuf, to_set, attr_reply);
+	int ret = saunafs_setattr_(ctx, ino, stbuf, to_set, attr_reply);
 	ec = make_error_code(ret);
 }
 
@@ -474,15 +476,15 @@ Client::ReadResult Client::read(Context &ctx, FileInfo *fileinfo,
 
 Client::ReadResult Client::read(Context &ctx, FileInfo *fileinfo,
 	                       off_t offset, std::size_t size, std::error_code &ec) {
-	if (lizardfs_isSpecialInode_(fileinfo->inode)) {
-		auto ret = lizardfs_read_special_inode_(ctx, fileinfo->inode, size, offset, fileinfo);
+	if (saunafs_isSpecialInode_(fileinfo->inode)) {
+		auto ret = saunafs_read_special_inode_(ctx, fileinfo->inode, size, offset, fileinfo);
 		ec = make_error_code(ret.first);
 		if (ec) {
 			return ReadResult();
 		}
 		return ReadResult(std::move(ret.second));
 	} else {
-		auto ret = lizardfs_read_(ctx, fileinfo->inode, size, offset, fileinfo);
+		auto ret = saunafs_read_(ctx, fileinfo->inode, size, offset, fileinfo);
 		ec = make_error_code(ret.first);
 		if (ec) {
 			return ReadResult();
@@ -504,7 +506,7 @@ std::size_t Client::write(Context &ctx, FileInfo *fileinfo, off_t offset, std::s
 std::size_t Client::write(Context &ctx, FileInfo *fileinfo, off_t offset, std::size_t size,
 		const char *buffer, std::error_code &ec) {
 	std::pair<int, ssize_t> ret =
-	        lizardfs_write_(ctx, fileinfo->inode, buffer, size, offset, fileinfo);
+	        saunafs_write_(ctx, fileinfo->inode, buffer, size, offset, fileinfo);
 	ec = make_error_code(ret.first);
 	return ec ? (std::size_t)0 : (std::size_t)ret.second;
 }
@@ -518,7 +520,7 @@ void Client::release(FileInfo *fileinfo) {
 }
 
 void Client::release(FileInfo *fileinfo, std::error_code &ec) {
-	int ret = lizardfs_release_(fileinfo->inode, fileinfo);
+	int ret = saunafs_release_(fileinfo->inode, fileinfo);
 	std::lock_guard<std::mutex> guard(mutex_);
 	fileinfos_.erase(fileinfos_.iterator_to(*fileinfo));
 	delete fileinfo;
@@ -534,7 +536,7 @@ void Client::flush(Context &ctx, FileInfo *fileinfo) {
 }
 
 void Client::flush(Context &ctx, FileInfo *fileinfo, std::error_code &ec) {
-	int ret = lizardfs_flush_(ctx, fileinfo->inode, fileinfo);
+	int ret = saunafs_flush_(ctx, fileinfo->inode, fileinfo);
 	ec = make_error_code(ret);
 }
 
@@ -547,11 +549,11 @@ void Client::fsync(Context &ctx, FileInfo *fileinfo) {
 }
 
 void Client::fsync(Context &ctx, FileInfo *fileinfo, std::error_code &ec) {
-	int ret = lizardfs_fsync_(ctx, fileinfo->inode, 0, fileinfo);
+	int ret = saunafs_fsync_(ctx, fileinfo->inode, 0, fileinfo);
 	ec = make_error_code(ret);
 }
 
-LizardClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode dst_inode,
+SaunaClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode dst_inode,
 	                                 const std::string &dst_name, bool can_overwrite) {
 	std::error_code ec;
 	JobId job_id = makesnapshot(ctx, src_inode, dst_inode, dst_name, can_overwrite, ec);
@@ -561,10 +563,10 @@ LizardClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode ds
 	return job_id;
 }
 
-LizardClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode dst_inode,
+SaunaClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode dst_inode,
 	                                 const std::string &dst_name, bool can_overwrite,
 	                                 std::error_code &ec) {
-	auto ret = lizardfs_makesnapshot_(ctx, src_inode, dst_inode, dst_name, can_overwrite);
+	auto ret = saunafs_makesnapshot_(ctx, src_inode, dst_inode, dst_name, can_overwrite);
 	ec = make_error_code(ret.first);
 	return ret.second;
 }
@@ -580,7 +582,7 @@ std::string Client::getgoal(Context &ctx, Inode inode) {
 
 std::string Client::getgoal(Context &ctx, Inode inode, std::error_code &ec) {
 	std::string goal;
-	int ret = lizardfs_getgoal_(ctx, inode, goal);
+	int ret = saunafs_getgoal_(ctx, inode, goal);
 	ec = make_error_code(ret);
 	return goal;
 }
@@ -595,7 +597,7 @@ void Client::setgoal(Context &ctx, Inode inode, const std::string &goal_name, ui
 
 void Client::setgoal(Context &ctx, Inode inode, const std::string &goal_name,
 	             uint8_t smode, std::error_code &ec) {
-	int ret = lizardfs_setgoal_(ctx, inode, goal_name, smode);
+	int ret = saunafs_setgoal_(ctx, inode, goal_name, smode);
 	ec = make_error_code(ret);
 }
 
@@ -608,7 +610,7 @@ void Client::statfs(Stats &stats) {
 }
 
 void Client::statfs(Stats &stats, std::error_code &ec) {
-	int ret = lizardfs_statfs_(&stats.total_space, &stats.avail_space, &stats.trash_space,
+	int ret = saunafs_statfs_(&stats.total_space, &stats.avail_space, &stats.trash_space,
 	                 &stats.reserved_space, &stats.inodes);
 	ec = make_error_code(ret);
 }
@@ -624,7 +626,7 @@ void Client::setxattr(Context &ctx, Inode ino, const std::string &name,
 
 void Client::setxattr(Context &ctx, Inode ino, const std::string &name,
 	              const XattrBuffer &value, int flags, std::error_code &ec) {
-	int ret = lizardfs_setxattr_(ctx, ino, name.c_str(),
+	int ret = saunafs_setxattr_(ctx, ino, name.c_str(),
 	                             (const char *)value.data(), value.size(), flags);
 	ec = make_error_code(ret);
 }
@@ -640,8 +642,8 @@ Client::XattrBuffer Client::getxattr(Context &ctx, Inode ino, const std::string 
 
 Client::XattrBuffer Client::getxattr(Context &ctx, Inode ino, const std::string &name,
 	                                  std::error_code &ec) {
-	LizardClient::XattrReply reply;
-	int ret = lizardfs_getxattr_(ctx, ino, name.c_str(), kMaxXattrRequestSize, reply);
+	SaunaClient::XattrReply reply;
+	int ret = saunafs_getxattr_(ctx, ino, name.c_str(), kMaxXattrRequestSize, reply);
 	ec = make_error_code(ret);
 	return reply.valueBuffer;
 }
@@ -656,8 +658,8 @@ Client::XattrBuffer Client::listxattr(Context &ctx, Inode ino) {
 }
 
 Client::XattrBuffer Client::listxattr(Context &ctx, Inode ino, std::error_code &ec) {
-	LizardClient::XattrReply reply;
-	int ret = lizardfs_listxattr_(ctx, ino, kMaxXattrRequestSize, reply);
+	SaunaClient::XattrReply reply;
+	int ret = saunafs_listxattr_(ctx, ino, kMaxXattrRequestSize, reply);
 	ec = make_error_code(ret);
 	return reply.valueBuffer;
 }
@@ -671,7 +673,7 @@ void Client::removexattr(Context &ctx, Inode ino, const std::string &name) {
 }
 
 void Client::removexattr(Context &ctx, Inode ino, const std::string &name, std::error_code &ec) {
-	int ret = lizardfs_removexattr_(ctx, ino, name.c_str());
+	int ret = saunafs_removexattr_(ctx, ino, name.c_str());
 	ec = make_error_code(ret);
 }
 
@@ -688,7 +690,7 @@ void Client::setacl(Context &ctx, Inode ino, const RichACL &acl, std::error_code
 		std::vector<uint8_t> xattr = richAclConverter::objectToRichACLXattr(acl);
 		setxattr(ctx, ino, kRichAclXattrName, xattr, 0, ec);
 	} catch (...) {
-		ec = make_error_code(LIZARDFS_ERROR_ENOATTR);
+		ec = make_error_code(SAUNAFS_ERROR_ENOATTR);
 	}
 }
 
@@ -709,7 +711,7 @@ RichACL Client::getacl(Context &ctx, Inode ino, std::error_code &ec) {
 		}
 		return richAclConverter::extractObjectFromRichACL(buffer.data(), buffer.size());
 	} catch (...) {
-		ec = make_error_code(LIZARDFS_ERROR_ENOATTR);
+		ec = make_error_code(SAUNAFS_ERROR_ENOATTR);
 	}
 	return RichACL();
 }
@@ -744,7 +746,7 @@ std::vector<ChunkWithAddressAndLabel> Client::getchunksinfo(Context &ctx, Inode 
 
 std::vector<ChunkWithAddressAndLabel> Client::getchunksinfo(Context &ctx, Inode ino,
 	                             uint32_t chunk_index, uint32_t chunk_count, std::error_code &ec) {
-	auto ret = lizardfs_getchunksinfo_(ctx, ino, chunk_index, chunk_count);
+	auto ret = saunafs_getchunksinfo_(ctx, ino, chunk_index, chunk_count);
 	ec = make_error_code(ret.first);
 	return ret.second;
 }
@@ -759,7 +761,7 @@ std::vector<ChunkserverListEntry> Client::getchunkservers() {
 }
 
 std::vector<ChunkserverListEntry> Client::getchunkservers(std::error_code &ec) {
-	auto ret = lizardfs_getchunkservers_();
+	auto ret = saunafs_getchunkservers_();
 	ec = make_error_code(ret.first);
 	return ret.second;
 }
@@ -774,12 +776,12 @@ void Client::getlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lo
 
 void Client::getlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
 		std::error_code &ec) {
-	int ret = lizardfs_getlk_(ctx, ino, fileinfo, lock);
+	int ret = saunafs_getlk_(ctx, ino, fileinfo, lock);
 	ec = make_error_code(ret);
 }
 
 void Client::setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
-	           std::function<int(const lzfs_locks::InterruptData &)> handler) {
+	           std::function<int(const safs_locks::InterruptData &)> handler) {
 	std::error_code ec;
 	setlk(ctx, ino, fileinfo, lock, handler, ec);
 	if (ec) {
@@ -788,26 +790,26 @@ void Client::setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lo
 }
 
 void Client::setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
-	                    std::function<int(const lzfs_locks::InterruptData &)> handler,
+	                    std::function<int(const safs_locks::InterruptData &)> handler,
 	                    std::error_code &ec) {
-	auto ret = lizardfs_setlk_send_(ctx, ino, fileinfo, lock);
+	auto ret = saunafs_setlk_send_(ctx, ino, fileinfo, lock);
 	ec = make_error_code(ret.first);
 	if (ec) {
 		return;
 	}
-	lzfs_locks::InterruptData interrupt_data(fileinfo->lock_owner, ino, ret.second);
+	safs_locks::InterruptData interrupt_data(fileinfo->lock_owner, ino, ret.second);
 	if (handler) {
 		int err = handler(interrupt_data);
-		if (err != LIZARDFS_STATUS_OK) {
+		if (err != SAUNAFS_STATUS_OK) {
 			ec = make_error_code(err);
 			return;
 		}
 	}
-	int err = lizardfs_setlk_recv_();
+	int err = saunafs_setlk_recv_();
 	ec = make_error_code(err);
 }
 
-void Client::setlk_interrupt(const lzfs_locks::InterruptData &data) {
+void Client::setlk_interrupt(const safs_locks::InterruptData &data) {
 	std::error_code ec;
 	setlk_interrupt(data, ec);
 	if (ec) {
@@ -815,7 +817,7 @@ void Client::setlk_interrupt(const lzfs_locks::InterruptData &data) {
 	}
 }
 
-void Client::setlk_interrupt(const lzfs_locks::InterruptData &data, std::error_code &ec) {
-	int ret = lizardfs_setlk_interrupt_(data);
+void Client::setlk_interrupt(const safs_locks::InterruptData &data, std::error_code &ec) {
+	int ret = saunafs_setlk_interrupt_(data);
 	ec = make_error_code(ret);
 }

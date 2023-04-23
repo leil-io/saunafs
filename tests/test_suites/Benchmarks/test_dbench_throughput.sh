@@ -1,7 +1,7 @@
 timeout_set 6 minutes
 
 CHUNKSERVERS=3 \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 

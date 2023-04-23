@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -48,6 +50,11 @@ struct MyStringAllocator : public std::allocator<std::string> {
 	template<class ... Args>
 	MyStringAllocator(Args... args) : std::allocator<std::string>(args...) {
 	}
+
+	template<typename U>
+	struct rebind {
+		using other = MyStringAllocator;
+	};
 };
 TEST(SerializationTests, SerializeVectorWithCustomAllocator) {
 	serializeTest<std::vector<std::string, MyStringAllocator>>(
@@ -55,7 +62,7 @@ TEST(SerializationTests, SerializeVectorWithCustomAllocator) {
 }
 
 TEST(SerializationTests, DeserializeStringNonEmptyVariable) {
-	LIZARDFS_DEFINE_INOUT_PAIR(std::string, stringVariable, "good!", "BAD!");
+	SAUNAFS_DEFINE_INOUT_PAIR(std::string, stringVariable, "good!", "BAD!");
 
 	std::vector<uint8_t> buffer;
 	ASSERT_NO_THROW(serialize(buffer, stringVariableIn));
@@ -63,7 +70,7 @@ TEST(SerializationTests, DeserializeStringNonEmptyVariable) {
 }
 
 TEST(SerializationTests, SerializeUniquePtr) {
-	LIZARDFS_DEFINE_INOUT_PAIR(std::unique_ptr<std::string>, ptr,
+	SAUNAFS_DEFINE_INOUT_PAIR(std::unique_ptr<std::string>, ptr,
 			new std::string("wyrob czekoladopodobny"), nullptr);
 
 	std::vector<uint8_t> buffer;
@@ -74,7 +81,7 @@ TEST(SerializationTests, SerializeUniquePtr) {
 }
 
 TEST(SerializationTests, SerializeEmptyUniquePtr) {
-	LIZARDFS_DEFINE_INOUT_PAIR(std::unique_ptr<std::string>, emptyPtr, nullptr, nullptr);
+	SAUNAFS_DEFINE_INOUT_PAIR(std::unique_ptr<std::string>, emptyPtr, nullptr, nullptr);
 
 	std::vector<uint8_t> buffer;
 	ASSERT_NO_THROW(serialize(buffer, emptyPtrIn));

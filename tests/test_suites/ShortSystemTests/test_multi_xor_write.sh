@@ -2,7 +2,7 @@ for_chunkservers() {
 	operation=${1}
 	shift
 	for csid in "${@}"; do
-		lizardfs_chunkserver_daemon $csid "${operation}" &
+		saunafs_chunkserver_daemon $csid "${operation}" &
 	done
 	wait
 	if [[ $operation == stop ]]; then
@@ -12,7 +12,7 @@ for_chunkservers() {
 	else
 		test_fail "Wrong branch"
 	fi
-	lizardfs_wait_for_ready_chunkservers $nr_of_running_chunkservers
+	saunafs_wait_for_ready_chunkservers $nr_of_running_chunkservers
 }
 
 timeout_set "1 minute"
@@ -22,21 +22,21 @@ CHUNKSERVERS=8 \
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|ACCEPTABLE_DIFFERENCE = 10.0`
 			`|DISABLE_CHUNKS_DEL = 1" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 nr_of_running_chunkservers=8
 cd ${info[mount0]}
 
 # Produce first version chunks
 dd if=/dev/zero of=file bs=1k count=5k
-lizardfs setgoal xor2 file
-while (( $(lizardfs fileinfo file | grep -c copy) < 4 )); do # 1 [goal1] + 3 [xor2]
+saunafs setgoal xor2 file
+while (( $(saunafs fileinfo file | grep -c copy) < 4 )); do # 1 [goal1] + 3 [xor2]
 	sleep 1
 done
-lizardfs setgoal xor3 file
-while (( $(lizardfs fileinfo file | grep -c copy) < 8 )); do # 1 [goal1] + 3 [xor2] + 4 [xor3]
+saunafs setgoal xor3 file
+while (( $(saunafs fileinfo file | grep -c copy) < 8 )); do # 1 [goal1] + 3 [xor2] + 4 [xor3]
 	sleep 1
 done
 sleep 2

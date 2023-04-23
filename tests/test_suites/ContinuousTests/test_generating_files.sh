@@ -1,6 +1,6 @@
 timeout_set 60 minutes
 continuous_test_begin
-lizardfs setgoal 2 .
+saunafs setgoal 2 .
 
 # Validate and generate a buch of files.
 # This test will maintain up tp 1000 files, each between 1 KiB and 600 MiB.
@@ -23,5 +23,5 @@ for i in {1..30}; do
 		assert_success mv -v "$file.tmp" "$file"
 	fi
 	# Randomly change goal of the file.
-	assert_success mfssetgoal "$(random 2 4)" "$file"
+	assert_success sfssetgoal "$(random 2 4)" "$file"
 done

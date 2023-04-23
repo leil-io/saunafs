@@ -1,23 +1,19 @@
 #
-# To run this test you need to add the following lines to /etc/sudoers.d/lizardfstest:
+# To run this test you need to add the following lines to /etc/sudoers.d/saunafstest:
 #
-# lizardfstest ALL = NOPASSWD: /bin/mount, /bin/umount, /bin/pkill, /bin/mkdir, /bin/touch
-# lizardfstest ALL = NOPASSWD: /tmp/LizardFS-autotests/mnt/mfs0/bin/ganesha.nfsd
+# saunafstest ALL = NOPASSWD: /bin/mount, /bin/umount, /bin/pkill, /bin/mkdir, /bin/touch
+# saunafstest ALL = NOPASSWD: /usr/bin/ganesha.nfsd
 #
 # The path for the Ganesha daemon should match the installation folder inside the test.
 #
 
-timeout_set 5 minutes
+timeout_set 2 minutes
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
-	setup_local_empty_lizardfs info
-
-MINIMUM_PARALLEL_JOBS=4
-MAXIMUM_PARALLEL_JOBS=16
-PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
+	setup_local_empty_saunafs info
 
 test_error_cleanup() {
 	for x in 1 2 97 99; do
@@ -42,28 +38,7 @@ else
 	echo "ganesha.pid already exists";
 fi
 
-# Copy Ganesha and libntirpc source code
-cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.3 nfs-ganesha-4.3
-cp -R "$SOURCE_DIR"/external/ntirpc-4.3 ntirpc-4.3
-
-# Remove original libntirpc folder to create a soft link
-rm -R nfs-ganesha-4.3/src/libntirpc
-ln -s ../../ntirpc-4.3 nfs-ganesha-4.3/src/libntirpc
-
-# Create build folder to compile Ganesha
-mkdir nfs-ganesha-4.3/src/build
-cd nfs-ganesha-4.3/src/build
-
-# flag -DUSE_GSS=NO disables the use of Kerberos library when compiling Ganesha
-CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} -DUSE_GSS=NO ..
-make -j${PARALLEL_JOBS} install
-
-# Copy LizardFS FSAL
-fsal_lizardfs=${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs.so
-assert_file_exists "$fsal_lizardfs"
-cp ${fsal_lizardfs} ${info[mount0]}/lib/ganesha
-
-cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
+cat <<EOF > ${info[mount0]}/ganesha.conf
 EXPORT
 {
 	Attr_Expiration_Time = 0;
@@ -72,9 +47,9 @@ EXPORT
 	Pseudo = /e1;
 	Access_Type = RW;
 	FSAL {
-		Name = LizardFS;
+		Name = SaunaFS;
 		hostname = localhost;
-		port = ${lizardfs_info_[matocl]};
+		port = ${saunafs_info_[matocl]};
 	}
 	Protocols = 3, 4;
 }
@@ -86,9 +61,9 @@ EXPORT
 	Pseudo = /e2;
 	Access_Type = RW;
 	FSAL {
-		Name = LizardFS;
+		Name = SaunaFS;
 		hostname = localhost;
-		port = ${lizardfs_info_[matocl]};
+		port = ${saunafs_info_[matocl]};
 	}
 	Protocols = 3, 4;
 }
@@ -100,9 +75,9 @@ EXPORT
 	Pseudo = /e97;
 	Access_Type = MDONLY;
 	FSAL {
-		Name = LizardFS;
+		Name = SaunaFS;
 		hostname = localhost;
-		port = ${lizardfs_info_[matocl]};
+		port = ${saunafs_info_[matocl]};
 	}
 	Protocols = 4;
 }
@@ -114,13 +89,13 @@ EXPORT
 	Pseudo = /e99;
 	Access_Type = RO;
 	FSAL {
-		Name = LizardFS;
+		Name = SaunaFS;
 		hostname = localhost;
-		port = ${lizardfs_info_[matocl]};
+		port = ${saunafs_info_[matocl]};
 	}
 	Protocols = 4;
 }
-LizardFS {
+SaunaFS {
 	PNFS_DS = true;
 	PNFS_MDS = true;
 }
@@ -134,8 +109,7 @@ mkdir ${info[mount0]}/export{1,2}
 touch ${info[mount0]}/export1/test1
 touch ${info[mount0]}/export2/test2
 
-sudo ${info[mount0]}/bin/ganesha.nfsd -f ${info[mount0]}/etc/ganesha/ganesha.conf
-
+sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
 assert_eventually 'showmount -e localhost'
 
 for x in 1 2 99; do

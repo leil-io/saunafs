@@ -1,19 +1,22 @@
 /*
+
+
    Copyright 2017 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -42,16 +45,16 @@ namespace detail {
  */
 template <class T, std::size_t N>
 class static_preallocator : public std::allocator<T> {
-	typedef std::allocator<T> base;
+	using base = std::allocator<T>;
 
 public:
-	typedef typename base::value_type value_type;
-	typedef typename base::pointer pointer;
-	typedef typename base::const_pointer const_pointer;
-	typedef typename base::reference reference;
-	typedef typename base::const_reference const_reference;
-	typedef typename base::size_type size_type;
-	typedef typename base::difference_type difference_type;
+	using value_type = typename base::value_type;
+	using pointer = T*;
+	using const_pointer = const T*;
+	using reference = T&;
+	using const_reference = const T&;
+	using size_type = typename base::size_type;
+	using difference_type = typename base::difference_type;
 
 	template <typename U>
 	struct rebind {
@@ -89,7 +92,7 @@ public:
 	~static_preallocator() {
 	}
 
-	pointer allocate(size_type n, const_pointer *hint = nullptr) {
+	pointer allocate(size_type n) {
 		if (n == 0) {
 			return nullptr;
 		}
@@ -98,7 +101,7 @@ public:
 			return reinterpret_cast<pointer>(data_.data());
 		}
 
-		return base::allocate(n, hint);
+		return base::allocate(n);
 	}
 
 	void deallocate(pointer p, size_type n) {
@@ -106,11 +109,6 @@ public:
 			base::deallocate(p, n);
 		}
 	}
-
-	using base::address;
-	using base::construct;
-	using base::destroy;
-	using base::max_size;
 
 protected:
 	const base &as_base() const {
@@ -144,21 +142,21 @@ bool operator!=(const static_preallocator<T1, N1> &a, const static_preallocator<
  */
 template <class T, std::size_t N>
 class small_vector : public std::vector<T, detail::static_preallocator<T, N>> {
-	typedef std::vector<T, detail::static_preallocator<T, N>> base;
+	using base = std::vector<T, detail::static_preallocator<T, N>>;
 
 public:
-	typedef typename base::value_type value_type;
-	typedef typename base::pointer pointer;
-	typedef typename base::const_pointer const_pointer;
-	typedef typename base::reference reference;
-	typedef typename base::const_reference const_reference;
-	typedef typename base::iterator iterator;
-	typedef typename base::const_iterator const_iterator;
-	typedef typename base::const_reverse_iterator const_reverse_iterator;
-	typedef typename base::reverse_iterator reverse_iterator;
-	typedef typename base::size_type size_type;
-	typedef typename base::difference_type difference_type;
-	typedef typename base::allocator_type allocator_type;
+	using value_type = typename base::value_type;
+	using pointer = T*;
+	using const_pointer = const T*;
+	using reference = T&;
+	using const_reference = const T&;
+	using iterator = typename base::iterator;
+	using const_iterator = typename base::const_iterator;
+	using const_reverse_iterator = typename base::const_reverse_iterator;
+	using reverse_iterator = typename base::reverse_iterator;
+	using size_type = typename base::size_type;
+	using difference_type = typename base::difference_type;
+	using allocator_type = typename base::allocator_type;
 
 public:
 	small_vector() noexcept(std::is_nothrow_constructible<base>::value) : base() {

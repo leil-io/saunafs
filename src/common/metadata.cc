@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -32,31 +34,31 @@
 
 #include "common/cwrap.h"
 #include "common/datapack.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/slogger.h"
 
-#define METADATA_FILENAME_TEMPL "metadata.mfs"
+#define METADATA_FILENAME_TEMPL "metadata.sfs"
 const char kMetadataFilename[] = METADATA_FILENAME_TEMPL;
 const char kMetadataTmpFilename[] = METADATA_FILENAME_TEMPL ".tmp";
 const char kMetadataEmergencyFilename[] = METADATA_FILENAME_TEMPL ".emergency";
 #undef METADATA_FILENAME_TEMPL
-#define METADATA_ML_FILENAME_TEMPL "metadata_ml.mfs"
+#define METADATA_ML_FILENAME_TEMPL "metadata_ml.sfs"
 const char kMetadataMlFilename[] = METADATA_ML_FILENAME_TEMPL;
 const char kMetadataMlTmpFilename[] = METADATA_ML_FILENAME_TEMPL ".tmp";
 #undef METADATA_ML_FILENAME_TEMPL
-#define CHANGELOG_FILENAME "changelog.mfs"
+#define CHANGELOG_FILENAME "changelog.sfs"
 const char kChangelogFilename[] = CHANGELOG_FILENAME;
 const char kChangelogTmpFilename[] = CHANGELOG_FILENAME ".tmp";
 #undef CHANGELOG_FILENAME
-#define CHANGELOG_ML_FILENAME "changelog_ml.mfs"
+#define CHANGELOG_ML_FILENAME "changelog_ml.sfs"
 const char kChangelogMlFilename[] = CHANGELOG_ML_FILENAME;
 const char kChangelogMlTmpFilename[] = CHANGELOG_ML_FILENAME ".tmp";
 #undef CHANGELOG_ML_FILENAME
-#define SESSIONS_ML_FILENAME "sessions_ml.mfs"
+#define SESSIONS_ML_FILENAME "sessions_ml.sfs"
 const char kSessionsMlFilename[] = SESSIONS_ML_FILENAME;
 const char kSessionsMlTmpFilename[] = SESSIONS_ML_FILENAME ".tmp";
 #undef SESSIONS_ML_FILENAME
-#define SESSIONS_FILENAME "sessions.mfs"
+#define SESSIONS_FILENAME "sessions.sfs"
 const char kSessionsFilename[] = SESSIONS_FILENAME;
 const char kSessionsTmpFilename[] = SESSIONS_FILENAME ".tmp";
 #undef SESSIONS_FILENAME
@@ -79,7 +81,7 @@ uint64_t metadataGetVersion(const std::string& file) {
 		close(fd);
 		throw MetadataCheckException("Can't read the metadata file");
 	}
-	if (memcmp(chkbuff,"MFSM NEW",8)==0) {
+	if (memcmp(chkbuff,"SFSM NEW",8)==0) {
 		close(fd);
 		return 0;
 	}
@@ -88,13 +90,13 @@ uint64_t metadataGetVersion(const std::string& file) {
 		throw MetadataCheckException("Can't read the metadata file");
 	}
 
-	if (memcmp(chkbuff,MFSSIGNATURE "M 1.",7)==0 && chkbuff[7]>='5' && chkbuff[7]<='6') {
+	if (memcmp(chkbuff,SFSSIGNATURE "M 1.",7)==0 && chkbuff[7]>='5' && chkbuff[7]<='6') {
 		memset(eofmark,0,16);
-	} else if (memcmp(chkbuff,MFSSIGNATURE "M 2.0",8)==0) {
-		memcpy(eofmark,"[MFS EOF MARKER]",16);
-	/* Note LIZARDFSSIGNATURE instead of MFSSIGNATURE! */
-	} else if (memcmp(chkbuff, LIZARDFSSIGNATURE "M 2.9", 8) == 0) {
-		memcpy(eofmark,"[MFS EOF MARKER]",16);
+	} else if (memcmp(chkbuff,SFSSIGNATURE "M 2.0",8)==0) {
+		memcpy(eofmark,"[SFS EOF MARKER]",16);
+	/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
+	} else if (memcmp(chkbuff, SAUNAFSSIGNATURE "M 2.9", 8) == 0) {
+		memcpy(eofmark,"[SFS EOF MARKER]",16);
 	} else {
 		close(fd);
 		throw MetadataCheckException("Bad format of the metadata file");
@@ -182,7 +184,7 @@ uint64_t changelogGetLastLogVersion(const std::string& fname) {
 		}
 	}
 	if (munmap((void*) fileContent, fileSize)) {
-		lzfs_pretty_errlog(LOG_WARNING, "munmap(%s) failed", fname.c_str());
+		safs_pretty_errlog(LOG_WARNING, "munmap(%s) failed", fname.c_str());
 	}
 	return lastLogVersion;
 }
@@ -191,8 +193,8 @@ void changelogsMigrateFrom_1_6_29(const std::string& fname) {
 	std::string name_new, name_old;
 	for (uint32_t i = 0; i < 99; i++) {
 		// 99 is the maximum number of changelog file in versions up to 1.6.29.
-		name_old = fname + "." + std::to_string(i) + ".mfs";
-		name_new = fname + ".mfs";
+		name_old = fname + "." + std::to_string(i) + ".sfs";
+		name_new = fname + ".sfs";
 		if (i != 0) {
 			name_new += "." + std::to_string(i);
 		}
@@ -201,7 +203,7 @@ void changelogsMigrateFrom_1_6_29(const std::string& fname) {
 				if (!fs::exists(name_new)) {
 					fs::rename(name_old, name_new);
 				} else {
-					lzfs_pretty_syslog(LOG_WARNING,
+					safs_pretty_syslog(LOG_WARNING,
 							"migrating changelogs from version 1.6.29: "
 							"both old and new changelog files exist (%s and %s); "
 							"old changelog won't be renamed automatically, "

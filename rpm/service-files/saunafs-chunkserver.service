@@ -1,0 +1,14 @@
+[Unit]
+Description=SaunaFS chunkserver daemon
+Documentation=man:sfschunkserver
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/sfschunkserver start
+ExecStop=/usr/sbin/sfschunkserver stop
+ExecReload=/usr/sbin/sfschunkserver reload
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

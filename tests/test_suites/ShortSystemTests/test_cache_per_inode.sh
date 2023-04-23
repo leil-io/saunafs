@@ -3,11 +3,11 @@ timeout_set 1 minute
 percent=63
 cache=149 # megabytes
 CHUNKSERVERS=1 \
-	MOUNT_EXTRA_CONFIG="mfscacheperinodepercentage=$percent | mfswritecachesize=$cache" \
+	MOUNT_EXTRA_CONFIG="sfscacheperinodepercentage=$percent | sfswritecachesize=$cache" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
-cs0_pid="$(lizardfs_chunkserver_daemon 0 test 2>&1 | sed 's/.*pid: //')"
+cs0_pid="$(saunafs_chunkserver_daemon 0 test 2>&1 | sed 's/.*pid: //')"
 test -n $cs0_pid
 kill -s SIGSTOP $cs0_pid
 

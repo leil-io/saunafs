@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA,
-   2013-2019 Skytechnology sp. z o.o.
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2019 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -25,14 +26,14 @@
 #include "mount/special_inode.h"
 #include "mount/stats.h"
 
-using namespace LizardClient;
+using namespace SaunaClient;
 
 namespace InodeMasterInfo {
 static void open(const Context &ctx, FileInfo *fi) {
 	if ((fi->flags & O_ACCMODE) != O_RDONLY) {
 		oplog_printf(ctx, "open (%lu) (internal node: MASTERINFO): %s",
-		            (unsigned long int)inode_, lizardfs_error_string(LIZARDFS_ERROR_EACCES));
-		throw RequestException(LIZARDFS_ERROR_EACCES);
+		            (unsigned long int)inode_, saunafs_error_string(SAUNAFS_ERROR_EACCES));
+		throw RequestException(SAUNAFS_ERROR_EACCES);
 	}
 	fi->fh = 0;
 	fi->direct_io = 0;
@@ -49,12 +50,12 @@ static void open(const Context &ctx, FileInfo *fi) {
 	if (!statsinfo) {
 		oplog_printf(ctx, "open (%lu) (internal node: STATS): %s",
 		            (unsigned long int)inode_,
-		            lizardfs_error_string(LIZARDFS_ERROR_OUTOFMEMORY));
-		throw RequestException(LIZARDFS_ERROR_OUTOFMEMORY);
+		            saunafs_error_string(SAUNAFS_ERROR_OUTOFMEMORY));
+		throw RequestException(SAUNAFS_ERROR_OUTOFMEMORY);
 	}
 	if (pthread_mutex_init(&(statsinfo->lock), NULL))  {
 		free(statsinfo);
-		throw RequestException(LIZARDFS_ERROR_EPERM);
+		throw RequestException(SAUNAFS_ERROR_EPERM);
 	}
 	PthreadMutexWrapper lock((statsinfo->lock));         // make helgrind happy
 	stats_show_all(&(statsinfo->buff),&(statsinfo->leng));
@@ -72,8 +73,8 @@ static void open(const Context &ctx, FileInfo *fi) {
 	if ((fi->flags & O_ACCMODE) != O_RDONLY) {
 		oplog_printf(ctx, "open (%lu) (internal node: OPLOG): %s",
 		            (unsigned long int)inode_,
-		            lizardfs_error_string(LIZARDFS_ERROR_EACCES));
-		throw RequestException(LIZARDFS_ERROR_EACCES);
+		            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+		throw RequestException(SAUNAFS_ERROR_EACCES);
 	}
 	fi->fh = oplog_newhandle(0);
 	fi->direct_io = 1;
@@ -88,8 +89,8 @@ static void open(const Context &ctx, FileInfo *fi) {
 	if ((fi->flags & O_ACCMODE) != O_RDONLY) {
 		oplog_printf(ctx, "open (%lu) (internal node: OPHISTORY): %s",
 		            (unsigned long int)inode_,
-		            lizardfs_error_string(LIZARDFS_ERROR_EACCES));
-		throw RequestException(LIZARDFS_ERROR_EACCES);
+		            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+		throw RequestException(SAUNAFS_ERROR_EACCES);
 	}
 	fi->fh = oplog_newhandle(1);
 	fi->direct_io = 1;
@@ -116,6 +117,7 @@ static const std::array<std::function<void
 	 &InodeOplog::open,             //0x1U
 	 &InodeOphistory::open,         //0x2U
 	 &InodeTweaks::open,            //0x3U
+	 nullptr,                       //0x4U
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
@@ -126,16 +128,15 @@ static const std::array<std::function<void
 	 nullptr,                       //0xCU
 	 nullptr,                       //0xDU
 	 nullptr,                       //0xEU
-	 nullptr,                       //0xEU
 	 &InodeMasterInfo::open         //0xFU
 }};
 
 void special_open(Inode ino, const Context &ctx, FileInfo *fi) {
 	auto func = funcs[ino - SPECIAL_INODE_BASE];
 	if (!func) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 			"Trying to call unimplemented 'open' function for special inode");
-		throw RequestException(LIZARDFS_ERROR_EINVAL);
+		throw RequestException(SAUNAFS_ERROR_EINVAL);
 	}
 	return func(ctx, fi);
 }

@@ -6,7 +6,7 @@ USE_RAMDISK=YES \
 	CHUNKSERVER_LABELS="0,1:de|2,3:us|4:cn" \
 	MASTER_CUSTOM_GOALS="11 11: de de|12 12: us us|13 13: us de|14 14: de de de|15 15: us us us`
 			`|16 16: us|17 17: us _|18 18: us _ _|19 19: _ us de|20 20: _ cn us de" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # For each goal, define all possible lists of labels. Each list is sorted alphabetically,
 # lists are separated using pipes, lables in a single list using commas.
@@ -37,7 +37,7 @@ get_file_labels() {
 			`/copy .*:(${info[chunkserver0_port]}|${info[chunkserver1_port]}):.*\$/ {print \"de\"} `
 			`/copy .*:(${info[chunkserver2_port]}|${info[chunkserver3_port]}):.*\$/ {print \"us\"} `
 			`/copy .*:(${info[chunkserver4_port]}):.*\$/ {print \"cn\"}"
-	lizardfs fileinfo "$1" | awk "$fileinfo_to_labels" | sort | tr '\n' ' ' | trim | tr ' ' ','
+	saunafs fileinfo "$1" | awk "$fileinfo_to_labels" | sort | tr '\n' ' ' | trim | tr ' ' ','
 }
 
 cd "${info[mount0]}"
@@ -46,7 +46,7 @@ for goal in "${!expected_labels[@]}"; do
 
 	# Create a lot of files in the current goal and verify labels for each file
 	mkdir "dir_$goal"
-	lizardfs setgoal "$goal" "dir_$goal"
+	saunafs setgoal "$goal" "dir_$goal"
 	for file in "dir_$goal/file"{1..50}; do
 		echo x > "$file"
 		assert_matches "^(${expected_labels[goal]})\$" "$(get_file_labels "$file")"

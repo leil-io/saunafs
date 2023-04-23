@@ -1,19 +1,20 @@
 /*
    Copyright 2016-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -28,25 +29,25 @@
 int SnapshotTask::cloneNodeTest(FSNode *src_node, FSNode *dst_node, FSNodeDirectory *dst_parent) {
 	if (fsnodes_quota_exceeded_ug(src_node, {{QuotaResource::kInodes, 1}}) ||
 	    fsnodes_quota_exceeded_dir(dst_parent, {{QuotaResource::kInodes, 1}})) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 	if (src_node->type == FSNode::kFile &&
 	    (fsnodes_quota_exceeded_ug(src_node, {{QuotaResource::kSize, 1}}) ||
 	     fsnodes_quota_exceeded_dir(dst_parent, {{QuotaResource::kSize, 1}}))) {
-		return LIZARDFS_ERROR_QUOTA;
+		return SAUNAFS_ERROR_QUOTA;
 	}
 	if (dst_node) {
 		if (orig_inode_ != 0 && dst_node->id == orig_inode_) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 		if (dst_node->type != src_node->type) {
-			return LIZARDFS_ERROR_EPERM;
+			return SAUNAFS_ERROR_EPERM;
 		}
 		if (src_node->type != FSNode::kDirectory && !can_overwrite_) {
-			return LIZARDFS_ERROR_EEXIST;
+			return SAUNAFS_ERROR_EEXIST;
 		}
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 FSNode *SnapshotTask::cloneToExistingNode(uint32_t ts, FSNode *src_node,
@@ -146,8 +147,8 @@ void SnapshotTask::cloneChunkData(const FSNodeFile *src_node, FSNodeFile *dst_no
 	for (uint32_t i = 0; i < src_node->chunks.size(); ++i) {
 		auto chunkid = src_node->chunks[i];
 		if (chunkid > 0) {
-			if (chunk_add_file(chunkid, dst_node->goal) != LIZARDFS_STATUS_OK) {
-				lzfs_pretty_syslog(LOG_ERR,
+			if (chunk_add_file(chunkid, dst_node->goal) != SAUNAFS_STATUS_OK) {
+				safs_pretty_syslog(LOG_ERR,
 				       "structure error - chunk %016" PRIX64
 				       " not found (inode: %" PRIu32 " ; index: %" PRIu32 ")",
 				       chunkid, src_node->id, i);
@@ -208,16 +209,16 @@ int SnapshotTask::cloneNode(uint32_t ts) {
 	FSNodeDirectory *dst_parent = fsnodes_id_to_node<FSNodeDirectory>(dst_parent_inode_);
 
 	if (!src_node || src_node->type == FSNode::kTrash || src_node->type == FSNode::kReserved) {
-		return LIZARDFS_ERROR_ENOENT;
+		return SAUNAFS_ERROR_ENOENT;
 	}
 	if (!dst_parent || dst_parent->type != FSNode::kDirectory) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 
 	FSNode *dst_node = fsnodes_lookup(dst_parent, current_subtask_->second);
 
 	int status = cloneNodeTest(src_node, dst_node, dst_parent);
-	if (status != LIZARDFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		return status;
 	}
 
@@ -232,9 +233,9 @@ int SnapshotTask::cloneNode(uint32_t ts) {
 	fsnodes_update_checksum(dst_parent);
 	emitChangelog(ts, dst_node->id);
 	if (dst_inode_ != 0 && dst_inode_ != dst_node->id) {
-		return LIZARDFS_ERROR_MISMATCH;
+		return SAUNAFS_ERROR_MISMATCH;
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 int SnapshotTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {
@@ -243,10 +244,10 @@ int SnapshotTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {
 	int status = cloneNode(ts);
 	++current_subtask_;
 
-	if (ignore_missing_src_ && status == LIZARDFS_ERROR_ENOENT) {
-		return LIZARDFS_STATUS_OK;
+	if (ignore_missing_src_ && status == SAUNAFS_ERROR_ENOENT) {
+		return SAUNAFS_STATUS_OK;
 	}
-	if (status == LIZARDFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK) {
 		work_queue.splice(work_queue.end(), local_tasks_);
 	}
 

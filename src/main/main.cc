@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2019 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2019 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -52,25 +53,25 @@
 #include "common/event_loop.h"
 #include "common/main.h"
 #include "common/massert.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "common/setup.h"
 #include "common/slogger.h"
 #include "common/time_utils.h"
-#include "protocol/MFSCommunication.h"
+#include "protocol/SFSCommunication.h"
 
-#if defined(LIZARDFS_HAVE_MLOCKALL)
-#  if defined(LIZARDFS_HAVE_SYS_MMAN_H)
+#if defined(SAUNAFS_HAVE_MLOCKALL)
+#  if defined(SAUNAFS_HAVE_SYS_MMAN_H)
 #    include <sys/mman.h>
 #  endif
-#  if defined(LIZARDFS_HAVE_SYS_RESOURCE_H)
+#  if defined(SAUNAFS_HAVE_SYS_RESOURCE_H)
 #    include <sys/resource.h>
 #  endif
 #  if defined(RLIMIT_MEMLOCK) && defined(MCL_CURRENT) && defined(MCL_FUTURE)
-#    define MFS_USE_MEMLOCK 1
+#    define SFS_USE_MEMLOCK 1
 #  endif
 #endif
 
-#if defined(LIZARDFS_HAVE_PAM)
+#if defined(SAUNAFS_HAVE_PAM)
 #  include <security/pam_appl.h>
 #  include <security/pam_misc.h>
 #endif
@@ -79,11 +80,11 @@
 #define CFGNAME APPNAME
 #endif
 
-#ifndef LIZARDFS_MAX_FILES
-#  define LIZARDFS_MAX_FILES 5000
+#ifndef SAUNAFS_MAX_FILES
+#  define SAUNAFS_MAX_FILES 5000
 #endif
 
-#if defined(LIZARDFS_HAVE_SYSTEMD_SD_DAEMON_H)
+#if defined(SAUNAFS_HAVE_SYSTEMD_SD_DAEMON_H)
 #include <systemd/sd-daemon.h>
 #endif
 
@@ -100,7 +101,7 @@ enum class RunMode {
 	kIsAlive = 6
 };
 
-#if defined(LIZARDFS_HAVE_PAM)
+#if defined(SAUNAFS_HAVE_PAM)
 static pam_handle_t *gPAMHandle=NULL;
 #endif
 
@@ -122,14 +123,14 @@ static void signal_pipe_serv(const std::vector<pollfd> &pdesc) {
 		uint8_t sigid;
 		if (read(signalpipe[0],&sigid,1)==1) {
 			if (sigid == '\001' && gExitingStatus == ExitingStatus::kRunning) {
-				lzfs_pretty_syslog(LOG_NOTICE,"terminate signal received");
+				safs_pretty_syslog(LOG_NOTICE,"terminate signal received");
 				gExitingStatus = ExitingStatus::kWantExit;
 			} else if (sigid=='\002') {
-				lzfs_pretty_syslog(LOG_NOTICE,"reloading config files");
+				safs_pretty_syslog(LOG_NOTICE,"reloading config files");
 				gReloadRequested = true;
 			} else if (sigid=='\003') {
-				lzfs_pretty_syslog(LOG_NOTICE, "Received SIGUSR1, killing gently...");
-				exit(LIZARDFS_EXIT_STATUS_GENTLY_KILL);
+				safs_pretty_syslog(LOG_NOTICE, "Received SIGUSR1, killing gently...");
+				exit(SAUNAFS_EXIT_STATUS_GENTLY_KILL);
 			}
 		}
 	}
@@ -144,11 +145,11 @@ int initialize(run_tab* tab) {
 		eventloop_updatetime();
 		try {
 			if (tab[i].fn()<0) {
-				lzfs_pretty_syslog(LOG_ERR,"init: %s failed",tab[i].name);
+				safs_pretty_syslog(LOG_ERR,"init: %s failed",tab[i].name);
 				ok=0;
 			}
 		} catch (const std::exception& e) {
-			lzfs_pretty_syslog(LOG_ERR, "%s", e.what());
+			safs_pretty_syslog(LOG_ERR, "%s", e.what());
 			ok = 0;
 		}
 	}
@@ -200,12 +201,12 @@ static void main_configure_debug_log() {
 	} else if (flush_on_str == "DEBUG") {
 		priority = LOG_DEBUG;
 	}
-	lzfs::drop_all_logs();
-	lzfs::add_log_syslog();
+	safs::drop_all_logs();
+	safs::add_log_syslog();
 	if (gRunAsDaemon) {
-		lzfs::add_log_stderr(lzfs::log_level::warn);
+		safs::add_log_stderr(safs::log_level::warn);
 	} else {
-		lzfs::add_log_stderr(lzfs::log_level::debug);
+		safs::add_log_stderr(safs::log_level::debug);
 	}
 	for (std::string suffix : {"", "_A", "_B", "_C"}) {
 		std::string configEntryName = "MAGIC_DEBUG_LOG" + suffix;
@@ -213,20 +214,20 @@ static void main_configure_debug_log() {
 		if (value.empty()) {
 			continue;
 		}
-		lzfs_add_log_file(value.c_str(), LOG_DEBUG, 16*1024*1024, 8);
+		safs_add_log_file(value.c_str(), LOG_DEBUG, 16*1024*1024, 8);
 	}
-	lzfs_set_log_flush_on(priority);
+	safs_set_log_flush_on(priority);
 }
 
 void main_reload() {
 	// Reload SYSLOG_IDENT
-	lzfs_pretty_syslog(LOG_NOTICE, "Changing SYSLOG_IDENT to %s",
+	safs_pretty_syslog(LOG_NOTICE, "Changing SYSLOG_IDENT to %s",
 			cfg_get("SYSLOG_IDENT", STR(APPNAME)).c_str());
 	set_syslog_ident();
 
 	// Reload MAGIC_DEBUG_LOG
 	main_configure_debug_log();
-	lzfs_silent_syslog(LOG_DEBUG, "main.reload");
+	safs_silent_syslog(LOG_DEBUG, "main.reload");
 }
 
 /* signals */
@@ -362,8 +363,8 @@ void changeugid(RunMode runmode) {
 		} else if (wgroup[0]) {
 			getgrnam_r(wgroup,&grp,pwdgrpbuff,16384,&gr);
 			if (gr==NULL) {
-				lzfs_pretty_syslog(LOG_WARNING,"%s: no such group",wgroup);
-				exit(LIZARDFS_EXIT_STATUS_ERROR);
+				safs_pretty_syslog(LOG_WARNING,"%s: no such group",wgroup);
+				exit(SAUNAFS_EXIT_STATUS_ERROR);
 			} else {
 				wrk_gid = gr->gr_gid;
 				gidok = 1;
@@ -375,16 +376,16 @@ void changeugid(RunMode runmode) {
 			if (gidok==0) {
 				getpwuid_r(wrk_uid,&pwd,pwdgrpbuff,16384,&pw);
 				if (pw==NULL) {
-					lzfs_pretty_syslog(LOG_ERR,"%s: no such user id - can't obtain group id",wuser+1);
-					exit(LIZARDFS_EXIT_STATUS_ERROR);
+					safs_pretty_syslog(LOG_ERR,"%s: no such user id - can't obtain group id",wuser+1);
+					exit(SAUNAFS_EXIT_STATUS_ERROR);
 				}
 				wrk_gid = pw->pw_gid;
 			}
 		} else {
 			getpwnam_r(wuser,&pwd,pwdgrpbuff,16384,&pw);
 			if (pw==NULL) {
-				lzfs_pretty_syslog(LOG_ERR,"%s: no such user",wuser);
-				exit(LIZARDFS_EXIT_STATUS_ERROR);
+				safs_pretty_syslog(LOG_ERR,"%s: no such user",wuser);
+				exit(SAUNAFS_EXIT_STATUS_ERROR);
 			}
 			wrk_uid = pw->pw_uid;
 			if (gidok==0) {
@@ -395,40 +396,40 @@ void changeugid(RunMode runmode) {
 		free(wgroup);
 
 		if (setgroups(0, NULL) < 0) {
-			lzfs::log_warn("can't reset supplementary groups");
+			safs::log_warn("can't reset supplementary groups");
 		}
 		if (setgid(wrk_gid) < 0) {
-			lzfs::log_err("can't set gid to {}", (int)wrk_gid);
-			exit(LIZARDFS_EXIT_STATUS_ERROR);
+			safs::log_err("can't set gid to {}", (int)wrk_gid);
+			exit(SAUNAFS_EXIT_STATUS_ERROR);
 		} else if ((runmode == RunMode::kStart) || (runmode == RunMode::kRestart)){
-			lzfs::log_info("set gid to {}", (int)wrk_gid);
+			safs::log_info("set gid to {}", (int)wrk_gid);
 		}
 		if (setuid(wrk_uid)<0) {
-			lzfs::log_err("can't set uid to {}", (int)wrk_uid);
-			exit(LIZARDFS_EXIT_STATUS_ERROR);
+			safs::log_err("can't set uid to {}", (int)wrk_uid);
+			exit(SAUNAFS_EXIT_STATUS_ERROR);
 		} else if ((runmode == RunMode::kStart) || (runmode == RunMode::kRestart)){
-			lzfs::log_info("set uid to {}", (int)wrk_uid);
+			safs::log_info("set uid to {}", (int)wrk_uid);
 		}
 	}
 }
 
 bool open_pam_session() {
-#if defined(LIZARDFS_HAVE_PAM)
+#if defined(SAUNAFS_HAVE_PAM)
 	static struct pam_conv conv = {misc_conv, NULL};
 
 	assert(gPAMHandle == NULL);
 
 	int retval;
 
-	retval = pam_start("lizardfs", DEFAULT_USER, &conv, &gPAMHandle);
+	retval = pam_start("saunafs", DEFAULT_USER, &conv, &gPAMHandle);
 	if (retval != PAM_SUCCESS) {
-		lzfs_pretty_errlog(LOG_ERR, "Can't initialize PAM");
+		safs_pretty_errlog(LOG_ERR, "Can't initialize PAM");
 		return false;
 	}
 
 	retval = pam_open_session(gPAMHandle, 0);
 	if (retval != PAM_SUCCESS) {
-		lzfs_pretty_errlog(LOG_ERR, "Can't open PAM session");
+		safs_pretty_errlog(LOG_ERR, "Can't open PAM session");
 		return false;
 	}
 
@@ -439,7 +440,7 @@ bool open_pam_session() {
 }
 
 void close_pam_session() {
-#if defined(LIZARDFS_HAVE_PAM)
+#if defined(SAUNAFS_HAVE_PAM)
 	if (!gPAMHandle) {
 		return;
 	}
@@ -529,7 +530,7 @@ bool FileLock::createLockFile() {
 	if (!fd_.isOpened()) {
 		std::string err = "can't create lockfile " + fs::getCurrentWorkingDirectoryNoThrow()
 		                  + "/" + name();
-		lzfs_pretty_errlog(LOG_ERR, "%s", err.c_str());
+		safs_pretty_errlog(LOG_ERR, "%s", err.c_str());
 
 		return false;
 	}
@@ -545,7 +546,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 
 	pid_t ownerpid(mylock());
 	if (ownerpid<0) {
-		lzfs_pretty_errlog(LOG_ERR, "fcntl error while creating lockfile %s", lockPath.c_str());
+		safs_pretty_errlog(LOG_ERR, "fcntl error while creating lockfile %s", lockPath.c_str());
 		return LockStatus::kFail;
 	}
 
@@ -558,7 +559,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 			return LockStatus::kFail;
 		}
 		if (runmode==RunMode::kStart) {
-			lzfs_pretty_syslog(LOG_ERR,
+			safs_pretty_syslog(LOG_ERR,
 					"can't start: lockfile %s is already locked by another process",
 					lockPath.c_str());
 			return LockStatus::kFail;
@@ -568,12 +569,12 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 			 * FIXME: buissiness logic should not be in file locking function.
 			 */
 			if (kill(ownerpid,SIGHUP)<0) {
-				lzfs_pretty_errlog(LOG_ERR,
+				safs_pretty_errlog(LOG_ERR,
 						"can't send reload signal to the lock owner of %s",
 						lockPath.c_str());
 				return LockStatus::kFail;
 			}
-			lzfs_pretty_syslog(LOG_INFO, "reload signal has been sent");
+			safs_pretty_syslog(LOG_INFO, "reload signal has been sent");
 			return LockStatus::kSuccess;
 		}
 		if (runmode==RunMode::kKill) {
@@ -585,7 +586,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 #else
 			if (kill(ownerpid,SIGKILL)<0) {
 #endif
-				lzfs_pretty_errlog(LOG_ERR,
+				safs_pretty_errlog(LOG_ERR,
 						"can't kill (SIGKILL) the lock owner (pid:%ld) of %s",
 						(long int)ownerpid, lockPath.c_str());
 				return LockStatus::kFail;
@@ -596,7 +597,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 			 * FIXME: buissiness logic should not be in file locking function.
 			 */
 			if (kill(ownerpid,SIGTERM)<0) {
-				lzfs_pretty_errlog(LOG_ERR,
+				safs_pretty_errlog(LOG_ERR,
 						"can't kill (SIGTERM) the lock owner (pid:%ld) of %s",
 						(long int)ownerpid, lockPath.c_str());
 				return LockStatus::kFail;
@@ -609,7 +610,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 		do {
 			newownerpid = mylock();
 			if (newownerpid<0) {
-				lzfs_pretty_errlog(LOG_ERR,
+				safs_pretty_errlog(LOG_ERR,
 						"fcntl error while creating lockfile %s",
 						lockPath.c_str());
 				return LockStatus::kFail;
@@ -618,22 +619,22 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 				l++;
 				uint32_t secondsElapsed = l / checksPerSecond;
 				if (secondsElapsed >= timeout) {
-					lzfs_pretty_syslog(LOG_ERR,
+					safs_pretty_syslog(LOG_ERR,
 							"about %" PRIu32 " seconds passed and the lock %s still exists - giving up",
 							secondsElapsed, lockPath.c_str());
 					return LockStatus::kFail;
 				}
 				if (l % (10 * checksPerSecond) == 0) {
-					lzfs_pretty_syslog(LOG_WARNING,
+					safs_pretty_syslog(LOG_WARNING,
 							"about %" PRIu32 " seconds passed and the lock %s still exists...",
 							secondsElapsed, lockPath.c_str());
 					fflush(stderr);
 				}
 				if (newownerpid!=ownerpid) {
-					lzfs_silent_syslog(LOG_INFO, "new lock owner of %s detected", lockPath.c_str());
+					safs_silent_syslog(LOG_INFO, "new lock owner of %s detected", lockPath.c_str());
 					if (runmode==RunMode::kKill) {
 						if (kill(newownerpid,SIGKILL)<0) {
-							lzfs_pretty_errlog(LOG_ERR,
+							safs_pretty_errlog(LOG_ERR,
 									"can't kill (SIGKILL) the lock owner (pid:%ld) of %s",
 									(long int)newownerpid, lockPath.c_str());
 							return LockStatus::kFail;
@@ -641,7 +642,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 					} else {
 						sassert((runmode == RunMode::kStop) || (runmode == RunMode::kRestart));
 						if (kill(newownerpid,SIGTERM)<0) {
-							lzfs_pretty_errlog(LOG_ERR,
+							safs_pretty_errlog(LOG_ERR,
 									"can't kill (SIGTERM) lock owner (pid:%ld) of %s",
 									(long int)newownerpid, lockPath.c_str());
 							return LockStatus::kFail;
@@ -655,12 +656,12 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 		return (runmode == RunMode::kRestart) ? LockStatus::kAgain : LockStatus::kSuccess;
 	}
 	if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
-		lzfs_pretty_syslog(LOG_INFO,"lockfile %s created and locked", lockPath.c_str());
+		safs_pretty_syslog(LOG_INFO,"lockfile %s created and locked", lockPath.c_str());
 	} else if (runmode==RunMode::kStop || runmode==RunMode::kKill) {
-		lzfs_pretty_syslog(LOG_WARNING,"can't find process to terminate");
+		safs_pretty_syslog(LOG_WARNING,"can't find process to terminate");
 		return LockStatus::kSuccess;
 	} else if (runmode==RunMode::kReload) {
-		lzfs_pretty_syslog(LOG_ERR,"can't find process to send reload signal");
+		safs_pretty_syslog(LOG_ERR,"can't find process to send reload signal");
 		return LockStatus::kFail;
 	} else if (runmode==RunMode::kTest) {
 		fprintf(stderr, STR(APPNAME) " is not running\n");
@@ -680,19 +681,19 @@ void makedaemon() {
 	fflush(stdout);
 	fflush(stderr);
 	if (pipe(piped)<0) {
-		lzfs_pretty_syslog(LOG_ERR, "pipe error");
-		exit(LIZARDFS_EXIT_STATUS_ERROR);
+		safs_pretty_syslog(LOG_ERR, "pipe error");
+		exit(SAUNAFS_EXIT_STATUS_ERROR);
 	}
 	f = fork();
 	if (f<0) {
-		lzfs_pretty_errlog(LOG_ERR, "first fork error");
-		exit(LIZARDFS_EXIT_STATUS_ERROR);
+		safs_pretty_errlog(LOG_ERR, "first fork error");
+		exit(SAUNAFS_EXIT_STATUS_ERROR);
 	}
 	if (f>0) {
 		wait(&f);       // just get child status - prevents child from being zombie during initialization stage
 		if (f) {
-			lzfs_pretty_syslog(LOG_ERR, "child status: %d",f);
-			exit(LIZARDFS_EXIT_STATUS_ERROR);
+			safs_pretty_syslog(LOG_ERR, "child status: %d",f);
+			exit(SAUNAFS_EXIT_STATUS_ERROR);
 		}
 		close(piped[1]);
 		while ((r=read(piped[0],pipebuff,1000))) {
@@ -702,30 +703,30 @@ void makedaemon() {
 						happy = fwrite(pipebuff,1,r-1,stderr);
 						(void)happy;
 					}
-					exit(LIZARDFS_EXIT_STATUS_ERROR);
+					exit(SAUNAFS_EXIT_STATUS_ERROR);
 				}
 				happy = fwrite(pipebuff,1,r,stderr);
 				(void)happy;
 			} else {
-				lzfs_pretty_errlog(LOG_ERR,"error reading pipe");
-				exit(LIZARDFS_EXIT_STATUS_ERROR);
+				safs_pretty_errlog(LOG_ERR,"error reading pipe");
+				exit(SAUNAFS_EXIT_STATUS_ERROR);
 			}
 		}
-		exit(LIZARDFS_EXIT_STATUS_SUCCESS);
+		exit(SAUNAFS_EXIT_STATUS_SUCCESS);
 	}
 	setsid();
 	setpgid(0,getpid());
 	f = fork();
 	if (f<0) {
-		lzfs_pretty_errlog(LOG_ERR,"second fork error");
+		safs_pretty_errlog(LOG_ERR,"second fork error");
 		if (write(piped[1],"fork error\n",11)!=11) {
-			lzfs_pretty_errlog(LOG_ERR,"pipe write error");
+			safs_pretty_errlog(LOG_ERR,"pipe write error");
 		}
 		close(piped[1]);
-		exit(LIZARDFS_EXIT_STATUS_ERROR);
+		exit(SAUNAFS_EXIT_STATUS_ERROR);
 	}
 	if (f>0) {
-		exit(LIZARDFS_EXIT_STATUS_SUCCESS);
+		exit(SAUNAFS_EXIT_STATUS_SUCCESS);
 	}
 	set_signal_handlers(1);
 
@@ -767,10 +768,10 @@ void createpath(const char *filename) {
 			*dst='\0';
 			if (mkdir(pathbuff,(mode_t)0777)<0) {
 				if (errno!=EEXIST) {
-					lzfs_pretty_errlog(LOG_NOTICE,"creating directory %s",pathbuff);
+					safs_pretty_errlog(LOG_NOTICE,"creating directory %s",pathbuff);
 				}
 			} else {
-				lzfs_pretty_syslog(LOG_NOTICE,"directory %s has been created",pathbuff);
+				safs_pretty_syslog(LOG_NOTICE,"directory %s has been created",pathbuff);
 			}
 			*dst++=*src++;
 		}
@@ -789,7 +790,7 @@ void usage(const char *appname) {
 "-p pidfile : write pid to given file\n"
 "-o extra_option : module specific extra option\n"
 	,appname);
-	exit(LIZARDFS_EXIT_STATUS_ERROR);
+	exit(SAUNAFS_EXIT_STATUS_ERROR);
 }
 
 void makePidFile(const std::string &name) {
@@ -799,7 +800,7 @@ void makePidFile(const std::string &name) {
 
 	std::ofstream ofs(name, std::ios_base::out | std::ios_base::trunc);
 	if (ofs.fail()) {
-		lzfs_pretty_syslog(LOG_WARNING, "failed to create pid file: %s",
+		safs_pretty_syslog(LOG_WARNING, "failed to create pid file: %s",
 				name.c_str());
 		return;
 	}
@@ -831,7 +832,7 @@ int main(int argc,char **argv) {
 	while ((ch = getopt(argc, argv, "o:c:p:dht:uvx?")) != -1) {
 		switch(ch) {
 			case 'v':
-				printf("version: %s\n",LIZARDFS_PACKAGE_VERSION);
+				printf("version: %s\n",SAUNAFS_PACKAGE_VERSION);
 				return 0;
 			case 'd':
 				gRunAsDaemon = false;
@@ -856,7 +857,7 @@ int main(int argc,char **argv) {
 				break;
 			default:
 				usage(appname);
-				return LIZARDFS_EXIT_STATUS_ERROR;
+				return SAUNAFS_EXIT_STATUS_ERROR;
 		}
 	}
 	argc -= optind;
@@ -878,17 +879,17 @@ int main(int argc,char **argv) {
 			runmode = RunMode::kIsAlive;
 		} else {
 			usage(appname);
-			return LIZARDFS_EXIT_STATUS_ERROR;
+			return SAUNAFS_EXIT_STATUS_ERROR;
 		}
 	} else if (argc!=0) {
 		usage(appname);
-		return LIZARDFS_EXIT_STATUS_ERROR;
+		return SAUNAFS_EXIT_STATUS_ERROR;
 	}
 
 	if (gRunAsDaemon) {
-		lzfs::add_log_stderr(lzfs::log_level::warn);
+		safs::add_log_stderr(safs::log_level::warn);
 	} else {
-		lzfs::add_log_stderr(lzfs::log_level::debug);
+		safs::add_log_stderr(safs::log_level::debug);
 	}
 	if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
 		if (gRunAsDaemon) {
@@ -901,7 +902,7 @@ int main(int argc,char **argv) {
 
 	ch = cfg_load(cfgfile.c_str(), logundefined);
 	if (ch == 1) {
-		lzfs_pretty_syslog(LOG_WARNING,
+		safs_pretty_syslog(LOG_WARNING,
 				"configuration file %s not found - using "
 				"defaults; please create one to remove this "
 				"warning (you can copy sample configuration "
@@ -909,29 +910,29 @@ int main(int argc,char **argv) {
 				"configuration)",
 				cfgfile.c_str());
 	} else if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
-		lzfs_pretty_syslog(LOG_INFO, "configuration file %s loaded", cfgfile.c_str());
+		safs_pretty_syslog(LOG_INFO, "configuration file %s loaded", cfgfile.c_str());
 	}
 
 	main_configure_debug_log();
 
 	if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
 		if (!open_pam_session()) {
-			rls.rlim_cur = LIZARDFS_MAX_FILES;
-			rls.rlim_max = LIZARDFS_MAX_FILES;
+			rls.rlim_cur = SAUNAFS_MAX_FILES;
+			rls.rlim_max = SAUNAFS_MAX_FILES;
 			if (setrlimit(RLIMIT_NOFILE, &rls) < 0) {
-				lzfs_pretty_syslog(
+				safs_pretty_syslog(
 				    LOG_WARNING,
 				    "can't change open files limit to %u, check restrictions with `ulimit -n'",
-				    LIZARDFS_MAX_FILES);
+				    SAUNAFS_MAX_FILES);
 			} else {
-				lzfs_pretty_syslog(
+				safs_pretty_syslog(
 				    LOG_INFO, "failed to use system open files limit, changed to default value %u",
-				    LIZARDFS_MAX_FILES);
+				    SAUNAFS_MAX_FILES);
 			}
 		}
 
 		lockmemory = cfg_getnum("LOCK_MEMORY",0);
-#ifdef MFS_USE_MEMLOCK
+#ifdef SFS_USE_MEMLOCK
 		if (lockmemory) {
 			rls.rlim_cur = RLIM_INFINITY;
 			rls.rlim_max = RLIM_INFINITY;
@@ -948,16 +949,16 @@ int main(int argc,char **argv) {
 
 
 	if (chdir(wrkdir)<0) {
-		lzfs_pretty_syslog(LOG_ERR,"can't set working directory to %s",wrkdir);
+		safs_pretty_syslog(LOG_ERR,"can't set working directory to %s",wrkdir);
 		if (gRunAsDaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
 		}
 		closelog();
-		return LIZARDFS_EXIT_STATUS_ERROR;
+		return SAUNAFS_EXIT_STATUS_ERROR;
 	} else {
 		if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
-			lzfs_pretty_syslog(LOG_INFO,"changed working directory to: %s",wrkdir);
+			safs_pretty_syslog(LOG_INFO,"changed working directory to: %s",wrkdir);
 		}
 	}
 	free(wrkdir);
@@ -972,7 +973,7 @@ int main(int argc,char **argv) {
 			close_msg_channel();
 		}
 		closelog();
-		return LIZARDFS_EXIT_STATUS_ERROR;
+		return SAUNAFS_EXIT_STATUS_ERROR;
 	}
 
 	// Only kStart should check for lock file consistency
@@ -983,7 +984,7 @@ int main(int argc,char **argv) {
 			close_msg_channel();
 		}
 		closelog();
-		return LIZARDFS_EXIT_STATUS_ERROR;
+		return SAUNAFS_EXIT_STATUS_ERROR;
 	}
 
 	if (runmode==RunMode::kStop || runmode==RunMode::kKill || runmode==RunMode::kReload
@@ -997,35 +998,35 @@ int main(int argc,char **argv) {
 			sassert((lockstatus == FileLock::LockStatus::kSuccess)
 					|| (lockstatus == FileLock::LockStatus::kAlive));
 			return (lockstatus == FileLock::LockStatus::kAlive
-					? LIZARDFS_EXIT_STATUS_SUCCESS : LIZARDFS_EXIT_STATUS_NOT_ALIVE);
+					? SAUNAFS_EXIT_STATUS_SUCCESS : SAUNAFS_EXIT_STATUS_NOT_ALIVE);
 		} else {
-			return LIZARDFS_EXIT_STATUS_SUCCESS;
+			return SAUNAFS_EXIT_STATUS_SUCCESS;
 		}
 	}
 
 
-#ifdef MFS_USE_MEMLOCK
+#ifdef SFS_USE_MEMLOCK
 	if (lockmemory) {
 		if (getrlimit(RLIMIT_MEMLOCK,&rls)<0) {
-			lzfs_pretty_errlog(LOG_WARNING,"error getting memory lock limits");
+			safs_pretty_errlog(LOG_WARNING,"error getting memory lock limits");
 		} else {
 			if (rls.rlim_cur!=RLIM_INFINITY && rls.rlim_max==RLIM_INFINITY) {
 				rls.rlim_cur = RLIM_INFINITY;
 				rls.rlim_max = RLIM_INFINITY;
 				if (setrlimit(RLIMIT_MEMLOCK,&rls)<0) {
-					lzfs_pretty_errlog(LOG_WARNING,"error setting memory lock limit to unlimited");
+					safs_pretty_errlog(LOG_WARNING,"error setting memory lock limit to unlimited");
 				}
 			}
 			if (getrlimit(RLIMIT_MEMLOCK,&rls)<0) {
-				lzfs_pretty_errlog(LOG_WARNING,"error getting memory lock limits");
+				safs_pretty_errlog(LOG_WARNING,"error getting memory lock limits");
 			} else {
 				if (rls.rlim_cur!=RLIM_INFINITY) {
-					lzfs_pretty_errlog(LOG_WARNING,"can't set memory lock limit to unlimited");
+					safs_pretty_errlog(LOG_WARNING,"can't set memory lock limit to unlimited");
 				} else {
 					if (mlockall(MCL_CURRENT|MCL_FUTURE)<0) {
-						lzfs_pretty_errlog(LOG_WARNING,"memory lock error");
+						safs_pretty_errlog(LOG_WARNING,"memory lock error");
 					} else {
-						lzfs_pretty_syslog(LOG_NOTICE,"process memory was successfully locked in RAM");
+						safs_pretty_syslog(LOG_NOTICE,"process memory was successfully locked in RAM");
 					}
 				}
 			}
@@ -1033,16 +1034,16 @@ int main(int argc,char **argv) {
 	}
 #else
 	if (lockmemory) {
-		lzfs_pretty_syslog(LOG_WARNING,"trying to lock memory, but memory lock not supported");
+		safs_pretty_syslog(LOG_WARNING,"trying to lock memory, but memory lock not supported");
 	}
 #endif
 
 	if (initialize()) {
 		if (getrlimit(RLIMIT_NOFILE,&rls)==0) {
-			lzfs_pretty_syslog(LOG_NOTICE,"open files limit: %lu",(unsigned long)(rls.rlim_cur));
+			safs_pretty_syslog(LOG_NOTICE,"open files limit: %lu",(unsigned long)(rls.rlim_cur));
 		}
-		lzfs_pretty_syslog(LOG_NOTICE, STR(APPNAME)" daemon initialized properly");
-#ifdef LIZARDFS_HAVE_SYSTEMD_SD_DAEMON_H
+		safs_pretty_syslog(LOG_NOTICE, STR(APPNAME)" daemon initialized properly");
+#ifdef SAUNAFS_HAVE_SYSTEMD_SD_DAEMON_H
 		sd_notify(0, "READY=1\nSTATUS=" STR(APPNAME) " daemon initialized properly.\n");
 #endif
 		set_syslog_ident();
@@ -1052,16 +1053,16 @@ int main(int argc,char **argv) {
 		if (initialize_late()) {
 			eventloop_reloadregister(main_reload); // this will be the first thing to do
 			eventloop_run();
-			ch=LIZARDFS_EXIT_STATUS_SUCCESS;
+			ch=SAUNAFS_EXIT_STATUS_SUCCESS;
 		} else {
-			ch=LIZARDFS_EXIT_STATUS_ERROR;
+			ch=SAUNAFS_EXIT_STATUS_ERROR;
 		}
 	} else {
 		if (gRunAsDaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
 		}
-		ch=LIZARDFS_EXIT_STATUS_ERROR;
+		ch=SAUNAFS_EXIT_STATUS_ERROR;
 	}
 	eventloop_destruct();
 	eventloop_release_resources();

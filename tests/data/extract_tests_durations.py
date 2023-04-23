@@ -87,7 +87,7 @@ def parse_logfile_for_tests(
 
 
 def get_subjobs_from_mainjob_log(log: TextIO) -> List[Tuple[str, str]]:
-    JOB_NAME = "lizardfs.ConcurrentJob"
+    JOB_NAME = "saunafs.ConcurrentJob"
     concurrent_job_re = re.compile(
         "Finished Build.*#(\d+).*{}.*with status".format(JOB_NAME)
     )

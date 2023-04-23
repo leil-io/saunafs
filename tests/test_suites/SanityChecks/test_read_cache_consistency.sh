@@ -4,7 +4,7 @@ CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
 	MOUNTS=2 \
 	MOUNT_EXTRA_CONFIG="cacheexpirationtime=10000"
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 repeated_validate() {
 	if REPEAT_AFTER_MS=$1 file-validate $2; then

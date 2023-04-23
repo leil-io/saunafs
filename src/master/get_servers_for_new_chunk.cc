@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -59,8 +61,10 @@ void GetServersForNewChunk::prepareData(ChunkCreationHistory &history) {
 	}
 
 	// Order servers by relative disk usage.
-	// random_shuffle to choose randomly if relative disk usage is the same.
-	std::random_shuffle(servers_.begin(), servers_.end());
+	// shuffle to choose randomly if relative disk usage is the same.
+	// Use std::random_device to ensure that the results are non-deterministic,
+	// i.e every time this method is called, a different seed is used.
+	std::shuffle(servers_.begin(), servers_.end(), kRandomEngine);
 	std::stable_sort(servers_.begin(), servers_.end(),
 				 [](const ChunkserverChunkCounter &a, const ChunkserverChunkCounter &b) {
 					 int64_t aRelativeUsage = a.chunks_created * b.weight;

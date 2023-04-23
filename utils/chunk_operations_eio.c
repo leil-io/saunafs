@@ -57,7 +57,9 @@ static int err_on_operation(int fd, const char* opname, size_t offset) {
 	// prepare substrings of the filename which trigger errors in various scenarios
 	sprintf(always_eio_trigger, "%s_EIO", opname);
 	sprintf(far_eio_trigger, "%s_far_EIO", opname);
-	if (strstr(filename, always_eio_trigger)) {
+
+	// TODO: remove fixed pattern for SMRs after the basic support
+	if (strstr(filename, always_eio_trigger) || strstr(filename, "sauna_nullb0")) {
 		return EIO;
 	} else if (strstr(filename, far_eio_trigger) && offset > FAR_OFFSET_THRESHOLD) {
 		return EIO;

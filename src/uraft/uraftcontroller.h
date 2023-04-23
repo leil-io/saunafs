@@ -7,9 +7,9 @@
 #include "common/time_utils.h"
 #include "uraftstatus.h"
 
-/*! \brief Managament of LizardFS metadata server based on uRaft algorithm.
+/*! \brief Managament of SaunaFS metadata server based on uRaft algorithm.
  *
- * This class manages local LizardFS master/shadow server. This is done using
+ * This class manages local SaunaFS master/shadow server. This is done using
  * base class uRaft for selection of leader. We get informed on leader change by call
  * to one of virtual node* methods. Then we call helper script to switch metadata server
  * to proper mode (master/shadow).
@@ -21,8 +21,8 @@ public:
 	enum CommandType { kCmdNone,kCmdPromote,kCmdDemote,kCmdStatusDead };
 
 	struct Options : uRaftStatus::Options {
-		std::string local_master_server;      //!< Local LizardFS master server address. //
-		int         local_master_port;        //!< Local LizardFS master server matocl port. //
+		std::string local_master_server;      //!< Local SaunaFS master server address. //
+		int         local_master_port;        //!< Local SaunaFS master server matocl port. //
 		int         elector_mode;             //!< Enable elector mode. //
 		int         check_node_status_period; //!< How often we check master server status. //
 		int         check_cmd_status_period;  //!< How often we check script status. //

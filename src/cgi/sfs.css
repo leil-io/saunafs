@@ -1,0 +1,177 @@
+body {
+	margin:0;
+	border:0;
+	padding:0;
+	height:100%;
+	max-height:100%;
+	background:#fff;
+	font-family:arial, verdana, sans-serif;
+	font-size:12px;
+	overflow:hidden;
+	letter-spacing: 0.5px;
+}
+
+/* for internet explorer */
+* html body {
+	padding:54px 0 0 0;
+}
+
+#container {
+	font-family:"times new roman", serif;
+	font-size: 1.2em;
+	position:fixed;
+	top:54px;
+	left:0;
+	bottom:0;
+	right:0;
+	overflow:auto;
+	background:#010101;
+	padding:15px 2px 15px 2px;
+	color:#fff;
+	text-align:center;
+}
+
+* html #container {
+	height:100%;
+	width:100%;
+}
+
+#header {
+	position:absolute;
+	top:0;
+	left:0;
+	width:100%;
+	height:54px;
+	overflow:hidden;
+	background:#1a202c;
+	color:#FFF
+}
+* html #header {height:54px;}
+
+#footer {
+	position:absolute;
+	bottom:0;
+	left:0;
+	width:100%;
+	height:19px;
+	overflow:hidden;
+	padding:0;
+	background:#1a202c;
+	border: none;
+	color:#FFF;
+	display: flex;
+	justify-content: space-around;
+        font-family: arial, verdana, sans-serif;
+}
+* html #footer {height:20px;}
+
+#footer-left, #footer-right, #footer-center {
+	flex: 1;
+	padding: 3px 0;
+}
+
+#footer-left {
+	text-align: left;
+	margin-left: 10px;
+}
+
+#footer-right {
+	text-align: right;
+	margin-right: 10px;
+}
+
+#footer-center {
+	text-align: center;
+	margin-left: 10px;
+	margin-right: 10px;
+}
+
+a:link {color: #fff;}
+a:active {color: #fff;}
+a:visited {color: #fff;}
+
+a.VISIBLELINK {color: #1a202c;}
+
+span.DELETEREADY {color: #999;}
+span.DELETEPENDING {color: #b972e8;}
+span.OVERGOAL {color: #9393fb;}
+span.NORMAL {color: #4fc34f;}
+span.UNDERGOAL {color: #EA0;}
+span.ENDANGERED {color: #e0711b;}
+span.MISSING {color: #f9373f;}
+
+span.DELETEREADYBOX {background: #999; width:8px; height:8px; display: inline-block;}
+span.DELETEPENDINGBOX {background: #b972e8; width:8px; height:8px; display: inline-block;}
+span.OVERGOALBOX {background: #9393fb; width:8px; height:8px; display: inline-block;}
+span.NORMALBOX {background: #4fc34f; width:8px; height:8px; display: inline-block;}
+span.UNDERGOALBOX {background: #EA0; width:8px; height:8px; display: inline-block;}
+span.ENDANGEREDBOX {background: #e0711b; width:8px; height:8px; display: inline-block;}
+span.MISSINGBOX {background:#f9373f; width:8px; height:8px; display: inline-block;}
+
+span.NOTEXCEEDED {color: #4fc34f;}
+span.EXCEEDED {color: #f9373f;}
+span.SEXCEEDED {color: #E80;}
+
+span.DISCONNECTED {color: #f9373f;}
+
+table {border: 1px solid black; border-spacing: 0px; border-collapse:collapse;}
+td {white-space:nowrap; border: 1px solid black; border-spacing: 0px; border-collapse:collapse; font-family: sans-serif; font-size: 12px;}
+th {white-space:nowrap; border: 1px solid black; border-spacing: 0px; border-collapse:collapse; font-family: sans-serif; font-size: 12px;}
+
+table.HDR {border-style: none; width: 100%; height: 54px; border-collapse:separate;}
+table.HDR td.LOGO {border: none; vertical-align: middle; padding: 0px 30px 0px 10px;}
+table.HDR td.MENU {border: none; vertical-align: middle; padding: 0px 0px 0px 0px; }
+table.HDR td.FILLER {border: none; vertical-align: middle; text-align: right; padding: 0px 10px 0px 30px; width: 100%;}
+
+table.MENU {border-style: none; border-collapse:separate;}
+table.MENU a:link {color:#FFF; text-decoration:none;}
+table.MENU a:active {color:#FFF; text-decoration:none;}
+table.MENU a:visited {color:#FFF; text-decoration:none;}
+table.MENU td {padding: 8px; font-family: sans-serif; font-size: 16px; text-align:center; white-space: nowrap; color:#FFF}
+table.MENU td.UU {background-color: #295b18;}
+table.MENU td.SU {background-color: #295b18;}
+table.MENU td.US {background-color: #4fa431;}
+table.MENU td.SS {background-color: #4fa431;}
+table.MENU td.LUU {background-color: #295b18;}
+table.MENU td.LSU {background-color: #295b18;}
+table.MENU td.LUS {background-color: #4fa431;}
+table.MENU td.LSS {background-color: #295b18;}
+
+table.FR {width: 1010px; margin-left:auto; margin-right:auto;}
+table.FR td, table.FR tr.C1 td {background-color: #3c5148;}
+table.FR tr.C2 td {background-color: #3c5148;}
+table.FR tr:first-child th {background-color: #1b2727; color: #fff}
+table.FR th {background-color: #708c66; color: #fff}
+table.FR th.SMPROGBAR {width: 102px;}
+table.FR th.PROGBAR {width: 202px;}
+table.FR th.PERC4 {width: 4%;}
+table.FR th.PERC8 {width: 8%;}
+table.FR th.PERC12 {width: 12%;}
+table.FR th.PERC20 {width: 20%;}
+table.FR th.PERC88 {width: 88%;}
+table.FR th.PERC96 {width: 96%;}
+table.FR .LEFT {text-align: left; padding-left: 7px}
+table.FR td.REL {background-color: #D0D0F0;}
+table.FR td.PR {background-color: #7878B8;}
+
+table.CR {width: 1010px; margin-left:auto; margin-right:auto;}
+table.CR td, table.CR tr.C1 td {background-color: #43523e;}
+table.CR tr.C2 td {background-color: #E0E0E0;}
+table.CR tr.C3 td {background-color: #D0D0D0;}
+table.CR tr.C4 td {background-color: #D8D8D8;}
+table.CR tr:first-child th {background-color: #1b2727;}
+table.CR th {background-color: #4f6159; color: #fff}
+
+table.CR > tbody > tr:nth-child(even):hover > td,
+table.CR > tbody > tr:nth-child(even):hover + tr > td,
+table.FR > tbody > tr:hover > td { background-color: #6b8e4e; }
+
+table.BOTMENU {width: 1000px; margin-left:auto; margin-right:auto;}
+
+.smbox {position:relative; border:1px solid #000; width:100px; background:#fff; height:14px;}
+.smbox .progress {background:#0F0; float:left; height:14px;}
+.smbox .value {width:100%; position:absolute; left:0; top:0; text-align:center;}
+
+.box {position:relative; border:1px solid #000; width:200px; background:#fff; height:14px;}
+.box .progress {background:#0F0; float:left; height:14px;}
+.box .value {width:100%; position:absolute; left:0; top:0; text-align:center;}

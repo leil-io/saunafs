@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -33,7 +35,7 @@
 
 typedef std::shared_ptr<spdlog::logger> LoggerPtr;
 
-namespace lzfs {
+namespace safs {
 namespace log_level {
 enum LogLevel {
 	trace = spdlog::level::trace,
@@ -60,32 +62,32 @@ void log(log_level::LogLevel log_level, const FormatType &format, Args&&... args
 
 template<typename FormatType, typename... Args>
 void log_trace(const FormatType &format, Args&&... args) {
-	log(log_level::trace, format, std::forward<Args>(args)...);
+	log(log_level::trace, fmt::runtime(format), std::forward<Args>(args)...);
 }
 
 template<typename FormatType, typename... Args>
 void log_debug(const FormatType &format, Args&&... args) {
-	log(log_level::debug, format, std::forward<Args>(args)...);
+	log(log_level::debug, fmt::runtime(format), std::forward<Args>(args)...);
 }
 
 template<typename FormatType, typename... Args>
 void log_info(const FormatType &format, Args&&... args) {
-	log(log_level::info, format, std::forward<Args>(args)...);
+	log(log_level::info, fmt::runtime(format), std::forward<Args>(args)...);
 }
 
 template<typename FormatType, typename... Args>
 void log_warn(const FormatType &format, Args&&... args) {
-	log(log_level::warn, format, std::forward<Args>(args)...);
+	log(log_level::warn, fmt::runtime(format), std::forward<Args>(args)...);
 }
 
 template<typename FormatType, typename... Args>
 void log_err(const FormatType &format, Args&&... args) {
-	log(log_level::err, format, std::forward<Args>(args)...);
+	log(log_level::err, fmt::runtime(format), std::forward<Args>(args)...);
 }
 
 template<typename FormatType, typename... Args>
 void log_critical(const FormatType &format, Args&&... args) {
-	log(log_level::critical, format, std::forward<Args>(args)...);
+	log(log_level::critical, fmt::runtime(format), std::forward<Args>(args)...);
 }
 
 bool add_log_file(const char *path, log_level::LogLevel level, int max_file_size, int max_file_count);
@@ -94,23 +96,23 @@ void drop_all_logs();
 bool add_log_syslog();
 bool add_log_stderr(log_level::LogLevel level);
 
-} // namespace lzfs
+} // namespace safs
 
 // NOTICE(sarna) Old interface, don't use unless extern-C is needed
 extern "C" {
 
 /// Adds custom logging file
-bool lzfs_add_log_file(const char *path, int priority, int max_file_size, int max_file_count);
+bool safs_add_log_file(const char *path, int priority, int max_file_size, int max_file_count);
 
 /// Sets which level triggers immediate log flush (default: CRITICAL)
-void lzfs_set_log_flush_on(int priority);
+void safs_set_log_flush_on(int priority);
 
 /// Removes all log files
-void lzfs_drop_all_logs();
+void safs_drop_all_logs();
 
-bool lzfs_add_log_syslog();
+bool safs_add_log_syslog();
 
-bool lzfs_add_log_stderr(int priority);
+bool safs_add_log_stderr(int priority);
 
 /*
  * function names may contain following words:
@@ -121,18 +123,18 @@ bool lzfs_add_log_stderr(int priority);
  *      that something is starting
  */
 
-void lzfs_pretty_syslog(int priority, const char* format, ...)
+void safs_pretty_syslog(int priority, const char* format, ...)
 		__attribute__ ((__format__ (__printf__, 2, 3)));
 
-void lzfs_pretty_syslog_attempt(int priority, const char* format, ...)
+void safs_pretty_syslog_attempt(int priority, const char* format, ...)
 		__attribute__ ((__format__ (__printf__, 2, 3)));
 
-void lzfs_pretty_errlog(int priority, const char* format, ...)
+void safs_pretty_errlog(int priority, const char* format, ...)
 		__attribute__ ((__format__ (__printf__, 2, 3)));
 
-void lzfs_silent_syslog(int priority, const char* format, ...)
+void safs_silent_syslog(int priority, const char* format, ...)
 		__attribute__ ((__format__ (__printf__, 2, 3)));
 
-void lzfs_silent_errlog(int priority, const char* format, ...)
+void safs_silent_errlog(int priority, const char* format, ...)
 		__attribute__ ((__format__ (__printf__, 2, 3)));
 } // extern "C"

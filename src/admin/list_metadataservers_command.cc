@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -24,7 +26,7 @@
 
 #include "protocol/cltoma.h"
 #include "common/human_readable_format.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "protocol/matocl.h"
 #include "common/server_connection.h"
 #include "common/sockets.h"
@@ -39,7 +41,7 @@ void ListMetadataserversCommand::usage() const {
 	std::cerr << "    Prints status of active metadata servers" << std::endl;
 }
 
-LizardFsProbeCommand::SupportedOptions ListMetadataserversCommand::supportedOptions() const {
+SaunaFsProbeCommand::SupportedOptions ListMetadataserversCommand::supportedOptions() const {
 	return { {kPorcelainMode, kPorcelainModeDescription} };
 }
 
@@ -77,7 +79,7 @@ void ListMetadataserversCommand::run(const Options& options) const {
 	tcpresolve(ipString.c_str(), portString.c_str(), &ip, &port, false);
 	ServerConnection connection(NetworkAddress(ip, port));
 	auto request = cltoma::metadataserversList::build();
-	auto response = connection.sendAndReceive(request, LIZ_MATOCL_METADATASERVERS_LIST);
+	auto response = connection.sendAndReceive(request, SAU_MATOCL_METADATASERVERS_LIST);
 
 	std::vector<MetadataserverListEntry> shadowsList;
 	uint32_t masterVersion;
@@ -97,7 +99,7 @@ void ListMetadataserversCommand::run(const Options& options) const {
 			s = MetadataserverStatusCommand::getStatus(shadowConnection);
 
 			auto request = cltoma::hostname::build();
-			auto response = shadowConnection.sendAndReceive(request, LIZ_MATOCL_HOSTNAME);
+			auto response = shadowConnection.sendAndReceive(request, SAU_MATOCL_HOSTNAME);
 			matocl::hostname::deserialize(response, hostname);
 		} else {
 			hostname = "unknown";
@@ -113,6 +115,6 @@ void ListMetadataserversCommand::run(const Options& options) const {
 				"Personality", s.personality,
 				"Status", s.serverStatus,
 				"Metadata version", s.metadataVersion,
-				"Version", lizardfsVersionToString(e.version));
+				"Version", saunafsVersionToString(e.version));
 	}
 }

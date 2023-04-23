@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/platform.h"
@@ -26,7 +27,7 @@
 #include "common/cwrap.h"
 #include "common/main.h"
 #include "common/setup.h"
-#include "common/lizardfs_version.h"
+#include "common/saunafs_version.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
 #include "common/setup.h"
@@ -51,7 +52,7 @@ static void fs_store_marker(FILE *fd) {
 	uint32_t marker = 0;
 	serialize(buffer, marker);
 	if (fwrite(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 }
@@ -62,7 +63,7 @@ static void fs_store_acl(uint32_t id, const RichACL &acl, FILE *fd) {
 	uint32_t size = serializedSize(id, acl);
 	serialize(buffer, size, id, acl);
 	if (fwrite(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-		lzfs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 }
@@ -93,7 +94,7 @@ static int fs_load_legacy_acl(FILE *fd, int ignoreflag) {
 		uint32_t size = 0;
 		buffer.resize(serializedSize(size));
 		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), LIZARDFS_ERROR_IO);
+			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
 		}
 		deserialize(buffer, size);
 		if (size == 0) {
@@ -101,13 +102,13 @@ static int fs_load_legacy_acl(FILE *fd, int ignoreflag) {
 			return 1;
 		} else if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
-				LIZARDFS_ERROR_ERANGE);
+				SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
 		buffer.resize(size);
 		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), LIZARDFS_ERROR_IO);
+			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
 		}
 
 		// Deserialize inode
@@ -139,8 +140,8 @@ static int fs_load_legacy_acl(FILE *fd, int ignoreflag) {
 		}
 		return 0;
 	} catch (Exception &ex) {
-		lzfs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != LIZARDFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
+		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		} else {
 			return 0;
@@ -169,7 +170,7 @@ static int fs_load_posix_acl(FILE *fd, int ignoreflag, bool default_acl) {
 		uint32_t size = 0;
 		buffer.resize(serializedSize(size));
 		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), LIZARDFS_ERROR_IO);
+			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
 		}
 		deserialize(buffer, size);
 		if (size == 0) {
@@ -177,13 +178,13 @@ static int fs_load_posix_acl(FILE *fd, int ignoreflag, bool default_acl) {
 			return 1;
 		} else if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
-				LIZARDFS_ERROR_ERANGE);
+				SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
 		buffer.resize(size);
 		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), LIZARDFS_ERROR_IO);
+			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
 		}
 
 		// Deserialize inode
@@ -222,8 +223,8 @@ static int fs_load_posix_acl(FILE *fd, int ignoreflag, bool default_acl) {
 		}
 		return 0;
 	} catch (Exception &ex) {
-		lzfs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != LIZARDFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
+		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		} else {
 			return 0;
@@ -260,7 +261,7 @@ static int fs_load_acl(FILE *fd, int ignoreflag) {
 		uint32_t size = 0;
 		buffer.resize(serializedSize(size));
 		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), LIZARDFS_ERROR_IO);
+			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
 		}
 		deserialize(buffer, size);
 		if (size == 0) {
@@ -268,13 +269,13 @@ static int fs_load_acl(FILE *fd, int ignoreflag) {
 			return 1;
 		} else if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
-				LIZARDFS_ERROR_ERANGE);
+				SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
 		buffer.resize(size);
 		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), LIZARDFS_ERROR_IO);
+			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
 		}
 
 		// Deserialize inode
@@ -291,8 +292,8 @@ static int fs_load_acl(FILE *fd, int ignoreflag) {
 		gMetadata->acl_storage.set(p->id, std::move(acl));
 		return 0;
 	} catch (Exception &ex) {
-		lzfs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != LIZARDFS_STATUS_OK) {
+		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
+		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		} else {
 			return 0;

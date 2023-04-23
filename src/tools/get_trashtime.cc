@@ -1,20 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare,
-   2013-2016 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -24,14 +25,14 @@
 #include <stdlib.h>
 
 #include "common/datapack.h"
-#include "common/mfserr.h"
+#include "common/sfserr.h"
 #include "tools/tools_commands.h"
 #include "tools/tools_common_functions.h"
 
 static void get_trashtime_usage() {
 	fprintf(stderr,
 	        "get objects trashtime (how many seconds file should be left in trash)\n\nusage: "
-	        "\n lizardfs gettrashtime [-nhHr] name [name ...]\n");
+	        "\n saunafs gettrashtime [-nhHr] name [name ...]\n");
 	print_numberformat_options();
 	print_recursive_option();
 }
@@ -89,7 +90,7 @@ static int get_trashtime(const char *fname, uint8_t mode) {
 	}
 	leng -= 4;
 	if (leng == 1) {
-		printf("%s: %s\n", fname, lizardfs_error_string(*rptr));
+		printf("%s: %s\n", fname, saunafs_error_string(*rptr));
 		free(buff);
 		return -1;
 	} else if (leng < 8 || leng % 8 != 0) {

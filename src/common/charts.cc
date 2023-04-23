@@ -1,26 +1,28 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef LIZARDFS_HAVE_CONFIG_H
+#ifdef SAUNAFS_HAVE_CONFIG_H
 #  include "common/platform.h"
 #else
-#  define LIZARDFS_HAVE_ZLIB_H 1
-#  define LIZARDFS_HAVE_STRUCT_TM_TM_GMTOFF 1
+#  define SAUNAFS_HAVE_ZLIB_H 1
+#  define SAUNAFS_HAVE_STRUCT_TM_TM_GMTOFF 1
 #endif
 
 #include "common/charts.h"
@@ -42,7 +44,7 @@
 #include "common/massert.h"
 #include "common/slogger.h"
 
-#ifdef LIZARDFS_HAVE_ZLIB_H
+#ifdef SAUNAFS_HAVE_ZLIB_H
 #  include <zlib.h>
 #endif
 
@@ -99,7 +101,7 @@ static std::string csv_data;
 static uint8_t rawchart[RAWSIZE];
 static uint8_t compbuff[CBUFFSIZE];
 static uint32_t compsize=0;
-#ifdef LIZARDFS_HAVE_ZLIB_H
+#ifdef SAUNAFS_HAVE_ZLIB_H
 static z_stream zstr;
 #else
 static uint8_t warning[50] = {
@@ -484,7 +486,7 @@ void charts_store (void) {
 
 	fd = open(statsfilename,O_WRONLY | O_TRUNC | O_CREAT,0666);
 	if (fd<0) {
-		lzfs_pretty_errlog(LOG_WARNING,"error creating charts data file");
+		safs_pretty_errlog(LOG_WARNING,"error creating charts data file");
 		return;
 	}
 	ptr = hdr;
@@ -493,7 +495,7 @@ void charts_store (void) {
 	put32bit(&ptr,statdefscount);
 	put32bit(&ptr,timepoint[SHORTRANGE]);
 	if (write(fd,(void*)hdr,16)!=16) {
-		lzfs_pretty_errlog(LOG_WARNING,"error writing charts data file");
+		safs_pretty_errlog(LOG_WARNING,"error writing charts data file");
 		close(fd);
 		return;
 	}
@@ -502,7 +504,7 @@ void charts_store (void) {
 		memset(namehdr,0,100);
 		memcpy(namehdr,statdefs[i].name,(s>100)?100:s);
 		if (write(fd,(void*)namehdr,100)!=100) {
-			lzfs_pretty_errlog(LOG_WARNING,"error writing charts data file");
+			safs_pretty_errlog(LOG_WARNING,"error writing charts data file");
 			close(fd);
 			return;
 		}
@@ -514,7 +516,7 @@ void charts_store (void) {
 				put64bit(&ptr,tab[(p+s)%LENG]);
 			}
 			if (write(fd,(void*)data,8*LENG)!=(ssize_t)(8*LENG)) {
-				lzfs_pretty_errlog(LOG_WARNING,"error writing charts data file");
+				safs_pretty_errlog(LOG_WARNING,"error writing charts data file");
 				close(fd);
 				return;
 			}
@@ -662,18 +664,18 @@ void charts_load(void) {
 	fd = open(statsfilename,O_RDONLY);
 	if (fd<0) {
 		if (errno!=ENOENT) {
-			lzfs_pretty_errlog(LOG_WARNING,
+			safs_pretty_errlog(LOG_WARNING,
 					"error reading charts data file %s - initializing empty charts instead",
 					fullFileName.c_str());
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,
+			safs_pretty_syslog(LOG_WARNING,
 					"no charts data file %s - initializing empty charts",
 					fullFileName.c_str());
 		}
 		return;
 	}
 	if (read(fd,(void*)hdr,16)!=16) {
-		lzfs_pretty_errlog(LOG_WARNING,"error reading charts data file %s", fullFileName.c_str());
+		safs_pretty_errlog(LOG_WARNING,"error reading charts data file %s", fullFileName.c_str());
 		close(fd);
 		return;
 	}
@@ -684,14 +686,14 @@ void charts_load(void) {
 		memcpy((void*)&j,hdr,4);        // get first 4 bytes of hdr as a 32-bit number in "natural" order
 		if (j==4) {
 			if (charts_import_from_old_4ranges_format(fd)<0) {
-				lzfs_pretty_syslog(LOG_WARNING,"error importing charts data from 4-ranges format");
+				safs_pretty_syslog(LOG_WARNING,"error importing charts data from 4-ranges format");
 			}
 		} else if (j==3) {
 			if (charts_import_from_old_3ranges_format(fd)<0) {
-				lzfs_pretty_syslog(LOG_WARNING,"error importing charts data from 3-ranges format");
+				safs_pretty_syslog(LOG_WARNING,"error importing charts data from 3-ranges format");
 			}
 		} else {
-			lzfs_pretty_syslog(LOG_WARNING,"unrecognized charts data file format - initializing empty charts");
+			safs_pretty_syslog(LOG_WARNING,"unrecognized charts data file format - initializing empty charts");
 		}
 		close(fd);
 		return;
@@ -706,7 +708,7 @@ void charts_load(void) {
 	pointers[VERYLONGRANGE]=LENG-1;
 	for (i=0 ; i<fcharts ; i++) {
 		if (read(fd,namehdr,100)!=100) {
-			lzfs_pretty_errlog(LOG_WARNING,"error reading charts data file %s",
+			safs_pretty_errlog(LOG_WARNING,"error reading charts data file %s",
 					fullFileName.c_str());
 			close(fd);
 			return;
@@ -724,7 +726,7 @@ void charts_load(void) {
 				}
 				if (fleng<LENG) {
 					if (read(fd,(void*)data,8*fleng)!=(ssize_t)(8*fleng)) {
-						lzfs_pretty_errlog(LOG_WARNING,"error reading charts data file %s",
+						safs_pretty_errlog(LOG_WARNING,"error reading charts data file %s",
 								fullFileName.c_str());
 						close(fd);
 						return;
@@ -735,7 +737,7 @@ void charts_load(void) {
 					}
 				} else {
 					if (read(fd,(void*)data,8*LENG)!=(ssize_t)(8*LENG)) {
-						lzfs_pretty_errlog(LOG_WARNING,"error reading charts data file %s",
+						safs_pretty_errlog(LOG_WARNING,"error reading charts data file %s",
 								fullFileName.c_str());
 						close(fd);
 						return;
@@ -749,7 +751,7 @@ void charts_load(void) {
 		}
 	}
 	close(fd);
-	lzfs_pretty_syslog(LOG_INFO,"loaded charts data file from %s", fullFileName.c_str());
+	safs_pretty_syslog(LOG_INFO,"loaded charts data file from %s", fullFileName.c_str());
 	return;
 }
 
@@ -934,7 +936,7 @@ void charts_inittimepointers (void) {
 	if (timepoint[SHORTRANGE]==0) {
 		now = time(NULL);
 		ts = localtime(&now);
-#ifdef LIZARDFS_HAVE_STRUCT_TM_TM_GMTOFF
+#ifdef SAUNAFS_HAVE_STRUCT_TM_TM_GMTOFF
 		local = now+ts->tm_gmtoff;
 #else
 		local = now;
@@ -980,7 +982,7 @@ void charts_add (uint64_t *data,uint32_t datats) {
 	int32_t nowtime,delta;
 
 	ts = localtime(&now);
-#ifdef LIZARDFS_HAVE_STRUCT_TM_TM_GMTOFF
+#ifdef SAUNAFS_HAVE_STRUCT_TM_TM_GMTOFF
 	local = now+ts->tm_gmtoff;
 #else
 	local = now;
@@ -1148,7 +1150,7 @@ void charts_term (void) {
 	if (series) {
 		free(series);
 	}
-#ifdef LIZARDFS_HAVE_ZLIB_H
+#ifdef SAUNAFS_HAVE_ZLIB_H
 	deflateEnd(&zstr);
 #endif
 }
@@ -1237,18 +1239,18 @@ int charts_init (const uint32_t *calcs,const statdef *stats,const estatdef *esta
 	charts_inittimepointers();
 	charts_add(NULL,time(NULL));
 
-#ifdef LIZARDFS_HAVE_ZLIB_H
+#ifdef SAUNAFS_HAVE_ZLIB_H
 	zstr.zalloc = NULL;
 	zstr.zfree = NULL;
 	zstr.opaque = NULL;
 	if (deflateInit(&zstr,Z_DEFAULT_COMPRESSION)!=Z_OK) {
 		return -1;
 	}
-#endif /* LIZARDFS_HAVE_ZLIB_H */
+#endif /* SAUNAFS_HAVE_ZLIB_H */
 	return 0;
 }
 
-#ifndef LIZARDFS_HAVE_ZLIB_H
+#ifndef SAUNAFS_HAVE_ZLIB_H
 static inline void charts_putwarning(uint32_t posx,uint32_t posy,uint8_t color) {
 	uint8_t *w,c,fx,fy,b;
 	uint32_t x,y;
@@ -1770,13 +1772,13 @@ void charts_fill_crc(uint8_t *buff,uint32_t leng) {
 			if (memcmp(ptr,"CRC#",4)==0) {
 				put32bit(&ptr,crc);
 			} else {
-				lzfs_pretty_syslog(LOG_WARNING,"charts: unexpected data in generated png stream");
+				safs_pretty_syslog(LOG_WARNING,"charts: unexpected data in generated png stream");
 			}
 		}
 	}
 }
 
-#ifndef LIZARDFS_HAVE_ZLIB_H
+#ifndef SAUNAFS_HAVE_ZLIB_H
 
 #define MOD_ADLER 65521
 
@@ -1831,7 +1833,7 @@ int charts_fake_compress(uint8_t *src,uint32_t srcsize,uint8_t *dst,uint32_t *ds
 	*dstsize = edstsize;
 	return 0;
 }
-#endif /* ! LIZARDFS_HAVE_ZLIB_H */
+#endif /* ! SAUNAFS_HAVE_ZLIB_H */
 
 
 uint32_t charts_make_csv(uint32_t number) {
@@ -1892,7 +1894,7 @@ uint32_t charts_make_csv(uint32_t number) {
 	tmepoch.tm_sec = 0;
 	csv_time = mktime(&tmepoch);
 
-#ifdef LIZARDFS_HAVE_STRUCT_TM_TM_GMTOFF
+#ifdef SAUNAFS_HAVE_STRUCT_TM_TM_GMTOFF
 	csv_time += tmepoch.tm_gmtoff;
 #endif
 	csv_data ="timestamp,,,\n";
@@ -1937,13 +1939,13 @@ uint32_t charts_make_png(uint32_t number) {
 	}
 
 	charts_makechart(chtype,chrange);
-#ifndef LIZARDFS_HAVE_ZLIB_H
+#ifndef SAUNAFS_HAVE_ZLIB_H
 	charts_putwarning(47,0,COLOR_TEXT);
 #endif
 
 	charts_chart_to_rawchart();
 
-#ifdef LIZARDFS_HAVE_ZLIB_H
+#ifdef SAUNAFS_HAVE_ZLIB_H
 	if (deflateReset(&zstr)!=Z_OK) {
 		compsize = 0;
 		return sizeof(png_1x1);
@@ -1961,13 +1963,13 @@ uint32_t charts_make_png(uint32_t number) {
 	}
 
 	compsize = zstr.total_out;
-#else /* LIZARDFS_HAVE_ZLIB_H */
+#else /* SAUNAFS_HAVE_ZLIB_H */
 	compsize = CBUFFSIZE;
 	if (charts_fake_compress(rawchart,RAWSIZE,compbuff,&compsize)<0) {
 		compsize = 0;
 		return sizeof(png_1x1);
 	}
-#endif /* LIZARDFS_HAVE_ZLIB_H */
+#endif /* SAUNAFS_HAVE_ZLIB_H */
 
 	return sizeof(png_header)+compsize+sizeof(png_tailer);
 }

@@ -1,21 +1,21 @@
 timeout_set "30 seconds"
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 
 mkdir dir_xor5
-lizardfs setgoal xor5 dir_xor5
+saunafs setgoal xor5 dir_xor5
 for i in {1..60}; do
 	FILE_SIZE=1M file-generate "dir_xor5/file$i"
 done
 mkdir dir_9
-lizardfs setgoal 9 dir_9
+saunafs setgoal 9 dir_9
 FILE_SIZE=1k file-generate dir_9/file
 
-chunks=$(lizardfs fileinfo */* | grep copy)
+chunks=$(saunafs fileinfo */* | grep copy)
 expect_equals 5 $(grep -v part <<< "$chunks" | grep -v parity | wc -l)
 
 # No parity is expected to appear

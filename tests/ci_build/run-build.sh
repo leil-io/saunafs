@@ -6,7 +6,7 @@ die() { echo "Error: $*" >&2; exit 1; }
 
 usage() {
 	cat <<-EOT
-	Builds lizardfs with different configurations
+	Builds saunafs with different configurations
 
 	Usage: run-build.sh [OPTION]
 
@@ -18,7 +18,7 @@ usage() {
 	exit 1
 }
 
-declare -a CMAKE_LIZARDFS_ARGUMENTS=(
+declare -a CMAKE_SAUNAFS_ARGUMENTS=(
   -G 'Unix Makefiles'
 	-DENABLE_DOCS=ON
 	-DENABLE_CLIENT_LIB=ON
@@ -32,33 +32,43 @@ declare -a CMAKE_LIZARDFS_ARGUMENTS=(
 build_type="${1}"
 shift
 case "${build_type,,}" in
-	coverage)
-		CMAKE_LIZARDFS_ARGUMENTS+=(
+	debug)
+		CMAKE_SAUNAFS_ARGUMENTS+=(
 			-DCMAKE_BUILD_TYPE=Debug
-			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/lizardfs/"
+			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
+			-DENABLE_TESTS=ON
+			-DCODE_COVERAGE=OFF
+			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
+			-DENABLE_WERROR=ON
+		)
+		;;
+	coverage)
+		CMAKE_SAUNAFS_ARGUMENTS+=(
+			-DCMAKE_BUILD_TYPE=Debug
+			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=ON
-			-DLIZARDFS_TEST_POINTER_OBFUSCATION=ON
+			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=OFF
 		)
 		;;
 	test)
-		CMAKE_LIZARDFS_ARGUMENTS+=(
+		CMAKE_SAUNAFS_ARGUMENTS+=(
 			-DCMAKE_BUILD_TYPE=RelWithDbInfo
-			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/lizardfs/"
+			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=OFF
-			-DLIZARDFS_TEST_POINTER_OBFUSCATION=ON
+			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
 		)
 		;;
 	release)
-		CMAKE_LIZARDFS_ARGUMENTS+=(
+		CMAKE_SAUNAFS_ARGUMENTS+=(
 			-DCMAKE_BUILD_TYPE=Release
 			-DCMAKE_INSTALL_PREFIX=/
 			-DENABLE_TESTS=OFF
 			-DCODE_COVERAGE=OFF
-			-DLIZARDFS_TEST_POINTER_OBFUSCATION=OFF
+			-DSAUNAFS_TEST_POINTER_OBFUSCATION=OFF
 			-DENABLE_WERROR=OFF
 		)
 		;;
@@ -67,14 +77,13 @@ case "${build_type,,}" in
 esac
 
 if [ -n "${PACKAGE_VERSION:-}" ]; then
-	CMAKE_LIZARDFS_ARGUMENTS+=( -DPACKAGE_VERSION="${PACKAGE_VERSION}" )
+	CMAKE_SAUNAFS_ARGUMENTS+=( -DPACKAGE_VERSION="${PACKAGE_VERSION}" )
 fi
 
 declare -a EXTRA_ARGUMENTS=("${@}")
-rm -rf "${WORKSPACE:?}/build/lizardfs"/{,.}* 2>/dev/null || true
-cmake -B "${WORKSPACE}/build/lizardfs" \
-	"${CMAKE_LIZARDFS_ARGUMENTS[@]}" \
+rm -r "${WORKSPACE:?}/build/saunafs"/{,.}* 2>/dev/null || true
+cmake -B "${WORKSPACE}/build/saunafs" \
+	"${CMAKE_SAUNAFS_ARGUMENTS[@]}" \
 	"${EXTRA_ARGUMENTS[@]}" "${WORKSPACE}"
 
-JOBS=${JOBS:-$(($(nproc) * 3 / 4 + 1))}
-make -C "${WORKSPACE}/build/lizardfs" -j "${JOBS}" install
+nice make -C "${WORKSPACE}/build/saunafs" -j "$(nproc)" install

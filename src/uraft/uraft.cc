@@ -1,7 +1,7 @@
 #include "common/platform.h"
 #include "uraft.h"
 
-#if defined(LIZARDFS_HAVE_GETIFADDRS)
+#if defined(SAUNAFS_HAVE_GETIFADDRS)
  #include <sys/types.h>
  #include <ifaddrs.h>
 #endif
@@ -466,7 +466,7 @@ int uRaft::findMatchingAddress(const boost::asio::ip::address &addr, int &id) {
 }
 
 int uRaft::scanLocalInterfaces() {
-#if defined(LIZARDFS_HAVE_GETIFADDRS)
+#if defined(SAUNAFS_HAVE_GETIFADDRS)
 	struct ifaddrs *ifaddr, *ifa;
 
 	if (getifaddrs(&ifaddr) == -1) {

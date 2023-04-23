@@ -1,19 +1,22 @@
 /*
+
+
    Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -50,7 +53,7 @@ static void checkPartRecovery(std::map<ChunkPartType, std::vector<uint8_t>> part
 	ASSERT_TRUE(tester.executePlan(std::move(plan), part_data) >= 0);
 
 	EXPECT_TRUE(unittests::ReadPlanTester::compareBlocks(
-	    tester.output_buffer_, 0, part_data[chunk_type], first_block * MFSBLOCKSIZE, block_count));
+	    tester.output_buffer_, 0, part_data[chunk_type], first_block * SFSBLOCKSIZE, block_count));
 }
 
 static void checkPartRecovery(ChunkPartType chunk_type, int first_block, int block_count,

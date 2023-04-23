@@ -9,20 +9,20 @@ USE_RAMDISK=YES \
 			`|CHUNKS_WRITE_REP_LIMIT = 5`
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|OPERATIONS_DELAY_DISCONNECT = 0" \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Create 20 files. All chunks should be placed on chunkservers 0 and 1.
 cd "${info[mount0]}"
 FILE_SIZE=1K file-generate file{1..20}
-assert_equals 0 $(find_chunkserver_chunks 2 | wc -l)
-assert_equals 0 $(find_chunkserver_chunks 3 | wc -l)
+assert_equals 0 $(find_chunkserver_metadata_chunks 2 | wc -l)
+assert_equals 0 $(find_chunkserver_metadata_chunks 3 | wc -l)
 
 # Change label of chunkserver 0 from "us" to "eu".
 sed -i -re 's/LABEL ?=.*/LABEL = eu/' "${info[chunkserver0_cfg]}"
-lizardfs_chunkserver_daemon 0 reload
+saunafs_chunkserver_daemon 0 reload
 
 # Expect all chunks to disappear from this server and move to server 1.
-assert_eventually_prints 0 'find_chunkserver_chunks 0 | wc -l'
-assert_equals 20 $(find_chunkserver_chunks 1 | wc -l)
-assert_equals  0 $(find_chunkserver_chunks 2 | wc -l)
-assert_equals  0 $(find_chunkserver_chunks 3 | wc -l)
+assert_eventually_prints 0 'find_chunkserver_metadata_chunks 0 | wc -l'
+assert_equals 20 $(find_chunkserver_metadata_chunks 1 | wc -l)
+assert_equals  0 $(find_chunkserver_metadata_chunks 2 | wc -l)
+assert_equals  0 $(find_chunkserver_metadata_chunks 3 | wc -l)

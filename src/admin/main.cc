@@ -1,19 +1,21 @@
 /*
-   Copyright 2013-2014 EditShare, 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -38,15 +40,18 @@
 #include "admin/promote_shadow_command.h"
 #include "admin/ready_chunkservers_count_command.h"
 #include "admin/reload_config_command.h"
+#include "admin/dump_config_command.h"
 #include "admin/save_metadata_command.h"
 #include "admin/stop_master_without_saving_metadata.h"
 #include "admin/stop_task_command.h"
+#include "admin/delete_sessions_command.h"
+#include "admin/list_sessions_command.h"
 #include "common/human_readable_format.h"
-#include "protocol/MFSCommunication.h"
-#include "common/mfserr.h"
+#include "protocol/SFSCommunication.h"
+#include "common/sfserr.h"
 
 int main(int argc, const char** argv) {
-	std::vector<const LizardFsProbeCommand*> allCommands = {
+	std::vector<const SaunaFsProbeCommand*> allCommands = {
 			new ChunksHealthCommand(),
 			new InfoCommand(),
 			new IoLimitsStatusCommand(),
@@ -67,6 +72,9 @@ int main(int argc, const char** argv) {
 			new SaveMetadataCommand(),
 			new StopTaskCommand(),
 			new MagicRecalculateMetadataChecksumCommand(),
+			new ListSessionsCommand(),
+			new DeleteSessionsCommand(),
+			new DumpConfigurationCommand(),
 	};
 
 	std::string command_name;
@@ -95,7 +103,7 @@ int main(int argc, const char** argv) {
 			command_name.clear();
 		}
 		throw WrongUsageException("Unknown command " + command_name
-		                          + ". Use lizardfs-admin help for a list of available commands");
+		                          + ". Use saunafs-admin help for a list of available commands");
 	} catch (WrongUsageException& ex) {
 		std::cerr << ex.message() << std::endl;
 		std::cerr << "Usage:\n";

@@ -1,19 +1,20 @@
 /*
    Copyright 2013-2017 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -27,8 +28,9 @@
 #include "common/time_utils.h"
 #include "mount/global_chunkserver_stats.h"
 
-ChunkReader::ChunkReader(ChunkConnector& connector, double bandwidth_overuse)
+ChunkReader::ChunkReader(ChunkConnector& connector, ReadChunkLocator& _locator, double bandwidth_overuse)
 		: connector_(connector),
+		  locator_(&_locator),
 		  inode_(0),
 		  index_(0),
 		  planner_(bandwidth_overuse),
@@ -46,8 +48,8 @@ void ChunkReader::prepareReadingChunk(uint32_t inode, uint32_t index, bool force
 	++preparations;
 	inode_ = inode;
 	index_ = index;
-	locator_.invalidateCache(inode, index);
-	location_ = locator_.locateChunk(inode, index);
+	locator_->invalidateCache(inode, index);
+	location_ = locator_->locateChunk(inode, index);
 	chunkAlreadyRead = false;
 	if (location_->isEmptyChunk()) {
 		return;
@@ -88,8 +90,8 @@ uint32_t ChunkReader::readData(std::vector<uint8_t>& buffer, uint32_t offset, ui
 	if (size == 0) {
 		return 0;
 	}
-	sassert(offset + size <= MFSCHUNKSIZE);
-	uint64_t offsetInFile = static_cast<uint64_t>(index_) * MFSCHUNKSIZE + offset;
+	sassert(offset + size <= SFSCHUNKSIZE);
+	uint64_t offsetInFile = static_cast<uint64_t>(index_) * SFSCHUNKSIZE + offset;
 	uint32_t availableSize = size;  // requested data may lie beyond end of file
 	if (offsetInFile >= location_->fileLength) {
 		// read request entirely beyond EOF, can't read anything
@@ -106,9 +108,9 @@ uint32_t ChunkReader::readData(std::vector<uint8_t>& buffer, uint32_t offset, ui
 		// We just have to append some zeros to the buffer
 		buffer.resize(buffer.size() + availableSize, 0);
 	} else {
-		// We have to request for availableSize rounded up to MFSBLOCKSIZE
-		uint32_t firstBlockToRead = offset / MFSBLOCKSIZE;
-		uint32_t blockToReadCount = (availableSize + MFSBLOCKSIZE - 1) / MFSBLOCKSIZE;
+		// We have to request for availableSize rounded up to SFSBLOCKSIZE
+		uint32_t firstBlockToRead = offset / SFSBLOCKSIZE;
+		uint32_t blockToReadCount = (availableSize + SFSBLOCKSIZE - 1) / SFSBLOCKSIZE;
 
 		planner_.prepare(firstBlockToRead, blockToReadCount, available_parts_);
 		if (!planner_.isReadingPossible()) {
@@ -136,7 +138,7 @@ uint32_t ChunkReader::readData(std::vector<uint8_t>& buffer, uint32_t offset, ui
 			crcErrors_.push_back(ChunkTypeWithAddress(err.server(), err.chunkType(), 0));
 			throw;
 		}
-		// Shrink the buffer. If availableSize is not divisible by MFSBLOCKSIZE
+		// Shrink the buffer. If availableSize is not divisible by SFSBLOCKSIZE
 		// we have to chop off the trailing zeros, that we've just read from a chunkserver.
 		buffer.resize(initialBufferSize + availableSize);
 	}

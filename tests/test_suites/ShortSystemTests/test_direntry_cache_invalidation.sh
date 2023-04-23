@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 END_OF_SOURCE
 chmod +x "$TEMP_DIR/test.cc"
 
-USE_RAMDISK=YES setup_local_empty_lizardfs info
+USE_RAMDISK=YES setup_local_empty_saunafs info
 cd "${info[mount0]}"
 FILE_SIZE=1K file-generate file
 assert_empty "$("$TEMP_DIR/test.cc" back 2>&1)" # rename 'file' to 'back', create a new empty 'file'

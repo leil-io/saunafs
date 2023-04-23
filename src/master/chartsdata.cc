@@ -1,19 +1,21 @@
 /*
-   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA, 2013-2014 EditShare, 2013-2015 Skytechnology sp. z o.o..
+   Copyright 2005-2010 Jakub Kruszona-Zawadzki, Gemius SA
+   Copyright 2013-2014 EditShare
+   Copyright 2013-2015 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file was part of MooseFS and is part of LizardFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -35,12 +37,12 @@
 #include "master/filesystem_operations.h"
 #include "master/matoclserv.h"
 
-#if defined(LIZARDFS_HAVE_GETRUSAGE) && defined(LIZARDFS_HAVE_STRUCT_RUSAGE_RU_MAXRSS)
+#if defined(SAUNAFS_HAVE_GETRUSAGE) && defined(SAUNAFS_HAVE_STRUCT_RUSAGE_RU_MAXRSS)
 #  include <sys/types.h>
-#  ifdef LIZARDFS_HAVE_SYS_RESOURCE_H
+#  ifdef SAUNAFS_HAVE_SYS_RESOURCE_H
 #    include <sys/resource.h>
 #  endif
-#  ifdef LIZARDFS_HAVE_SYS_RUSAGE_H
+#  ifdef SAUNAFS_HAVE_SYS_RUSAGE_H
 #    include <sys/rusage.h>
 #  endif
 #  ifndef RUSAGE_SELF
@@ -49,7 +51,7 @@
 #  define MEMORY_USAGE 1
 #endif
 
-#if defined(LIZARDFS_HAVE_SETITIMER)
+#if defined(SAUNAFS_HAVE_SETITIMER)
 #  include <sys/time.h>
 #  ifndef ITIMER_REAL
 #    define ITIMER_REAL 0
@@ -63,7 +65,7 @@
 #  define CPU_USAGE 1
 #endif
 
-#define CHARTS_FILENAME "stats.mfs"
+#define CHARTS_FILENAME "stats.sfs"
 
 #define CHARTS_UCPU 0
 #define CHARTS_SCPU 1

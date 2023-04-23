@@ -14,8 +14,8 @@ chmod +x "$TEMP_DIR/getlen.sh"
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
-	setup_local_empty_lizardfs info
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 mkdir dir
@@ -46,7 +46,7 @@ expect_success attr -qLs "$name5" -V "$value5" file_link
 expect_success attr -qs "$name6" -V "$value6" dir
 expect_failure attr -qs "$name7" -V "$value7" dir
 
-lizardfs_master_daemon restart
+saunafs_master_daemon restart
 
 expect_equals "$name1" "$(attr -ql .)"
 expect_equals "$(echo -e "$name2\n$name3\n$name5" | sort)" "$(attr -ql file | sort)"

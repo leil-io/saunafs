@@ -1,9 +1,9 @@
-About the LizardFS Wireshark plugin
+About the SaunaFS Wireshark plugin
 ===================================
 
 This directory contains a Python and Bash scripts which generate a plugin
 (dissector) for Wireshark (http://www.wireshark.org/) which adds support for
-the LizardFS protocol. This plugin is compiled into a lizardfs.so shared
+the SaunaFS protocol. This plugin is compiled into a saunafs.so shared
 library to make it easily redistributable.
 
 To learn more about Wireshark dissectors see:
@@ -11,7 +11,7 @@ https://www.wireshark.org/docs/wsdg_html_chunked/ChapterDissection.html
 
 ----
 
-Follow below steps to install LizardFS Wireshark plugin:
+Follow below steps to install SaunaFS Wireshark plugin:
 
 1) Ensure you have the following packages installed (for Debian and Ubuntu):
 
@@ -32,7 +32,7 @@ Follow below steps to install LizardFS Wireshark plugin:
 
 3) Set some variables:
 
-        $ LIZARDFS_SRCDIR=~/src/lizardfs
+        $ SAUNAFS_SRCDIR=~/src/saunafs
         $ WIRESHARK_SRCDIR=~/src/wireshark
         $ WIRESHARK_VERSION=2.2.6  # get version by invoking wireshark --version
 
@@ -46,12 +46,12 @@ Follow below steps to install LizardFS Wireshark plugin:
 
 6) Copy contents of this directory to the Wireshark source directory:
 
-        $ tar -C "$LIZARDFS_SRCDIR"/utils/wireshark -c . | tar -C "$WIRESHARK_SRCDIR" -vx
+        $ tar -C "$SAUNAFS_SRCDIR"/utils/wireshark -c . | tar -C "$WIRESHARK_SRCDIR" -vx
 
-7) Run the generate.sh script (provide path to the MFSCommunication file as an
+7) Run the generate.sh script (provide path to the SFSCommunication file as an
    argument):
 
-        $ "$WIRESHARK_SRCDIR"/plugins/epan/lizardfs/generate.sh "$LIZARDFS_SRCDIR"/src/protocol/MFSCommunication.h
+        $ "$WIRESHARK_SRCDIR"/plugins/epan/saunafs/generate.sh "$SAUNAFS_SRCDIR"/src/protocol/SFSCommunication.h
 
 8) Edit the main CMakeLists.txt file in the Wireshark source tree to add the
    new plugin:
@@ -64,7 +64,7 @@ Follow below steps to install LizardFS Wireshark plugin:
                             plugins/epan/ethercat
                             plugins/epan/gryphon
                             plugins/epan/irda
-            +               plugins/epan/lizardfs
+            +               plugins/epan/saunafs
                             plugins/epan/mate
                             plugins/epan/opcua
                             plugins/epan/profinet
@@ -76,15 +76,15 @@ Follow below steps to install LizardFS Wireshark plugin:
         $ cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_wireshark=NO
         $ make -j8
 
-10) To install the plugin copy lizardfs.so library to the personal plugin
+10) To install the plugin copy saunafs.so library to the personal plugin
     folder:
 
         $ mkdir -p ${PERSONAL_CONFIG_DIR}/epan
-        $ cp "$WIRESHARK_SRCDIR"/build/run/lizardfs.so ${PERSONAL_CONFIG_DIR}/epan
+        $ cp "$WIRESHARK_SRCDIR"/build/run/saunafs.so ${PERSONAL_CONFIG_DIR}/epan
 
     or global plugin folder:
 
-        # cp "$WIRESHARK_SRCDIR"/build/run/lizardfs.so ${GLOBAL_CONFIG_DIR}/epan
+        # cp "$WIRESHARK_SRCDIR"/build/run/saunafs.so ${GLOBAL_CONFIG_DIR}/epan
 
     ${PERSONAL_CONFIG_DIR} and ${GLOBAL_CONFIG_DIR} are dependent on your
     system and Wireshark version. You can determine them by running Wireshark
@@ -99,11 +99,11 @@ Follow below steps to install LizardFS Wireshark plugin:
 
 12) Enjoy!
 
-    This plugin recognizes the LizardFS protocol using TCP port numbers. If you
+    This plugin recognizes the SaunaFS protocol using TCP port numbers. If you
     use non-standard ports (9419-9422) you need to change them in:
 
-        Edit -> Preferences -> Protocols -> LizardFS
+        Edit -> Preferences -> Protocols -> SaunaFS
 
-    E.g. to parse the communication in our test suite set LizardFS TCP ports to:
+    E.g. to parse the communication in our test suite set SaunaFS TCP ports to:
 
         9419-9422,25000-25015

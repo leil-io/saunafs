@@ -1,7 +1,10 @@
 /*
    A ping-pong fcntl byte range lock test
 
-   Copyright (C) Andrew Tridgell 2002; Skytechnology sp. z o.o. 2015
+   Copyright 2002      Andrew Tridgell
+
+   Copyright 2015 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by

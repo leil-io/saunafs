@@ -13,7 +13,7 @@ add_custom_target(list_of_test_cases
 
   COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && bash tools/generate_tests_from_templates.sh
 
-  COMMAND find ${CMAKE_CURRENT_SOURCE_DIR}/test_suites/ -name test_*.sh
+  COMMAND find -L ${CMAKE_CURRENT_SOURCE_DIR}/test_suites/ -name test_*.sh
     ${filter_out}
     | sed -e "s/[.]sh$//"
     | awk -F/ "{print $(NF-1) \",\" $NF}"
@@ -23,18 +23,18 @@ add_custom_target(list_of_test_cases
 
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   VERBATIM)
-set_source_files_properties(lizardfs-tests.cc PROPERTIES
+set_source_files_properties(saunafs-tests.cc PROPERTIES
   OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test_cases.h
   OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test_suites.h)
 
 # Create constants.sh file
-configure_file(set_lizardfs_constants.sh.in set_lizardfs_constants.sh @ONLY)
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/set_lizardfs_constants.sh DESTINATION ${BIN_SUBDIR})
+configure_file(set_saunafs_constants.sh.in set_saunafs_constants.sh @ONLY)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/set_saunafs_constants.sh DESTINATION ${BIN_SUBDIR})
 
 # Build executable running all the test cases
 include_directories(${CMAKE_CURRENT_BINARY_DIR}) # test_cases.h is located here
 add_definitions(-DTEST_DATA_PATH=${CMAKE_CURRENT_SOURCE_DIR})
-add_executable(lizardfs-tests lizardfs-tests.cc)
-add_dependencies(lizardfs-tests list_of_test_cases)
-target_link_libraries(lizardfs-tests ${GTEST_BOTH_LIBRARIES} ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
-install(TARGETS lizardfs-tests RUNTIME DESTINATION ${BIN_SUBDIR})
+add_executable(saunafs-tests saunafs-tests.cc)
+add_dependencies(saunafs-tests list_of_test_cases)
+target_link_libraries(saunafs-tests ${GTEST_BOTH_LIBRARIES} ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
+install(TARGETS saunafs-tests RUNTIME DESTINATION ${BIN_SUBDIR})

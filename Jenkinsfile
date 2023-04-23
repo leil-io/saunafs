@@ -4,14 +4,13 @@ pipeline {
         label 'docker'
     }
     environment{
-        projectName = 'saunafs'
-        registryPrefix = "registry.ci.leil.io"
-        dockerRegistry = "https://${registryPrefix}"
+        PROJECT_NAME = 'saunafs'
+        DOCKER_INTERNAL_REGISTRY = "registry.ci.leil.io"
+        DOCKER_ENABLE_PUSH_IMAGE = 'true'
+        DOCKER_ENABLE_PULL_CACHE_IMAGE = 'true'
+        DOCKER_INTERNAL_REGISTRY_URL= "https://${DOCKER_INTERNAL_REGISTRY}"
         dockerRegistrySecretId = 'private-docker-registry-credentials'
-        imageName = projectName.replaceAll('\\.','-').replaceAll('/','-')
-        jenkinsUsername = "${sh(script:'id -un', returnStdout: true).trim()}"
-        jenkinsUserId = "${sh(script:'id -u', returnStdout: true).trim()}"
-        jenkinsGroupId = "${sh(script:'id -g', returnStdout: true).trim()}"
+        nexusUrl = "http://192.168.50.208:8081"
     }
     options {
         skipDefaultCheckout()
@@ -21,67 +20,68 @@ pipeline {
         preserveStashes(buildCount: 2)
     }
     stages {
-        stage('Prepare') {
-            steps {
-                script {
-                    def branchedStages = [:]
-                    stageNames=['cppcheck', 'cpplint', 'bookworm-build', 'bookworm-test']
-                    stageNames.each { stageName ->
-                        branchedStages["${stageName}"] = {
-                            stage("${stageName}") {
-                                node('docker') {
-                                    cleanAndClone()
-                                    def commitId = getCommitId()
-                                    def containerTag = getPartialTag(env.BRANCH_NAME, stageName, commitId)
-                                    def latestTag = getPartialTag(env.BRANCH_NAME, stageName)
-                                    def imagePrefix="${registryPrefix}/${imageName}"
-                                    println("${imagePrefix}:${containerTag}")
-                                    println("${imagePrefix}:${latestTag}")
-                                    docker.withRegistry(env.dockerRegistry, env.dockerRegistrySecretId) {
-                                        dockerTryPull("${imagePrefix}:${latestTag}")
-                                        def ciImage = docker.build("${imagePrefix}:${containerTag}", """\
-                                            --build-arg GROUP_ID=${jenkinsGroupId} \
-                                            --build-arg USER_ID=${jenkinsUserId} \
-                                            --build-arg USERNAME=${jenkinsUsername} \
-                                            --cache-from ${imagePrefix}:${latestTag} \
-                                            --file tests/ci_build/Dockerfile.${stageName} .
-                                        """)
-                                        ciImage.push(containerTag)
-                                        ciImage.push(latestTag)
-                                        imageTags[stageName] = containerTag
-                                    }
-                                }
+        stage('Preparation') {
+            parallel {
+                stage('Image_Build') {
+                    agent { label 'docker' }
+                    steps {
+                        cleanAndClone()
+                        script {
+                            docker.withRegistry(env.DOCKER_INTERNAL_REGISTRY_URL, env.dockerRegistrySecretId) {
+                                sh "tests/ci_build/docker-build.sh ubuntu22.04-test"
                             }
+                            imageTags['ubuntu22.04-test'] = getPartialTag(env.BRANCH_NAME, 'ubuntu22.04-test', getCommitId())
                         }
                     }
-                    parallel branchedStages
                 }
             }
         }
-        stage('Process') {
+        stage('Build') {
             parallel {
-                stage('Lint') {
+                stage ('BuildProject') {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/saunafs:' + imageTags['cpplint']
-                            registryUrl env.dockerRegistry
+                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                            registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                             registryCredentialsId env.dockerRegistrySecretId
+                            args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
                         }
                     }
                     steps {
                         cleanAndClone()
-                        sh 'cpplint --quiet --counting=detailed --linelength=120 --recursive src/ 2> cpplint.log || true'
-                        archiveArtifacts artifacts: 'cpplint.log', followSymlinks: false
-                        stash allowEmpty: true, name: 'cpplint-result', includes: "cpplint.log"
+                        sh 'tests/ci_build/run-build.sh test'
+                        stash allowEmpty: true, name: 'test-binaries', includes: "install/saunafs/**/*"
+                        stash allowEmpty: true, name: 'built-binaries', includes: "build/saunafs/**/*"
                     }
                 }
-                stage('Check') {
+                stage('GaneshaImage') {
+                    when {
+                        beforeAgent true
+                        expression { env.BRANCH_NAME ==~ /(main|dev)/ }
+                    }
+                    agent { label 'docker' }
+                    steps {
+                        cleanAndClone()
+                        script {
+                            docker.withRegistry(env.DOCKER_INTERNAL_REGISTRY_URL, env.dockerRegistrySecretId) {
+                                DOCKER_BASE_IMAGE="${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                                sh "tests/ci_build/docker-build.sh ganesha"
+                            }
+                            imageTags['ganesha'] = getPartialTag(env.BRANCH_NAME, 'ganesha', 'latest')
+                        }
+                    }
+                }
+            }
+        }
+        stage('Tests') {
+            parallel {
+                stage("CppCheck") {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/saunafs:' + imageTags['cppcheck']
-                            registryUrl env.dockerRegistry
+                            image "registry.ci.leil.io/ci-tools/cppcheck:2023.09.18"
+                            registryUrl 'https://registry.ci.leil.io'
                             registryCredentialsId env.dockerRegistrySecretId
                         }
                     }
@@ -89,78 +89,31 @@ pipeline {
                         cleanAndClone()
                         sh 'cppcheck --enable=all --inconclusive --xml --xml-version=2 ./src 2> cppcheck.xml'
                         archiveArtifacts artifacts: 'cppcheck.xml', followSymlinks: false
-                        stash allowEmpty: true, name: 'cppcheck-result', includes: "cppcheck.xml"
-
+                        recordIssues enabledForFailure: true, tool: cppCheck(name: "Lint: cppcheck", pattern: 'cppcheck.xml')
                     }
                 }
-                stage('Build') {
+                stage("CppLint") {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-build']
-                            registryUrl env.dockerRegistry
-                            registryCredentialsId env.dockerRegistrySecretId
-                            args  '--security-opt seccomp=unconfined'
-                        }
-                    }
-                    steps {
-                        cleanAndClone()
-                        sh 'tests/ci_build/run-build.sh test'
-                        stash allowEmpty: true, name: 'built-binaries', includes: "build/lizardfs/**/*"
-                        stash allowEmpty: true, name: 'test-binaries', includes: "install/lizardfs/**/*"
-                    }
-                }
-                stage('BuildCov') {
-                    agent {
-                        docker {
-                            label 'docker'
-                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-build']
-                            registryUrl env.dockerRegistry
-                            registryCredentialsId env.dockerRegistrySecretId
-                            args  '--security-opt seccomp=unconfined'
-                        }
-                    }
-                    steps {
-                        cleanAndClone()
-                        sh 'tests/ci_build/run-build.sh coverage'
-                        stash allowEmpty: true, name: 'coverage-binaries', includes: "build/lizardfs/**/*"
-                    }
-                }
-            }
-            post {
-                always {
-                    unstash 'cppcheck-result'
-                    unstash 'cpplint-result'
-                    recordIssues enabledForFailure: true, tool: cppCheck(name: "Lint: cppcheck", pattern: 'cppcheck.xml')
-                    recordIssues enabledForFailure: true, tool: cppLint(name: "Lint: cpplint", pattern: 'cpplint.log')
-                }
-            }
-        }
-        stage('Test') {
-            parallel {
-                stage('Unit') {
-                    agent {
-                        docker {
-                            label 'docker'
-                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-test']
-                            registryUrl env.dockerRegistry
+                            image "registry.ci.leil.io/ci-tools/cpplint:2023.09.18"
+                            registryUrl 'https://registry.ci.leil.io'
                             registryCredentialsId env.dockerRegistrySecretId
                         }
                     }
                     steps {
                         cleanAndClone()
-                        unstash 'coverage-binaries'
-                        sh 'tests/ci_build/run-unit-tests.sh'
-                        archiveArtifacts artifacts: 'test_output/coverage.xml', followSymlinks: false
-                        stash allowEmpty: true, name: 'coverage-report', includes: "test_output/coverage.xml"
+                        sh 'cpplint --quiet --counting=detailed --linelength=120 --recursive src/ 2> cpplint.log || true'
+                        archiveArtifacts artifacts: 'cpplint.log', followSymlinks: false
+                        recordIssues enabledForFailure: true, tool: cppLint(name: "Lint: cpplint", pattern: 'cpplint.log')
                     }
                 }
-                stage('Sanity') {
+                stage ('SanityCheck') {
                     agent {
                         docker {
                             label 'docker'
-                            image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-test']
-                            registryUrl env.dockerRegistry
+                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                            registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
                         }
@@ -171,20 +124,55 @@ pipeline {
                         sh 'tests/ci_build/run-sanity-check.sh'
                     }
                 }
-            }
-            post {
-                always {
-                    unstash 'coverage-report'
-                    cobertura coberturaReportFile: 'test_output/coverage.xml'
+                stage('Unit') {
+                    agent {
+                        docker {
+                            label 'docker'
+                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                            registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
+                            registryCredentialsId env.dockerRegistrySecretId
+                            args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
+                        }
+                    }
+                    steps {
+                        cleanAndClone()
+                        unstash 'built-binaries'
+                        unstash 'test-binaries'
+                        sh 'tests/ci_build/run-unit-tests.sh'
+                    }
+                }
+                stage('Ganesha') {
+                    when {
+                        beforeAgent true
+                        expression { env.BRANCH_NAME ==~ /(main|dev)/ }
+                    }
+                    agent {
+                        docker {
+                            label 'docker'
+                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ganesha']
+                            registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
+                            registryCredentialsId env.dockerRegistrySecretId
+                            args  '--security-opt seccomp=unconfined --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1 --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --cap-add SETPCAP'
+                        }
+                    }
+                    steps {
+                        cleanAndClone()
+                        unstash 'test-binaries'
+                        sh 'tests/ci_build/run-ganesha-tests.sh'
+                    }
                 }
             }
         }
         stage('Package') {
+            when {
+                beforeAgent true
+                expression { env.BRANCH_NAME ==~ /(main|dev)/ }
+            }
             agent {
                 docker {
                     label 'docker'
-                    image 'registry.ci.leil.io/saunafs:' + imageTags['bookworm-build']
-                    registryUrl env.dockerRegistry
+                    image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                    registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                     registryCredentialsId env.dockerRegistrySecretId
                     args  '--security-opt seccomp=unconfined'
                 }
@@ -193,7 +181,46 @@ pipeline {
                 cleanAndClone()
                 script {
                     sh "./package.sh"
+                    stash allowEmpty: false, name: 'bundle', includes: "*bundle*.tar"
                     archiveArtifacts artifacts: '*bundle*.tar', followSymlinks: false
+                }
+            }
+        }
+        stage('Delivery') {
+            when {
+                beforeAgent true
+                expression { env.BRANCH_NAME ==~ /(main|dev)/ }
+            }
+            agent {
+                docker {
+                    label 'docker'
+                    image "ictus4u/ssh-courier:1.1.1"
+                }
+            }
+            steps {
+                cleanAndClone()
+                script {
+                    unstash 'bundle'
+                    withCredentials([usernamePassword(credentialsId: 'nexus-deployment-credentials', passwordVariable: 'nexusDeploymentPassword', usernameVariable: 'nexusDeploymentUsername')]) {
+                        withEnv([
+                            "NEXUS_USERNAME=${nexusDeploymentUsername}",
+                            "NEXUS_PASSWORD=${nexusDeploymentPassword}",
+                            "NEXUS_URL=${env.nexusUrl}"
+                        ]) {
+                            sh '''
+                                bundle_name=$(ls -1t *bundle*.tar | head -1)
+                                nexusRepoName="${PROJECT_NAME}-$(echo "${bundle_name}" | cut -d- -f3-4)"
+                                if [ "${BRANCH_NAME}" != "main" ]; then
+                                    nexusRepoName="${nexusRepoName}-${BRANCH_NAME}"
+                                fi
+                                tar -vxf ${bundle_name}
+                                bundle_dir=$(basename ${bundle_name} .tar)
+                                NEXUS_REPO_NAME=${nexusRepoName} \
+                                    bash -x tests/ci_build/run-delivery-nexus-deb.sh \
+                                        ${bundle_dir}
+                            '''
+                        }
+                    }
                 }
             }
         }
@@ -210,31 +237,10 @@ def cleanAndClone() {
     checkout scm
 }
 
-def getVersion() {
-    "0.1.0"
-}
-
-def getBuildTimestamp() {
-    return sh(returnStdout: true, script: 'date -u +"%Y%m%d-%H%M%S"').trim()
-}
-
 def getCommitId() {
     return sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
 }
 
 def getPartialTag(branchName, customTag, commitId = 'latest') {
     return "${branchName}-${customTag}-${commitId}"
-}
-
-def getTag(version, branchName, commitId = 'HEAD') {
-    def branchStatus = (branchName == 'main' ) ? 'stable' : 'unstable'
-    def timestamp = getBuildTimestamp()
-    return "${version}-${timestamp}-${branchStatus}-${branchName}-${commitId}"
-}
-
-def dockerTryPull(image) {
-    def exitCode = sh(script: "docker pull ${image}", returnStatus: true)
-    if (exitCode != 0) {
-        println("Catching failure pulling ${image} image")
-    }
 }

@@ -1,19 +1,20 @@
 /*
-   Copyright 2013-2016 Skytechnology sp. z o.o..
+   Copyright 2013-2016 Skytechnology sp. z o.o.
+   Copyright 2023      Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "common/platform.h"
@@ -63,7 +64,7 @@ static void fs_remove_invisible_quota_entries(uint32_t root_inode, std::vector<Q
 
 uint8_t fs_quota_get_all(const FsContext &context, std::vector<QuotaEntry> &results) {
 	if (context.uid() != 0 && !(context.sesflags() & SESFLAG_ALLCANCHANGEQUOTA)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	results = gMetadata->quota_database.getEntriesWithStats();
 
@@ -90,7 +91,7 @@ uint8_t fs_quota_get_all(const FsContext &context, std::vector<QuotaEntry> &resu
 
 	fs_remove_invisible_quota_entries(context.rootinode(), results);
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_quota_get(const FsContext &context,
@@ -102,25 +103,25 @@ uint8_t fs_quota_get(const FsContext &context,
 			switch (owner.ownerType) {
 			case QuotaOwnerType::kUser:
 				if (context.uid() != owner.ownerId) {
-					return LIZARDFS_ERROR_EPERM;
+					return SAUNAFS_ERROR_EPERM;
 				}
 				break;
 			case QuotaOwnerType::kGroup:
 				if (context.gid() != owner.ownerId && !(context.sesflags() & SESFLAG_IGNOREGID)) {
-					return LIZARDFS_ERROR_EPERM;
+					return SAUNAFS_ERROR_EPERM;
 				}
 				break;
 			case QuotaOwnerType::kInode:
 				node = fsnodes_id_to_node<FSNodeDirectory>(owner.ownerId);
 				if (!node || node->type != FSNode::kDirectory) {
-					return LIZARDFS_ERROR_EINVAL;
+					return SAUNAFS_ERROR_EINVAL;
 				}
 				if (node->uid != context.uid() || (node->gid != context.gid() && !(context.sesflags() & SESFLAG_IGNOREGID))) {
-					return LIZARDFS_ERROR_EPERM;
+					return SAUNAFS_ERROR_EPERM;
 				}
 				break;
 			default:
-				return LIZARDFS_ERROR_EINVAL;
+				return SAUNAFS_ERROR_EINVAL;
 			}
 		}
 		auto result = gMetadata->quota_database.get(owner.ownerType, owner.ownerId);
@@ -145,7 +146,7 @@ uint8_t fs_quota_get(const FsContext &context,
 	fs_remove_invisible_quota_entries(context.rootinode(), tmp);
 	results = std::move(tmp);
 
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 static void fsnodes_getpath(uint32_t root_inode, FSNode *node, std::string &ret) {
@@ -166,7 +167,7 @@ static void fsnodes_getpath(uint32_t root_inode, FSNode *node, std::string &ret)
 		p = parent;
 	}
 	if (size > 65535) {
-		lzfs_pretty_syslog(LOG_WARNING, "path too long !!! - truncate");
+		safs_pretty_syslog(LOG_WARNING, "path too long !!! - truncate");
 		size = 65535;
 	}
 
@@ -207,7 +208,7 @@ uint8_t fs_quota_get_info(const FsContext &context, const std::vector<QuotaEntry
 		}
 		result.push_back(info);
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 uint8_t fs_quota_set(const FsContext &context, const std::vector<QuotaEntry> &entries) {
@@ -218,10 +219,10 @@ uint8_t fs_quota_set(const FsContext &context, const std::vector<QuotaEntry> &en
 	uint32_t ts = eventloop_time();
 	ChecksumUpdater cu(ts);
 	if (context.sesflags() & SESFLAG_READONLY) {
-		return LIZARDFS_ERROR_EROFS;
+		return SAUNAFS_ERROR_EROFS;
 	}
 	if (context.uid() != 0 && !(context.sesflags() & SESFLAG_ALLCANCHANGEQUOTA)) {
-		return LIZARDFS_ERROR_EPERM;
+		return SAUNAFS_ERROR_EPERM;
 	}
 	for (const QuotaEntry &entry : entries) {
 		if(entry.entryKey.owner.ownerType != QuotaOwnerType::kInode) {
@@ -229,7 +230,7 @@ uint8_t fs_quota_set(const FsContext &context, const std::vector<QuotaEntry> &en
 		}
 		FSNode *node = fsnodes_id_to_node(entry.entryKey.owner.ownerId);
 		if(!node) {
-			return LIZARDFS_ERROR_EINVAL;
+			return SAUNAFS_ERROR_EINVAL;
 		}
 	}
 
@@ -244,7 +245,7 @@ uint8_t fs_quota_set(const FsContext &context, const std::vector<QuotaEntry> &en
 		             resource_name[(int)entry.entryKey.resource], owner_name[(int)owner.ownerType],
 		             uint32_t{owner.ownerId}, uint64_t{entry.limit});
 	}
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 #endif
 
@@ -261,13 +262,13 @@ uint8_t fs_apply_setquota(char rigor, char resource, char owner_type, uint32_t o
 	    decodeChar("UGI", {QuotaOwnerType::kUser, QuotaOwnerType::kGroup, QuotaOwnerType::kInode},
 	               owner_type, quotaOwnerType);
 	if (!valid) {
-		return LIZARDFS_ERROR_EINVAL;
+		return SAUNAFS_ERROR_EINVAL;
 	}
 	gMetadata->metaversion++;
 	gMetadata->quota_database.set(quotaOwnerType, owner_id, quotaRigor, quotaResource, limit);
 	gMetadata->quota_database.removeEmpty(quotaOwnerType, owner_id);
 	gMetadata->quota_checksum = gMetadata->quota_database.checksum();
-	return LIZARDFS_STATUS_OK;
+	return SAUNAFS_STATUS_OK;
 }
 
 static int fsnodes_find_depth(FSNodeDirectory *a) {

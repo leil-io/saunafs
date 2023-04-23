@@ -2,7 +2,7 @@ for_chunkservers() {
 	operation=${1}
 	shift
 	for csid in "${@}"; do
-		lizardfs_chunkserver_daemon $csid "${operation}" &
+		saunafs_chunkserver_daemon $csid "${operation}" &
 	done
 	wait
 	if [[ $operation == stop ]]; then
@@ -12,7 +12,7 @@ for_chunkservers() {
 	else
 		test_fail "Wrong branch"
 	fi
-	lizardfs_wait_for_ready_chunkservers $nr_of_running_chunkservers
+	saunafs_wait_for_ready_chunkservers $nr_of_running_chunkservers
 }
 
 timeout_set "1 minute"
@@ -23,21 +23,21 @@ CHUNKSERVERS=15 \
 			`|ACCEPTABLE_DIFFERENCE = 10.0`
 			`|DISABLE_CHUNKS_DEL = 1" \
 	MASTER_CUSTOM_GOALS="5 ec4_1: \$ec(4,1)|6 ec5_4: \$ec(5,4)" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 nr_of_running_chunkservers=15
 cd ${info[mount0]}
 
 # Produce first version chunks
 dd if=/dev/zero of=file bs=1k count=5k
-lizardfs setgoal ec4_1 file
-while (( $(lizardfs fileinfo file | grep -c copy) < 6 )); do # 1 [goal1] + 5 [ec4_1]
+saunafs setgoal ec4_1 file
+while (( $(saunafs fileinfo file | grep -c copy) < 6 )); do # 1 [goal1] + 5 [ec4_1]
 	sleep 1
 done
-lizardfs setgoal ec5_4 file
-while (( $(lizardfs fileinfo file | grep -c copy) < 15 )); do # 1 [goal1] + 5 [ec4_1] + 9 [ec5_4]
+saunafs setgoal ec5_4 file
+while (( $(saunafs fileinfo file | grep -c copy) < 15 )); do # 1 [goal1] + 5 [ec4_1] + 9 [ec5_4]
 	sleep 1
 done
 sleep 2

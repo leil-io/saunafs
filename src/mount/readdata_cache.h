@@ -1,19 +1,21 @@
 /*
+
    Copyright 2016 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -34,6 +36,8 @@
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/set.hpp>
 
+#define MISSING_OFFSET_PTR nullptr
+
 class ReadCache {
 public:
 	typedef uint64_t Offset;
@@ -43,7 +47,9 @@ public:
 		Offset offset;
 		std::vector<uint8_t> buffer;
 		Timer timer;
-		std::atomic<int> refcount;
+		std::atomic<int> refcount = 0;
+		std::atomic<Size> requested_size;
+		std::atomic<bool> done = false;
 		boost::intrusive::set_member_hook<> set_member_hook;
 		boost::intrusive::list_member_hook<> lru_member_hook;
 		boost::intrusive::list_member_hook<> reserved_member_hook;
@@ -54,7 +60,8 @@ public:
 			}
 		};
 
-		Entry(Offset offset) : offset(offset), buffer(), timer(), refcount(0),
+		Entry(Offset offset, Size requested_size)
+		    : offset(offset), buffer(), timer(), requested_size(requested_size),
 		      set_member_hook(), lru_member_hook() {}
 
 		bool operator<(const Entry &other) const {
@@ -63,6 +70,10 @@ public:
 
 		bool expired(uint32_t expiration_time) const {
 			return timer.elapsed_ms() >= expiration_time;
+		}
+
+		void reset_timer() {
+			return timer.reset();
 		}
 
 		Offset endOffset() const {
@@ -105,7 +116,7 @@ public:
 
 		// Wrapper for returning data not really residing in cache
 		Result(std::vector<uint8_t> &&data) : entries(), is_fake(true) {
-			Entry *entry = new Entry(0);
+			Entry *entry = new Entry(0, 0);
 			entry->buffer = std::move(data);
 			entries.push_back(entry);
 		}
@@ -131,7 +142,10 @@ public:
 
 		Offset endOffset() const {
 			assert(!entries.empty());
-			return entries.back()->offset + entries.back()->buffer.size();
+			return entries.back()->offset +
+			       (entries.back()->done
+			            ? entries.back()->buffer.size()
+			            : static_cast<size_t>(entries.back()->requested_size));
 		}
 
 		/*!
@@ -235,10 +249,14 @@ public:
 			return std::min<Size>(endOffset() - real_offset, real_size);
 		}
 
+		Entry* back() {
+			return entries.back();
+		}
+
 		std::string toString() const {
 			std::string text;
 			for(const auto &entry : entries) {
-				text += "(" + std::to_string(entry->refcount) + "|"
+				text += "(" + std::to_string(entry->refcount.load()) + "|"
 				+ std::to_string(entry->offset) + ":"
 				+ std::to_string(entry->buffer.size()) + "),";
 			}
@@ -267,10 +285,10 @@ public:
 	 *
 	 * \return cache query result
 	 */
-	Result query(Offset offset, Size size) {
+	void query(Offset offset, Size size, ReadCache::Result &result,
+	           bool insertPending = true) {
 		collectGarbage();
 
-		Result result;
 		auto it = entries_.upper_bound(offset, Entry::OffsetComp());
 		if (it != entries_.begin()) {
 			--it;
@@ -282,6 +300,11 @@ public:
 		while (it != entries_.end() && bytes_left > 0) {
 			if (offset < it->offset) {
 				break;
+			}
+
+			if (!it->done) {
+				++it;
+				continue;
 			}
 
 			if (it->expired(expiration_time_) || it->buffer.empty()) {
@@ -299,12 +322,31 @@ public:
 			++it;
 		}
 
-		if (bytes_left > 0) {
+		if (bytes_left > 0 && insertPending) {
+			it = entries_.upper_bound(offset, Entry::OffsetComp());
+			if (it != entries_.begin()) {
+				--it;
+			}
+
+			if (it != entries_.end() && it->offset == offset) {
+				assert(!it->done);
+				it = erase(it);
+			}
 			auto inserted = insert(it, offset, bytes_left);
 			result.add(*inserted);
 		}
+	}
 
-		return result;
+	Entry *forceInsert(Offset offset, Size size) {
+		collectGarbage();
+
+		auto it = entries_.upper_bound(offset, Entry::OffsetComp());
+		if (it != entries_.begin()) {
+			--it;
+		}
+
+		auto inserted = insert(it, offset, size);
+		return std::addressof(*inserted);
 	}
 
 	void clear() {
@@ -314,10 +356,26 @@ public:
 		}
 	}
 
+	Entry *find(uint64_t offset) {
+		auto it = entries_.upper_bound(offset, Entry::OffsetComp());
+		if (it != entries_.begin()) {
+			--it;
+		}
+
+		if (it != entries_.end() && it->offset == offset) {
+			if (it->requested_size == 0) {
+				it = erase(it);
+				return MISSING_OFFSET_PTR;
+			}
+			return std::addressof(*it);
+		}
+		return MISSING_OFFSET_PTR;
+	}
+
 protected:
 	EntrySet::iterator insert(EntrySet::iterator it, Offset offset, Size size) {
 		it = clearCollisions(it, offset + size);
-		Entry *e = new Entry(offset);
+		Entry *e = new Entry(offset, size);
 		lru_.push_back(*e);
 		assert(entries_.find(*e) == entries_.end());
 		return entries_.insert(it, *e);
@@ -327,7 +385,7 @@ protected:
 		unsigned reserved_count = count;
 		while (!lru_.empty() && count-- > 0) {
 			Entry *e = std::addressof(lru_.front());
-			if (e->expired(expiration_time_)) {
+			if (e->expired(expiration_time_) && e->done) {
 				erase(entries_.iterator_to(*e));
 			} else {
 				break;
@@ -366,7 +424,11 @@ protected:
 
 	EntrySet::iterator clearCollisions(EntrySet::iterator it, Offset start_offset) {
 		while (it != entries_.end() && it->offset < start_offset) {
-			it = erase(it);
+			if (it->done && it->offset + it->requested_size > start_offset) {
+				it = erase(it);
+			} else {
+				it++;
+			}
 		}
 		return it;
 	}
@@ -374,7 +436,7 @@ protected:
 	std::string toString() const {
 		std::string text;
 		for(const auto &entry : entries_) {
-			text += "(" + std::to_string(entry.refcount) + "|"
+			text += "(" + std::to_string(entry.refcount.load()) + "|"
 			+ std::to_string(entry.offset) + ":"
 			+ std::to_string(entry.buffer.size()) + "),";
 		}

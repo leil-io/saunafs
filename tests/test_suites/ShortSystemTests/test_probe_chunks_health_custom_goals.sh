@@ -1,24 +1,24 @@
 CHUNKSERVERS=2 \
 	CHUNKSERVER_LABELS="0:A" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1" \
-	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	MASTER_CUSTOM_GOALS="5 AA: A A|6 A_: A _|7 A__: A _ _|8 BB: B B|`
 			`9 B_: B _|10 BB_: B B _|11 AB: A B|12 AB_: A B _|`
 			`13 AA_: A A _|14 B__: B _ _" \
 	USE_RAMDISK=YES \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 # Create one chunk in each of three goals
 goals="2 3 4"
 cd "${info[mount0]}"
 for goal in $goals; do
 	touch file_$goal
-	lizardfs setgoal $goal file_$goal
+	saunafs setgoal $goal file_$goal
 	echo a > file_$goal
 done
 
 function chunks-health-trimmed() {
-	lizardfs-probe chunks-health --porcelain localhost "${info[matocl]}" \
+	saunafs-probe chunks-health --porcelain localhost "${info[matocl]}" \
 		| egrep -o "^... [234AB_]+ (0 )*[1-9]+" \
 		| tr "\n" "|" \
 		| sed 's/|$//'
@@ -43,11 +43,11 @@ output+=([B__]="AVA B__ 3|REP B__ 0 3|DEL B__ 3")
 # files goal back and forth
 for new_goal in "${!output[@]}"; do
 	MESSAGE="Testing goal ${new_goal}"
-	lizardfs setgoal ${new_goal} file_*
+	saunafs setgoal ${new_goal} file_*
 	expect_equals "${output[$new_goal]}" "$(chunks-health-trimmed)"
 	chunks-health-trimmed
 	for old_goal in $goals; do
-		lizardfs setgoal ${old_goal} file_${old_goal}
+		saunafs setgoal ${old_goal} file_${old_goal}
 	done
 	expect_equals "$first_output" "$(chunks-health-trimmed)"
 done
@@ -55,9 +55,9 @@ done
 # Check if the output is fine after chunkserver disconnection and reconnection
 output_without_chunkserver_A=`
 	`"AVA 2 0 1|AVA 3 0 1|AVA 4 0 1|REP 2 0 1|REP 3 0 0 1|REP 4 0 0 0 1|DEL 2 1|DEL 3 1|DEL 4 1"
-lizardfs_chunkserver_daemon 0 stop
+saunafs_chunkserver_daemon 0 stop
 assert_not_equal "$first_output" "$output_without_chunkserver_A"
 assert_eventually_prints "$output_without_chunkserver_A" "chunks-health-trimmed"
-lizardfs_chunkserver_daemon 0 start
+saunafs_chunkserver_daemon 0 start
 assert_eventually_prints "$first_output" "chunks-health-trimmed"
 

@@ -1,7 +1,7 @@
 timeout_set 30 minutes
 
 CHUNKSERVERS=3 \
-	setup_local_empty_lizardfs info
+	setup_local_empty_saunafs info
 
 file_size_mb=1000
 cd "${info[mount0]}"
@@ -9,7 +9,7 @@ cd "${info[mount0]}"
 for goal in 1 2 xor2 xor3; do
 	test_filename=speed_test_file_${goal}
 	touch "$test_filename"
-	lizardfs setgoal $goal "$test_filename"
+	saunafs setgoal $goal "$test_filename"
 
 	# write file and measure time
 	drop_caches

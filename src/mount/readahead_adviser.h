@@ -1,29 +1,33 @@
 /*
+
    Copyright 2016 Skytechnology sp. z o.o.
+   Copyright 2023 Leil Storage OÜ
 
-   This file is part of LizardFS.
+   This file is part of SaunaFS.
 
-   LizardFS is free software: you can redistribute it and/or modify
+   SaunaFS is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, version 3.
 
-   LizardFS is distributed in the hope that it will be useful,
+   SaunaFS is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/platform.h"
 
-#include "common/ring_buffer.h"
-#include "common/time_utils.h"
 #include <array>
 #include <cassert>
+
+#include "common/ring_buffer.h"
+#include "common/time_utils.h"
+#include "mount/sauna_client.h"
 
 /*! Adviser class for readahead mechanism.
  *
@@ -37,10 +41,15 @@ public:
 		uint32_t request_size;
 	};
 
-	ReadaheadAdviser(uint32_t timeout_ms, uint32_t window_size_limit = kDefaultWindowSizeLimit) :
+	static constexpr int kOppositeRequestThreshold = 4;
+
+	ReadaheadAdviser(uint32_t timeout_ms, uint32_t window_size_limit =
+	    SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize * 1024,
+	    int oppositeRequestThreshold = kOppositeRequestThreshold) :
 		current_offset_(),
 		window_(kInitWindowSize),
 		random_candidates_(),
+		oppositeRequestThreshold_(oppositeRequestThreshold),
 		max_window_size_(window_size_limit),
 		window_size_limit_(window_size_limit),
 		random_threshold_(kRandomThreshold),
@@ -52,24 +61,46 @@ public:
 	 * \brief Acknowledge read request and judge whether it is sequential or random.
 	 * \param offset offset of read operation
 	 * \param size size of read operation
+	 * \param is_sequential type of the last request
 	 */
-	void feed(uint64_t offset, uint32_t size) {
+	void feed(uint64_t offset, uint32_t size, bool &is_sequential) {
+		addToHistory(size);
+		is_sequential = difference(offset, current_offset_) <= kErrorThreshold;
+		updateShouldUseReadahead(is_sequential);
+		current_offset_ = offset + size;
+
 		if (timeout_ms_ == 0) {
 			window_ = 0;
 			return;
 		}
-		addToHistory(size);
-		if (offset == current_offset_) {
+
+		if (is_sequential) {
 			random_candidates_ = 0;
 			expand();
-			current_offset_ = offset + size;
 		} else {
 			random_candidates_++;
 			if (looksRandom()) {
 				reduce();
-				current_offset_ = offset + size;
 			}
 		}
+	}
+
+	void feed(uint64_t offset, uint32_t size) {
+		bool dummy;
+		feed(offset, size, dummy);
+	}
+
+	/*!
+	 * \brief Estimation of the size of data requested by the process
+	 * considering the last read requests made.
+	 */
+	uint64_t throughputWindow() {
+		int64_t timestamp = timer_.elapsed_us();
+		double throughput_MBps = static_cast<double>(requested_bytes_) /
+		                         (timestamp - history_.front().timestamp);
+
+		return kConservativeMultiplier * throughput_MBps * timeout_ms_
+		       * kBytesInOneKiB;
 	}
 
 	/*!
@@ -80,14 +111,58 @@ public:
 		return std::min(window_, max_window_size_);
 	}
 
+	/*!
+	 * \brief Update the adviser's internal members for suggesting whether to
+	 * use or not the readahead mechanism. The following rule is applied:
+	 * - after ```oppositeRequestThreshold_``` consecutive sequential reads, if
+	 * the current advise was to not use the readahead mechanism, it is changed
+	 * to use it.
+	 * - after ```oppositeRequestThreshold_``` consecutive non-sequential reads,
+	 * if the current advise was to use the readahead mechanism, it is changed
+	 * to not use it.
+	 */
+	void updateShouldUseReadahead(bool is_sequential) {
+		if (is_sequential == shouldUseReadahead_) {
+			continuousRequestType_ = 0;
+		} else {
+			continuousRequestType_++;
+			if (continuousRequestType_ >= oppositeRequestThreshold_) {
+				continuousRequestType_ = 0;
+				shouldUseReadahead_ = !shouldUseReadahead_;
+			}
+		}
+	}
+
+	/*!
+	 * \brief Return whether it is suggested to use the readahead mechanism.
+	*/
+	bool shouldUseReadahead() const {
+		return shouldUseReadahead_;
+	}
+
 private:
+
+	/*!
+	 * \brief Calculates the absolute difference between two ```uint64_t``` values.
+	 */
+	static uint64_t difference(uint64_t x, uint64_t y) {
+		return x > y ? x - y : y - x;
+	}
+
+	/*!
+	 * \brief Convert from ms to ns.
+	 */
+	static inline int64_t millisecondsToNanoseconds(int64_t valueInMs) {
+		static constexpr int64_t kNanosecondsInOneMillisecond = 1000000;
+		return valueInMs * kNanosecondsInOneMillisecond;
+	}
 
 	/*!
 	 * \brief Check if history entry is not overdue.
 	 * \return true if history entry is overdue
 	 */
 	bool expired(HistoryEntry entry, int64_t timestamp) {
-		return entry.timestamp + kHistoryEntryLifespan_ns < timestamp;
+		return entry.timestamp + millisecondsToNanoseconds(timeout_ms_) < timestamp;
 	}
 
 	/*!
@@ -116,9 +191,12 @@ private:
 	 * \param timestamp time point used for latency estimation
 	 */
 	void adjustMaxWindowSize(int64_t timestamp) {
-		double throughput_MBps = (double)requested_bytes_ / (timestamp - history_.front().timestamp);
+		double throughput_MBps =
+		    (double)requested_bytes_ / (timestamp - history_.front().timestamp);
 		// Max window size is set on the basis of estimated throughput
-		max_window_size_ = std::min<uint64_t>(window_size_limit_, 2 * throughput_MBps * timeout_ms_ * 1024);
+		max_window_size_ = std::min<uint64_t>(
+		    window_size_limit_,
+		    kConservativeMultiplier * throughput_MBps * timeout_ms_ * 1024);
 		max_window_size_ = std::max(max_window_size_, kInitWindowSize);
 	}
 
@@ -154,11 +232,17 @@ private:
 	}
 
 	static const unsigned kInitWindowSize = 1 << 16;
-	static const unsigned kDefaultWindowSizeLimit = 1 << 22;
 	static const int kRandomThreshold = 3;
 	static const int kHistoryEntryLifespan_ns = 1 << 20;
 	static const int kHistoryCapacity = 64;
 	static const unsigned kHistoryValidityThreshold = 3;
+	// This multiplier makes the raw estimation of the throughput window a much
+	// conservative one -- it is much safer to assume the process won't ask more
+	// data than expected.
+	static const int64_t kConservativeMultiplier = 2;
+	static const uint16_t kBytesInOneKiB = 1024;
+	// up to add a command line options for these parameters
+	static const int64_t kErrorThreshold = SFSBLOCKSIZE;
 	static_assert(kHistoryCapacity >= (int)kHistoryValidityThreshold,
 			"History validity threshold must not be greater than history capacity");
 
@@ -166,9 +250,13 @@ private:
 	unsigned window_;
 	int random_candidates_;
 
+	int oppositeRequestThreshold_;
 	unsigned max_window_size_;
 	unsigned window_size_limit_;
 	int random_threshold_;
+
+	int continuousRequestType_ = 0;
+	bool shouldUseReadahead_ = false;
 
 	RingBuffer<HistoryEntry, kHistoryCapacity> history_;
 	uint64_t requested_bytes_;
