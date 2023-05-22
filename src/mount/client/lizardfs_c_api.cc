@@ -16,8 +16,6 @@
    along with LizardFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "common/platform.h"
-
 #include <cassert>
 #include <system_error>
 
@@ -32,7 +30,8 @@
 using namespace lizardfs;
 
 void liz_set_default_init_params(struct liz_init_params *params,
-		const char *host, const char *port, const char *mountpoint) {
+                                 const char *host, const char *port,
+                                 const char *mountpoint) {
 	assert(params != nullptr);
 	params->bind_host = nullptr;
 	params->host = host;
@@ -109,7 +108,8 @@ static void to_entry(const Client::EntryParam &param, liz_entry *entry) {
 	entry->entry_timeout = param.entry_timeout;
 }
 
-static void to_attr_reply(const Client::AttrReply &attr_reply, liz_attr_reply *reply) {
+static void to_attr_reply(const Client::AttrReply &attr_reply,
+                          liz_attr_reply *reply) {
 	assert(reply);
 	reply->attr = attr_reply.attr;
 	reply->attr_timeout = attr_reply.attrTimeout;
@@ -142,7 +142,8 @@ const char *liz_error_string(liz_err_t lizardfs_error_code) {
 
 liz_context_t *liz_create_context() {
 	try {
-		Client::Context *ret = new Client::Context(getuid(), getgid(), getpid(), 0);
+		Client::Context *ret = new Client::Context(getuid(), getgid(),
+		                                           getpid(), 0);
 		return (liz_context_t *)ret;
 	} catch (...) {
 		gLastErrorCode = LIZARDFS_ERROR_OUTOFMEMORY;
@@ -150,7 +151,8 @@ liz_context_t *liz_create_context() {
 	}
 }
 
-liz_context_t *liz_create_user_context(uid_t uid, gid_t gid, pid_t pid, mode_t umask) {
+liz_context_t *liz_create_user_context(uid_t uid, gid_t gid, pid_t pid,
+                                       mode_t umask) {
 	try {
 		Client::Context *ret = new Client::Context(uid, gid, pid, umask);
 		return (liz_context_t *)ret;
@@ -160,8 +162,8 @@ liz_context_t *liz_create_user_context(uid_t uid, gid_t gid, pid_t pid, mode_t u
 	}
 }
 
-void liz_destroy_context(liz_context_t *ctx) {
-	Client::Context *client_ctx = (Client::Context *)ctx;
+void liz_destroy_context(liz_context_t **ctx) {
+	Client::Context *client_ctx = (Client::Context *) *ctx;
 	delete client_ctx;
 }
 
@@ -189,8 +191,9 @@ liz_t *liz_init_with_params(struct liz_init_params *params) {
 	assert(params->sugid_clear_mode >= 0);
 	assert(params->sugid_clear_mode < LIZARDFS_SUGID_CLEAR_MODE_END_);
 
-	Client::FsInitParams init_params(params->bind_host != nullptr ? params->bind_host : "",
-			params->host, params->port, params->mountpoint);
+	Client::FsInitParams init_params(
+	    params->bind_host != nullptr ? params->bind_host : "", params->host,
+	    params->port, params->mountpoint);
 
 	init_params.meta = params->meta;
 	if (params->subfolder != nullptr) {
@@ -200,52 +203,57 @@ liz_t *liz_init_with_params(struct liz_init_params *params) {
 		md5ctx md5_ctx;
 		init_params.password_digest.resize(16);
 		md5_init(&md5_ctx);
-		md5_update(&md5_ctx,(uint8_t *)(params->password), strlen(params->password));
+		md5_update(&md5_ctx,(uint8_t *)(params->password),
+		           strlen(params->password));
 		md5_final(init_params.password_digest.data(), &md5_ctx);
 	} else if (params->md5_pass) {
-		int ret = md5_parse(init_params.password_digest, params->md5_pass);
+		int ret = md5_parse(init_params.password_digest,
+		                    params->md5_pass);
 		if (ret < 0) {
 			gLastErrorCode = LIZARDFS_ERROR_EINVAL;
 			return nullptr;
 		}
 	}
 
-	#define COPY_PARAM(PARAM) do { \
-		static_assert(std::is_same<decltype(init_params.PARAM), decltype(params->PARAM)>::value, \
-			"liz_init_params member incompatible with FsInitParams"); \
-		init_params.PARAM = params->PARAM; \
+#define COPY_PARAM(PARAM)                                              \
+	do {                                                               \
+		static_assert(                                                 \
+		    std::is_same<decltype(init_params.PARAM),                  \
+		                 decltype(params->PARAM)>::value,              \
+		    "liz_init_params member incompatible with FsInitParams");  \
+		init_params.PARAM = params->PARAM;                             \
 	} while (0)
-		COPY_PARAM(do_not_remember_password);
-		COPY_PARAM(delayed_init);
-		COPY_PARAM(report_reserved_period);
-		COPY_PARAM(io_retries);
-		COPY_PARAM(chunkserver_round_time_ms);
-		COPY_PARAM(chunkserver_connect_timeout_ms);
-		COPY_PARAM(chunkserver_wave_read_timeout_ms);
-		COPY_PARAM(total_read_timeout_ms);
-		COPY_PARAM(cache_expiration_time_ms);
-		COPY_PARAM(readahead_max_window_size_kB);
-		COPY_PARAM(prefetch_xor_stripes);
-		COPY_PARAM(bandwidth_overuse);
-		COPY_PARAM(write_cache_size);
-		COPY_PARAM(write_workers);
-		COPY_PARAM(write_window_size);
-		COPY_PARAM(chunkserver_write_timeout_ms);
-		COPY_PARAM(cache_per_inode_percentage);
-		COPY_PARAM(symlink_cache_timeout_s);
-		COPY_PARAM(debug_mode);
-		COPY_PARAM(keep_cache);
-		COPY_PARAM(direntry_cache_timeout);
-		COPY_PARAM(direntry_cache_size);
-		COPY_PARAM(entry_cache_timeout);
-		COPY_PARAM(attr_cache_timeout);
-		COPY_PARAM(mkdir_copy_sgid);
-		init_params.sugid_clear_mode = (SugidClearMode)params->sugid_clear_mode;
-		COPY_PARAM(use_rw_lock);
-		COPY_PARAM(acl_cache_timeout);
-		COPY_PARAM(acl_cache_size);
-		COPY_PARAM(verbose);
-	#undef COPY_PARAM
+	COPY_PARAM(do_not_remember_password);
+	COPY_PARAM(delayed_init);
+	COPY_PARAM(report_reserved_period);
+	COPY_PARAM(io_retries);
+	COPY_PARAM(chunkserver_round_time_ms);
+	COPY_PARAM(chunkserver_connect_timeout_ms);
+	COPY_PARAM(chunkserver_wave_read_timeout_ms);
+	COPY_PARAM(total_read_timeout_ms);
+	COPY_PARAM(cache_expiration_time_ms);
+	COPY_PARAM(readahead_max_window_size_kB);
+	COPY_PARAM(prefetch_xor_stripes);
+	COPY_PARAM(bandwidth_overuse);
+	COPY_PARAM(write_cache_size);
+	COPY_PARAM(write_workers);
+	COPY_PARAM(write_window_size);
+	COPY_PARAM(chunkserver_write_timeout_ms);
+	COPY_PARAM(cache_per_inode_percentage);
+	COPY_PARAM(symlink_cache_timeout_s);
+	COPY_PARAM(debug_mode);
+	COPY_PARAM(keep_cache);
+	COPY_PARAM(direntry_cache_timeout);
+	COPY_PARAM(direntry_cache_size);
+	COPY_PARAM(entry_cache_timeout);
+	COPY_PARAM(attr_cache_timeout);
+	COPY_PARAM(mkdir_copy_sgid);
+	init_params.sugid_clear_mode = (SugidClearMode)params->sugid_clear_mode;
+	COPY_PARAM(use_rw_lock);
+	COPY_PARAM(acl_cache_timeout);
+	COPY_PARAM(acl_cache_size);
+	COPY_PARAM(verbose);
+#undef COPY_PARAM
 
 	if (params->io_limits_config_file != nullptr) {
 		init_params.io_limits_config_file = params->io_limits_config_file;
@@ -261,7 +269,8 @@ liz_t *liz_init_with_params(struct liz_init_params *params) {
 	}
 }
 
-int liz_update_groups(liz_t *instance, liz_context_t *ctx, gid_t *gids, int gid_num) {
+int liz_update_groups(liz_t *instance, liz_context_t *ctx, gid_t *gids,
+                      int gid_num) {
 	Client &client = *(Client *)instance;
 	Client::Context &client_ctx = *(Client::Context *)ctx;
 	Client::Context::GroupsContainer gids_backup(std::move(client_ctx.gids));
@@ -282,8 +291,8 @@ int liz_update_groups(liz_t *instance, liz_context_t *ctx, gid_t *gids, int gid_
 	return 0;
 }
 
-int liz_lookup(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path,
-	       liz_entry *entry) {
+int liz_lookup(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+               const char *path, liz_entry *entry) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::EntryParam entry_param;
@@ -298,8 +307,8 @@ int liz_lookup(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const ch
 	return 0;
 }
 
-int liz_mknod(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path,
-	      mode_t mode, dev_t rdev, liz_entry *entry) {
+int liz_mknod(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+              const char *path, mode_t mode, dev_t rdev, liz_entry *entry) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::EntryParam entry_param;
@@ -314,8 +323,8 @@ int liz_mknod(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const cha
 	return 0;
 }
 
-int liz_link(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz_inode_t parent,
-	      const char *name, struct liz_entry *entry) {
+int liz_link(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+             liz_inode_t parent, const char *name, struct liz_entry *entry) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::EntryParam entry_param;
@@ -329,8 +338,8 @@ int liz_link(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz_inode_t
 	return 0;
 }
 
-int liz_symlink(liz_t *instance, liz_context_t *ctx, const char *link, liz_inode_t parent,
-	      const char *name, struct liz_entry *entry) {
+int liz_symlink(liz_t *instance, liz_context_t *ctx, const char *link,
+                liz_inode_t parent, const char *name, struct liz_entry *entry) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::EntryParam entry_param;
@@ -344,7 +353,8 @@ int liz_symlink(liz_t *instance, liz_context_t *ctx, const char *link, liz_inode
 	return 0;
 }
 
-liz_fileinfo *liz_open(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, int flags) {
+liz_fileinfo *liz_open(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                       int flags) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -353,12 +363,13 @@ liz_fileinfo *liz_open(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, i
 	return fi;
 }
 
-ssize_t liz_read(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo, off_t offset,
-	         size_t size, char *buffer) {
+ssize_t liz_read(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo,
+                 off_t offset, size_t size, char *buffer) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-	auto ret = client.read(context, (Client::FileInfo *)fileinfo, offset, size, ec);
+	auto ret = client.read(context, (Client::FileInfo *)fileinfo, offset,
+	                       size, ec);
 	if (ec) {
 		gLastErrorCode = ec.value();
 		return -1;
@@ -366,12 +377,14 @@ ssize_t liz_read(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo, of
 	return ret.copyToBuffer((uint8_t *)buffer, offset, size);
 }
 
-ssize_t liz_readv(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo, off_t offset,
-	          size_t size, const struct iovec *iov, int iovcnt) {
+ssize_t liz_readv(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo,
+                  off_t offset, size_t size, const struct iovec *iov,
+                  int iovcnt) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-	auto ret = client.read(context, (Client::FileInfo *)fileinfo, offset, size, ec);
+	auto ret = client.read(context, (Client::FileInfo *)fileinfo, offset,
+	                       size, ec);
 	if (ec) {
 		gLastErrorCode = ec.value();
 		return -1;
@@ -381,13 +394,14 @@ ssize_t liz_readv(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo, o
 	return copyIoVec(iov, iovcnt, reply.data(), reply.size());
 }
 
-ssize_t liz_write(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo, off_t offset,
-	          size_t size, const char *buffer){
+ssize_t liz_write(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo,
+                  off_t offset, size_t size, const char *buffer) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-	std::size_t write_ret = client.write(context, (Client::FileInfo *)fileinfo, offset, size,
-	                                     buffer, ec);
+	std::size_t write_ret = client.write(context,
+	                                     (Client::FileInfo *)fileinfo,
+	                                     offset, size, buffer, ec);
 	gLastErrorCode = ec.value();
 	return ec ? -1 : write_ret;
 }
@@ -410,7 +424,7 @@ int liz_flush(liz_t *instance, liz_context_t *ctx, liz_fileinfo *fileinfo) {
 }
 
 int liz_getattr(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
-	        liz_attr_reply *reply) {
+                liz_attr_reply *reply) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::AttrReply r;
@@ -430,7 +444,8 @@ void liz_destroy(liz_t *instance) {
 	delete client;
 }
 
-struct liz_fileinfo *liz_opendir(liz_t *instance, liz_context_t *ctx, liz_inode_t inode) {
+struct liz_fileinfo *liz_opendir(liz_t *instance, liz_context_t *ctx,
+                                 liz_inode_t inode) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -439,8 +454,9 @@ struct liz_fileinfo *liz_opendir(liz_t *instance, liz_context_t *ctx, liz_inode_
 	return fi;
 }
 
-int liz_readdir(liz_t *instance, liz_context_t *ctx, struct liz_fileinfo *fileinfo,
-		off_t offset, size_t max_entries, struct liz_direntry *buf, size_t *num_entries) {
+int liz_readdir(liz_t *instance, liz_context_t *ctx,
+                struct liz_fileinfo *fileinfo, off_t offset, size_t max_entries,
+                struct liz_direntry *buf, size_t *num_entries) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -452,8 +468,9 @@ int liz_readdir(liz_t *instance, liz_context_t *ctx, struct liz_fileinfo *filein
 		return -1;
 	}
 
-	Client::ReadDirReply reply = client.readdir(context, (Client::FileInfo *)fileinfo,
-	                                            offset, max_entries, ec);
+	Client::ReadDirReply reply;
+	reply = client.readdir(context, (Client::FileInfo *)fileinfo, offset,
+	                       max_entries, ec);
 	*num_entries = 0;
 	gLastErrorCode = ec.value();
 	if (ec) {
@@ -506,8 +523,9 @@ int liz_releasedir(liz_t *instance, struct liz_fileinfo *fileinfo) {
 	return ec ? -1 : 0;
 }
 
-static int convert_named_inodes(liz_namedinode_entry *out_entries, uint32_t *num_entries,
-	                     const std::vector<NamedInodeEntry> &input) {
+static int convert_named_inodes(liz_namedinode_entry *out_entries,
+                                uint32_t *num_entries,
+                                const std::vector<NamedInodeEntry> &input) {
 	*num_entries = 0;
 	if (input.empty()) {
 		return 0;
@@ -541,8 +559,10 @@ static int convert_named_inodes(liz_namedinode_entry *out_entries, uint32_t *num
 	return 0;
 }
 
-int liz_readreserved(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint32_t max_entries,
-	             struct liz_namedinode_entry *out_entries, uint32_t *num_entries) {
+int liz_readreserved(liz_t *instance, liz_context_t *ctx, uint32_t offset,
+                     uint32_t max_entries,
+                     struct liz_namedinode_entry *out_entries,
+                     uint32_t *num_entries) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -554,8 +574,9 @@ int liz_readreserved(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint3
 	return convert_named_inodes(out_entries, num_entries, named_inodes);
 }
 
-int liz_readtrash(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint32_t max_entries,
-	          struct liz_namedinode_entry *out_entries, uint32_t *num_entries) {
+int liz_readtrash(liz_t *instance, liz_context_t *ctx, uint32_t offset,
+                  uint32_t max_entries, struct liz_namedinode_entry *out_entries,
+                  uint32_t *num_entries) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -567,14 +588,15 @@ int liz_readtrash(liz_t *instance, liz_context_t *ctx, uint32_t offset, uint32_t
 	return convert_named_inodes(out_entries, num_entries, named_inodes);
 }
 
-void liz_free_namedinode_entries(struct liz_namedinode_entry *entries, uint32_t num_entries) {
+void liz_free_namedinode_entries(struct liz_namedinode_entry *entries,
+                                 uint32_t num_entries) {
 	assert(num_entries > 0);
 	(void)num_entries;
 	delete[] entries->name;
 }
 
-int liz_mkdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path,
-		mode_t mode, struct liz_entry *entry) {
+int liz_mkdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+              const char *path, mode_t mode, struct liz_entry *entry) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::EntryParam entry_param;
@@ -587,7 +609,8 @@ int liz_mkdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const cha
 	return ec ? -1 : 0;
 }
 
-int liz_rmdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path) {
+int liz_rmdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+              const char *path) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -596,13 +619,16 @@ int liz_rmdir(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const cha
 	return ec ? -1 : 0;
 }
 
-int liz_makesnapshot(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz_inode_t dst_parent,
-	             const char *dst_name, int can_overwrite, uint32_t *job_id) {
-	static_assert(sizeof(LizardClient::JobId) <= sizeof(uint32_t), "JobId type too large");
+int liz_makesnapshot(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                     liz_inode_t dst_parent, const char *dst_name,
+                     int can_overwrite, uint32_t *job_id) {
+	static_assert(sizeof(LizardClient::JobId) <= sizeof(uint32_t),
+	              "JobId type too large");
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-	LizardClient::JobId ret = client.makesnapshot(context, inode, dst_parent, dst_name, can_overwrite, ec);
+	LizardClient::JobId ret = client.makesnapshot(context, inode, dst_parent,
+	                                              dst_name, can_overwrite, ec);
 	if (job_id) {
 		*job_id = ret;
 	}
@@ -610,7 +636,8 @@ int liz_makesnapshot(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, liz
 	return ec ? -1 : 0;
 }
 
-int liz_getgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *goal_name) {
+int liz_getgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                char *goal_name) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -625,17 +652,19 @@ int liz_getgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *go
 	return 0;
 }
 
-int liz_setgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, const char *goal_name,
-	        int is_recursive) {
+int liz_setgoal(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                const char *goal_name, int is_recursive) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-	client.setgoal(context, inode, goal_name, is_recursive ? SMODE_RMASK : 0, ec);
+	client.setgoal(context, inode, goal_name,
+	               is_recursive ? SMODE_RMASK : 0, ec);
 	gLastErrorCode = ec.value();
 	return ec ? -1 : 0;
 }
 
-int liz_readlink(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *buf, size_t size) {
+int liz_readlink(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                 char *buf, size_t size) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -648,7 +677,8 @@ int liz_readlink(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, char *b
 	return link.size();
 }
 
-int liz_unlink(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path) {
+int liz_unlink(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+               const char *path) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -666,8 +696,8 @@ int liz_undel(liz_t *instance, liz_context_t *ctx, liz_inode_t inode) {
 	return ec ? -1 : 0;
 }
 
-int liz_setattr(liz_t *instance, liz_context_t *ctx, liz_inode_t inode, struct stat *stbuf,
-	        int to_set, struct liz_attr_reply *reply) {
+int liz_setattr(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
+                struct stat *stbuf, int to_set, struct liz_attr_reply *reply) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::AttrReply r;
@@ -689,8 +719,8 @@ int liz_fsync(liz_t *instance, liz_context_t *ctx, struct liz_fileinfo *fileinfo
 	return ec ? -1 : 0;
 }
 
-int liz_rename(liz_t *instance, liz_context_t *ctx, liz_inode_t parent, const char *path,
-	       liz_inode_t new_parent, const char *new_path) {
+int liz_rename(liz_t *instance, liz_context_t *ctx, liz_inode_t parent,
+               const char *path, liz_inode_t new_parent, const char *new_path) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -712,18 +742,20 @@ int liz_statfs(liz_t *instance, liz_stat_t *buf) {
 	return 0;
 }
 
-int liz_setxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name,
-	         const uint8_t *value, size_t size, int flags) {
-	Client &client = *(Client *)instance;
+int liz_setxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                 const char *name, const uint8_t *value, size_t size,
+                 enum liz_setxattr_mode mode) {
+	Client &client = *(Client *) instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
-	client.setxattr(context, ino, name, std::vector<uint8_t>(value, value + size), flags, ec);
+	client.setxattr(context, ino, name,
+	                std::vector<uint8_t>(value, value + size), mode, ec);
 	gLastErrorCode = ec.value();
 	return ec ? -1 : 0;
 }
 
-int liz_getxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name,
-	         size_t size, size_t *out_size, uint8_t *buf) {
+int liz_getxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                 const char *name, size_t size, size_t *out_size, uint8_t *buf) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -739,8 +771,8 @@ int liz_getxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const cha
 	return 0;
 }
 
-int liz_listxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, size_t size,
-	          size_t *out_size, char *buf) {
+int liz_listxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                  size_t size, size_t *out_size, char *buf) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -756,7 +788,8 @@ int liz_listxattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, size_t s
 	return 0;
 }
 
-int liz_removexattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const char *name) {
+int liz_removexattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+                    const char *name) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
@@ -768,6 +801,21 @@ int liz_removexattr(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const 
 liz_acl_t *liz_create_acl() {
 	try {
 		return (liz_acl_t *)new RichACL;
+	} catch (...) {
+		return nullptr;
+	}
+}
+
+liz_acl_t *liz_create_acl_from_mode(unsigned int mode) {
+	try {
+		RichACL richacl = RichACL::createFromMode(mode, S_ISDIR(mode));
+		RichACL *acl = new RichACL;
+		// Updating the masks
+		acl->setFlags(richacl.getFlags());
+		acl->setOwnerMask(richacl.getOwnerMask());
+		acl->setGroupMask(richacl.getGroupMask());
+		acl->setOtherMask(richacl.getOtherMask());
+		return (liz_acl_t *)acl;
 	} catch (...) {
 		return nullptr;
 	}
@@ -822,7 +870,8 @@ size_t liz_get_acl_size(const liz_acl_t *acl) {
 	return richacl.size();
 }
 
-int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const liz_acl_t *acl) {
+int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+               liz_acl_t *acl) {
 	assert(instance);
 	assert(ctx);
 	assert(acl);
@@ -830,7 +879,7 @@ int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const liz_a
 	Client::Context &context = *(Client::Context *)ctx;
 	std::error_code ec;
 	try {
-		const RichACL &richacl = *(RichACL *)acl;
+		RichACL &richacl = *(RichACL *)acl;
 		client.setacl(context, ino, richacl, ec);
 		gLastErrorCode = ec.value();
 		return ec ? -1 : 0;
@@ -840,7 +889,8 @@ int liz_setacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, const liz_a
 	}
 }
 
-int liz_getacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino, liz_acl_t **acl) {
+int liz_getacl(liz_t *instance, liz_context_t *ctx, liz_inode_t ino,
+               liz_acl_t **acl) {
 	assert(instance);
 	assert(ctx);
 	assert(acl);
@@ -876,8 +926,8 @@ int liz_acl_apply_masks(liz_acl_t *acl, uint32_t owner) {
 }
 
 int liz_get_chunks_info(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
-	                    uint32_t chunk_index, liz_chunk_info_t *buffer, uint32_t buffer_size,
-	                    uint32_t *reply_size) {
+                        uint32_t chunk_index, liz_chunk_info_t *buffer,
+                        uint32_t buffer_size, uint32_t *reply_size) {
 	assert(instance && ctx && buffer && reply_size);
 
 	Client &client = *(Client *)instance;
@@ -891,7 +941,8 @@ int liz_get_chunks_info(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
 	}
 
 	std::error_code ec;
-	auto chunks = client.getchunksinfo(context, inode, chunk_index, buffer_size, ec);
+	auto chunks = client.getchunksinfo(context, inode, chunk_index,
+	                                   buffer_size, ec);
 	gLastErrorCode = ec.value();
 	if (ec) {
 		return -1;
@@ -906,13 +957,15 @@ int liz_get_chunks_info(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
 	std::size_t strings_size = 0;
 	std::size_t parts_table_size = 0;
 	for(const auto &chunk : chunks) {
-		parts_table_size += chunk.chunk_parts.size() * sizeof(liz_chunk_part_info_t);
+		auto chunkPartSize = sizeof(liz_chunk_part_info_t);
+		parts_table_size += chunk.chunk_parts.size() * chunkPartSize;
 		for(const auto &part : chunk.chunk_parts) {
 			strings_size += part.label.size() + 1;
 		}
 	}
 
-	uint8_t *data_buffer = (uint8_t *)std::malloc(parts_table_size + strings_size);
+	auto totalSize = parts_table_size + strings_size;
+	uint8_t *data_buffer = (uint8_t *)std::malloc(totalSize);
 	if (data_buffer == NULL) {
 		gLastErrorCode = LIZARDFS_ERROR_OUTOFMEMORY;
 		return -1;
@@ -944,8 +997,8 @@ int liz_get_chunks_info(liz_t *instance, liz_context_t *ctx, liz_inode_t inode,
 	return 0;
 }
 
-int liz_get_chunkservers_info(liz_t *instance, liz_chunkserver_info_t *servers, uint32_t size,
-	                 uint32_t *reply_size) {
+int liz_get_chunkservers_info(liz_t *instance, liz_chunkserver_info_t *servers,
+                              uint32_t size, uint32_t *reply_size) {
 	Client &client = *(Client *)instance;
 	std::error_code ec;
 
@@ -1004,7 +1057,8 @@ void liz_destroy_chunks_info(liz_chunk_info_t *buffer) {
 }
 
 int liz_setlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
-	      const liz_lock_info *lock, liz_lock_register_interrupt_t handler, void *priv) {
+              const liz_lock_info *lock, liz_lock_register_interrupt_t handler,
+              void *priv) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::FileInfo *fi = (Client::FileInfo *)fileinfo;
@@ -1019,7 +1073,8 @@ int liz_setlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
 	liz_lock_interrupt_info_t interrupt_info;
 	std::function<int(const lzfs_locks::InterruptData &)> lambda;
 	if (handler) {
-		lambda = [&handler, &interrupt_info, priv](const lzfs_locks::InterruptData &data) {
+		lambda = [&handler, &interrupt_info, priv](
+		             const lzfs_locks::InterruptData &data) {
 			interrupt_info.owner = data.owner;
 			interrupt_info.ino = data.ino;
 			interrupt_info.reqid = data.reqid;
@@ -1031,7 +1086,8 @@ int liz_setlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
 	return ec ? -1 : 0;
 }
 
-int liz_getlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo, liz_lock_info *lock) {
+int liz_getlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo,
+              liz_lock_info *lock) {
 	Client &client = *(Client *)instance;
 	Client::Context &context = *(Client::Context *)ctx;
 	Client::FileInfo *fi = (Client::FileInfo *)fileinfo;
@@ -1055,7 +1111,8 @@ int liz_getlk(liz_t *instance, liz_context_t *ctx, liz_fileinfo_t *fileinfo, liz
 	return 0;
 }
 
-int liz_setlk_interrupt(liz_t *instance, const liz_lock_interrupt_info_t *interrupt_info) {
+int liz_setlk_interrupt(liz_t *instance,
+                        const liz_lock_interrupt_info_t *interrupt_info) {
 	if (interrupt_info == nullptr) {
 		return 0;
 	}

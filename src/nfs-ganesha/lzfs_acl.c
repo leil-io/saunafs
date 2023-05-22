@@ -17,44 +17,52 @@
  */
 
 #include "context_wrap.h"
-#include "lzfs_internal.h"
+#include "lzfs_fsal_methods.h"
 
-liz_acl_t *lzfs_int_convert_fsal_acl(const fsal_acl_t *fsal_acl) {
-	liz_acl_t *lzfs_acl = NULL;
+/**
+ * @brief Convert an FSAL ACL to a LizardFS ACL.
+ *
+ * @param[in] fsalACL     FSAL ACL
+ * @param[in] mode        Mode used to create the acl and set POSIX permission flags
+ *
+ * @returns: Converted LizardFS ACL
+ */
+liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
+                                     unsigned int mode) {
+	liz_acl_t *nativeACL = NULL;
 
-	if (!fsal_acl || (!fsal_acl->aces && fsal_acl->naces > 0)) {
+	if (!fsalACL || (!fsalACL->aces && fsalACL->naces > 0)) {
 		return NULL;
 	}
 
-	int count = 0;
-	for (unsigned i = 0; i < fsal_acl->naces; ++i) {
-		fsal_ace_t *fsal_ace = fsal_acl->aces + i;
-		count += (IS_FSAL_ACE_ALLOW(*fsal_ace) || IS_FSAL_ACE_DENY(*fsal_ace)) ? 1 : 0;
-	}
-
-	lzfs_acl = liz_create_acl();
-	if (!lzfs_acl) {
+	nativeACL = liz_create_acl_from_mode(mode);
+	if (!nativeACL) {
 		return NULL;
 	}
 
-	for (unsigned i = 0; i < fsal_acl->naces; ++i) {
-		fsal_ace_t *fsal_ace = fsal_acl->aces + i;
-		if (!(IS_FSAL_ACE_ALLOW(*fsal_ace) || IS_FSAL_ACE_DENY(*fsal_ace))) {
+	for (unsigned int i = 0; i < fsalACL->naces; ++i) {
+		fsal_ace_t *fsalACE = fsalACL->aces + i;
+
+		if (!(IS_FSAL_ACE_ALLOW(*fsalACE) ||
+		      IS_FSAL_ACE_DENY(*fsalACE))) {
 			continue;
 		}
 
 		liz_acl_ace_t ace;
-		ace.flags = fsal_ace->flag & 0xFF;
-		ace.mask = fsal_ace->perm;
-		ace.type = fsal_ace->type;
-		if (IS_FSAL_ACE_GROUP_ID(*fsal_ace)) {
-			ace.id = GET_FSAL_ACE_GROUP(*fsal_ace);
-		} else {
-			ace.id = GET_FSAL_ACE_USER(*fsal_ace);
+		ace.flags = fsalACE->flag & 0xFF;
+		ace.mask  = fsalACE->perm;
+		ace.type  = fsalACE->type;
+
+		if (IS_FSAL_ACE_GROUP_ID(*fsalACE)) {
+			ace.id = GET_FSAL_ACE_GROUP(*fsalACE);
 		}
-		if (IS_FSAL_ACE_SPECIAL_ID(*fsal_ace)) {
+		else {
+			ace.id = GET_FSAL_ACE_USER(*fsalACE);
+		}
+
+		if (IS_FSAL_ACE_SPECIAL_ID(*fsalACE)) {
 			ace.flags |= LIZ_ACL_SPECIAL_WHO;
-			switch (GET_FSAL_ACE_USER(*fsal_ace)) {
+			switch (GET_FSAL_ACE_USER(*fsalACE)) {
 			case FSAL_ACE_SPECIAL_OWNER:
 				ace.id = LIZ_ACL_OWNER_SPECIAL_ID;
 				break;
@@ -65,127 +73,165 @@ liz_acl_t *lzfs_int_convert_fsal_acl(const fsal_acl_t *fsal_acl) {
 				ace.id = LIZ_ACL_EVERYONE_SPECIAL_ID;
 				break;
 			default:
-				LogFullDebug(COMPONENT_FSAL, "Invalid FSAL ACE special id type (%d)",
-				             (int)GET_FSAL_ACE_USER(*fsal_ace));
+				LogFullDebug(COMPONENT_FSAL,
+				             "Invalid FSAL ACE special id type (%d)",
+				             (int)GET_FSAL_ACE_USER(*fsalACE));
 				continue;
 			}
 		}
 
-		liz_add_acl_entry(lzfs_acl, &ace);
+		liz_add_acl_entry(nativeACL, &ace);
 	}
 
-	return lzfs_acl;
+	return nativeACL;
 }
 
-fsal_acl_t *lzfs_int_convert_lzfs_acl(const liz_acl_t *lzfs_acl) {
-	fsal_acl_data_t acl_data;
-	fsal_acl_status_t acl_status;
-	fsal_acl_t *fsal_acl = NULL;
+/**
+ * @brief Convert a LizardFS ACL to an FSAL ACL.
+ *
+ * @param[in] nativeACL     LizardFS ACL
+ *
+ * @returns: Converted FSAL ACL
+ */
+fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
+	fsal_acl_data_t ACLData;
+	fsal_acl_status_t ACLStatus;
+	fsal_acl_t *fsalACL = NULL;
 
-	if (!lzfs_acl) {
+	if (!nativeACL) {
 		return NULL;
 	}
 
-	acl_data.naces = liz_get_acl_size(lzfs_acl);
-	acl_data.aces = (fsal_ace_t *)nfs4_ace_alloc(acl_data.naces);
+	ACLData.naces = liz_get_acl_size(nativeACL);
+	ACLData.aces = (fsal_ace_t *)nfs4_ace_alloc(ACLData.naces);
 
-	if (!acl_data.aces) {
+	if (!ACLData.aces) {
 		return NULL;
 	}
 
-	for (unsigned i = 0; i < acl_data.naces; ++i) {
-		fsal_ace_t *fsal_ace = acl_data.aces + i;
-		liz_acl_ace_t lzfs_ace;
+	for (size_t i = 0; i < ACLData.naces; ++i) {
+		fsal_ace_t *fsalACE = ACLData.aces + i;
+		liz_acl_ace_t nativeACE;
 
-		int rc = liz_get_acl_entry(lzfs_acl, i, &lzfs_ace);
-		(void)rc;
+		int rc = liz_get_acl_entry(nativeACL, i, &nativeACE);
+
+		(void) rc;
 		assert(rc == 0);
 
-		fsal_ace->type = lzfs_ace.type;
-		fsal_ace->flag = lzfs_ace.flags & 0xFF;
-		fsal_ace->iflag = (lzfs_ace.flags & LIZ_ACL_SPECIAL_WHO) ? FSAL_ACE_IFLAG_SPECIAL_ID : 0;
+		fsalACE->type  = nativeACE.type;
+		fsalACE->flag  = nativeACE.flags & 0xFF;
+		fsalACE->iflag = (nativeACE.flags & LIZ_ACL_SPECIAL_WHO) ?
+		            FSAL_ACE_IFLAG_SPECIAL_ID : 0;
+		fsalACE->perm = nativeACE.mask;
 
-		if (IS_FSAL_ACE_GROUP_ID(*fsal_ace)) {
-			fsal_ace->who.gid = lzfs_ace.id;
-		} else {
-			fsal_ace->who.uid = lzfs_ace.id;
+		if (IS_FSAL_ACE_GROUP_ID(*fsalACE)) {
+			fsalACE->who.gid = nativeACE.id;
+		}
+		else {
+			fsalACE->who.uid = nativeACE.id;
 		}
 
-		if (IS_FSAL_ACE_SPECIAL_ID(*fsal_ace)) {
-			switch (lzfs_ace.id) {
+		if (IS_FSAL_ACE_SPECIAL_ID(*fsalACE)) {
+			switch (nativeACE.id) {
 			case LIZ_ACL_OWNER_SPECIAL_ID:
-				fsal_ace->who.uid = FSAL_ACE_SPECIAL_OWNER;
+				fsalACE->who.uid = FSAL_ACE_SPECIAL_OWNER;
 				break;
 			case LIZ_ACL_GROUP_SPECIAL_ID:
-				fsal_ace->who.uid = FSAL_ACE_SPECIAL_GROUP;
+				fsalACE->who.uid = FSAL_ACE_SPECIAL_GROUP;
 				break;
 			case LIZ_ACL_EVERYONE_SPECIAL_ID:
-				fsal_ace->who.uid = FSAL_ACE_SPECIAL_EVERYONE;
+				fsalACE->who.uid = FSAL_ACE_SPECIAL_EVERYONE;
 				break;
 			default:
-				fsal_ace->who.uid = FSAL_ACE_NORMAL_WHO;
-				LogWarn(COMPONENT_FSAL, "Invalid LizardFS ACE special id type (%u)",
-				        (unsigned)lzfs_ace.id);
+				fsalACE->who.uid = FSAL_ACE_NORMAL_WHO;
+				LogWarn(COMPONENT_FSAL,
+				        "Invalid LizardFS ACE special id type (%u)",
+				        (unsigned int)nativeACE.id);
 			}
 		}
 	}
 
-	fsal_acl = nfs4_acl_new_entry(&acl_data, &acl_status);
-	LogDebug(COMPONENT_FSAL, "fsal acl = %p, fsal_acl_status = %u", fsal_acl, acl_status);
-	return fsal_acl;
+	fsalACL = nfs4_acl_new_entry(&ACLData, &ACLStatus);
+	return fsalACL;
 }
 
-fsal_status_t lzfs_int_getacl(struct lzfs_fsal_export *lzfs_export, uint32_t inode,
-                              uint32_t owner_id, fsal_acl_t **fsal_acl) {
-	if (*fsal_acl) {
-		int acl_status = nfs4_acl_release_entry(*fsal_acl);
-		if (acl_status != NFS_V4_ACL_SUCCESS) {
-			LogCrit(COMPONENT_FSAL, "Failed to release old acl, status=%d", acl_status);
-		}
-		*fsal_acl = NULL;
+/**
+ * @brief Get ACL from a file.
+ *
+ * This function returns the FSAL ACL of the file.
+ *
+ * @param[in] export       LizardFS export instance
+ * @param[in] inode        inode of the file
+ * @param[in] ownerId      ownerId of the file
+ * @param[in] fsalACL      Buffer to fill with information
+ *
+ * @returns: FSAL status.
+ */
+fsal_status_t getACL(struct FSExport *export, uint32_t inode,
+                     uint32_t ownerId, fsal_acl_t **fsalACL) {
+	if (*fsalACL) {
+		nfs4_acl_release_entry(*fsalACL);
+		*fsalACL = NULL;
 	}
 
-	liz_acl_t *acl = NULL;
-	int rc = liz_cred_getacl(lzfs_export->lzfs_instance, op_ctx->creds, inode, &acl);
+	liz_acl_t *nativeACL = NULL;
+	int rc = fs_getacl(export->fsInstance, &op_ctx->creds, inode, &nativeACL);
+
 	if (rc < 0) {
-		LogFullDebug(COMPONENT_FSAL, "getacl status=%s export=%" PRIu16 " inode=%" PRIu32,
-		             liz_error_string(liz_last_err()), lzfs_export->export.export_id, inode);
-		return lzfs_fsal_last_err();
+		LogFullDebug(COMPONENT_FSAL,
+		             "getacl status = %s export=%" PRIu16 " inode=%" PRIu32,
+		             liz_error_string(liz_last_err()),
+		             export->export.export_id, inode);
+
+		return fsalLastError();
 	}
 
-	liz_acl_apply_masks(acl, owner_id);
+	liz_acl_apply_masks(nativeACL, ownerId);
 
-	*fsal_acl = lzfs_int_convert_lzfs_acl(acl);
-	liz_destroy_acl(acl);
+	*fsalACL = convertNativeACLToFsalACL(nativeACL);
+	liz_destroy_acl(nativeACL);
 
-	if (*fsal_acl == NULL) {
+	if (*fsalACL == NULL) {
 		LogFullDebug(COMPONENT_FSAL,
-		             "Failed to convert lzfs acl to nfs4 acl, export=%" PRIu16 " inode=%" PRIu32,
-		             lzfs_export->export.export_id, inode);
+		             "Failed to convert lzfs acl to nfs4 acl, export=%"
+		             PRIu16 " inode=%" PRIu32,
+		             export->export.export_id, inode);
 		return fsalstat(ERR_FSAL_FAULT, 0);
 	}
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-fsal_status_t lzfs_int_setacl(struct lzfs_fsal_export *lzfs_export, uint32_t inode,
-                              const fsal_acl_t *fsal_acl) {
-	if (!fsal_acl) {
+/**
+ * @brief Set ACL to a file.
+ *
+ * This function sets the native ACL to a file from the FSAL ACL.
+ *
+ * @param[in] export      LizardFS export instance
+ * @param[in] inode       inode of the file
+ * @param[in] fsalACL     FSAL ACL to set
+ * @param[in] mode        Mode used to create the acl and set POSIX permission flags
+ *
+ * @returns: FSAL status.
+ */
+fsal_status_t setACL(struct FSExport *export, uint32_t inode,
+                     const fsal_acl_t *fsalACL, unsigned int mode) {
+	if (!fsalACL) {
 		return fsalstat(ERR_FSAL_NO_ERROR, 0);
 	}
 
-	liz_acl_t *lzfs_acl = lzfs_int_convert_fsal_acl(fsal_acl);
-	if (!lzfs_acl) {
-		LogFullDebug(COMPONENT_FSAL, "failed to convert acl");
+	liz_acl_t *nativeACL = convertFsalACLToNativeACL(fsalACL, mode);
+
+	if (!nativeACL) {
+		LogFullDebug(COMPONENT_FSAL, "Failed to convert acl");
 		return fsalstat(ERR_FSAL_FAULT, 0);
 	}
-	int rc = liz_cred_setacl(lzfs_export->lzfs_instance, op_ctx->creds, inode, lzfs_acl);
-	liz_destroy_acl(lzfs_acl);
+
+	int rc = fs_setacl(export->fsInstance, &op_ctx->creds, inode, nativeACL);
+	liz_destroy_acl(nativeACL);
 
 	if (rc < 0) {
-		LogFullDebug(COMPONENT_FSAL, "setacl returned %s (%d)", liz_error_string(liz_last_err()),
-		             (int)liz_last_err());
-		return lzfs_fsal_last_err();
+		return fsalLastError();
 	}
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);

@@ -1,9 +1,10 @@
 #
-# To run this test you need to install libntirpc-1.5 and add following
-# line to /etc/sudoers.d/lizardfstest
+# To run this test you need to add the following lines to /etc/sudoers.d/lizardfstest:
 #
-# lizardfstest ALL = NOPASSWD: ALL
+# lizardfstest ALL = NOPASSWD: /bin/mount, /bin/umount, /bin/pkill, /bin/mkdir, /bin/touch
+# lizardfstest ALL = NOPASSWD: /tmp/LizardFS-autotests/mnt/mfs0/bin/ganesha.nfsd
 #
+# The path for the Ganesha daemon should match the installation folder inside the test.
 #
 
 timeout_set 5 minutes
@@ -20,33 +21,47 @@ PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PAR
 
 test_error_cleanup() {
 	for x in 1 2 97 99; do
-		sudo umount $TEMP_DIR/mnt/nfs$x
+		sudo umount -l $TEMP_DIR/mnt/nfs$x
 	done
 	sudo pkill -9 ganesha.nfsd
 }
 
 cd ${info[mount0]}
 
+# Create mountpoints for testing
 mkdir $TEMP_DIR/mnt/nfs{1,2,97,99}
 mkdir ganesha
 
-cp -R "$SOURCE_DIR"/external/nfs-ganesha-2.5-stable nfs-ganesha-2.5-stable
-cp -R "$SOURCE_DIR"/external/ntirpc-1.5 ntirpc-1.5
+# Create PID file for Ganesha
+PID_FILE=/var/run/ganesha/ganesha.pid
+if [ ! -f ${PID_FILE} ]; then
+	echo "ganesha.pid doesn't exists, creating it...";
+	sudo mkdir -p /var/run/ganesha;
+	sudo touch ${PID_FILE};
+else
+	echo "ganesha.pid already exists";
+fi
 
-rm -R nfs-ganesha-2.5-stable/src/libntirpc
-ln -s ../../ntirpc-1.5 nfs-ganesha-2.5-stable/src/libntirpc
+# Copy Ganesha and libntirpc source code
+cp -R "$SOURCE_DIR"/external/nfs-ganesha-4.3 nfs-ganesha-4.3
+cp -R "$SOURCE_DIR"/external/ntirpc-4.3 ntirpc-4.3
 
-mkdir nfs-ganesha-2.5-stable/src/build
-cd nfs-ganesha-2.5-stable/src/build
-CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} ..
+# Remove original libntirpc folder to create a soft link
+rm -R nfs-ganesha-4.3/src/libntirpc
+ln -s ../../ntirpc-4.3 nfs-ganesha-4.3/src/libntirpc
+
+# Create build folder to compile Ganesha
+mkdir nfs-ganesha-4.3/src/build
+cd nfs-ganesha-4.3/src/build
+
+# flag -DUSE_GSS=NO disables the use of Kerberos library when compiling Ganesha
+CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} -DUSE_GSS=NO ..
 make -j${PARALLEL_JOBS} install
-cp ${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs* ${info[mount0]}/lib/ganesha
 
-# mkdir ${info[mount0]}/ntirpc-1.5/build
-# cd ${info[mount0]}/ntirpc-1.5/build
-# CC="ccache gcc" cmake -DCMAKE_INSTALL_PREFIX=${info[mount0]} ..
-# make -j${PARALLEL_JOBS} install
-
+# Copy LizardFS FSAL
+fsal_lizardfs=${LIZARDFS_ROOT}/lib/ganesha/libfsallizardfs.so
+assert_file_exists "$fsal_lizardfs"
+cp ${fsal_lizardfs} ${info[mount0]}/lib/ganesha
 
 cat <<EOF > ${info[mount0]}/etc/ganesha/ganesha.conf
 EXPORT
@@ -145,6 +160,7 @@ file-validate $TEMP_DIR/mnt/nfs1/test1.bin
 file-validate $TEMP_DIR/mnt/nfs2/test2.bin
 file-validate $TEMP_DIR/mnt/nfs99/export1/test1.bin
 file-validate $TEMP_DIR/mnt/nfs99/export2/test2.bin
+
 # Files on export97 are "metadata only", so file validation should fail
 assert_failure file-validate $TEMP_DIR/mnt/nfs97/export1/test1.bin
 assert_failure file-validate $TEMP_DIR/mnt/nfs97/export2/test2.bin

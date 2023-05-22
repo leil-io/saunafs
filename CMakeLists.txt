@@ -37,6 +37,7 @@ option(ENABLE_REQUEST_LOG       "Enable logging request times"                  
 option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"           OFF)
 option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              OFF)
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
+option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                         ON)
 
 
 find_program(CCACHE_FOUND ccache)
@@ -193,6 +194,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64" )
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m64")
 endif()
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  set(LINUX ON)
+  set(UNIX ON)
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+if (LINUX)
+    set(PLATFORM "LINUX")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-strict-aliasing")
+    find_library(LIBDL dl)  # module loader
+endif(LINUX)
+
 if(MINGW)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat=0")
 endif()
@@ -205,7 +219,7 @@ set(CMAKE_CXX_FLAGS_COVERAGE "-O0 -g --coverage")
 set(CMAKE_CXX_FLAGS_CLANG_ANALYZE "--analyze -Xanalyzer -analyzer-output=text")
 set(CMAKE_CXX_FLAGS_CLANG_SANITIZE_THREAD "-g -O0 -fsanitize=thread")
 set(CMAKE_CXX_FLAGS_CXXDEBUG "-O0 -g -D_GLIBCXX_DEBUG")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c17 -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
 add_definitions(-D_LARGEFILE_SOURCE)
 add_definitions(-D_FILE_OFFSET_BITS=64)
@@ -288,6 +302,9 @@ else()
 endif()
 
 set(CHARTS_CSV_CHARTID_BASE 90000)
+
+# Internal capability required by some FSALs
+set(GSH_CAN_HOST_LOCAL_FS ${ENABLE_NFS_GANESHA})
 
 # Create config.h file
 configure_file(config.h.in config.h)

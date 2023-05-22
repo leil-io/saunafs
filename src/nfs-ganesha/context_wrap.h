@@ -16,49 +16,101 @@
    along with LizardFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include <fsal_types.h>
 
-#include "mount/client/lizardfs_c_api.h"
+#include "lzfs_fsal_types.h"
 
-int liz_cred_lookup(liz_t *instance, struct user_cred *cred, liz_inode_t parent, const char *path,
-                    struct liz_entry *entry);
-int liz_cred_mknod(liz_t *instance, struct user_cred *cred, liz_inode_t parent, const char *path,
-                   mode_t mode, dev_t rdev, struct liz_entry *entry);
-liz_fileinfo_t *liz_cred_open(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
-                              int flags);
-ssize_t liz_cred_read(liz_t *instance, struct user_cred *cred, liz_fileinfo_t *fileinfo,
-                      off_t offset, size_t size, char *buffer);
-ssize_t liz_cred_write(liz_t *instance, struct user_cred *cred, liz_fileinfo_t *fileinfo,
-                       off_t offset, size_t size, const char *buffer);
-int liz_cred_flush(liz_t *instance, struct user_cred *cred, liz_fileinfo_t *fileinfo);
-int liz_cred_getattr(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
-                     struct liz_attr_reply *reply);
-liz_fileinfo_t *liz_cred_opendir(liz_t *instance, struct user_cred *cred, liz_inode_t inode);
-int liz_cred_readdir(liz_t *instance, struct user_cred *cred, struct liz_fileinfo *fileinfo,
-                     off_t offset, size_t max_entries, struct liz_direntry *buf,
-                     size_t *num_entries);
-int liz_cred_mkdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent, const char *name,
-                   mode_t mode, struct liz_entry *out_entry);
-int liz_cred_rmdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent, const char *name);
-int liz_cred_unlink(liz_t *instance, struct user_cred *cred, liz_inode_t parent, const char *name);
-int liz_cred_setattr(liz_t *instance, struct user_cred *cred, liz_inode_t inode, struct stat *stbuf,
-                     int to_set, struct liz_attr_reply *reply);
-int liz_cred_fsync(liz_t *instance, struct user_cred *cred, struct liz_fileinfo *fileinfo);
-int liz_cred_rename(liz_t *instance, struct user_cred *cred, liz_inode_t parent, const char *name,
-                    liz_inode_t new_parent, const char *new_name);
-int liz_cred_symlink(liz_t *instance, struct user_cred *cred, const char *link, liz_inode_t parent,
-                     const char *name, struct liz_entry *entry);
-int liz_cred_readlink(liz_t *instance, struct user_cred *cred, liz_inode_t inode, char *buf,
-                      size_t size);
-int liz_cred_link(liz_t *instance, struct user_cred *cred, liz_inode_t inode, liz_inode_t parent,
-                  const char *name, struct liz_entry *entry);
-int liz_cred_get_chunks_info(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
-                             uint32_t chunk_index, liz_chunk_info_t *buffer, uint32_t buffer_size,
-                             uint32_t *reply_size);
-int liz_cred_setacl(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
-                    const liz_acl_t *acl);
-int liz_cred_getacl(liz_t *instance, struct user_cred *cred, liz_inode_t inode, liz_acl_t **acl);
-int liz_cred_setlk(liz_t *instance, struct user_cred *cred, liz_fileinfo_t *fileinfo,
-                   const liz_lock_info_t *lock);
-int liz_cred_getlk(liz_t *instance, struct user_cred *cred, liz_fileinfo_t *fileinfo,
-                   liz_lock_info_t *lock);
+int fs_lookup(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
+              const char *path, struct liz_entry *entry);
+
+int fs_mknode(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
+              const char *path, mode_t mode, dev_t rdev,
+              struct liz_entry *entry);
+
+fileinfo_t *fs_open(liz_t *instance, struct user_cred *cred,
+                    liz_inode_t inode, int flags);
+
+ssize_t fs_read(liz_t *instance, struct user_cred *cred,
+                fileinfo_t *fileinfo, off_t offset,
+                size_t size, char *buffer);
+
+ssize_t fs_write(liz_t *instance, struct user_cred *cred, fileinfo_t *fileinfo,
+                 off_t offset, size_t size, const char *buffer);
+
+int fs_flush(liz_t *instance, struct user_cred *cred, fileinfo_t *fileinfo);
+
+int fs_getattr(liz_t *instance, struct user_cred *cred,
+               liz_inode_t inode, struct liz_attr_reply *reply);
+
+fileinfo_t *fs_opendir(liz_t *instance, struct user_cred *cred,
+                       liz_inode_t inode);
+
+int fs_readdir(liz_t *instance, struct user_cred *cred,
+               struct liz_fileinfo *fileinfo, off_t offset,
+               size_t max_entries, struct liz_direntry *buf,
+               size_t *num_entries);
+
+int fs_mkdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
+             const char *name, mode_t mode, struct liz_entry *out_entry);
+
+int fs_rmdir(liz_t *instance, struct user_cred *cred, liz_inode_t parent,
+             const char *name);
+
+int fs_unlink(liz_t *instance, struct user_cred *cred,
+              liz_inode_t parent, const char *name);
+
+int fs_setattr(liz_t *instance, struct user_cred *cred,
+               liz_inode_t inode, struct stat *stbuf, int to_set,
+               struct liz_attr_reply *reply);
+
+int fs_fsync(liz_t *instance, struct user_cred *cred,
+             struct liz_fileinfo *fileinfo);
+
+int fs_rename(liz_t *instance, struct user_cred *cred,
+              liz_inode_t parent, const char *name,
+              liz_inode_t new_parent, const char *new_name);
+
+int fs_symlink(liz_t *instance, struct user_cred *cred, const char *link,
+               liz_inode_t parent, const char *name,
+               struct liz_entry *entry);
+
+int fs_readlink(liz_t *instance, struct user_cred *cred,
+                liz_inode_t inode, char *buf, size_t size);
+
+int fs_link(liz_t *instance, struct user_cred *cred, liz_inode_t inode,
+            liz_inode_t parent, const char *name,
+            struct liz_entry *entry);
+
+int fs_get_chunks_info(liz_t *instance, struct user_cred *cred,
+                       liz_inode_t inode, uint32_t chunk_index,
+                       liz_chunk_info_t *buffer, uint32_t buffer_size,
+                       uint32_t *reply_size);
+
+int fs_setacl(liz_t *instance, struct user_cred *cred,
+              liz_inode_t inode, liz_acl_t *acl);
+
+int fs_getacl(liz_t *instance, struct user_cred *cred,
+              liz_inode_t inode, liz_acl_t **acl);
+
+int fs_setlk(liz_t *instance, struct user_cred *cred,
+             fileinfo_t *fileinfo, const liz_lock_info_t *lock);
+
+int fs_getlk(liz_t *instance, struct user_cred *cred,
+             fileinfo_t *fileinfo, liz_lock_info_t *lock);
+
+int fs_getxattr(liz_t *instance, struct user_cred *cred,
+                liz_inode_t ino, const char *name,
+                size_t size, size_t *out_size, uint8_t *buf);
+
+int fs_setxattr(liz_t *instance, struct user_cred *cred,
+                liz_inode_t ino, const char *name,
+                const uint8_t *value, size_t size, int flags);
+
+int fs_listxattr(liz_t *instance, struct user_cred *cred,
+                 liz_inode_t ino, size_t size,
+                 size_t *out_size, char *buf);
+
+int fs_removexattr(liz_t *instance, struct user_cred *cred,
+                   liz_inode_t ino, const char *name);
