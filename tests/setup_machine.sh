@@ -56,6 +56,7 @@ fi
 release="$(lsb_release -si)/$(lsb_release -sr)"
 case "$release" in
 	LinuxMint/*|Ubuntu/*|Debian/*)
+		apt-get -y install ca-certificates-java # https://www.mail-archive.com/debian-bugs-dist@lists.debian.org/msg1911078.html
 		apt-get -y install asciidoc build-essential cmake debhelper devscripts git fuse3 libfuse3-dev
 		apt-get -y install libfuse-dev pkg-config zlib1g-dev libboost-program-options-dev
 		apt-get -y install libboost-system-dev acl attr netcat-openbsd pylint python3 rsync
