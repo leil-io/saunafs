@@ -233,10 +233,8 @@ def getTag(version, branchName, commitId = 'HEAD') {
 }
 
 def dockerTryPull(image) {
-    try {
-        docker.image(image).pull()
-    }
-    catch (Exception ex) {
+    def exitCode = sh(script: "docker pull ${image}", returnStatus: true)
+    if (exitCode != 0) {
         println("Catching failure pulling ${image} image")
     }
 }
