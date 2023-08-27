@@ -45,11 +45,10 @@
  *
  * @returns: Valid error codes in RFC 5661, pp. 366-7.
  */
-static nfsstat4 _layoutget(struct fsal_obj_handle *objectHandle,
-                           XDR *xdrStream,
-                           const struct fsal_layoutget_arg *arguments,
-                           struct fsal_layoutget_res *output) {
-	struct FSHandle *handle;
+static nfsstat4 layoutget(struct fsal_obj_handle *objectHandle, XDR *xdrStream,
+                          const struct fsal_layoutget_arg *arguments,
+                          struct fsal_layoutget_res *output) {
+	struct FSHandle *handle = NULL;
 	struct DataServerWire dataServerWire;
 
 	struct gsh_buffdesc dsBufferDescriptor = {
@@ -95,7 +94,6 @@ static nfsstat4 _layoutget(struct fsal_obj_handle *objectHandle,
 	return nfs_status;
 }
 
-
 /**
  * @brief Potentially return one layout segment.
  *
@@ -117,9 +115,9 @@ static nfsstat4 _layoutget(struct fsal_obj_handle *objectHandle,
  *
  * @returns: Valid error codes in RFC 5661, p. 367.
  */
-static nfsstat4 _layoutreturn(struct fsal_obj_handle *objectHandle,
-                              XDR *xdrStream,
-                              const struct fsal_layoutreturn_arg *arguments) {
+static nfsstat4 layoutreturn(struct fsal_obj_handle *objectHandle,
+                             XDR *xdrStream,
+                             const struct fsal_layoutreturn_arg *arguments) {
 	(void) objectHandle;
 	(void) xdrStream;
 
@@ -183,14 +181,14 @@ bool hasRecentModificationTime(const struct fsal_layoutcommit_arg *arguments,
  *
  * @returns: Valid error codes in RFC 5661, p. 366.
  */
-static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
-                              XDR *xdrStream,
-                              const struct fsal_layoutcommit_arg *arguments,
-                              struct fsal_layoutcommit_res *output) {
+static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
+                             XDR *xdrStream,
+                             const struct fsal_layoutcommit_arg *arguments,
+                             struct fsal_layoutcommit_res *output) {
 	(void) xdrStream;
 
-	struct FSExport *export;
-	struct FSHandle *handle;
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	struct liz_attr_reply previousReply;
 
 	// FIXME(haze): Does this function make sense for our implementation ?
@@ -203,10 +201,10 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
-	int rc = fs_getattr(export->fsInstance, &op_ctx->creds,
-	                    handle->inode, &previousReply);
+	int retvalue = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
+	                          &previousReply);
 
-	if (rc < 0) {
+	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to get "
 		        "attributes of file %lli.",
 		        liz_error_string(liz_last_err()),
@@ -216,13 +214,13 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
 	}
 
 	struct stat posixAttributes;
-	int mask = 0;
+	uint64_t mask = 0;
 
 	memset(&posixAttributes, 0, sizeof(posixAttributes));
 
 	if (isOffsetChangedByClient(arguments, previousReply)) {
 		mask |= LIZ_SET_ATTR_SIZE;
-		posixAttributes.st_size = arguments->last_write + 1;
+		posixAttributes.st_size = (__off_t)arguments->last_write + 1;
 		output->size_supplied = true;
 		output->new_size = arguments->last_write + 1;
 	}
@@ -231,13 +229,14 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
 		posixAttributes.st_mtim.tv_sec = arguments->new_time.seconds;
 		posixAttributes.st_mtim.tv_sec = arguments->new_time.nseconds;
 		mask |= LIZ_SET_ATTR_MTIME;
+		mask = (unsigned)mask | LIZ_SET_ATTR_MTIME;
 	}
 
 	liz_attr_reply_t reply;
-	rc = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
-	                &posixAttributes, mask, &reply);
+	retvalue = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+	                      &posixAttributes, (int)mask, &reply);
 
-	if (rc < 0) {
+	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to set attributes "
 		        "of file %lli.", liz_error_string(liz_last_err()),
 		        (long long)handle->inode);
@@ -254,7 +253,7 @@ static nfsstat4 _layoutcommit(struct fsal_obj_handle *objectHandle,
  * @param[in] ops      FSAL object operations vector
  */
 void initializeMetaDataServerOperations(struct fsal_obj_ops *ops) {
-	ops->layoutget = _layoutget;
-	ops->layoutreturn = _layoutreturn;
-	ops->layoutcommit = _layoutcommit;
+	ops->layoutget = layoutget;
+	ops->layoutreturn = layoutreturn;
+	ops->layoutcommit = layoutcommit;
 }

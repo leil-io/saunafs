@@ -30,70 +30,69 @@
 /* FSAL name determines name of shared library: libfsal<name>.so */
 static const char *module_name = "LizardFS";
 
+static const int millisecondsInOneSecond = 1000;
+
 /**
  * my module private storage
  */
 
 struct FSModule LizardFS = {
-	.module = {
-	    .fs_info = {
-	        .maxfilesize = UINT64_MAX,
-	        .maxlink = _POSIX_LINK_MAX,
-	        .maxnamelen = MFS_NAME_MAX,
-	        .maxpathlen = MAXPATHLEN,
-	        .no_trunc = true,
-	        .chown_restricted = false,
-	        .case_insensitive = false,
-	        .case_preserving = true,
-	        .link_support = true,
-	        .symlink_support = true,
-	        .lock_support = true,
-	        .lock_support_async_block = false,
-	        .named_attr = true,
-	        .unique_handles = true,
-        #ifdef ENABLE_NFS_ACL_SUPPORT
-	        .acl_support = FSAL_ACLSUPPORT_ALLOW | FSAL_ACLSUPPORT_DENY,
-        #else
-	        .acl_support = 0,
-        #endif
-	        .cansettime = true,
-	        .homogenous = true,
-	        .supported_attrs = LZFS_SUPPORTED_ATTRS,
-	        .maxread = FSAL_MAXIOSIZE,
-	        .maxwrite = FSAL_MAXIOSIZE,
-	        .umask = 0,
-	        .auth_exportpath_xdev = false,
-	        .pnfs_mds = true,
-	        .pnfs_ds = true,
-	        .fsal_trace = false,
-	        .fsal_grace = false,
-	        .link_supports_permission_checks = true,
-	        .xattr_support = true,
-	    }
-	},
-	.onlyOneUser = false
-};
+    .module = {.fs_info =
+                   {
+                       .maxfilesize = UINT64_MAX,
+                       .maxlink = _POSIX_LINK_MAX,
+                       .maxnamelen = MFS_NAME_MAX,
+                       .maxpathlen = MAXPATHLEN,
+                       .no_trunc = true,
+                       .chown_restricted = false,
+                       .case_insensitive = false,
+                       .case_preserving = true,
+                       .link_support = true,
+                       .symlink_support = true,
+                       .lock_support = true,
+                       .lock_support_async_block = false,
+                       .named_attr = true,
+                       .unique_handles = true,
+#ifdef ENABLE_NFS_ACL_SUPPORT
+                       .acl_support = (unsigned)FSAL_ACLSUPPORT_ALLOW |
+                                      (unsigned)FSAL_ACLSUPPORT_DENY,
+#else
+                       .acl_support = 0,
+#endif
+                       .cansettime = true,
+                       .homogenous = true,
+                       .supported_attrs = LZFS_SUPPORTED_ATTRS,
+                       .maxread = (uint64_t)FSAL_MAXIOSIZE,
+                       .maxwrite = (uint64_t)FSAL_MAXIOSIZE,
+                       .umask = 0,
+                       .auth_exportpath_xdev = false,
+                       .pnfs_mds = true,
+                       .pnfs_ds = true,
+                       .fsal_trace = false,
+                       .fsal_grace = false,
+                       .link_supports_permission_checks = true,
+                       .xattr_support = true,
+                   }},
+    .onlyOneUser = false};
 
 static struct config_item export_params[] = {
-	CONF_ITEM_MODE("umask", 0, fsal_staticfsinfo_t, umask),
-	CONF_ITEM_BOOL("link_support", true, fsal_staticfsinfo_t,
-	               link_support),
-	CONF_ITEM_BOOL("symlink_support", true, fsal_staticfsinfo_t,
-	               symlink_support),
-	CONF_ITEM_BOOL("cansettime", true, fsal_staticfsinfo_t, cansettime),
-	CONF_ITEM_BOOL("auth_xdev_export", false, fsal_staticfsinfo_t,
-	               auth_exportpath_xdev),
-	CONF_ITEM_UI64("maxread", 512, FSAL_MAXIOSIZE, FSAL_MAXIOSIZE,
-	               fsal_staticfsinfo_t, maxread),
-	CONF_ITEM_UI64("maxwrite", 512, FSAL_MAXIOSIZE, FSAL_MAXIOSIZE,
-	               fsal_staticfsinfo_t, maxwrite),
-	CONF_ITEM_BOOL("PNFS_MDS", false, fsal_staticfsinfo_t, pnfs_mds),
-	CONF_ITEM_BOOL("PNFS_DS", false, fsal_staticfsinfo_t, pnfs_ds),
-	CONF_ITEM_BOOL("fsal_trace", true, fsal_staticfsinfo_t, fsal_trace),
-	CONF_ITEM_BOOL("fsal_grace", false, fsal_staticfsinfo_t, fsal_grace),
-	CONF_ITEM_BOOL("only_one_user", false, FSModule, onlyOneUser),
-	CONFIG_EOL
-};
+    CONF_ITEM_MODE("umask", 0, fsal_staticfsinfo_t, umask),
+    CONF_ITEM_BOOL("link_support", true, fsal_staticfsinfo_t, link_support),
+    CONF_ITEM_BOOL("symlink_support", true, fsal_staticfsinfo_t,
+                   symlink_support),
+    CONF_ITEM_BOOL("cansettime", true, fsal_staticfsinfo_t, cansettime),
+    CONF_ITEM_BOOL("auth_xdev_export", false, fsal_staticfsinfo_t,
+                   auth_exportpath_xdev),
+    CONF_ITEM_UI64("maxread", 512, (uint64_t)FSAL_MAXIOSIZE,
+                   (uint64_t)FSAL_MAXIOSIZE, fsal_staticfsinfo_t, maxread),
+    CONF_ITEM_UI64("maxwrite", 512, (uint64_t)FSAL_MAXIOSIZE,
+                   (uint64_t)FSAL_MAXIOSIZE, fsal_staticfsinfo_t, maxwrite),
+    CONF_ITEM_BOOL("PNFS_MDS", false, fsal_staticfsinfo_t, pnfs_mds),
+    CONF_ITEM_BOOL("PNFS_DS", false, fsal_staticfsinfo_t, pnfs_ds),
+    CONF_ITEM_BOOL("fsal_trace", true, fsal_staticfsinfo_t, fsal_trace),
+    CONF_ITEM_BOOL("fsal_grace", false, fsal_staticfsinfo_t, fsal_grace),
+    CONF_ITEM_BOOL("only_one_user", false, FSModule, onlyOneUser),
+    CONFIG_EOL};
 
 static struct config_block export_param = {
 	.dbus_interface_name = "org.ganesha.nfsd.config.fsal.lizardfs",
@@ -105,61 +104,56 @@ static struct config_block export_param = {
 };
 
 static struct config_item fsal_export_params[] = {
-	CONF_ITEM_NOOP("name"),
-	CONF_MAND_STR("hostname", 1, MAXPATHLEN, NULL, FSExport,
-	              initialParameters.host),
-	CONF_ITEM_STR("port", 1, MAXPATHLEN, "9421", FSExport,
-	              initialParameters.port),
-	CONF_ITEM_STR("mountpoint", 1, MAXPATHLEN, "nfs-ganesha",
-	              FSExport, initialParameters.mountpoint),
-	CONF_ITEM_STR("subfolder", 1, MAXPATHLEN, "/", FSExport,
-	              initialParameters.subfolder),
-	CONF_ITEM_BOOL("delayed_init", false, FSExport,
-	               initialParameters.delayed_init),
-	CONF_ITEM_UI32("io_retries", 0, 1024, 30, FSExport,
-	               initialParameters.io_retries),
-	CONF_ITEM_UI32("chunkserver_round_time_ms", 0, 65536, 200,
-	               FSExport, initialParameters.chunkserver_round_time_ms),
-	CONF_ITEM_UI32("chunkserver_connect_timeout_ms", 0, 65536, 2000,
-	               FSExport,
-	               initialParameters.chunkserver_connect_timeout_ms),
-	CONF_ITEM_UI32("chunkserver_wave_read_timeout_ms", 0, 65536, 500,
-	               FSExport,
-	               initialParameters.chunkserver_wave_read_timeout_ms),
-	CONF_ITEM_UI32("total_read_timeout_ms", 0, 65536, 2000,
-	               FSExport, initialParameters.total_read_timeout_ms),
-	CONF_ITEM_UI32("cache_expiration_time_ms", 0, 65536, 1000,
-	               FSExport, initialParameters.cache_expiration_time_ms),
-	CONF_ITEM_UI32("readahead_max_window_size_kB", 0, 65536, 16384,
-	               FSExport, initialParameters.readahead_max_window_size_kB),
-	CONF_ITEM_UI32("write_cache_size", 0, 1024, 64, FSExport,
-	               initialParameters.write_cache_size),
-	CONF_ITEM_UI32("write_workers", 0, 32, 10, FSExport,
-	               initialParameters.write_workers),
-	CONF_ITEM_UI32("write_window_size", 0, 256, 32, FSExport,
-	               initialParameters.write_window_size),
-	CONF_ITEM_UI32("chunkserver_write_timeout_ms", 0, 60000, 5000,
-	               FSExport, initialParameters.chunkserver_write_timeout_ms),
-	CONF_ITEM_UI32("cache_per_inode_percentage", 0, 80, 25,
-	               FSExport, initialParameters.cache_per_inode_percentage),
-	CONF_ITEM_UI32("symlink_cache_timeout_s", 0, 60000, 3600,
-	               FSExport, initialParameters.symlink_cache_timeout_s),
-	CONF_ITEM_BOOL("debug_mode", false, FSExport,
-	               initialParameters.debug_mode),
-	CONF_ITEM_I32("keep_cache", 0, 2, 0, FSExport,
-	              initialParameters.keep_cache),
-	CONF_ITEM_BOOL("verbose", false, FSExport,
-	               initialParameters.verbose),
-	CONF_ITEM_UI32("fileinfo_cache_timeout", 1, 3600, 60, FSExport,
-	               cacheTimeout),
-	CONF_ITEM_UI32("fileinfo_cache_max_size", 100, 1000000, 1000,
-	               FSExport, cacheMaximumSize),
-	CONF_ITEM_STR("password", 1, 128, NULL, FSExport,
-	              initialParameters.password),
-	CONF_ITEM_STR("md5_pass", 32, 32, NULL, FSExport,
-	              initialParameters.md5_pass),
-	CONFIG_EOL
-};
+    CONF_ITEM_NOOP("name"),
+    CONF_MAND_STR("hostname", 1, MAXPATHLEN, NULL, FSExport,
+                  initialParameters.host),
+    CONF_ITEM_STR("port", 1, MAXPATHLEN, "9421", FSExport,
+                  initialParameters.port),
+    CONF_ITEM_STR("mountpoint", 1, MAXPATHLEN, "nfs-ganesha", FSExport,
+                  initialParameters.mountpoint),
+    CONF_ITEM_STR("subfolder", 1, MAXPATHLEN, "/", FSExport,
+                  initialParameters.subfolder),
+    CONF_ITEM_BOOL("delayed_init", false, FSExport,
+                   initialParameters.delayed_init),
+    CONF_ITEM_UI32("io_retries", 0, 1024, 30, FSExport,
+                   initialParameters.io_retries),
+    CONF_ITEM_UI32("chunkserver_round_time_ms", 0, 65536, 200, FSExport,
+                   initialParameters.chunkserver_round_time_ms),
+    CONF_ITEM_UI32("chunkserver_connect_timeout_ms", 0, 65536, 2000, FSExport,
+                   initialParameters.chunkserver_connect_timeout_ms),
+    CONF_ITEM_UI32("chunkserver_wave_read_timeout_ms", 0, 65536, 500, FSExport,
+                   initialParameters.chunkserver_wave_read_timeout_ms),
+    CONF_ITEM_UI32("total_read_timeout_ms", 0, 65536, 2000, FSExport,
+                   initialParameters.total_read_timeout_ms),
+    CONF_ITEM_UI32("cache_expiration_time_ms", 0, 65536, 1000, FSExport,
+                   initialParameters.cache_expiration_time_ms),
+    CONF_ITEM_UI32("readahead_max_window_size_kB", 0, 65536, 16384, FSExport,
+                   initialParameters.readahead_max_window_size_kB),
+    CONF_ITEM_UI32("write_cache_size", 0, 1024, 64, FSExport,
+                   initialParameters.write_cache_size),
+    CONF_ITEM_UI32("write_workers", 0, 32, 10, FSExport,
+                   initialParameters.write_workers),
+    CONF_ITEM_UI32("write_window_size", 0, 256, 32, FSExport,
+                   initialParameters.write_window_size),
+    CONF_ITEM_UI32("chunkserver_write_timeout_ms", 0, 60000, 5000, FSExport,
+                   initialParameters.chunkserver_write_timeout_ms),
+    CONF_ITEM_UI32("cache_per_inode_percentage", 0, 80, 25, FSExport,
+                   initialParameters.cache_per_inode_percentage),
+    CONF_ITEM_UI32("symlink_cache_timeout_s", 0, 60000, 3600, FSExport,
+                   initialParameters.symlink_cache_timeout_s),
+    CONF_ITEM_BOOL("debug_mode", false, FSExport, initialParameters.debug_mode),
+    CONF_ITEM_I32("keep_cache", 0, 2, 0, FSExport,
+                  initialParameters.keep_cache),
+    CONF_ITEM_BOOL("verbose", false, FSExport, initialParameters.verbose),
+    CONF_ITEM_UI32("fileinfo_cache_timeout", 1, 3600, 60, FSExport,
+                   cacheTimeout),
+    CONF_ITEM_UI32("fileinfo_cache_max_size", 100, 1000000, 1000, FSExport,
+                   cacheMaximumSize),
+    CONF_ITEM_STR("password", 1, 128, NULL, FSExport,
+                  initialParameters.password),
+    CONF_ITEM_STR("md5_pass", 32, 32, NULL, FSExport,
+                  initialParameters.md5_pass),
+    CONFIG_EOL};
 
 static struct config_block fsal_export_param_block = {
 	.dbus_interface_name = "org.ganesha.nfsd.config.fsal.lizardfs-export%d",
@@ -192,7 +186,7 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
                                    const struct fsal_up_vector *upcallOperations) {
 	fsal_status_t status;
 	struct fsal_pnfs_ds *pnfsDataServer = NULL;
-	int rc;
+	int retvalue = 0;
 
 	struct FSExport *export = gsh_calloc(1, sizeof(struct FSExport));
 
@@ -203,10 +197,10 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 	liz_set_default_init_params(&export->initialParameters, "", "", "");
 
 	if (parseNode) {
-		rc = load_config_from_node(parseNode, &fsal_export_param_block,
-		                           export, true, errorType);
+		retvalue = load_config_from_node(parseNode, &fsal_export_param_block,
+		                                 export, true, errorType);
 
-		if (rc != 0) {
+		if (retvalue != 0) {
 			LogCrit(COMPONENT_FSAL,
 			        "Failed to parse export configuration for %s",
 			        CTX_FULLPATH(op_ctx));
@@ -243,8 +237,8 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 
 	if (export->isDSEnabled) {
 		export->fileinfoCache = createFileInfoCache(
-		            export->cacheMaximumSize,
-		            export->cacheTimeout * 1000);
+		    export->cacheMaximumSize,
+		    (int)export->cacheTimeout * millisecondsInOneSecond);
 
 		if (export->fileinfoCache == NULL) {
 			LogCrit(COMPONENT_FSAL, "Unable to create fileinfo cache for %s.",
@@ -293,10 +287,10 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 
 	// get attributes for root inode
 	liz_attr_reply_t reply;
-	rc = fs_getattr(export->fsInstance, &op_ctx->creds,
+	retvalue = fs_getattr(export->fsInstance, &op_ctx->creds,
 	                SPECIAL_INODE_ROOT, &reply);
 
-	if (rc < 0) {
+	if (retvalue < 0) {
 		status = fsalLastError();
 
 		if (pnfsDataServer != NULL) {
@@ -316,9 +310,10 @@ static fsal_status_t create_export(struct fsal_module *FSALModule,
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 
 error_pds:
-	if (pnfsDataServer != NULL)
+	if (pnfsDataServer != NULL) {
 		// Return the ref taken by create_fsal_pnfs_ds
 		pnfs_ds_put(pnfsDataServer);
+	}
 
 error:
 	if (export) {
@@ -353,7 +348,7 @@ error:
 static fsal_status_t init_config(struct fsal_module *FSALModule,
                                  config_file_t configFile,
                                  struct config_error_type *errorType) {
-	struct FSModule *myself;
+	struct FSModule *myself = NULL;
 	myself = container_of(FSALModule, struct FSModule, module);
 
 	(void) load_config_from_parse(configFile, &export_param,

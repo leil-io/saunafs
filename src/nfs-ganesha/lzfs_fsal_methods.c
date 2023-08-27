@@ -38,8 +38,9 @@ bool setCredentials(const struct user_cred *creds,
 	bool onlyOneUser = container_of(fsal_module, struct FSModule,
 	                                module)->onlyOneUser;
 
-	if (onlyOneUser)
+	if (onlyOneUser) {
 		return fsal_set_credentials_only_one_user(creds);
+	}
 
 	fsal_set_credentials(creds);
 	return true;
@@ -54,25 +55,25 @@ void restoreGaneshaCredentials(const struct fsal_module *fsal_module) {
 	}
 }
 
-nfsstat4 lizardfsToNfs4Error(int ec) {
-	if (!ec) {
+nfsstat4 lizardfsToNfs4Error(int errorCode) {
+	if (!errorCode) {
 		LogWarn(COMPONENT_FSAL, "appropriate errno not set");
-		ec = EINVAL;
+		errorCode = EINVAL;
 	}
 
-	return posix2nfs4_error(liz_error_conv(ec));
+	return posix2nfs4_error(liz_error_conv(errorCode));
 }
 
-fsal_status_t lizardfsToFsalError(int ec) {
+fsal_status_t lizardfsToFsalError(int errorCode) {
 	fsal_status_t status;
 
-	if (!ec) {
+	if (!errorCode) {
 		LogWarn(COMPONENT_FSAL, "appropriate errno not set");
-		ec = EINVAL;
+		errorCode = EINVAL;
 	}
 
-	status.minor = ec;
-	status.major = posix2fsal_error(liz_error_conv(ec));
+	status.minor = errorCode;
+	status.major = posix2fsal_error(liz_error_conv(errorCode));
 
 	return status;
 }

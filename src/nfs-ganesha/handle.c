@@ -39,8 +39,8 @@
  *
  * @param[in] objectHandle     Handle to release
  */
-static void _release(struct fsal_obj_handle *objectHandle) {
-	struct FSHandle *handle;
+static void release(struct fsal_obj_handle *objectHandle) {
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	if (handle != handle->export->rootHandle) {
@@ -63,21 +63,20 @@ static void _release(struct fsal_obj_handle *objectHandle) {
  *
  * @returns: FSAL status
  */
-static fsal_status_t _lookup(struct fsal_obj_handle *dirHandle,
-                             const char *path,
-                             struct fsal_obj_handle **objectHandle,
-                             struct fsal_attrlist *attributes) {
-	struct FSExport *export;
-	struct FSHandle *directory;
+static fsal_status_t lookup(struct fsal_obj_handle *dirHandle, const char *path,
+                            struct fsal_obj_handle **objectHandle,
+                            struct fsal_attrlist *attributes) {
+	struct FSExport *export = NULL;
+	struct FSHandle *directory = NULL;
 	struct liz_entry node;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	directory = container_of(dirHandle, struct FSHandle, fileHandle);
 
-	int rc = fs_lookup(export->fsInstance, &op_ctx->creds,
-	                   directory->inode, path, &node);
+	int status = fs_lookup(export->fsInstance, &op_ctx->creds, directory->inode,
+	                       path, &node);
 
-	if (rc < 0) {
+	if (status < 0) {
 		return fsalLastError();
 	}
 
@@ -105,31 +104,31 @@ static fsal_status_t _lookup(struct fsal_obj_handle *dirHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
+static fsal_status_t readdir_(struct fsal_obj_handle *dirHandle,
                               fsal_cookie_t *whence, void *dirState,
                               fsal_readdir_cb readdirCb,
                               attrmask_t attributesMask, bool *eof) {
 	static const int batchSize = 100;
 	struct liz_direntry buffer[batchSize];
 
-	struct FSExport *export;
-	struct FSHandle *directory, *handle;
+	struct FSExport *export = NULL;
+	struct FSHandle *directory = NULL;
+	struct FSHandle *handle = NULL;
 
 	struct fsal_attrlist attributes;
 	off_t direntryOffset = 0;
 
-	enum fsal_dir_result result;
-	int rc;
+	enum fsal_dir_result result = DIR_CONTINUE;
+	int status = 0;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	directory = container_of(dirHandle, struct FSHandle, fileHandle);
 
-	liz_context_t *context __attribute__((cleanup(liz_destroy_context)));
+	liz_context_t *context __attribute__((cleanup(liz_destroy_context))) = NULL;
 	context = createFSALContext(export->fsInstance, &op_ctx->creds);
 
-	struct liz_fileinfo *fileDescriptor;
-	fileDescriptor = liz_opendir(export->fsInstance, context,
-	                             directory->inode);
+	struct liz_fileinfo *fileDescriptor = NULL;
+	fileDescriptor = liz_opendir(export->fsInstance, context, directory->inode);
 
 	if (!fileDescriptor) {
 		return fsalLastError();
@@ -140,45 +139,48 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
 	}
 
 	while (1) {
-		size_t i, entries = 0;
+		size_t totalEntries = 0;
+		size_t entry = 0;
 
-		rc = liz_readdir(export->fsInstance, context, fileDescriptor,
-		                 direntryOffset, batchSize, buffer, &entries);
+		status = liz_readdir(export->fsInstance, context, fileDescriptor,
+		                     direntryOffset, batchSize, buffer, &totalEntries);
 
-		if (rc < 0) {
+		if (status < 0) {
 			return fsalLastError();
 		}
 
 		result = DIR_CONTINUE;
-		for (i = 0; i < entries && result != DIR_TERMINATE; ++i) {
-			if (strcmp(buffer[i].name, ".")  == 0 ||
-				strcmp(buffer[i].name, "..") == 0)
+		for (entry = 0; entry < totalEntries && result != DIR_TERMINATE;
+		     ++entry) {
+			if (strcmp(buffer[entry].name, ".")  == 0 ||
+			    strcmp(buffer[entry].name, "..") == 0) {
 				continue;
+			}
 
-			handle = allocateNewHandle(&buffer[i].attr, export);
+			handle = allocateNewHandle(&buffer[entry].attr, export);
 
 			fsal_prepare_attrs(&attributes, attributesMask);
-			posix2fsal_attributes_all(&buffer[i].attr, &attributes);
+			posix2fsal_attributes_all(&buffer[entry].attr, &attributes);
 
-			direntryOffset = buffer[i].next_entry_offset;
+			direntryOffset = buffer[entry].next_entry_offset;
 
-			result = readdirCb(buffer[i].name, &handle->fileHandle,
+			result = readdirCb(buffer[entry].name, &handle->fileHandle,
 			                   &attributes, dirState, direntryOffset + 1);
 
 			fsal_release_attrs(&attributes);
 		}
 
-		liz_destroy_direntry(buffer, entries);
-		*eof = (entries < batchSize) && (i == entries);
+		liz_destroy_direntry(buffer, totalEntries);
+		*eof = (totalEntries < batchSize) && (entry == totalEntries);
 
-		if (result != DIR_CONTINUE || entries < batchSize) {
+		if (result != DIR_CONTINUE || totalEntries < batchSize) {
 			break;
 		}
 	}
 
-	rc = liz_releasedir(export->fsInstance, fileDescriptor);
+	status = liz_releasedir(export->fsInstance, fileDescriptor);
 
-	if (rc < 0) {
+	if (status < 0) {
 		return fsalLastError();
 	}
 
@@ -199,10 +201,10 @@ static fsal_status_t _readdir(struct fsal_obj_handle *dirHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _getattrs(struct fsal_obj_handle *objectHandle,
-                               struct fsal_attrlist *attributes) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static fsal_status_t getattrs(struct fsal_obj_handle *objectHandle,
+                              struct fsal_attrlist *attributes) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	struct liz_attr_reply lzfs_attrs;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
@@ -211,10 +213,10 @@ static fsal_status_t _getattrs(struct fsal_obj_handle *objectHandle,
 	LogFullDebug(COMPONENT_FSAL, " export = %" PRIu16 " inode = %" PRIu32,
 	             export->export.export_id, handle->inode);
 
-	int rc = fs_getattr(export->fsInstance, &op_ctx->creds,
-	                    handle->inode, &lzfs_attrs);
+	int status = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
+	                        &lzfs_attrs);
 
-	if (rc < 0) {
+	if (status < 0) {
 		if (attributes->request_mask & ATTR_RDATTR_ERR) {
 			attributes->valid_mask = ATTR_RDATTR_ERR;
 		}
@@ -224,13 +226,13 @@ static fsal_status_t _getattrs(struct fsal_obj_handle *objectHandle,
 	posix2fsal_attributes_all(&lzfs_attrs.attr, attributes);
 
 #ifdef ENABLE_NFS_ACL_SUPPORT
-	if (attributes->request_mask & ATTR_ACL) {
+	if (attributes->request_mask & (attrmask_t)ATTR_ACL) {
 		fsal_status_t status = getACL(export, handle->inode,
 		                              lzfs_attrs.attr.st_uid,
 		                              &attributes->acl);
 
 		if (!FSAL_IS_ERROR(status)) {
-			attributes->valid_mask |= ATTR_ACL;
+			attributes->valid_mask |= (attrmask_t)ATTR_ACL;
 		}
 	}
 #endif
@@ -251,12 +253,12 @@ static fsal_status_t _getattrs(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _handle_to_wire(const struct fsal_obj_handle *objectHandle,
-                                     uint32_t outputType,
-                                     struct gsh_buffdesc *bufferDescriptor) {
-	(void) outputType;
+static fsal_status_t handle_to_wire(const struct fsal_obj_handle *objectHandle,
+                                    uint32_t outputType,
+                                    struct gsh_buffdesc *bufferDescriptor) {
+	(void)outputType;
 
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	liz_inode_t inode = handle->inode;
@@ -283,9 +285,9 @@ static fsal_status_t _handle_to_wire(const struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static void _handle_to_key(struct fsal_obj_handle *objectHandle,
-                           struct gsh_buffdesc *bufferDescriptor) {
-	struct FSHandle *handle;
+static void handle_to_key(struct fsal_obj_handle *objectHandle,
+                          struct gsh_buffdesc *bufferDescriptor) {
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	bufferDescriptor->addr = &handle->uniqueKey;
@@ -304,10 +306,10 @@ static void _handle_to_key(struct fsal_obj_handle *objectHandle,
  */
 static fsal_status_t openFileDescriptor(struct FSHandle *handle,
                                         fsal_openflags_t openflags,
-                                        struct FSFileDescriptor *fd,
+                                        struct FSFileDescriptor *fileDescriptor,
                                         bool noAccessCheck) {
-	struct FSExport *export;
-	int posixFlags;
+	struct FSExport *export = NULL;
+	int posixFlags = 0;
 
 	fsal2posix_openflags(openflags, &posixFlags);
 	if (noAccessCheck) {
@@ -316,23 +318,23 @@ static fsal_status_t openFileDescriptor(struct FSHandle *handle,
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 
-	LogFullDebug(COMPONENT_FSAL,
-	             "fd = %p fd->fd = %p openflags = %x, posix_flags = %x",
-	             fd, fd->fileDescriptor, openflags, posixFlags);
+	LogFullDebug(
+	    COMPONENT_FSAL, "fd = %p fd->fd = %p openflags = %x, posix_flags = %x",
+	    fileDescriptor, fileDescriptor->fileDescriptor, openflags, posixFlags);
 
-	assert(fd->fileDescriptor == NULL &&
-	       fd->openFlags == FSAL_O_CLOSED && openflags != 0);
+	assert(fileDescriptor->fileDescriptor == NULL &&
+	       fileDescriptor->openFlags == FSAL_O_CLOSED && openflags != 0);
 
-	fd->fileDescriptor = fs_open(export->fsInstance, &op_ctx->creds,
-	                             handle->inode, posixFlags);
+	fileDescriptor->fileDescriptor =
+	    fs_open(export->fsInstance, &op_ctx->creds, handle->inode, posixFlags);
 
-	if (!fd->fileDescriptor) {
+	if (!fileDescriptor->fileDescriptor) {
 		LogFullDebug(COMPONENT_FSAL, "open failed with %s",
 		             liz_error_string(liz_last_err()));
 		return fsalLastError();
 	}
 
-	fd->openFlags = openflags;
+	fileDescriptor->openFlags = openflags;
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
@@ -344,16 +346,18 @@ static fsal_status_t openFileDescriptor(struct FSHandle *handle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t closeFileDescriptor(struct FSHandle *handle,
-                                         struct FSFileDescriptor *fd) {
-	if (fd->fileDescriptor != NULL && fd->openFlags != FSAL_O_CLOSED) {
-		int rc = liz_release(handle->export->fsInstance,
-		                     fd->fileDescriptor);
+static fsal_status_t
+closeFileDescriptor(struct FSHandle *handle,
+                    struct FSFileDescriptor *fileDescriptor) {
+	if (fileDescriptor->fileDescriptor != NULL &&
+	    fileDescriptor->openFlags != FSAL_O_CLOSED) {
+		int status = liz_release(handle->export->fsInstance,
+		                         fileDescriptor->fileDescriptor);
 
-		fd->fileDescriptor = NULL;
-		fd->openFlags = FSAL_O_CLOSED;
+		fileDescriptor->fileDescriptor = NULL;
+		fileDescriptor->openFlags = FSAL_O_CLOSED;
 
-		if (rc < 0) {
+		if (status < 0) {
 			return fsalLastError();
 		}
 	}
@@ -384,11 +388,11 @@ static fsal_status_t openByHandle(struct fsal_obj_handle *objectHandle,
                                   struct fsal_attrlist *attributes,
                                   bool *callerPermissionCheck,
                                   bool afterMknode) {
-	struct FSExport *export;
-	struct FSHandle *handle;
-	struct FSFileDescriptor *fd;
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
+	struct FSFileDescriptor *fileDescriptor = NULL;
 	fsal_status_t status;
-	int posixFlags;
+	int posixFlags = 0;
 
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
@@ -396,8 +400,9 @@ static fsal_status_t openByHandle(struct fsal_obj_handle *objectHandle,
 	PTHREAD_RWLOCK_wrlock(&objectHandle->obj_lock);
 
 	if (state != NULL) {
-		fd = &container_of(state, struct FSFileDescriptorState,
-		                   state)->fileDescriptor;
+		fileDescriptor =
+		    &container_of(state, struct FSFileDescriptorState, state)
+		         ->fileDescriptor;
 
 		// Prepare to take the share reservation, but only if we
 		// are called with a valid state
@@ -416,10 +421,10 @@ static fsal_status_t openByHandle(struct fsal_obj_handle *objectHandle,
 	}
 	else {
 		// We need to use the global file descriptor to continue
-		fd = &handle->fileDescriptor;
+		fileDescriptor = &handle->fileDescriptor;
 	}
 
-	status = openFileDescriptor(handle, openflags, fd, afterMknode);
+	status = openFileDescriptor(handle, openflags, fileDescriptor, afterMknode);
 	if (FSAL_IS_ERROR(status)) {
 		if (state != NULL) {
 			goto undo_share;
@@ -438,10 +443,10 @@ static fsal_status_t openByHandle(struct fsal_obj_handle *objectHandle,
 	if (isValidFile) {
 		struct liz_attr_reply lzfs_attrs;
 
-		int rc = fs_getattr(export->fsInstance, &op_ctx->creds,
-		                    handle->inode, &lzfs_attrs);
+		int retvalue = fs_getattr(export->fsInstance, &op_ctx->creds,
+		                          handle->inode, &lzfs_attrs);
 
-		if (rc == 0) {
+		if (retvalue == 0) {
 			LogFullDebug(COMPONENT_FSAL, "New size = %" PRIx64,
 			             (int64_t)lzfs_attrs.attr.st_size);
 		}
@@ -482,7 +487,7 @@ static fsal_status_t openByHandle(struct fsal_obj_handle *objectHandle,
 		return status;
 	}
 
-	closeFileDescriptor(handle, fd);
+	closeFileDescriptor(handle, fileDescriptor);
 
 undo_share:
 	// On error we need to release our share reservation
@@ -568,22 +573,18 @@ static fsal_status_t openByName(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _open2(struct fsal_obj_handle *objectHandle,
-                            struct state_t *state,
-                            fsal_openflags_t openflags,
-                            enum fsal_create_mode createmode,
-                            const char *name,
-                            struct fsal_attrlist *attributesToSet,
-                            fsal_verifier_t verifier,
-                            struct fsal_obj_handle **createdObject,
-                            struct fsal_attrlist *attributes,
-                            bool *callerPermissionCheck) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static fsal_status_t
+open2(struct fsal_obj_handle *objectHandle, struct state_t *state,
+      fsal_openflags_t openflags, enum fsal_create_mode createmode,
+      const char *name, struct fsal_attrlist *attributesToSet,
+      fsal_verifier_t verifier, struct fsal_obj_handle **createdObject,
+      struct fsal_attrlist *attributes, bool *callerPermissionCheck) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	fsal_status_t status;
 
-	LogAttrlist(COMPONENT_FSAL, NIV_FULL_DEBUG, "attrs ",
-	            attributesToSet, false);
+	LogAttrlist(COMPONENT_FSAL, NIV_FULL_DEBUG, "attrs ", attributesToSet,
+	            false);
 
 	if (createmode >= FSAL_EXCLUSIVE) {
 		// Now fixup attrs for verifier if exclusive create
@@ -592,8 +593,7 @@ static fsal_status_t _open2(struct fsal_obj_handle *objectHandle,
 
 	if (name == NULL) {
 		return openByHandle(objectHandle, state, openflags, createmode,
-		                    verifier, attributes,
-		                    callerPermissionCheck, false);
+		                    verifier, attributes, callerPermissionCheck, false);
 	}
 
 	if (createmode == FSAL_NO_CREATE) {
@@ -610,27 +610,26 @@ static fsal_status_t _open2(struct fsal_obj_handle *objectHandle,
 	        ~op_ctx->fsal_export->exp_ops.fs_umask(op_ctx->fsal_export);
 
 	// Don't set the mode if we later set the attributes
-	FSAL_UNSET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_UNSET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 
 	struct liz_entry fsAttributes;
-	int rc = fs_mknode(export->fsInstance, &op_ctx->creds, handle->inode,
-	                   name, unix_mode, 0, &fsAttributes);
+	int retval = fs_mknode(export->fsInstance, &op_ctx->creds, handle->inode,
+	                       name, unix_mode, 0, &fsAttributes);
 
-	if (rc < 0 && liz_last_err() == LIZARDFS_ERROR_EEXIST &&
+	if (retval < 0 && liz_last_err() == LIZARDFS_ERROR_EEXIST &&
 		createmode == FSAL_UNCHECKED) {
 		return openByName(objectHandle, state, openflags, name, verifier,
 		                  attributes, callerPermissionCheck);
 	}
 
-	if (rc < 0) {
+	if (retval < 0) {
 		return fsalLastError();
 	}
 
 	// File has been created by us.
 	*callerPermissionCheck = false;
 
-	struct FSHandle *newHandle;
-	newHandle = allocateNewHandle(&fsAttributes.attr, export);
+	struct FSHandle *newHandle = allocateNewHandle(&fsAttributes.attr, export);
 	if (newHandle == NULL) {
 		status = fsalstat(posix2fsal_error(ENOMEM), ENOMEM);
 		goto fileerr;
@@ -639,9 +638,8 @@ static fsal_status_t _open2(struct fsal_obj_handle *objectHandle,
 	*createdObject = &newHandle->fileHandle;
 
 	if (attributesToSet->valid_mask != 0) {
-		status = (*createdObject)->obj_ops->setattr2(*createdObject,
-		                                             false, state,
-		                                             attributesToSet);
+		status = (*createdObject)->obj_ops->setattr2(*createdObject, false,
+		                                             state, attributesToSet);
 		if (FSAL_IS_ERROR(status)) {
 			goto fileerr;
 		}
@@ -670,9 +668,9 @@ fileerr:
 	(*createdObject)->obj_ops->release(*createdObject);
 	*createdObject = NULL;
 
-	rc = fs_unlink(export->fsInstance, &op_ctx->creds, handle->inode, name);
+	retval = fs_unlink(export->fsInstance, &op_ctx->creds, handle->inode, name);
 
-	if (rc < 0) {
+	if (retval < 0) {
 		return fsalLastError();
 	}
 
@@ -691,11 +689,10 @@ fileerr:
 static fsal_status_t openFunction(struct fsal_obj_handle *objectHandle,
                                   fsal_openflags_t openflags,
                                   struct fsal_fd *fileDescriptor) {
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 	return openFileDescriptor(handle, openflags,
-	                          (struct FSFileDescriptor *)fileDescriptor,
-	                          true);
+	                          (struct FSFileDescriptor *)fileDescriptor, true);
 }
 
 /**
@@ -708,7 +705,7 @@ static fsal_status_t openFunction(struct fsal_obj_handle *objectHandle,
  */
 static fsal_status_t closeFunction(struct fsal_obj_handle *objectHandle,
                                    struct fsal_fd *fileDescriptor) {
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 	return closeFileDescriptor(handle,
 	                           (struct FSFileDescriptor *)fileDescriptor);
@@ -736,10 +733,11 @@ static fsal_status_t closeFunction(struct fsal_obj_handle *objectHandle,
 static fsal_status_t findFileDescriptor(struct FSFileDescriptor *fileDescriptor,
                                         struct fsal_obj_handle *objectHandle,
                                         bool bypass, struct state_t *state,
-                                        fsal_openflags_t openflags, bool *hasLock,
+                                        fsal_openflags_t openflags,
+                                        bool *hasLock,
                                         bool *closeFileDescriptor,
                                         bool openForLocks) {
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	struct FSFileDescriptor emptyFileDescriptor = {0, NULL};
@@ -776,36 +774,35 @@ static fsal_status_t findFileDescriptor(struct FSFileDescriptor *fileDescriptor,
  * @param [in,out] readArg          Info about read, passed back in callback
  * @param [in,out] callerArg        Opaque arg from the caller for callback
  */
-static void _read2(struct fsal_obj_handle *objectHandle,
-                   bool bypass, fsal_async_cb doneCb,
-                   struct fsal_io_arg *readArg, void *callerArg) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static void read2(struct fsal_obj_handle *objectHandle, bool bypass,
+                  fsal_async_cb doneCb, struct fsal_io_arg *readArg,
+                  void *callerArg) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	struct FSFileDescriptor fileDescriptor;
 	fsal_status_t status;
 
 	bool hasLock = false;
 	bool closeFd = false;
-	ssize_t bytes;
+	ssize_t bytes = 0;
 	uint64_t offset = readArg->offset;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
-	LogFullDebug(COMPONENT_FSAL, "export = %" PRIu16 " inode = %" PRIu32
-	             " offset=%" PRIu64, export->export.export_id,
-	             handle->inode, offset);
+	LogFullDebug(COMPONENT_FSAL,
+	             "export = %" PRIu16 " inode = %" PRIu32 " offset=%" PRIu64,
+	             export->export.export_id, handle->inode, offset);
 
 	if (readArg->info != NULL) {
 		// Currently we don't support READ_PLUS
-		doneCb(objectHandle, fsalstat(ERR_FSAL_NOTSUPP, 0),
-		       readArg, callerArg);
+		doneCb(objectHandle, fsalstat(ERR_FSAL_NOTSUPP, 0), readArg, callerArg);
 		return;
 	}
 
 	status = findFileDescriptor(&fileDescriptor, objectHandle, bypass,
-	                            readArg->state, FSAL_O_READ, &hasLock,
-	                            &closeFd, false);
+	                            readArg->state, FSAL_O_READ, &hasLock, &closeFd,
+	                            false);
 
 	if (FSAL_IS_ERROR(status)) {
 		goto out;
@@ -859,13 +856,14 @@ out:
  *
  * @returns: FSAL status
  */
-static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
+static fsal_status_t mkdir_(struct fsal_obj_handle *directoryHandle,
                             const char *name,
                             struct fsal_attrlist *attributesToSet,
                             struct fsal_obj_handle **createdObject,
                             struct fsal_attrlist *attributes) {
-	struct FSExport *export;
-	struct FSHandle *directory, *handle;
+	struct FSExport *export = NULL;
+	struct FSHandle *directory = NULL;
+	struct FSHandle *handle = NULL;
 	struct liz_entry directoryEntry;
 	fsal_status_t status;
 
@@ -880,22 +878,21 @@ static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
 	mode_t unix_mode = fsal2unix_mode(attributesToSet->mode) &
 	        ~op_ctx->fsal_export->exp_ops.fs_umask(op_ctx->fsal_export);
 
-	int rc = fs_mkdir(export->fsInstance, &op_ctx->creds, directory->inode,
-	                  name, unix_mode, &directoryEntry);
+	int retvalue = fs_mkdir(export->fsInstance, &op_ctx->creds,
+	                        directory->inode, name, unix_mode, &directoryEntry);
 
-	if (rc < 0) {
+	if (retvalue < 0) {
 		return fsalLastError();
 	}
 
 	handle = allocateNewHandle(&directoryEntry.attr, export);
 	*createdObject = &handle->fileHandle;
 
-	FSAL_UNSET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_UNSET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 
 	if (attributesToSet->valid_mask) {
-		status = (*createdObject)->obj_ops->setattr2(*createdObject,
-		                                             false, NULL,
-		                                             attributesToSet);
+		status = (*createdObject)->obj_ops->setattr2(*createdObject, false,
+		                                             NULL, attributesToSet);
 
 		if (FSAL_IS_ERROR(status)) {
 			LogFullDebug(COMPONENT_FSAL, "setattr2 status=%s",
@@ -909,8 +906,7 @@ static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
 			// We ignore errors here. The mkdir and setattr succeeded,
 			// so we don't want to return error if the getattrs fails.
 			// We'll just return no attributes in that case.
-			(*createdObject)->obj_ops->getattrs(*createdObject,
-			                                    attributes);
+			(*createdObject)->obj_ops->getattrs(*createdObject, attributes);
 		}
 	}
 	else if (attributes != NULL) {
@@ -920,7 +916,7 @@ static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
 		posix2fsal_attributes_all(&directoryEntry.attr, attributes);
 	}
 
-	FSAL_SET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_SET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
@@ -935,11 +931,12 @@ static fsal_status_t _mkdir(struct fsal_obj_handle *directoryHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _link(struct fsal_obj_handle *objectHandle,
+static fsal_status_t link_(struct fsal_obj_handle *objectHandle,
                            struct fsal_obj_handle *destinationDirHandle,
                            const char *name) {
-	struct FSExport *export;
-	struct FSHandle *handle, *dest_directory;
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
+	struct FSHandle *dest_directory = NULL;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
@@ -953,10 +950,10 @@ static fsal_status_t _link(struct fsal_obj_handle *objectHandle,
 	             handle->inode, dest_directory->inode, name);
 
 	liz_entry_t entry;
-	int rc = fs_link(export->fsInstance, &op_ctx->creds, handle->inode,
-	                 dest_directory->inode, name, &entry);
+	int retvalue = fs_link(export->fsInstance, &op_ctx->creds, handle->inode,
+	                       dest_directory->inode, name, &entry);
 
-	if (rc < 0) {
+	if (retvalue < 0) {
 		return fsalLastError();
 	}
 
@@ -976,13 +973,15 @@ static fsal_status_t _link(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _rename(struct fsal_obj_handle *objectHandle,
+static fsal_status_t rename_(struct fsal_obj_handle *objectHandle,
                              struct fsal_obj_handle *oldParentHandle,
                              const char *oldName,
                              struct fsal_obj_handle *newParentHandle,
                              const char *newName) {
-	struct FSExport *export;
-	struct FSHandle *oldDir, *newDir;
+	(void)objectHandle;
+	struct FSExport *export = NULL;
+	struct FSHandle *oldDir = NULL;
+	struct FSHandle *newDir = NULL;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	oldDir = container_of(oldParentHandle, struct FSHandle, fileHandle);
@@ -993,10 +992,10 @@ static fsal_status_t _rename(struct fsal_obj_handle *objectHandle,
 	             export->export.export_id, oldDir->inode,
 	             newDir->inode, oldName, newName);
 
-	int rc = fs_rename(export->fsInstance, &op_ctx->creds, oldDir->inode,
-	                   oldName, newDir->inode, newName);
+	int status = fs_rename(export->fsInstance, &op_ctx->creds, oldDir->inode,
+	                       oldName, newDir->inode, newName);
 
-	if (rc < 0) {
+	if (status < 0) {
 		return fsalLastError();
 	}
 
@@ -1015,12 +1014,12 @@ static fsal_status_t _rename(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _unlink(struct fsal_obj_handle *directoryHandle,
+static fsal_status_t unlink_(struct fsal_obj_handle *directoryHandle,
                              struct fsal_obj_handle *objectHandle,
                              const char *name) {
-	struct FSExport *export;
-	struct FSHandle *directory;
-	int rc;
+	struct FSExport *export = NULL;
+	struct FSHandle *directory = NULL;
+	int status = 0;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	directory = container_of(directoryHandle, struct FSHandle, fileHandle);
@@ -1031,15 +1030,15 @@ static fsal_status_t _unlink(struct fsal_obj_handle *directoryHandle,
 	             object_file_type_to_str(objectHandle->type));
 
 	if (objectHandle->type != DIRECTORY) {
-		rc = fs_unlink(export->fsInstance, &op_ctx->creds,
-		               directory->inode, name);
+		status = fs_unlink(export->fsInstance, &op_ctx->creds, directory->inode,
+		                   name);
 	}
 	else {
-		rc = fs_rmdir(export->fsInstance, &op_ctx->creds,
-		              directory->inode, name);
+		status = fs_rmdir(export->fsInstance, &op_ctx->creds, directory->inode,
+		                  name);
 	}
 
-	if (rc < 0) {
+	if (status < 0) {
 		return fsalLastError();
 	}
 
@@ -1056,9 +1055,9 @@ static fsal_status_t _unlink(struct fsal_obj_handle *directoryHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _close(struct fsal_obj_handle *objectHandle) {
+static fsal_status_t close_(struct fsal_obj_handle *objectHandle) {
 	fsal_status_t status;
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	LogFullDebug(COMPONENT_FSAL, "export=%" PRIu16 " inode=%" PRIu32,
@@ -1066,10 +1065,12 @@ static fsal_status_t _close(struct fsal_obj_handle *objectHandle) {
 
 	PTHREAD_RWLOCK_wrlock(&objectHandle->obj_lock);
 
-	if (handle->fileDescriptor.openFlags == FSAL_O_CLOSED)
+	if (handle->fileDescriptor.openFlags == FSAL_O_CLOSED) {
 		status = fsalstat(ERR_FSAL_NOT_OPENED, 0);
-	else
+	}
+	else {
 		status = closeFileDescriptor(handle, &handle->fileDescriptor);
+	}
 
 	PTHREAD_RWLOCK_unlock(&objectHandle->obj_lock);
 
@@ -1094,19 +1095,18 @@ static fsal_status_t _close(struct fsal_obj_handle *objectHandle) {
  * @param [in,out] writeArg         Info about write, passed back in callback
  * @param [in,out] callerArg        Opaque arg from the caller for callback
  */
-static void _write2(struct fsal_obj_handle *objectHandle,
-                    bool bypass, fsal_async_cb doneCb,
-                    struct fsal_io_arg *writeArg,
-                    void *callerArg) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static void write2(struct fsal_obj_handle *objectHandle, bool bypass,
+                   fsal_async_cb doneCb, struct fsal_io_arg *writeArg,
+                   void *callerArg) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	struct FSFileDescriptor fileDescriptor;
 
 	fsal_status_t status;
 	bool hasLock = false;
 	bool closeFd = false;
 
-	ssize_t bytes;
+	ssize_t bytes = 0;
 	uint64_t offset = writeArg->offset;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
@@ -1117,8 +1117,9 @@ static void _write2(struct fsal_obj_handle *objectHandle,
 	             handle->inode, offset);
 
 	if (writeArg->info) {
-		return doneCb(objectHandle, fsalstat(ERR_FSAL_NOTSUPP, 0),
-		              writeArg, callerArg);
+		doneCb(objectHandle, fsalstat(ERR_FSAL_NOTSUPP, 0), writeArg,
+		       callerArg);
+		return;
 	}
 
 	status = findFileDescriptor(&fileDescriptor, objectHandle, bypass,
@@ -1142,11 +1143,10 @@ static void _write2(struct fsal_obj_handle *objectHandle,
 		else {
 			writeArg->io_amount = bytes;
 			if (writeArg->fsal_stable) {
-				int rc = fs_fsync(export->fsInstance,
-				                  &op_ctx->creds,
-				                  fileDescriptor.fileDescriptor);
+				int retvalue = fs_fsync(export->fsInstance, &op_ctx->creds,
+				                        fileDescriptor.fileDescriptor);
 
-				if (rc < 0) {
+				if (retvalue < 0) {
 					status = fsalLastError();
 				}
 			}
@@ -1182,10 +1182,10 @@ out:
  *
  * @returns: FSAL status
  */
-static fsal_status_t _commit2(struct fsal_obj_handle *objectHandle,
-                              off_t offset, size_t length) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static fsal_status_t commit2(struct fsal_obj_handle *objectHandle, off_t offset,
+                             size_t length) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 
 	struct FSFileDescriptor emptyFileDescriptor = {0, NULL};
 	struct FSFileDescriptor *fileDescriptor = &emptyFileDescriptor;
@@ -1208,19 +1208,19 @@ static fsal_status_t _commit2(struct fsal_obj_handle *objectHandle,
 	                         &hasLock, &closeFd);
 
 	if (!FSAL_IS_ERROR(status)) {
-		int rc = fs_fsync(export->fsInstance, &op_ctx->creds,
-		                  fileDescriptor->fileDescriptor);
+		int retvalue = fs_fsync(export->fsInstance, &op_ctx->creds,
+		                        fileDescriptor->fileDescriptor);
 
-		if (rc < 0) {
+		if (retvalue < 0) {
 			status = fsalLastError();
 		}
 	}
 
 	if (closeFd) {
-		int rc = liz_release(export->fsInstance,
-		                     fileDescriptor->fileDescriptor);
+		int retvalue =
+		    liz_release(export->fsInstance, fileDescriptor->fileDescriptor);
 
-		if (rc < 0) {
+		if (retvalue < 0) {
 			status = fsalLastError();
 		}
 	}
@@ -1250,11 +1250,11 @@ static fsal_status_t _commit2(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _setattr2(struct fsal_obj_handle *objectHandle,
-                               bool bypass, struct state_t *state,
-                               struct fsal_attrlist *attributes) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static fsal_status_t setattr2(struct fsal_obj_handle *objectHandle, bool bypass,
+                              struct state_t *state,
+                              struct fsal_attrlist *attributes) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 
 	bool hasLock = false;
 	bool closeFd = false;
@@ -1265,12 +1265,12 @@ static fsal_status_t _setattr2(struct fsal_obj_handle *objectHandle,
 
 	LogAttrlist(COMPONENT_FSAL, NIV_FULL_DEBUG, "attrs ", attributes, false);
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_MODE)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_MODE)) {
 		attributes->mode &=
 		        ~op_ctx->fsal_export->exp_ops.fs_umask(op_ctx->fsal_export);
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_SIZE)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_SIZE)) {
 		if (objectHandle->type != REGULAR_FILE) {
 			LogFullDebug(COMPONENT_FSAL,
 			             "Setting size on non-regular file");
@@ -1291,46 +1291,46 @@ static fsal_status_t _setattr2(struct fsal_obj_handle *objectHandle,
 	}
 
 	struct stat posixAttributes;
-	int mask = 0;
+	uint mask = 0;
 	memset(&posixAttributes, 0, sizeof(posixAttributes));
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_SIZE)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_SIZE)) {
 		mask |= LIZ_SET_ATTR_SIZE;
 		posixAttributes.st_size = attributes->filesize;
 		LogFullDebug(COMPONENT_FSAL, "setting size to %lld",
 		             (long long)posixAttributes.st_size);
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_MODE)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_MODE)) {
 		mask |= LIZ_SET_ATTR_MODE;
 		posixAttributes.st_mode = fsal2unix_mode(attributes->mode);
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_OWNER)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_OWNER)) {
 		mask |= LIZ_SET_ATTR_UID;
 		posixAttributes.st_uid = attributes->owner;
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_GROUP)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_GROUP)) {
 		mask |= LIZ_SET_ATTR_GID;
 		posixAttributes.st_gid = attributes->group;
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_ATIME)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_ATIME)) {
 		mask |= LIZ_SET_ATTR_ATIME;
 		posixAttributes.st_atim = attributes->atime;
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_ATIME_SERVER)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_ATIME_SERVER)) {
 		mask |= LIZ_SET_ATTR_ATIME_NOW;
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_MTIME)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_MTIME)) {
 		mask |= LIZ_SET_ATTR_MTIME;
 		posixAttributes.st_mtim = attributes->mtime;
 	}
 
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_MTIME_SERVER)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_MTIME_SERVER)) {
 		mask |= LIZ_SET_ATTR_MTIME_NOW;
 	}
 
@@ -1344,7 +1344,7 @@ static fsal_status_t _setattr2(struct fsal_obj_handle *objectHandle,
 	}
 
 #ifdef ENABLE_NFS_ACL_SUPPORT
-	if (FSAL_TEST_MASK(attributes->valid_mask, ATTR_ACL)) {
+	if (FSAL_TEST_MASK(attributes->valid_mask, (attrmask_t)ATTR_ACL)) {
 		status = setACL(export, handle->inode, attributes->acl,
 		                reply.attr.st_mode);
 	}
@@ -1370,9 +1370,9 @@ out:
  *
  * @returns: FSAL status
  */
-static fsal_status_t _close2(struct fsal_obj_handle *objectHandle,
-                             struct state_t *state) {
-	struct FSHandle *handle;
+static fsal_status_t close2(struct fsal_obj_handle *objectHandle,
+                            struct state_t *state) {
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	LogFullDebug(COMPONENT_FSAL, "export = %" PRIu16 " inode = %" PRIu32,
@@ -1411,16 +1411,15 @@ static fsal_status_t _close2(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
-                              const char *name,
-                              const char *symbolicLinkPath,
+static fsal_status_t symlink_(struct fsal_obj_handle *directoryHandle,
+                              const char *name, const char *symbolicLinkPath,
                               struct fsal_attrlist *attributesToSet,
                               struct fsal_obj_handle **createdObject,
                               struct fsal_attrlist *attributes) {
-	struct FSExport *export;
-	struct FSHandle *directory;
+	struct FSExport *export = NULL;
+	struct FSHandle *directory = NULL;
 	struct liz_entry entry;
-	int rc;
+	int retvalue = 0;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	directory = container_of(directoryHandle, struct FSHandle, fileHandle);
@@ -1429,9 +1428,9 @@ static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
 	             PRIu32 " name = %s", export->export.export_id,
 	             directory->inode, name);
 
-	rc = fs_symlink(export->fsInstance, &op_ctx->creds, symbolicLinkPath,
-	                directory->inode, name, &entry);
-	if (rc < 0) {
+	retvalue = fs_symlink(export->fsInstance, &op_ctx->creds, symbolicLinkPath,
+	                      directory->inode, name, &entry);
+	if (retvalue < 0) {
 		return fsalLastError();
 	}
 
@@ -1439,7 +1438,7 @@ static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
 	*createdObject = &handle->fileHandle;
 
 	// We handled the mode above
-	FSAL_UNSET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_UNSET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 
 	if (attributesToSet->valid_mask) {
 		fsal_status_t status;
@@ -1463,7 +1462,7 @@ static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
 		posix2fsal_attributes_all(&entry.attr, attributes);
 	}
 
-	FSAL_SET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_SET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
@@ -1485,15 +1484,15 @@ static fsal_status_t _symlink(struct fsal_obj_handle *directoryHandle,
  *
  * @returns: FSAL status
  */
-fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
-                        struct state_t *state,
-                        void *owner, fsal_lock_op_t lockOperation,
-                        fsal_lock_param_t *requestedLock,
-                        fsal_lock_param_t *conflictingLock) {
-	struct FSExport *export;
+fsal_status_t lock_op2(struct fsal_obj_handle *objectHandle,
+                       struct state_t *state, void *owner,
+                       fsal_lock_op_t lockOperation,
+                       fsal_lock_param_t *requestedLock,
+                       fsal_lock_param_t *conflictingLock) {
+	struct FSExport *export = NULL;
 
-	liz_err_t lastError;
-	fileinfo_t *fileinfo;
+	liz_err_t lastError = 0;
+	fileinfo_t *fileinfo = NULL;
 	liz_lock_info_t lockInfo;
 
 	fsal_status_t status = {0, 0};
@@ -1528,10 +1527,12 @@ fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
 		openflags = FSAL_O_ANY;
 	}
 	else if (lockOperation == FSAL_OP_LOCK) {
-		if (requestedLock->lock_type == FSAL_LOCK_R)
+		if (requestedLock->lock_type == FSAL_LOCK_R) {
 			openflags = FSAL_O_READ;
-		else if (requestedLock->lock_type == FSAL_LOCK_W)
+		}
+		else if (requestedLock->lock_type == FSAL_LOCK_W) {
 			openflags = FSAL_O_WRITE;
+		}
 	}
 	else if (lockOperation == FSAL_OP_UNLOCK) {
 		openflags = FSAL_O_ANY;
@@ -1562,8 +1563,9 @@ fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
 		return fsalstat(ERR_FSAL_NOTSUPP, 0);
 	}
 
-	if (lockOperation == FSAL_OP_UNLOCK)
+	if (lockOperation == FSAL_OP_UNLOCK) {
 		lockInfo.l_type = F_UNLCK;
+	}
 
 	lockInfo.l_pid = 0;
 	lockInfo.l_len = requestedLock->lock_length;
@@ -1577,9 +1579,8 @@ fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
 	// turned off, which means that the consecutive attempt is very likely
 	// to succeed immediately.
 	if (status.major == ERR_FSAL_DELAY) {
-		status = findFileDescriptor(&fileDescriptor, objectHandle,
-		                            bypass, state, openflags, &hasLock,
-		                            &closeFd, true);
+		status = findFileDescriptor(&fileDescriptor, objectHandle, bypass,
+		                            state, openflags, &hasLock, &closeFd, true);
 	}
 
 	if (FSAL_IS_ERROR(status)) {
@@ -1596,8 +1597,8 @@ fsal_status_t _lock_op2(struct fsal_obj_handle *objectHandle,
 		                  fileinfo, &lockInfo);
 	}
 	else {
-		retval = fs_setlk(export->fsInstance, &op_ctx->creds,
-		                  fileinfo, &lockInfo);
+		retval =
+		    fs_setlk(export->fsInstance, &op_ctx->creds, fileinfo, &lockInfo);
 	}
 
 	if (retval < 0) {
@@ -1652,11 +1653,11 @@ err:
  *
  * @returns: FSAL status
  */
-static fsal_status_t _reopen2(struct fsal_obj_handle *objectHandle,
-                              struct state_t *state,
-                              fsal_openflags_t openflags) {
-	struct FSHandle *handle;
-	struct FSFileDescriptor *sharedFileDescriptor;
+static fsal_status_t reopen2(struct fsal_obj_handle *objectHandle,
+                             struct state_t *state,
+                             fsal_openflags_t openflags) {
+	struct FSHandle *handle = NULL;
+	struct FSFileDescriptor *sharedFileDescriptor = NULL;
 	fsal_status_t status;
 
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
@@ -1723,16 +1724,16 @@ static fsal_status_t _reopen2(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
-                             const char *name,
-                             object_file_type_t nodeType,
-                             struct fsal_attrlist *attributesToSet,
-                             struct fsal_obj_handle **createdObject,
-                             struct fsal_attrlist *attributes) {
-	struct FSExport *export;
-	struct FSHandle *directory, *handle;
+static fsal_status_t mknode(struct fsal_obj_handle *directoryHandle,
+                            const char *name, object_file_type_t nodeType,
+                            struct fsal_attrlist *attributesToSet,
+                            struct fsal_obj_handle **createdObject,
+                            struct fsal_attrlist *attributes) {
+	struct FSExport *export = NULL;
+	struct FSHandle *directory = NULL;
+	struct FSHandle *handle = NULL;
 	struct liz_entry entry;
-	mode_t unixMode;
+	mode_t unixMode = 0;
 	dev_t unixDev = 0;
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
@@ -1764,16 +1765,16 @@ static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
 		unixMode |= S_IFSOCK;
 		break;
 	default:
-		LogMajor(COMPONENT_FSAL,
-		         "Invalid node type in FSAL_mknode: %d", nodeType);
+		LogMajor(COMPONENT_FSAL, "Invalid node type in FSAL_mknode: %d",
+		         nodeType);
 
 		return fsalstat(ERR_FSAL_INVAL, EINVAL);
 	}
 
-	int rc = fs_mknode(export->fsInstance, &op_ctx->creds, directory->inode,
-	                   name, unixMode, unixDev, &entry);
+	int retvalue = fs_mknode(export->fsInstance, &op_ctx->creds,
+	                         directory->inode, name, unixMode, unixDev, &entry);
 
-	if (rc < 0) {
+	if (retvalue < 0) {
 		return fsalLastError();
 	}
 
@@ -1781,7 +1782,7 @@ static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
 	*createdObject = &handle->fileHandle;
 
 	// We handled the mode above
-	FSAL_UNSET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_UNSET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 
 	if (attributesToSet->valid_mask) {
 		fsal_status_t status;
@@ -1805,7 +1806,7 @@ static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
 		posix2fsal_attributes_all(&entry.attr, attributes);
 	}
 
-	FSAL_SET_MASK(attributesToSet->valid_mask, ATTR_MODE);
+	FSAL_SET_MASK(attributesToSet->valid_mask, (attrmask_t)ATTR_MODE);
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
@@ -1828,15 +1829,16 @@ static fsal_status_t _mknode(struct fsal_obj_handle *directoryHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _readlink(struct fsal_obj_handle *objectHandle,
-                               struct gsh_buffdesc *linkContent,
-                               bool refresh) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static fsal_status_t readlink_(struct fsal_obj_handle *objectHandle,
+                               struct gsh_buffdesc *linkContent, bool refresh) {
+	(void)refresh;
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	char result[LIZARDFS_MAX_READLINK_LENGTH];
 
-	if (objectHandle->type != SYMBOLIC_LINK)
+	if (objectHandle->type != SYMBOLIC_LINK) {
 		return fsalstat(ERR_FSAL_FAULT, 0);
+	}
 
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
@@ -1870,9 +1872,10 @@ static fsal_status_t _readlink(struct fsal_obj_handle *objectHandle,
  *
  * @returns: Flags representing current open status
  */
-static fsal_openflags_t _status2(struct fsal_obj_handle *objectHandle,
-                                 struct state_t *state) {
-	struct FSFileDescriptor *fileDescriptor;
+static fsal_openflags_t status2(struct fsal_obj_handle *objectHandle,
+                                struct state_t *state) {
+	(void)objectHandle;
+	struct FSFileDescriptor *fileDescriptor = NULL;
 	fileDescriptor = &container_of(state, struct FSFileDescriptorState,
 	                               state)->fileDescriptor;
 
@@ -1894,24 +1897,22 @@ static fsal_openflags_t _status2(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _merge(struct fsal_obj_handle *originalHandle,
-                            struct fsal_obj_handle *toMergeHandle) {
+static fsal_status_t merge(struct fsal_obj_handle *originalHandle,
+                           struct fsal_obj_handle *toMergeHandle) {
 	fsal_status_t status = fsalstat(ERR_FSAL_NO_ERROR, 0);
 
 	if (originalHandle->type == REGULAR_FILE &&
 	    toMergeHandle->type == REGULAR_FILE) {
 		// We need to merge the share reservations on this file.
 		// This could result in ERR_FSAL_SHARE_DENIED.
-		struct FSHandle *original, *toMerge;
+		struct FSHandle *original = NULL;
+		struct FSHandle *toMerge = NULL;
 
-		original = container_of(originalHandle, struct FSHandle,
-		                        fileHandle);
-		toMerge = container_of(toMergeHandle, struct FSHandle,
-		                       fileHandle);
+		original = container_of(originalHandle, struct FSHandle, fileHandle);
+		toMerge = container_of(toMergeHandle, struct FSHandle, fileHandle);
 
 		// This can block over an I/O operation
-		status = merge_share(originalHandle, &original->share,
-		                     &toMerge->share);
+		status = merge_share(originalHandle, &original->share, &toMerge->share);
 	}
 
 	return status;
@@ -1928,11 +1929,11 @@ static fsal_status_t _merge(struct fsal_obj_handle *originalHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
-                                struct state_t *state, uint64_t offset,
-                                uint64_t length, bool allocate) {
-	struct FSExport *export;
-	struct FSHandle *handle;
+static fsal_status_t fallocate(struct fsal_obj_handle *objectHandle,
+                               struct state_t *state, uint64_t offset,
+                               uint64_t length, bool allocate) {
+	struct FSExport *export = NULL;
+	struct FSHandle *handle = NULL;
 	struct FSFileDescriptor fileDescriptor;
 
 	fsal_status_t status;
@@ -1949,38 +1950,40 @@ static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
 		goto out;
 	}
 
-	struct stat st;
-	memset(&st, 0, sizeof(st));
+	struct stat statData;
+	memset(&statData, 0, sizeof(statData));
 
-	st.st_mode = allocate ? 0 : FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE;
+	statData.st_mode = allocate ? 0 : FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE;
 
 	// Get stat to obtain the current size
-	liz_attr_reply_t currentStats, reply;
-	int rc = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
-	                    &currentStats);
+	liz_attr_reply_t currentStats;
+	liz_attr_reply_t reply;
 
-	if (rc < 0) {
+	int retvalue = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
+	                          &currentStats);
+
+	if (retvalue < 0) {
 		status = fsalLastError();
 		goto out;
 	}
 
 	if (allocate) {
 		if (offset + length > currentStats.attr.st_size) {
-			st.st_size = offset + length;
+			statData.st_size = offset + length;
 
-			rc = fs_setattr(export->fsInstance, &op_ctx->creds,
-			                handle->inode, &st, LIZ_SET_ATTR_SIZE,
-			                &reply);
+			retvalue =
+			    fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+			               &statData, LIZ_SET_ATTR_SIZE, &reply);
 
-			if (rc < 0) {
+			if (retvalue < 0) {
 				status = fsalLastError();
 				goto out;
 			}
 
-			rc = fs_fsync(export->fsInstance, &op_ctx->creds,
-			              fileDescriptor.fileDescriptor);
+			retvalue = fs_fsync(export->fsInstance, &op_ctx->creds,
+			                    fileDescriptor.fileDescriptor);
 
-			if (rc < 0) {
+			if (retvalue < 0) {
 				status = fsalLastError();
 			}
 		}
@@ -1991,10 +1994,11 @@ static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
 
 		memset(buffer, 0, length);
 
-		// Write the interval [offset..offset + length] with zeros using fs_write
-		ssize_t bytes = fs_write(export->fsInstance, &op_ctx->creds,
-		                         fileDescriptor.fileDescriptor, offset,
-		                         length, buffer);
+		// Write the interval [offset..offset + length] with zeros using
+		// fs_write
+		ssize_t bytes =
+		    fs_write(export->fsInstance, &op_ctx->creds,
+		             fileDescriptor.fileDescriptor, offset, length, buffer);
 
 		free(buffer);
 
@@ -2004,20 +2008,20 @@ static fsal_status_t _fallocate(struct fsal_obj_handle *objectHandle,
 		}
 
 		// Set the original size because deallocation must not change file size
-		st.st_size = currentStats.attr.st_size;
+		statData.st_size = currentStats.attr.st_size;
 
-		rc = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
-		                &st, LIZ_SET_ATTR_SIZE, &reply);
+		retvalue = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+		                      &statData, LIZ_SET_ATTR_SIZE, &reply);
 
-		if (rc < 0) {
+		if (retvalue < 0) {
 			status = fsalLastError();
 			goto out;
 		}
 
-		rc = fs_fsync(export->fsInstance, &op_ctx->creds,
-		              fileDescriptor.fileDescriptor);
+		retvalue = fs_fsync(export->fsInstance, &op_ctx->creds,
+		                    fileDescriptor.fileDescriptor);
 
-		if (rc < 0) {
+		if (retvalue < 0) {
 			status = fsalLastError();
 		}
 	}
@@ -2045,25 +2049,25 @@ out:
  *
  * @returns: FSAL status
  */
-static fsal_status_t _getxattrs(struct fsal_obj_handle *objectHandle,
-                                xattrkey4 *xattributeName,
-                                xattrvalue4 *xattributeValue) {
-	struct FSExport *export;
+static fsal_status_t getxattrs(struct fsal_obj_handle *objectHandle,
+                               xattrkey4 *xattributeName,
+                               xattrvalue4 *xattributeValue) {
+	struct FSExport *export = NULL;
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	size_t curr_size = 0;
-	int rc = fs_getxattr(export->fsInstance, &op_ctx->creds,
-	                     handle->inode, xattributeName->utf8string_val,
-	                     xattributeValue->utf8string_len, &curr_size,
-	                     (uint8_t *)xattributeValue->utf8string_val);
+	int retvalue = fs_getxattr(export->fsInstance, &op_ctx->creds,
+	                           handle->inode, xattributeName->utf8string_val,
+	                           xattributeValue->utf8string_len, &curr_size,
+	                           (uint8_t *)xattributeValue->utf8string_val);
 
-	if (rc < 0) {
-		LogFullDebug(COMPONENT_FSAL,
-		             "GETXATTRS failed returned rc = %d ", rc);
-		return lizardfsToFsalError(rc);
+	if (retvalue < 0) {
+		LogFullDebug(COMPONENT_FSAL, "GETXATTRS failed returned rc = %d ",
+		             retvalue);
+		return lizardfsToFsalError(retvalue);
 	}
 
 	if (curr_size && curr_size <= xattributeValue->utf8string_len) {
@@ -2088,24 +2092,24 @@ static fsal_status_t _getxattrs(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _setxattrs(struct fsal_obj_handle *objectHandle,
-                                setxattr_option4 option,
-                                xattrkey4 *xattributeName,
-                                xattrvalue4 *xattributeValue) {
-	struct FSExport *export;
+static fsal_status_t setxattrs(struct fsal_obj_handle *objectHandle,
+                               setxattr_option4 option,
+                               xattrkey4 *xattributeName,
+                               xattrvalue4 *xattributeValue) {
+	struct FSExport *export = NULL;
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
-	int rc = fs_setxattr(export->fsInstance, &op_ctx->creds,
-	                     handle->inode, xattributeName->utf8string_val,
-	                     (const uint8_t *)xattributeValue->utf8string_val,
-	                     xattributeValue->utf8string_len, option);
+	int retvalue = fs_setxattr(export->fsInstance, &op_ctx->creds,
+	                           handle->inode, xattributeName->utf8string_val,
+	                           (const uint8_t *)xattributeValue->utf8string_val,
+	                           xattributeValue->utf8string_len, option);
 
-	if (rc < 0) {
-		LogDebug(COMPONENT_FSAL, "SETXATTRS returned rc %d", rc);
-		return lizardfsToFsalError(rc);
+	if (retvalue < 0) {
+		LogDebug(COMPONENT_FSAL, "SETXATTRS returned rc %d", retvalue);
+		return lizardfsToFsalError(retvalue);
 	}
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
@@ -2126,18 +2130,16 @@ static fsal_status_t _setxattrs(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _listxattrs(struct fsal_obj_handle *objectHandle,
-                                 count4 maximumNameSize,
-                                 nfs_cookie4 *cookie,
-                                 bool_t *eof,
-                                 xattrlist4 *xattributesNames) {
+static fsal_status_t listxattrs(struct fsal_obj_handle *objectHandle,
+                                count4 maximumNameSize, nfs_cookie4 *cookie,
+                                bool_t *eof, xattrlist4 *xattributesNames) {
 	char *buffer = NULL;
 	fsal_status_t status = fsalstat(ERR_FSAL_NO_ERROR, 0);
 
-	struct FSExport *export;
+	struct FSExport *export = NULL;
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
 	LogFullDebug(COMPONENT_FSAL, "in cookie %llu length %d",
@@ -2147,12 +2149,12 @@ static fsal_status_t _listxattrs(struct fsal_obj_handle *objectHandle,
 	size_t curr_size = 0;
 
 	// First time, the function is called to get the size of xattr list
-	int rc = fs_listxattr(export->fsInstance, &op_ctx->creds,
-	                      handle->inode, 0, &curr_size, NULL);
+	int retvalue = fs_listxattr(export->fsInstance, &op_ctx->creds,
+	                            handle->inode, 0, &curr_size, NULL);
 
-	if (rc < 0) {
-		LogDebug(COMPONENT_FSAL, "LISTXATTRS returned rc %d", rc);
-		return lizardfsToFsalError(rc);
+	if (retvalue < 0) {
+		LogDebug(COMPONENT_FSAL, "LISTXATTRS returned rc %d", retvalue);
+		return lizardfsToFsalError(retvalue);
 	}
 
 	// If xattr were retrieved and they can be allocated
@@ -2160,13 +2162,13 @@ static fsal_status_t _listxattrs(struct fsal_obj_handle *objectHandle,
 		buffer = gsh_malloc(curr_size);
 
 		// Second time, the function is called to retrieve the xattr list
-		rc = fs_listxattr(export->fsInstance, &op_ctx->creds,
-		                  handle->inode, curr_size, &curr_size, buffer);
+		retvalue = fs_listxattr(export->fsInstance, &op_ctx->creds,
+		                        handle->inode, curr_size, &curr_size, buffer);
 
-		if (rc < 0) {
-			LogDebug(COMPONENT_FSAL, "LISTXATTRS returned rc %d", rc);
+		if (retvalue < 0) {
+			LogDebug(COMPONENT_FSAL, "LISTXATTRS returned rc %d", retvalue);
 			gsh_free(buffer);
-			return lizardfsToFsalError(rc);
+			return lizardfsToFsalError(retvalue);
 		}
 
 		// Setting retrieved extended attributes to Ganesha
@@ -2190,20 +2192,21 @@ static fsal_status_t _listxattrs(struct fsal_obj_handle *objectHandle,
  *
  * @returns: FSAL status
  */
-static fsal_status_t _removexattrs(struct fsal_obj_handle *objectHandle,
-                                   xattrkey4 *xattributeName) {
-	struct FSExport *export;
+static fsal_status_t removexattrs(struct fsal_obj_handle *objectHandle,
+                                  xattrkey4 *xattributeName) {
+	struct FSExport *export = NULL;
 	export = container_of(op_ctx->fsal_export, struct FSExport, export);
 
-	struct FSHandle *handle;
+	struct FSHandle *handle = NULL;
 	handle = container_of(objectHandle, struct FSHandle, fileHandle);
 
-	int rc = fs_removexattr(export->fsInstance, &op_ctx->creds,
-	                        handle->inode, xattributeName->utf8string_val);
+	int retvalue =
+	    fs_removexattr(export->fsInstance, &op_ctx->creds, handle->inode,
+	                   xattributeName->utf8string_val);
 
-	if (rc < 0) {
-		LogFullDebug(COMPONENT_FSAL, "REMOVEXATTR returned rc %d", rc);
-		return lizardfsToFsalError(rc);
+	if (retvalue < 0) {
+		LogFullDebug(COMPONENT_FSAL, "REMOVEXATTR returned rc %d", retvalue);
+		return lizardfsToFsalError(retvalue);
 	}
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
@@ -2211,35 +2214,35 @@ static fsal_status_t _removexattrs(struct fsal_obj_handle *objectHandle,
 
 void initializeFilesystemOperations(struct fsal_obj_ops *ops) {
 	fsal_default_obj_ops_init(ops);
-	ops->release = _release;
-	ops->lookup = _lookup;
-	ops->readdir = _readdir;
-	ops->getattrs = _getattrs;
-	ops->handle_to_wire = _handle_to_wire;
-	ops->handle_to_key = _handle_to_key;
-	ops->open2 = _open2;
-	ops->read2 = _read2;
-	ops->mkdir = _mkdir;
-	ops->link = _link;
-	ops->rename = _rename;
-	ops->unlink = _unlink;
-	ops->close = _close;
-	ops->write2 = _write2;
-	ops->commit2 = _commit2;
-	ops->setattr2 = _setattr2;
-	ops->close2 = _close2;
-	ops->symlink = _symlink;
-	ops->lock_op2 = _lock_op2;
-	ops->reopen2 = _reopen2;
-	ops->mknode = _mknode;
-	ops->readlink = _readlink;
-	ops->status2 = _status2;
-	ops->merge = _merge;
-	ops->fallocate = _fallocate;
-	ops->getxattrs = _getxattrs;
-	ops->setxattrs = _setxattrs;
-	ops->listxattrs = _listxattrs;
-	ops->removexattrs = _removexattrs;
+	ops->release = release;
+	ops->lookup = lookup;
+	ops->readdir = readdir_;
+	ops->getattrs = getattrs;
+	ops->handle_to_wire = handle_to_wire;
+	ops->handle_to_key = handle_to_key;
+	ops->open2 = open2;
+	ops->read2 = read2;
+	ops->mkdir = mkdir_;
+	ops->link = link_;
+	ops->rename = rename_;
+	ops->unlink = unlink_;
+	ops->close = close_;
+	ops->write2 = write2;
+	ops->commit2 = commit2;
+	ops->setattr2 = setattr2;
+	ops->close2 = close2;
+	ops->symlink = symlink_;
+	ops->lock_op2 = lock_op2;
+	ops->reopen2 = reopen2;
+	ops->mknode = mknode;
+	ops->readlink = readlink_;
+	ops->status2 = status2;
+	ops->merge = merge;
+	ops->fallocate = fallocate;
+	ops->getxattrs = getxattrs;
+	ops->setxattrs = setxattrs;
+	ops->listxattrs = listxattrs;
+	ops->removexattrs = removexattrs;
 }
 
 /**

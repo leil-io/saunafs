@@ -36,7 +36,8 @@ typedef struct FileInfoEntry FileInfoEntry_t;
  * \return pointer to FileInfoCache_t structure
  * \post Destroy with destroyFileInfoCache function
  */
-FileInfoCache_t *createFileInfoCache(unsigned max_entries, int min_timeout_ms);
+FileInfoCache_t *createFileInfoCache(unsigned maxEntries,
+                                     int minTimeoutMilliseconds);
 
 /*!
  * \brief Reset cache parameters
@@ -44,8 +45,8 @@ FileInfoCache_t *createFileInfoCache(unsigned max_entries, int min_timeout_ms);
  * \param max_entries max number of entries to be stored in cache
  * \param min_timeout_ms entries will not be removed until at least min_timeout_ms ms has passed
  */
-void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned max_entries,
-                                  int min_timeout_ms);
+void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned maxEntries,
+                                  int minTimeoutMilliseconds);
 
 /*!
  * \brief Destroy fileinfo cache

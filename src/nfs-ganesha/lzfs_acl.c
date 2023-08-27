@@ -27,6 +27,9 @@
  *
  * @returns: Converted LizardFS ACL
  */
+
+const uint ByteMaxValue = 0xFF;
+
 liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
                                      unsigned int mode) {
 	liz_acl_t *nativeACL = NULL;
@@ -49,7 +52,7 @@ liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
 		}
 
 		liz_acl_ace_t ace;
-		ace.flags = fsalACE->flag & 0xFF;
+		ace.flags = fsalACE->flag & ByteMaxValue;
 		ace.mask  = fsalACE->perm;
 		ace.type  = fsalACE->type;
 
@@ -61,7 +64,7 @@ liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
 		}
 
 		if (IS_FSAL_ACE_SPECIAL_ID(*fsalACE)) {
-			ace.flags |= LIZ_ACL_SPECIAL_WHO;
+			ace.flags |= (uint)LIZ_ACL_SPECIAL_WHO;
 			switch (GET_FSAL_ACE_USER(*fsalACE)) {
 			case FSAL_ACE_SPECIAL_OWNER:
 				ace.id = LIZ_ACL_OWNER_SPECIAL_ID;
@@ -95,7 +98,7 @@ liz_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
  */
 fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
 	fsal_acl_data_t ACLData;
-	fsal_acl_status_t ACLStatus;
+	fsal_acl_status_t ACLStatus = 0;
 	fsal_acl_t *fsalACL = NULL;
 
 	if (!nativeACL) {
@@ -103,24 +106,24 @@ fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
 	}
 
 	ACLData.naces = liz_get_acl_size(nativeACL);
-	ACLData.aces = (fsal_ace_t *)nfs4_ace_alloc(ACLData.naces);
+	ACLData.aces = nfs4_ace_alloc(ACLData.naces);
 
 	if (!ACLData.aces) {
 		return NULL;
 	}
 
-	for (size_t i = 0; i < ACLData.naces; ++i) {
-		fsal_ace_t *fsalACE = ACLData.aces + i;
+	for (size_t aceIterator = 0; aceIterator < ACLData.naces; ++aceIterator) {
+		fsal_ace_t *fsalACE = ACLData.aces + aceIterator;
 		liz_acl_ace_t nativeACE;
 
-		int rc = liz_get_acl_entry(nativeACL, i, &nativeACE);
+		int retvalue = liz_get_acl_entry(nativeACL, aceIterator, &nativeACE);
 
-		(void) rc;
-		assert(rc == 0);
+		(void) retvalue;
+		assert(retvalue == 0);
 
 		fsalACE->type  = nativeACE.type;
-		fsalACE->flag  = nativeACE.flags & 0xFF;
-		fsalACE->iflag = (nativeACE.flags & LIZ_ACL_SPECIAL_WHO) ?
+		fsalACE->flag  = nativeACE.flags & ByteMaxValue;
+		fsalACE->iflag = (nativeACE.flags & (unsigned)LIZ_ACL_SPECIAL_WHO) ?
 		            FSAL_ACE_IFLAG_SPECIAL_ID : 0;
 		fsalACE->perm = nativeACE.mask;
 
@@ -167,21 +170,21 @@ fsal_acl_t *convertNativeACLToFsalACL(const liz_acl_t *nativeACL) {
  *
  * @returns: FSAL status.
  */
-fsal_status_t getACL(struct FSExport *export, uint32_t inode,
-                     uint32_t ownerId, fsal_acl_t **fsalACL) {
+fsal_status_t getACL(struct FSExport *export, uint32_t inode, uint32_t ownerId,
+                     fsal_acl_t **fsalACL) {
 	if (*fsalACL) {
 		nfs4_acl_release_entry(*fsalACL);
 		*fsalACL = NULL;
 	}
 
 	liz_acl_t *nativeACL = NULL;
-	int rc = fs_getacl(export->fsInstance, &op_ctx->creds, inode, &nativeACL);
+	int ret = fs_getacl(export->fsInstance, &op_ctx->creds, inode, &nativeACL);
 
-	if (rc < 0) {
+	if (ret < 0) {
 		LogFullDebug(COMPONENT_FSAL,
 		             "getacl status = %s export=%" PRIu16 " inode=%" PRIu32,
-		             liz_error_string(liz_last_err()),
-		             export->export.export_id, inode);
+		             liz_error_string(liz_last_err()), export->export.export_id,
+		             inode);
 
 		return fsalLastError();
 	}
@@ -227,10 +230,10 @@ fsal_status_t setACL(struct FSExport *export, uint32_t inode,
 		return fsalstat(ERR_FSAL_FAULT, 0);
 	}
 
-	int rc = fs_setacl(export->fsInstance, &op_ctx->creds, inode, nativeACL);
+	int ret = fs_setacl(export->fsInstance, &op_ctx->creds, inode, nativeACL);
 	liz_destroy_acl(nativeACL);
 
-	if (rc < 0) {
+	if (ret < 0) {
 		return fsalLastError();
 	}
 

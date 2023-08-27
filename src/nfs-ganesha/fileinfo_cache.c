@@ -23,6 +23,9 @@
 #include <abstract_mem.h>
 #include <avltree.h>
 
+const uint64_t kMillisecondsInOneSecond = 1000LL;
+const uint64_t kNanosecondsInOneMicrosecond = 1000LL;
+
 struct FileInfoEntry {
 	struct glist_head list_hook;
 	struct avltree_node tree_hook;
@@ -32,7 +35,7 @@ struct FileInfoEntry {
 	uint64_t timestamp;
 	bool is_used;
 	bool lookup;
-};
+} __attribute__((packed)) __attribute__((aligned(64)));
 
 struct FileInfoCache {
 	struct glist_head lru_list;
@@ -45,65 +48,65 @@ struct FileInfoCache {
 	int min_timeout_ms;
 
 	pthread_mutex_t lock;
-};
+} __attribute__((aligned(128)));
 
 static uint64_t get_time_ms() {
-	struct timespec ts;
-	timespec_get(&ts, TIME_UTC);
+	struct timespec time_;
+	timespec_get(&time_, TIME_UTC);
 
-	return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000;
+	return (uint64_t)time_.tv_sec * kMillisecondsInOneSecond +
+	       (uint64_t)time_.tv_nsec / kNanosecondsInOneMicrosecond;
 }
 
-static int cache_entry_cmp_function(const struct avltree_node *a,
-                                    const struct avltree_node *b) {
-	FileInfoEntry_t *a_entry = avltree_container_of(a, FileInfoEntry_t,
-	                                                tree_hook);
-	FileInfoEntry_t *b_entry = avltree_container_of(b, FileInfoEntry_t,
-	                                                tree_hook);
+static int cacheEntryCompareFunction(const struct avltree_node *nodeA,
+                                     const struct avltree_node *nodeB) {
+	FileInfoEntry_t *entryA =
+	    avltree_container_of(nodeA, FileInfoEntry_t, tree_hook);
+	FileInfoEntry_t *entryB =
+	    avltree_container_of(nodeB, FileInfoEntry_t, tree_hook);
 
-	if (a_entry->inode < b_entry->inode) {
+	if (entryA->inode < entryB->inode) {
 		return -1;
 	}
-	if (a_entry->inode > b_entry->inode) {
+	if (entryA->inode > entryB->inode) {
 		return 1;
 	}
-	if (a_entry->lookup || b_entry->lookup) {
+	if (entryA->lookup || entryB->lookup) {
 		return 0;
 	}
-	if (a_entry < b_entry) {
+	if (entryA < entryB) {
 		return -1;
 	}
-	if (a_entry > b_entry) {
+	if (entryA > entryB) {
 		return 1;
 	}
 	return 0;
 }
 
-FileInfoCache_t *createFileInfoCache(unsigned max_entries, int min_timeout_ms) {
-	FileInfoCache_t *cache;
-
-	cache = gsh_calloc(1, sizeof(FileInfoCache_t));
-	cache->max_entries = max_entries;
-	cache->min_timeout_ms = min_timeout_ms;
+FileInfoCache_t *createFileInfoCache(unsigned maxEntries,
+                                     int minTimeoutMilliseconds) {
+	FileInfoCache_t *cache = gsh_calloc(1, sizeof(FileInfoCache_t));
+	cache->max_entries = maxEntries;
+	cache->min_timeout_ms = minTimeoutMilliseconds;
 	PTHREAD_MUTEX_init(&cache->lock, NULL);
 
 	glist_init(&cache->lru_list);
 	glist_init(&cache->used_list);
-	avltree_init(&cache->entry_lookup, &cache_entry_cmp_function, 0);
+	avltree_init(&cache->entry_lookup, &cacheEntryCompareFunction, 0);
 
 	return cache;
 }
 
-void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned max_entries,
-                                  int min_timeout_ms) {
+void resetFileInfoCacheParameters(FileInfoCache_t *cache, unsigned maxEntries,
+                                  int minTimeoutMilliseconds) {
 	PTHREAD_MUTEX_lock(&cache->lock);
-	cache->max_entries = max_entries;
-	cache->min_timeout_ms = min_timeout_ms;
+	cache->max_entries = maxEntries;
+	cache->min_timeout_ms = minTimeoutMilliseconds;
 	PTHREAD_MUTEX_unlock(&cache->lock);
 }
 
 void destroyFileInfoCache(FileInfoCache_t *cache) {
-	FileInfoEntry_t *entry;
+	FileInfoEntry_t *entry = NULL;
 
 	if (!cache) {
 		return;
@@ -125,14 +128,16 @@ void destroyFileInfoCache(FileInfoCache_t *cache) {
 }
 
 FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, liz_inode_t inode) {
-	FileInfoEntry_t key, *entry;
-	struct avltree_node *node;
+	FileInfoEntry_t key;
+	FileInfoEntry_t *entry = NULL;
 
 	key.inode = inode;
 	key.lookup = true;
 	PTHREAD_MUTEX_lock(&cache->lock);
 
-	node = avltree_lookup(&key.tree_hook, &cache->entry_lookup);
+	struct avltree_node *node =
+	    avltree_lookup(&key.tree_hook, &cache->entry_lookup);
+
 	if (node) {
 		entry = avltree_container_of(node, FileInfoEntry_t, tree_hook);
 		assert(!entry->is_used);
@@ -188,11 +193,11 @@ FileInfoEntry_t *popExpiredFileInfoCache(FileInfoCache_t *cache) {
 		return NULL;
 	}
 
-	bool is_full = cache->entry_count > cache->max_entries;
-	int timeout = is_full ? 0 : cache->min_timeout_ms;
-	uint64_t current_time = get_time_ms();
+	bool isCacheFull = cache->entry_count > cache->max_entries;
+	int timeout = isCacheFull ? 0 : cache->min_timeout_ms;
+	uint64_t currentTime = get_time_ms();
 
-	if ((current_time - entry->timestamp) >= timeout) {
+	if ((currentTime - entry->timestamp) >= timeout) {
 		glist_del(&entry->list_hook);
 		avltree_remove(&entry->tree_hook, &cache->entry_lookup);
 		cache->entry_count--;

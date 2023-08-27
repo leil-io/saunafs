@@ -39,14 +39,14 @@ struct FSHandle *allocateNewHandle(const struct stat *attr,
 void deleteHandle(struct FSHandle *object);
 
 // Methods for support ACL
-fsal_status_t getACL(struct FSExport *export, uint32_t inode,
-                     uint32_t owner, fsal_acl_t **fsal_acl);
+fsal_status_t getACL(struct FSExport *export, uint32_t inode, uint32_t ownerId,
+                     fsal_acl_t **fsalACL);
 
 fsal_status_t setACL(struct FSExport *export, uint32_t inode,
-                     const fsal_acl_t *fsal_acl, unsigned int mode);
+                     const fsal_acl_t *fsalACL, unsigned int mode);
 
 // Methods for handling errors
-fsal_status_t lizardfsToFsalError(liz_err_t err);
+fsal_status_t lizardfsToFsalError(liz_err_t errorCode);
 fsal_status_t fsalLastError(void);
 nfsstat4 Nfs4LastError(void);
 

@@ -95,14 +95,14 @@ struct liz_context;
 typedef struct liz_context liz_context_t;
 typedef struct liz_acl liz_acl_t;
 
-#define LIZ_SET_ATTR_MODE      (1 << 0)
-#define LIZ_SET_ATTR_UID       (1 << 1)
-#define LIZ_SET_ATTR_GID       (1 << 2)
-#define LIZ_SET_ATTR_SIZE      (1 << 3)
-#define LIZ_SET_ATTR_ATIME     (1 << 4)
-#define LIZ_SET_ATTR_MTIME     (1 << 5)
-#define LIZ_SET_ATTR_ATIME_NOW (1 << 7)
-#define LIZ_SET_ATTR_MTIME_NOW (1 << 8)
+#define LIZ_SET_ATTR_MODE      (1u << 0u)
+#define LIZ_SET_ATTR_UID       (1u << 1u)
+#define LIZ_SET_ATTR_GID       (1u << 2u)
+#define LIZ_SET_ATTR_SIZE      (1u << 3u)
+#define LIZ_SET_ATTR_ATIME     (1u << 4u)
+#define LIZ_SET_ATTR_MTIME     (1u << 5u)
+#define LIZ_SET_ATTR_ATIME_NOW (1u << 7u)
+#define LIZ_SET_ATTR_MTIME_NOW (1u << 8u)
 
 /* ACL flags */
 #define LIZ_ACL_AUTO_INHERIT 0x01
