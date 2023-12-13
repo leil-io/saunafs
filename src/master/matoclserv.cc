@@ -129,7 +129,9 @@ struct session {
 
 	uint32_t sessionid;
 	char *info;
+	std::string config;
 	uint32_t peerip;
+	uint16_t peerport{};
 	uint8_t newsession;
 	uint8_t sesflags;
 	uint8_t mingoal;
@@ -218,6 +220,7 @@ struct matoclserventry {
 	uint32_t lastread,lastwrite;            //time of last activity
 	uint32_t version;
 	uint32_t peerip;
+	uint16_t peerport;
 	uint8_t hdrbuff[8];
 	packetstruct inputpacket;
 	packetstruct *outputhead,**outputtail;
@@ -1602,6 +1605,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->sesdata->rootinode = SPECIAL_INODE_ROOT;
 				eptr->sesdata->sesflags = 0;
 				eptr->sesdata->peerip = eptr->peerip;
+				eptr->sesdata->peerport = eptr->peerport;
 		} else { // reconnect or tools
 			eptr->sesdata = matoclserv_find_session(sessionid);
 			if (eptr->sesdata==NULL) {      // in old model if session doesn't exist then create it
@@ -1614,9 +1618,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->sesdata->rootinode = SPECIAL_INODE_ROOT;
 				eptr->sesdata->sesflags = 0;
 				eptr->sesdata->peerip = eptr->peerip;
+				eptr->sesdata->peerport = eptr->peerport;
 				status = SAUNAFS_STATUS_OK;
 			} else if (eptr->sesdata->peerip==0) { // created by "filesystem"
 				eptr->sesdata->peerip = eptr->peerip;
+				eptr->sesdata->peerport = eptr->peerport;
 				status = SAUNAFS_STATUS_OK;
 			} else if (eptr->sesdata->peerip==eptr->peerip) {
 				status = SAUNAFS_STATUS_OK;
@@ -1742,6 +1748,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->sesdata->mintrashtime = mintrashtime;
 				eptr->sesdata->maxtrashtime = maxtrashtime;
 				eptr->sesdata->peerip = eptr->peerip;
+				eptr->sesdata->peerport = eptr->peerport;
 				if (ileng>0) {
 					if (info[ileng-1]==0) {
 						eptr->sesdata->info = strdup(info);
@@ -1826,6 +1833,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->sesdata->mintrashtime = mintrashtime;
 				eptr->sesdata->maxtrashtime = maxtrashtime;
 				eptr->sesdata->peerip = eptr->peerip;
+				eptr->sesdata->peerport = eptr->peerport;
 				if (ileng>0) {
 					if (info[ileng-1]==0) {
 						eptr->sesdata->info = strdup(info);
@@ -1913,6 +1921,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		eptr->mode = KILL;
 		return;
 	}
+}
+
+void matoclserv_register_config(matoclserventry *eptr, const uint8_t *data,
+                                uint32_t length) {
+	cltoma::registerConfig::deserialize(data, length, eptr->sesdata->config);
 }
 
 void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -4506,6 +4519,16 @@ void matoclserv_admin_reload(matoclserventry* eptr, const uint8_t* data, uint32_
 	}
 }
 
+std::string get_client_configs() {
+	std::map<std::string, std::string> client_configs;
+	for (session *sess = sessionshead; sess != nullptr; sess = sess->next) {
+		if (sess->config.empty()) { continue; }
+		NetworkAddress addr(sess->peerip, sess->peerport);
+		client_configs[addr.toString()] = sess->config;
+	}
+	return cfg_yaml_list("clients", client_configs);
+}
+
 void matoclserv_admin_dump_config(matoclserventry *eptr) {
 	if (eptr->registered != ClientState::kAdmin) {
 		safs_pretty_syslog(LOG_NOTICE,
@@ -4520,9 +4543,10 @@ void matoclserv_admin_dump_config(matoclserventry *eptr) {
 	    cfg_yaml_string((metadataserver::isMaster() ? "master" : "shadow"));
 	auto chunkserver_configs = csdb_chunkserver_configs();
 	auto metalogger_configs = get_metaloggers_config();
+	auto client_configs = get_client_configs();
 	matocl::adminDumpConfiguration::serialize(
-	    reply,
-	    master_config + "\n" + chunkserver_configs + "\n" + metalogger_configs);
+	    reply, master_config + "\n" + chunkserver_configs + "\n" +
+	               metalogger_configs + "\n" + client_configs);
 	matoclserv_createpacket(eptr, reply);
 }
 
@@ -4911,6 +4935,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			switch (type) {
 				case CLTOMA_FUSE_REGISTER:
 					matoclserv_fuse_register(eptr,data,length);
+					break;
+				case SAU_CLTOMA_REGISTER_CONFIG:
+					matoclserv_register_config(eptr,data,length);
 					break;
 				case CLTOMA_FUSE_RESERVED_INODES:
 					matoclserv_fuse_reserved_inodes(eptr,data,length);
@@ -5445,7 +5472,7 @@ void matoclserv_serve(const std::vector<pollfd> &pdesc) {
 			matoclservhead = eptr;
 			eptr->sock = ns;
 			eptr->pdescpos = -1;
-			tcpgetpeer(ns,&(eptr->peerip),NULL);
+			tcpgetpeer(ns,&(eptr->peerip),&(eptr->peerport));
 			eptr->registered = ClientState::kUnregistered;
 			eptr->iolimits = false;
 			eptr->version = 0;

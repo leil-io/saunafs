@@ -116,6 +116,8 @@ typedef std::unordered_map<PacketHeader::Type, PacketHandler*> PerTypePacketHand
 static PerTypePacketHandlers perTypePacketHandlers;
 static std::mutex perTypePacketHandlersLock;
 
+std::string gCfgString = "";
+
 void fs_getmasterlocation(uint8_t loc[14]) {
 	put32bit(&loc,masterip);
 	put16bit(&loc,masterport);
@@ -465,6 +467,14 @@ int fs_resolve(bool verbose, const std::string &bindhostname, const std::string 
 	return 0;
 }
 
+void fs_register_config() {
+	if (gCfgString.empty()) {
+		return;
+	}
+	auto message = cltoma::registerConfig::build(gCfgString);
+	fs_send_custom(message);
+}
+
 int fs_connect(bool verbose) {
 	uint32_t i,j;
 	uint8_t *wptr,*regbuff;
@@ -736,6 +746,7 @@ int fs_connect(bool verbose) {
 		mintrashtime = 0;
 		maxtrashtime = 0;
 	}
+	fs_register_config();
 	free(regbuff);
 	lastwrite=time(NULL);
 	if (!verbose) {

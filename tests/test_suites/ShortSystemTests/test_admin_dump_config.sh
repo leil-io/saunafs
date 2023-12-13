@@ -1,22 +1,24 @@
 password="good-password"
 chunkservers=5
-
+mounts=4
 # Values to search for
 master_config_value="NO_ATIME = 0"
+mount_config_value=sfscachemode=NEVER
 chunk_config_value="READ_AHEAD_KB = 1024"
+metalogger_config_value="BACK_LOGS = 50"
 
 CHUNKSERVERS=$chunkservers \
-CHUNKSERVER_EXTRA_CONFIG="${chunk_config_value}" \
-USE_RAMDISK="YES" \
-ADMIN_PASSWORD="$password" \
-MASTER_EXTRA_CONFIG="${master_config_value}" \
+	CHUNKSERVER_EXTRA_CONFIG="${chunk_config_value}" \
+	MASTER_EXTRA_CONFIG="${master_config_value}" \
+	MOUNT_EXTRA_CONFIG="${mount_config_value}" \
+	MOUNTS=${mounts} \
+	USE_RAMDISK="YES" \
+	ADMIN_PASSWORD="$password" \
 	setup_local_empty_saunafs info
 
 # Setup metalogger config with a key-value to search for
-metalogger_config_value="BACK_LOGS = 50"
 echo $metalogger_config_value >> $TEMP_DIR/saunafs/etc/sfsmetalogger.cfg
 saunafs_metalogger_daemon start
-
 
 master_port="${saunafs_info_[matocl]}"
 shadow_port="${saunafs_info_[masterauto_matocl]}"
@@ -34,6 +36,9 @@ expect_equals $chunkservers $(grep "${chunk_config_value// = /: }" <<< "$config"
 
 # Expect 1 line with $metalogger_config_value
 expect_equals 1 $(grep "${metalogger_config_value// = /: }" <<< "$config" | wc -l)
+
+# Find mounts
+expect_equals $mounts $(grep "${mount_config_value//=/: }" <<< "$config" | wc -l)
 
 # Make sure that shadow works as well
 # Note that shadow does not contain other service configurations, only shadow

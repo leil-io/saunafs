@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <fuse.h>
 #include <fuse_lowlevel.h>
+#include <regex>
 
 #define SFS_OPT(t, p, v) { t, offsetof(struct sfsopts_, p), v }
 
@@ -32,6 +33,7 @@ sfsopts_ gMountOptions;
 
 int gCustomCfg = 0;
 char *gDefaultMountpoint = NULL;
+extern std::string gCfgString;
 
 struct fuse_opt gSfsOptsStage1[] = {
 	FUSE_OPT_KEY("sfscfgfile=",    KEY_CFGFILE),
@@ -319,6 +321,7 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 	FILE *fd;
 	constexpr size_t N = 1000;
 	char lbuff[N],*p;
+	gCfgString.reserve(N);
 
 	fd = fopen(filename, "r");
 	if (!fd) {
@@ -334,6 +337,7 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 			continue;
 
 		lbuff[N - 1] = 0;
+		gCfgString += lbuff;
 
 		for (p = lbuff; *p; p++) {
 			if (*p == '\r' || *p == '\n') {
@@ -369,6 +373,9 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 		}
 	}
 	fclose(fd);
+
+	// Replace the equal signs with colons for YAML
+	gCfgString = std::regex_replace(gCfgString, std::regex("="), ": ");
 }
 
 // Function for FUSE: has to have these arguments

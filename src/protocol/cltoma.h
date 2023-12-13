@@ -435,6 +435,10 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		uint64_t, first_entry,
 		uint64_t, number_of_entries)
 
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(
+		cltoma, registerConfig, SAU_CLTOMA_REGISTER_CONFIG, 0,
+		std::string, config)
+
 namespace cltoma {
 
 namespace fuseReadChunk {
