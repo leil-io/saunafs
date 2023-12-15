@@ -94,8 +94,7 @@ uint64_t metadataGetVersion(const std::string& file) {
 		memset(eofmark,0,16);
 	} else if (memcmp(chkbuff,SFSSIGNATURE "M 2.0",8)==0) {
 		memcpy(eofmark,"[SFS EOF MARKER]",16);
-	/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
-	} else if (memcmp(chkbuff, SAUNAFSSIGNATURE "M 2.9", 8) == 0) {
+	} else if (memcmp(chkbuff, SFSSIGNATURE "M 2.9", 8) == 0) {
 		memcpy(eofmark,"[SFS EOF MARKER]",16);
 	} else {
 		close(fd);

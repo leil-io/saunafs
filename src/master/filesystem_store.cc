@@ -999,8 +999,7 @@ void fs_store(FILE *fd, uint8_t fver) {
 
 void fs_store_fd(FILE *fd) {
 #if SAUNAFS_VERSHEX >= SAUNAFS_VERSION(2, 9, 0)
-	/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
-	const char hdr[] = SAUNAFSSIGNATURE "M 2.9";
+	const char hdr[] = SFSSIGNATURE "M 2.9";
 	const uint8_t metadataVersion = kMetadataVersionWithLockIds;
 #elif SAUNAFS_VERSHEX >= SAUNAFS_VERSION(1, 6, 29)
 	const char hdr[] = SFSSIGNATURE "M 2.0";
@@ -1470,8 +1469,7 @@ void fs_loadall(const std::string& fname,int ignoreflag) {
 		metadataVersion = kMetadataVersionSaunaFS;
 	} else if (memcmp(hdr,SFSSIGNATURE "M 2.0",8)==0) {
 		metadataVersion = kMetadataVersionWithSections;
-		/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
-	} else if (memcmp(hdr, SAUNAFSSIGNATURE "M 2.9", 8) == 0) {
+	} else if (memcmp(hdr, SFSSIGNATURE "M 2.9", 8) == 0) {
 		metadataVersion = kMetadataVersionWithLockIds;
 	} else {
 		throw MetadataConsistencyException("wrong metadata header version");

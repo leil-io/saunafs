@@ -513,8 +513,7 @@ int fs_loadall(const char *fname) {
 			fclose(fd);
 			return -1;
 		}
-	/* Note SAUNAFSSIGNATURE instead of SFSSIGNATURE! */
-	} else if (memcmp(hdr,SAUNAFSSIGNATURE "M 2.9",8) == 0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "M 2.9",8) == 0) {
 		if (fs_load_29(fd) < 0) {
 			fclose(fd);
 			return -1;
