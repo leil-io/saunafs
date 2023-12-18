@@ -29,8 +29,9 @@
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
-#include "protocol/cltoma.h"
+#include "common/memory_file.h"
 #include "master/checksum.h"
+#include "protocol/cltoma.h"
 
 struct matocsserventry;
 
@@ -99,7 +100,7 @@ int chunk_invalidate_goal_cache();
 
 #endif
 
-int chunk_load(FILE *fd, bool loadLockIds);
+bool chunk_load(const MemoryMappedFile &metadataFile, size_t& offsetBegin, bool loadLockIds = true);
 void chunk_store(FILE *fd);
 void chunk_unload(void);
 void chunk_newfs(void);

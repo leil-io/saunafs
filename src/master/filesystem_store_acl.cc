@@ -80,125 +80,49 @@ void fs_store_acls(FILE *fd) {
 	fs_store_marker(fd);
 }
 
-static int fs_load_legacy_acl(FILE *fd, int ignoreflag) {
-	static std::vector<uint8_t> buffer;
-	buffer.clear();
-
-	// initialize
-	if (fd == nullptr) {
-		return 0;
-	}
-
+static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
+                             size_t& offsetBegin,
+                             int ignoreflag,
+                             bool default_acl) {
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
-		buffer.resize(serializedSize(size));
-		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
+        uint32_t sizeofsize = sizeof(size);
+		uint8_t *ptr = nullptr;
+		try{
+			ptr = metadataFile.seek(offsetBegin);
+		} catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
+			throw e;
 		}
-		deserialize(buffer, size);
+		deserialize(ptr, sizeofsize, size);
+		offsetBegin += sizeofsize;
+
 		if (size == 0) {
 			// this is end marker
 			return 1;
 		} else if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
-				SAUNAFS_ERROR_ERANGE);
+			                SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
-		buffer.resize(size);
-		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
+        try {
+			ptr = metadataFile.seek(offsetBegin);
+        } catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
+			throw e;
 		}
 
-		// Deserialize inode
+		// Deserialize inode & ACL
 		uint32_t inode;
-		deserialize(buffer, inode);
-		FSNode *p = fsnodes_id_to_node(inode);
-		if (!p) {
-			throw Exception("unknown inode: " + std::to_string(inode));
-		}
-
-		// Deserialize ACL
-		std::unique_ptr<legacy::ExtendedAcl> extended_acl;
-		std::unique_ptr<legacy::AccessControlList> default_acl;
-
-		deserialize(buffer, inode, extended_acl, default_acl);
-
-		RichACL new_acl;
-		if (extended_acl) {
-			AccessControlList posix_acl = (AccessControlList)*extended_acl;
-			new_acl.appendPosixACL(posix_acl, p->type == FSNode::kDirectory);
-			p->mode = (p->mode & ~0777) | (new_acl.getMode() & 0777);
-		}
-		if (default_acl && p->type == FSNode::kDirectory) {
-			AccessControlList posix_acl = (AccessControlList)*default_acl;
-			new_acl.appendDefaultPosixACL(posix_acl);
-		}
-		if (new_acl.size() > 0) {
-			gMetadata->acl_storage.set(p->id, std::move(new_acl));
-		}
-		return 0;
-	} catch (Exception &ex) {
-		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
-			return -1;
-		} else {
-			return 0;
-		}
-	}
-}
-
-int fs_load_legacy_acls(FILE *fd, int ignoreflag) {
-	fs_load_legacy_acl(NULL, ignoreflag);  // init
-	int s = 0;
-	do {
-		s = fs_load_legacy_acl(fd, ignoreflag);
-		if (s < 0) {
-			return -1;
-		}
-	} while (s == 0);
-	return 0;
-}
-
-static int fs_load_posix_acl(FILE *fd, int ignoreflag, bool default_acl) {
-	static std::vector<uint8_t> buffer;
-	buffer.clear();
-
-	try {
-		// Read size of the entry
-		uint32_t size = 0;
-		buffer.resize(serializedSize(size));
-		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
-		}
-		deserialize(buffer, size);
-		if (size == 0) {
-			// this is end marker
-			return 1;
-		} else if (size > 10000000) {
-			throw Exception("strange size of entry: " + std::to_string(size),
-				SAUNAFS_ERROR_ERANGE);
-		}
-
-		// Read the entry
-		buffer.resize(size);
-		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
-		}
-
-		// Deserialize inode
-		uint32_t inode;
-		deserialize(buffer, inode);
-		FSNode *p = fsnodes_id_to_node(inode);
-		if (!p) {
-			throw Exception("unknown inode: " + std::to_string(inode));
-		}
-
-		// Deserialize ACL
 		AccessControlList posix_acl;
-
-		deserialize(buffer, inode, posix_acl);
+		deserialize(ptr, size, inode, posix_acl);
+		offsetBegin += size;
+		FSNode *p = fsnodes_id_to_node(inode);
+		if (!p) {
+			throw Exception("unknown inode: " + std::to_string(inode));
+		}
 
 		if (default_acl) {
 			RichACL new_acl;
@@ -232,38 +156,122 @@ static int fs_load_posix_acl(FILE *fd, int ignoreflag, bool default_acl) {
 	}
 }
 
-int fs_load_posix_acls(FILE *fd, int ignoreflag) {
-	int s;
-
-	do {
-		s = fs_load_posix_acl(fd, ignoreflag, false);
-		if (s < 0) {
-			return -1;
-		}
-	} while (s == 0);
-
-	do {
-		s = fs_load_posix_acl(fd, ignoreflag, true);
-		if (s < 0) {
-			return -1;
-		}
-	} while (s == 0);
-
-	return 0;
-}
-
-static int fs_load_acl(FILE *fd, int ignoreflag) {
-	static std::vector<uint8_t> buffer;
-	buffer.clear();
-
+static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
+                              size_t& offsetBegin,
+                              int ignoreflag) {
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
-		buffer.resize(serializedSize(size));
-		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
+        uint32_t sizeofsize = sizeof(size);
+		uint8_t *ptr = nullptr;
+        try {
+			ptr = metadataFile.seek(offsetBegin);
+        } catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
+			throw e;
 		}
-		deserialize(buffer, size);
+		deserialize(ptr, sizeofsize, size);
+		offsetBegin += sizeofsize;
+		if (size == 0) {
+			// this is end marker
+			return 1;
+		} else if (size > 10000000) {
+			throw Exception("strange size of entry: " + std::to_string(size),
+			                SAUNAFS_ERROR_ERANGE);
+		}
+
+		// Read the entry
+        try {
+			ptr = metadataFile.seek(offsetBegin);
+        } catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
+			throw e;
+		}
+
+		// Deserialize inode & ACL
+		uint32_t inode;
+		std::unique_ptr<legacy::ExtendedAcl> extended_acl;
+		std::unique_ptr<legacy::AccessControlList> default_acl;
+		deserialize(ptr, size, inode, extended_acl, default_acl);
+		offsetBegin += size;
+		FSNode *p = fsnodes_id_to_node(inode);
+		if (!p) {
+			throw Exception("unknown inode: " + std::to_string(inode));
+		}
+
+		RichACL new_acl;
+		if (extended_acl) {
+			AccessControlList posix_acl = (AccessControlList)*extended_acl;
+			new_acl.appendPosixACL(posix_acl, p->type == FSNode::kDirectory);
+			p->mode = (p->mode & ~0777) | (new_acl.getMode() & 0777);
+		}
+		if (default_acl && p->type == FSNode::kDirectory) {
+			AccessControlList posix_acl = (AccessControlList)*default_acl;
+			new_acl.appendDefaultPosixACL(posix_acl);
+		}
+		if (new_acl.size() > 0) {
+			gMetadata->acl_storage.set(p->id, std::move(new_acl));
+		}
+		return 0;
+	} catch (Exception &ex) {
+		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
+		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
+			return -1;
+		} else {
+			return 0;
+		}
+	}
+}
+
+bool fs_load_legacy_acls(const MemoryMappedFile &metadataFile,
+                         size_t &offsetBegin, int ignoreflag) {
+	int s = 0;
+	do {
+		s = fs_load_legacy_acl(metadataFile, offsetBegin, ignoreflag);
+		if (s < 0) {
+			return false;
+		}
+	} while (s == 0);
+	return true;
+}
+
+bool fs_load_posix_acls(const MemoryMappedFile &metadataFile,
+                        size_t& offsetBegin, int ignoreflag) {
+	int s;
+
+	do {
+		s = fs_load_posix_acl(metadataFile, offsetBegin, ignoreflag, false);
+		if (s < 0) {
+			return false;
+		}
+	} while (s == 0);
+
+	do {
+		s = fs_load_posix_acl(metadataFile, offsetBegin, ignoreflag, true);
+		if (s < 0) {
+			return false;
+		}
+	} while (s == 0);
+
+	return true;
+}
+
+static int fs_load_acl(const MemoryMappedFile &metadataFile,
+                       size_t& offsetBegin,
+                       int ignoreflag) {
+	try {
+		// Read size of the entry
+		uint32_t size = 0;
+        uint32_t sizeofsize = sizeof(size);
+		uint8_t *ptr = nullptr;
+        try {
+			ptr = metadataFile.seek(offsetBegin);
+        } catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
+			throw e;
+		}
+		deserialize(ptr, sizeofsize, size);
+		offsetBegin += sizeofsize;
 		if (size == 0) {
 			// this is end marker
 			return 1;
@@ -273,22 +281,22 @@ static int fs_load_acl(FILE *fd, int ignoreflag) {
 		}
 
 		// Read the entry
-		buffer.resize(size);
-		if (fread(buffer.data(), 1, buffer.size(), fd) != buffer.size()) {
-			throw Exception(std::string("read error: ") + strerr(errno), SAUNAFS_ERROR_IO);
+        try {
+			ptr = metadataFile.seek(offsetBegin);
+        } catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
+			throw e;
 		}
 
-		// Deserialize inode
+		// Deserialize inode & ACL
 		uint32_t inode;
-		deserialize(buffer, inode);
+		RichACL acl;
+		deserialize(ptr, size, inode);
+		offsetBegin += size;
 		FSNode *p = fsnodes_id_to_node(inode);
 		if (!p) {
 			throw Exception("unknown inode: " + std::to_string(inode));
 		}
-
-		// Deserialize ACL
-		RichACL acl;
-		deserialize(buffer, inode, acl);
 		gMetadata->acl_storage.set(p->id, std::move(acl));
 		return 0;
 	} catch (Exception &ex) {
@@ -301,15 +309,16 @@ static int fs_load_acl(FILE *fd, int ignoreflag) {
 	}
 }
 
-int fs_load_acls(FILE *fd, int ignoreflag) {
+bool fs_load_acls(const MemoryMappedFile &metadataFile,
+                  size_t&  offsetBegin, int ignoreflag) {
 	int s;
 
 	do {
-		s = fs_load_acl(fd, ignoreflag);
+		s = fs_load_acl(metadataFile, offsetBegin, ignoreflag);
 		if (s < 0) {
-			return -1;
+			return false;
 		}
 	} while (s == 0);
 
-	return 0;
+	return true;
 }

@@ -18,31 +18,33 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "common/platform.h"
 #include "master/filesystem_store.h"
+#include "common/platform.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <future>
 #include <vector>
 
 #include "common/cwrap.h"
 #include "common/event_loop.h"
-#include "common/setup.h"
-#include "common/saunafs_version.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
+#include "common/saunafs_version.h"
 #include "common/setup.h"
 
+#include "common/memory_file.h"
 #include "master/changelog.h"
 #include "master/filesystem.h"
-#include "master/filesystem_xattr.h"
+#include "master/filesystem_checksum.h"
+#include "master/filesystem_freenode.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_node.h"
-#include "master/filesystem_freenode.h"
 #include "master/filesystem_operations.h"
-#include "master/filesystem_checksum.h"
 #include "master/filesystem_quota.h"
 #include "master/filesystem_store_acl.h"
+#include "master/filesystem_xattr.h"
 #include "master/locks.h"
 #include "master/matoclserv.h"
 #include "master/matomlserv.h"
@@ -53,8 +55,12 @@ constexpr uint8_t kMetadataVersionLegacy = 0x15;
 constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
 constexpr uint8_t kMetadataVersionWithSections = 0x20;
 constexpr uint8_t kMetadataVersionWithLockIds = 0x29;
+static constexpr int8_t kOpSuccess = 0;
+static constexpr int8_t kOpFailure = -1;
+static std::mutex gOffsetBeginMutex;
 
-char const MetadataStructureReadErrorMsg[] = "error reading metadata (structure)";
+char const MetadataStructureReadErrorMsg[] =
+    "error reading metadata (structure)";
 
 void xattr_store(FILE *fd) {
 	uint8_t hdrbuff[4 + 1 + 4];
@@ -72,7 +78,8 @@ void xattr_store(FILE *fd) {
 				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
-			if (fwrite(xa->attrname, 1, xa->anleng, fd) != (size_t)(xa->anleng)) {
+			if (fwrite(xa->attrname, 1, xa->anleng, fd) !=
+			    (size_t)(xa->anleng)) {
 				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
@@ -92,8 +99,9 @@ void xattr_store(FILE *fd) {
 	}
 }
 
-int xattr_load(FILE *fd, int ignoreflag) {
-	uint8_t hdrbuff[4 + 1 + 4];
+bool xattr_load(const MemoryMappedFile &metadataFile, size_t& offsetBegin,
+                int ignoreflag) {
+//	constexpr uint8_t kBufferXattrSize = 4 + 1 + 4;
 	const uint8_t *ptr;
 	uint32_t inode;
 	uint8_t anleng;
@@ -102,49 +110,48 @@ int xattr_load(FILE *fd, int ignoreflag) {
 	xattr_inode_entry *ih;
 	uint32_t hash, ihash;
 
-	while (1) {
-		if (fread(hdrbuff, 1, 4 + 1 + 4, fd) != 4 + 1 + 4) {
-			safs_pretty_errlog(LOG_ERR, "loading xattr: read error");
-			return -1;
+	while (true) {
+		try {
+			ptr = metadataFile.seek(offsetBegin);
+		} catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading xattr: can't read xattr");
+			return false;
 		}
-		ptr = hdrbuff;
 		inode = get32bit(&ptr);
 		anleng = get8bit(&ptr);
 		avleng = get32bit(&ptr);
+		offsetBegin = metadataFile.offset(ptr);
 		if (inode == 0) {
-			return 1;
+			return true;
 		}
 		if (anleng == 0) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: empty name");
 			if (ignoreflag) {
-				fseek(fd, anleng + avleng, SEEK_CUR);
 				continue;
 			} else {
-				return -1;
+				return false;
 			}
 		}
 		if (avleng > SFS_XATTR_SIZE_MAX) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: value oversized");
 			if (ignoreflag) {
-				fseek(fd, anleng + avleng, SEEK_CUR);
 				continue;
 			} else {
-				return -1;
+				return false;
 			}
 		}
 
 		ihash = xattr_inode_hash_fn(inode);
 		for (ih = gMetadata->xattr_inode_hash[ihash]; ih && ih->inode != inode;
-			ih = ih->next) {
-		}
+		     ih = ih->next)
+			;
 
 		if (ih && ih->anleng + anleng + 1 > SFS_XATTR_LIST_MAX) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: name list too long");
 			if (ignoreflag) {
-				fseek(fd, anleng + avleng, SEEK_CUR);
 				continue;
 			} else {
-				return -1;
+				return false;
 			}
 		}
 
@@ -152,27 +159,18 @@ int xattr_load(FILE *fd, int ignoreflag) {
 		xa->inode = inode;
 		xa->attrname = (uint8_t *)malloc(anleng);
 		passert(xa->attrname);
-		if (fread(xa->attrname, 1, anleng, fd) != (size_t)anleng) {
-			int err = errno;
-			delete xa;
-			errno = err;
-			safs_pretty_errlog(LOG_ERR, "loading xattr: read error");
-			return -1;
-		}
+		memcpy(xa->attrname, ptr, anleng);
+		ptr+=anleng;
 		xa->anleng = anleng;
 		if (avleng > 0) {
 			xa->attrvalue = (uint8_t *)malloc(avleng);
 			passert(xa->attrvalue);
-			if (fread(xa->attrvalue, 1, avleng, fd) != (size_t)avleng) {
-				int err = errno;
-				delete xa;
-				errno = err;
-				safs_pretty_errlog(LOG_ERR, "loading xattr: read error");
-				return -1;
-			}
+			memcpy(xa->attrvalue, ptr, avleng);
+			ptr+=avleng;
 		} else {
 			xa->attrvalue = NULL;
 		}
+		offsetBegin = metadataFile.offset(ptr);
 		xa->avleng = avleng;
 		hash = xattr_data_hash_fn(inode, xa->anleng, xa->attrname);
 		xa->next = gMetadata->xattr_data_hash[hash];
@@ -207,7 +205,7 @@ int xattr_load(FILE *fd, int ignoreflag) {
 }
 
 template <class... Args>
-static void fs_store_generic(FILE *fd, Args &&... args) {
+static void fs_store_generic(FILE *fd, Args &&...args) {
 	static std::vector<uint8_t> buffer;
 	buffer.clear();
 	const uint32_t size = serializedSize(std::forward<Args>(args)...);
@@ -219,27 +217,36 @@ static void fs_store_generic(FILE *fd, Args &&... args) {
 }
 
 template <class... Args>
-static bool fs_load_generic(FILE *fd, Args &&... args) {
-	static std::vector<uint8_t> buffer;
+static bool fs_load_generic(const MemoryMappedFile &metadataFile,
+                            size_t& offsetBegin, Args &&...args) {
+	constexpr uint8_t kSize = sizeof(std::uint32_t);
 	uint32_t size;
-	buffer.resize(4);
-	if (fread(buffer.data(), 1, 4, fd) != 4) {
+	uint8_t *ptr;
+	try {
+		ptr = metadataFile.seek(offsetBegin);
+	} catch (const std::exception &e) {
+		safs_pretty_syslog(LOG_ERR, "loading node: %s", e.what());
 		throw Exception("fread error (size)");
 	}
-	deserialize(buffer, size);
+	deserialize(ptr, kSize, size);
+	offsetBegin += kSize;
 	if (size == 0) {
 		// marker
 		return false;
 	}
-	buffer.resize(size);
-	if (fread(buffer.data(), 1, size, fd) != size) {
-		throw Exception("fread error (entry)");
+	try {
+		ptr = metadataFile.seek(offsetBegin);
+	} catch (const std::exception &e) {
+		safs_pretty_syslog(LOG_ERR, "loading node: %s", e.what());
+		throw Exception("fread error (size)");
 	}
-	deserialize(buffer, std::forward<Args>(args)...);
+	deserialize(ptr, size, std::forward<Args>(args)...);
+	offsetBegin += size;
 	return true;
 }
 
-void fs_storeedge(FSNodeDirectory* parent, FSNode* child, const std::string &name, FILE *fd) {
+void fs_storeedge(FSNodeDirectory *parent, FSNode *child,
+                  const std::string &name, FILE *fd) {
 	uint8_t uedgebuff[4 + 4 + 2 + 65535];
 	uint8_t *ptr;
 	if (child == nullptr) {  // last edge
@@ -259,168 +266,176 @@ void fs_storeedge(FSNodeDirectory* parent, FSNode* child, const std::string &nam
 	put32bit(&ptr, child->id);
 	put16bit(&ptr, name.length());
 	memcpy(ptr, name.c_str(), name.length());
-	if (fwrite(uedgebuff, 1, 4 + 4 + 2 + name.length(), fd) != (size_t)(4 + 4 + 2 + name.length())) {
+	if (fwrite(uedgebuff, 1, 4 + 4 + 2 + name.length(), fd) !=
+	    (size_t)(4 + 4 + 2 + name.length())) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 }
 
-int fs_loadedge(FILE *fd, int ignoreflag) {
-	uint8_t uedgebuff[4 + 4 + 2];
-	const uint8_t *ptr;
-	uint32_t parent_id;
-	uint32_t child_id;
-	statsrecord sr;
-	static uint32_t current_parent_id;
+/**
+ * @brief
+ * @param pSrc A pointer to the data storing all edges.
+ * @param sectionOffset A reference to point to the next edge attribute.
+ * @param ignoreFlag
+ * @param init
+ * @return 0 on success, 1 if last edge mark is found, -1 if unknown edge type
+ * 			or Error.
+ */
+int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, int ignoreFlag,
+                    bool init = false) {
+	static uint32_t currentParentId;
+	uint32_t parentId, childId;
 
-	if (fd == NULL) {
-		current_parent_id = 0;
+	if (init) {
+		currentParentId = 0;
 		return 0;
 	}
+	const uint8_t* pSrc = metadataFile.seek(sectionOffset);
+	parentId = get32bit(&pSrc);
+	childId = get32bit(&pSrc);
+	sectionOffset += (sizeof(uint32_t) << 1);
 
-	if (fread(uedgebuff, 1, 4 + 4 + 2, fd) != 4 + 4 + 2) {
-		safs_pretty_errlog(LOG_ERR, "loading edge: read error");
-		return -1;
-	}
-	ptr = uedgebuff;
-	parent_id = get32bit(&ptr);
-	child_id = get32bit(&ptr);
-	if (parent_id == 0 && child_id == 0) {  // last edge
+	uint16_t edgeNameSize = get16bit(&pSrc);
+	sectionOffset = metadataFile.offset(pSrc);
+
+	if (!parentId && !childId) {  /// Last edge mark;
 		return 1;
 	}
-	auto nleng = get16bit(&ptr);
-	if (nleng == 0) {
-		safs_pretty_syslog(LOG_ERR,
-		                   "loading edge: %" PRIu32 "->%" PRIu32 " error: empty name",
-		                   parent_id, child_id);
-		return -1;
-	}
-	std::vector<char> name_buffer(nleng);
-	if (fread(name_buffer.data(), 1, nleng, fd) != nleng) {
-		safs_pretty_errlog(LOG_ERR, "loading edge: read error");
+
+	if (!edgeNameSize) {
+		safs_pretty_syslog(
+		    LOG_ERR, "loading edge: %" PRIu32 "->%" PRIu32 " error: empty name",
+		    parentId, childId);
 		return -1;
 	}
 
-	std::string name(name_buffer.begin(), name_buffer.end());
-
-	FSNode* child = fsnodes_id_to_node(child_id);
-
-	if (child == nullptr) {
-		safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-		                            " error: child not found",
-		                   parent_id, fsnodes_escape_name(name).c_str(), child_id);
-		if (ignoreflag) {
+	std::string name(pSrc, pSrc + edgeNameSize);
+	sectionOffset += edgeNameSize;
+	FSNode *child = fsnodes_id_to_node(childId);
+	if (!child) {
+		safs_pretty_syslog(
+		    LOG_ERR,
+		    "loading edge: %" PRIu32 ",%s->%" PRIu32 " error: child not found",
+		    parentId, fsnodes_escape_name(name).c_str(), childId);
+		if (ignoreFlag) {
 			return 0;
 		}
 		return -1;
 	}
-
-	if (parent_id == 0) {
+	if (!parentId) {
 		if (child->type == FSNode::kTrash) {
-			gMetadata->trash.insert({TrashPathKey(child), hstorage::Handle(name)});
-
-			gMetadata->trashspace += static_cast<FSNodeFile*>(child)->length;
+			gMetadata->trash.insert(
+			    {TrashPathKey(child), hstorage::Handle(name)});
+			gMetadata->trashspace += static_cast<FSNodeFile *>(child)->length;
 			gMetadata->trashnodes++;
 		} else if (child->type == FSNode::kReserved) {
 			gMetadata->reserved.insert({child->id, hstorage::Handle(name)});
-
-			gMetadata->reservedspace += static_cast<FSNodeFile*>(child)->length;
+			gMetadata->reservedspace +=
+			    static_cast<FSNodeFile *>(child)->length;
 			gMetadata->reservednodes++;
 		} else {
-			safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-			                            " error: bad child type (%c)\n",
-			                   parent_id, fsnodes_escape_name(name).c_str(),
-			                   child_id, child->type);
+			safs_pretty_syslog(LOG_ERR,
+			                   "loading edge: %" PRIu32 ",%s->%" PRIu32
+			                   " error: bad child type (%c)\n",
+			                   parentId, fsnodes_escape_name(name).c_str(),
+			                   childId, child->type);
 			return -1;
 		}
 	} else {
-		FSNodeDirectory *parent = fsnodes_id_to_node<FSNodeDirectory>(parent_id);
-
-		if (parent == NULL) {
-			safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-			                            " error: parent not found",
-			                   parent_id, fsnodes_escape_name(name).c_str(),
-			                   child_id);
-			if (ignoreflag) {
-				parent = fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
-				if (parent == NULL || parent->type != FSNode::kDirectory) {
+		FSNodeDirectory *parent = fsnodes_id_to_node<FSNodeDirectory>(parentId);
+		if (!parent) {
+			safs_pretty_syslog(LOG_ERR,
+			                   "loading edge: %" PRIu32 ",%s->%" PRIu32
+			                   " error: parent not found",
+			                   parentId, fsnodes_escape_name(name).c_str(),
+			                   childId);
+			if (ignoreFlag) {
+				parent =
+				    fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
+				if (!parent || parent->type != FSNode::kDirectory) {
 					safs_pretty_syslog(
-					        LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-					                 " root dir not found !!!",
-					        parent_id, fsnodes_escape_name(name).c_str(),
-					        child_id);
+					    LOG_ERR,
+					    "loading edge: %" PRIu32 ",%s->%" PRIu32
+					    " root dir not found !!!",
+					    parentId, fsnodes_escape_name(name).c_str(), childId);
 					return -1;
 				}
-				safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-				                            " attaching node to root dir",
-				                   parent_id,
-				                   fsnodes_escape_name(name).c_str(),
-				                   child_id);
-				parent_id = SPECIAL_INODE_ROOT;
-			} else {
 				safs_pretty_syslog(LOG_ERR,
-				                   "use sfsmetarestore (option -i) to attach this "
-				                   "node to root dir\n");
+				                   "loading edge: %" PRIu32 ",%s->%" PRIu32
+				                   " attaching node to root dir",
+				                   parentId, fsnodes_escape_name(name).c_str(),
+				                   childId);
+				parentId = SPECIAL_INODE_ROOT;
+			} else {
+				safs_pretty_syslog(
+				    LOG_ERR,
+				    "use sfsmetarestore (option -i) to attach this "
+				    "node to root dir\n");
 				return -1;
 			}
 		}
 		if (parent->type != FSNode::kDirectory) {
-			safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-			                            " error: bad parent type (%c)",
-			                   parent_id, fsnodes_escape_name(name).c_str(),
-			                   child_id, parent->type);
-			if (ignoreflag) {
-				parent = fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
-				if (parent == NULL || parent->type != FSNode::kDirectory) {
+			safs_pretty_syslog(LOG_ERR,
+			                   "loading edge: %" PRIu32 ",%s->%" PRIu32
+			                   " error: bad parent type (%c)",
+			                   parentId, fsnodes_escape_name(name).c_str(),
+			                   childId, parent->type);
+			if (ignoreFlag) {
+				parent =
+				    fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
+				if (!parent || parent->type != FSNode::kDirectory) {
 					safs_pretty_syslog(
-					        LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-					                 " root dir not found !!!",
-					        parent_id, fsnodes_escape_name(name).c_str(),
-					        child_id);
+					    LOG_ERR,
+					    "loading edge: %" PRIu32 ",%s->%" PRIu32
+					    " root dir not found !!!",
+					    parentId, fsnodes_escape_name(name).c_str(), childId);
 					return -1;
 				}
-				safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-				                            " attaching node to root dir",
-				                   parent_id,
-				                   fsnodes_escape_name(name).c_str(),
-				                   child_id);
-				parent_id = SPECIAL_INODE_ROOT;
-			} else {
 				safs_pretty_syslog(LOG_ERR,
-				                   "use sfsmetarestore (option -i) to attach this "
-				                   "node to root dir\n");
+				                   "loading edge: %" PRIu32 ",%s->%" PRIu32
+				                   " attaching node to root dir",
+				                   parentId, fsnodes_escape_name(name).c_str(),
+				                   childId);
+				parentId = SPECIAL_INODE_ROOT;
+			} else {
+				safs_pretty_syslog(
+				    LOG_ERR,
+				    "use sfsmetarestore (option -i) to attach this "
+				    "node to root dir\n");
 				return -1;
 			}
 		}
-		if (current_parent_id != parent_id) {
+		if (currentParentId != parentId) {
 			if (parent->entries.size() > 0) {
-				safs_pretty_syslog(LOG_ERR, "loading edge: %" PRIu32 ",%s->%" PRIu32
-				                " error: parent node sequence error",
-				       parent_id, fsnodes_escape_name(name).c_str(), child_id);
+				safs_pretty_syslog(LOG_ERR,
+				                   "loading edge: %" PRIu32 ",%s->%" PRIu32
+				                   " error: parent node sequence error",
+				                   parentId, fsnodes_escape_name(name).c_str(),
+				                   childId);
 				return -1;
 			}
-			current_parent_id = parent_id;
+			currentParentId = parentId;
 		}
 
 		auto it = parent->entries.insert({hstorage::Handle(name), child}).first;
 		parent->entries_hash ^= (*it).first.hash();
 
 		child->parent.push_back(parent->id);
-
 		if (child->type == FSNode::kDirectory) {
 			parent->nlink++;
 		}
 
+		statsrecord sr;
 		fsnodes_get_stats(child, &sr);
 		fsnodes_add_stats(parent, &sr);
-
 	}
 	return 0;
 }
 
 void fs_storenode(FSNode *f, FILE *fd) {
-	uint8_t unodebuff[1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 + 8 * 65536 +
-	                  4 * 65536 + 4];
+	uint8_t unodebuff[1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 +
+	                  8 * 65536 + 4 * 65536 + 4];
 	uint8_t *ptr, *chptr;
 	uint32_t i, indx, ch, sessionids;
 	std::string name;
@@ -441,7 +456,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	put32bit(&ptr, f->ctime);
 	put32bit(&ptr, f->trashtime);
 
-	FSNodeFile *node_file = static_cast<FSNodeFile*>(f);
+	FSNodeFile *node_file = static_cast<FSNodeFile *>(f);
 
 	switch (f->type) {
 	case FSNode::kDirectory:
@@ -455,23 +470,23 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		break;
 	case FSNode::kBlockDev:
 	case FSNode::kCharDev:
-		put32bit(&ptr, static_cast<FSNodeDevice*>(f)->rdev);
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
-		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		put32bit(&ptr, static_cast<FSNodeDevice *>(f)->rdev);
+		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
+		           fd) != (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		break;
 	case FSNode::kSymlink:
-		name = (std::string)static_cast<FSNodeSymlink*>(f)->path;
+		name = (std::string) static_cast<FSNodeSymlink *>(f)->path;
 		put32bit(&ptr, name.length());
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
-		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
+		           fd) != (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		if (fwrite(name.c_str(), 1, name.length(), fd) !=
-		    (size_t)(static_cast<FSNodeSymlink*>(f)->path_length)) {
+		    (size_t)(static_cast<FSNodeSymlink *>(f)->path_length)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
@@ -485,7 +500,8 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		sessionids = std::min<int>(node_file->sessionid.size(), 65535);
 		put16bit(&ptr, sessionids);
 
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
+		if (fwrite(unodebuff, 1,
+		           1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
 		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
@@ -512,7 +528,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		}
 
 		sessionids = 0;
-		for(const auto &sid : node_file->sessionid) {
+		for (const auto &sid : node_file->sessionid) {
 			if (sessionids >= 65535) {
 				break;
 			}
@@ -528,146 +544,117 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	}
 }
 
-int fs_loadnode(FILE *fd) {
-	uint8_t unodebuff[4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 + 8 * 65536 + 4 * 65536 +
-	                  4];
-	const uint8_t *ptr, *chptr;
+/**
+ * @brief
+ * @param pSrc A pointer to the data storing all nodes.
+ * @param sectionOffset A reference to point to the next node attribute.
+ * @return 0 on success, 1 if last node mark is found, -1 if unknown node type.
+ */
+int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset) {
+	static constexpr uint32_t kChunkSize = (1 << 16);
+//	static constexpr uint8_t kNodeSize = 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4;
+
 	uint8_t type;
-	uint32_t i, indx, pleng, ch, sessionids, sessionid;
-	FSNode *p;
-	uint32_t nodepos;
-	std::vector<char> name_buffer;
-
-	if (fd == NULL) {
-		return 0;
-	}
-
-	type = fgetc(fd);
-	if (type == 0) {  // last node
+	FSNode *node;
+	const uint8_t *pSrc = metadataFile.seek(sectionOffset);
+	type = get8bit(&pSrc);
+//	sectionOffset++;
+	if (!type) {  // last node
+		sectionOffset = metadataFile.offset(pSrc);
 		return 1;
 	}
+
+	node = FSNode::create(type);
+	passert(node);
+	node->id = get32bit(&pSrc);
+	node->goal = get8bit(&pSrc);
+	node->mode = get16bit(&pSrc);
+	node->uid = get32bit(&pSrc);
+	node->gid = get32bit(&pSrc);
+	node->atime = get32bit(&pSrc);
+	node->mtime = get32bit(&pSrc);
+	node->ctime = get32bit(&pSrc);
+	node->trashtime = get32bit(&pSrc);
+//	sectionOffset += kNodeSize;
+	FSNodeFile *nodeFile = static_cast<FSNodeFile *>(node);
+
+	uint32_t nodeNameLength;
+	uint32_t chunkAmount;
+	uint16_t sessionIds;
+	uint32_t index;
+
 	switch (type) {
 	case FSNode::kDirectory:
-	case FSNode::kFifo:
+		gMetadata->dirnodes++;
+		break;
 	case FSNode::kSocket:
-		if (fread(unodebuff, 1, 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
-		    4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4) {
-			safs_pretty_errlog(LOG_ERR, "loading node: read error");
-			return -1;
-		}
+	case FSNode::kFifo:  /// No extra info to Parse
 		break;
 	case FSNode::kBlockDev:
 	case FSNode::kCharDev:
+		static_cast<FSNodeDevice *>(node)->rdev = get32bit(&pSrc);
+//		sectionOffset += sizeof(uint32_t);
+		break;
 	case FSNode::kSymlink:
-		if (fread(unodebuff, 1, 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
-		    4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4) {
-			safs_pretty_errlog(LOG_ERR, "loading node: read error");
-			return -1;
+		nodeNameLength = get32bit(&pSrc);
+//		sectionOffset += sizeof(uint32_t);
+		static_cast<FSNodeSymlink *>(node)->path_length = nodeNameLength;
+		if (nodeNameLength > 0) {  /// TODO check if pointer is shifted by
+			                       /// memcpy
+			std::memcpy(&(static_cast<FSNodeSymlink *>(node)->path.data()),
+			            pSrc, nodeNameLength);
+//			sectionOffset += nodeNameLength;
 		}
 		break;
 	case FSNode::kFile:
 	case FSNode::kTrash:
 	case FSNode::kReserved:
-		if (fread(unodebuff, 1, 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
-		    4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2) {
-			safs_pretty_errlog(LOG_ERR, "loading node: read error");
-			return -1;
+		nodeFile->length = get64bit(&pSrc);
+//		sectionOffset += sizeof(uint64_t);
+		chunkAmount = get32bit(&pSrc);
+//		sectionOffset += sizeof(uint32_t);
+		sessionIds = get16bit(&pSrc);
+//		sectionOffset += sizeof(uint16_t);
+		nodeFile->chunks.resize(chunkAmount);
+		index = 0;
+		while (chunkAmount > kChunkSize) {
+			for (uint32_t i = 0; i < kChunkSize; i++) {
+				nodeFile->chunks[index++] = get64bit(&pSrc);
+//				sectionOffset += sizeof(uint64_t);
+			}
+			chunkAmount -= kChunkSize;
 		}
+		for (uint32_t i = 0; i < chunkAmount; i++) {
+			nodeFile->chunks[index++] = get64bit(&pSrc);
+//			sectionOffset += sizeof(uint64_t);
+		}
+		while (sessionIds) {
+			uint32_t sessionId = get32bit(&pSrc);
+//			sectionOffset += sizeof(uint32_t);
+			nodeFile->sessionid.push_back(sessionId);
+#ifndef METARESTORE
+			matoclserv_add_open_file(sessionId, node->id);
+#endif
+			sessionIds--;
+		}
+		fsnodes_quota_update(node,
+		                     {{QuotaResource::kSize, +fsnodes_get_size(node)}});
+		gMetadata->filenodes++;
 		break;
 	default:
-		safs_pretty_syslog(LOG_ERR, "loading node: unrecognized node type: %c", type);
+		safs_pretty_syslog(LOG_ERR, "loading node: unrecognized node type: %c",
+		                   type);
+		fsnodes_quota_update(node, {{QuotaResource::kInodes, +1}});
+		sectionOffset = metadataFile.offset(pSrc);
 		return -1;
 	}
-	p = FSNode::create(type);
-	ptr = unodebuff;
-	p->id = get32bit(&ptr);
-	p->goal = get8bit(&ptr);
-	p->mode = get16bit(&ptr);
-	p->uid = get32bit(&ptr);
-	p->gid = get32bit(&ptr);
-	p->atime = get32bit(&ptr);
-	p->mtime = get32bit(&ptr);
-	p->ctime = get32bit(&ptr);
-	p->trashtime = get32bit(&ptr);
-	FSNodeFile *node_file = static_cast<FSNodeFile*>(p);
-	switch (type) {
-	case FSNode::kDirectory:
-		break;
-	case FSNode::kSocket:
-	case FSNode::kFifo:
-		break;
-	case FSNode::kBlockDev:
-	case FSNode::kCharDev:
-		static_cast<FSNodeDevice*>(p)->rdev = get32bit(&ptr);
-		break;
-	case FSNode::kSymlink:
-		pleng = get32bit(&ptr);
-		static_cast<FSNodeSymlink*>(p)->path_length = pleng;
-
-		if (pleng > 0) {
-			name_buffer.resize(pleng);
-			if (fread(name_buffer.data(), 1, pleng, fd) != pleng) {
-				safs_pretty_errlog(LOG_ERR, "loading node: read error");
-				FSNode::destroy(p);
-				return -1;
-			}
-			static_cast<FSNodeSymlink*>(p)->path = HString(name_buffer.begin(), name_buffer.end());
-		}
-		break;
-	case FSNode::kFile:
-	case FSNode::kTrash:
-	case FSNode::kReserved:
-		node_file->length = get64bit(&ptr);
-		ch = get32bit(&ptr);
-		sessionids = get16bit(&ptr);
-		node_file->chunks.resize(ch);
-
-		indx = 0;
-		while (ch > 65536) {
-			chptr = ptr;
-			if (fread((uint8_t *)ptr, 1, 8 * 65536, fd) != 8 * 65536) {
-				safs_pretty_errlog(LOG_ERR, "loading node: read error");
-				FSNode::destroy(p);
-				return -1;
-			}
-			for (i = 0; i < 65536; i++) {
-				node_file->chunks[indx] = get64bit(&chptr);
-				indx++;
-			}
-			ch -= 65536;
-		}
-		if (fread((uint8_t *)ptr, 1, 8 * ch + 4 * sessionids, fd) !=
-		    8 * ch + 4 * sessionids) {
-			safs_pretty_errlog(LOG_ERR, "loading node: read error");
-			FSNode::destroy(p);
-			return -1;
-		}
-		for (i = 0; i < ch; i++) {
-			node_file->chunks[indx] = get64bit(&ptr);
-			indx++;
-		}
-		while (sessionids) {
-			sessionid = get32bit(&ptr);
-			node_file->sessionid.push_back(sessionid);
-#ifndef METARESTORE
-			matoclserv_add_open_file(sessionid, p->id);
-#endif
-			sessionids--;
-		}
-		fsnodes_quota_update(p, {{QuotaResource::kSize, +fsnodes_get_size(p)}});
-	}
-	nodepos = NODEHASHPOS(p->id);
-	p->next = gMetadata->nodehash[nodepos];
-	gMetadata->nodehash[nodepos] = p;
-	gMetadata->inode_pool.markAsAcquired(p->id);
+	uint32_t nodeIndex = NODEHASHPOS(node->id);
+	node->next = gMetadata->nodehash[nodeIndex];
+	gMetadata->nodehash[nodeIndex] = node;
+	gMetadata->inode_pool.markAsAcquired(node->id);
 	gMetadata->nodes++;
-	if (type == FSNode::kDirectory) {
-		gMetadata->dirnodes++;
-	}
-	if (type == FSNode::kFile || type == FSNode::kTrash || type == FSNode::kReserved) {
-		gMetadata->filenodes++;
-	}
-	fsnodes_quota_update(p, {{QuotaResource::kInodes, +1}});
+	fsnodes_quota_update(node, {{QuotaResource::kInodes, +1}});
+	sectionOffset = metadataFile.offset(pSrc);
 	return 0;
 }
 
@@ -704,9 +691,9 @@ void fs_storeedgelist(const ReservedPathContainer &data, FILE *fd) {
 
 void fs_storeedges_rec(FSNodeDirectory *f, FILE *fd) {
 	fs_storeedgelist(f, fd);
-	for(const auto &entry : f->entries) {
+	for (const auto &entry : f->entries) {
 		if (entry.second->type == FSNode::kDirectory) {
-			fs_storeedges_rec(static_cast<FSNodeDirectory*>(entry.second), fd);
+			fs_storeedges_rec(static_cast<FSNodeDirectory *>(entry.second), fd);
 		}
 	}
 }
@@ -719,7 +706,8 @@ void fs_storeedges(FILE *fd) {
 }
 
 static void fs_storequotas(FILE *fd) {
-	const std::vector<QuotaEntry> &entries = gMetadata->quota_database.getEntries();
+	const std::vector<QuotaEntry> &entries =
+	    gMetadata->quota_database.getEntries();
 	fs_store_generic(fd, entries);
 }
 
@@ -736,10 +724,10 @@ int fs_lostnode(FSNode *p) {
 		if (i == 0) {
 			l = snprintf((char *)artname, 40, "lost_node_%" PRIu32, p->id);
 		} else {
-			l = snprintf((char *)artname, 40, "lost_node_%" PRIu32 ".%" PRIu32, p->id,
-			             i);
+			l = snprintf((char *)artname, 40, "lost_node_%" PRIu32 ".%" PRIu32,
+			             p->id, i);
 		}
-		HString name((const char*)artname, l);
+		HString name((const char *)artname, l);
 		if (!fsnodes_nameisused(gMetadata->root, name)) {
 			fsnodes_link(0, gMetadata->root, p, name);
 			return 1;
@@ -754,7 +742,8 @@ int fs_checknodes(int ignoreflag) {
 	FSNode *p;
 	for (i = 0; i < NODEHASHSIZE; i++) {
 		for (p = gMetadata->nodehash[i]; p; p = p->next) {
-			if (p->parent.empty() && p != gMetadata->root && (p->type != FSNode::kTrash) && (p->type != FSNode::kReserved)) {
+			if (p->parent.empty() && p != gMetadata->root &&
+			    (p->type != FSNode::kTrash) && (p->type != FSNode::kReserved)) {
 				safs_pretty_syslog(LOG_ERR, "found orphaned inode: %" PRIu32,
 				                   p->id);
 				if (ignoreflag) {
@@ -773,60 +762,61 @@ int fs_checknodes(int ignoreflag) {
 	return 1;
 }
 
-int fs_loadnodes(FILE *fd) {
-	int s;
-	fs_loadnode(NULL);
+bool fs_loadnodes(const MemoryMappedFile &metadataFile, size_t& offsetBegin) {
+	int8_t s;
 	do {
-		s = fs_loadnode(fd);
+		s = fs_parseNode(metadataFile, offsetBegin);
 		if (s < 0) {
-			return -1;
+			return false;
 		}
 	} while (s == 0);
-	return 0;
+	return true;
 }
 
-int fs_loadedges(FILE *fd, int ignoreflag) {
+bool fs_loadedges(const MemoryMappedFile &metadataFile, size_t& offsetBegin, int ignoreflag) {
 	int s;
-	fs_loadedge(NULL, ignoreflag);  // init
+	fs_parseEdge(metadataFile, offsetBegin, ignoreflag, true);
 	do {
-		s = fs_loadedge(fd, ignoreflag);
+		s = fs_parseEdge(metadataFile, offsetBegin, ignoreflag);
 		if (s < 0) {
-			return -1;
+			return false;
 		}
 	} while (s == 0);
-	return 0;
+	return true;
 }
 
-static int fs_loadquotas(FILE *fd, int ignoreflag) {
+static bool fs_loadquotas(const MemoryMappedFile &metadataFile,
+                          size_t& offsetBegin, int ignoreflag) {
 	try {
 		std::vector<QuotaEntry> entries;
-		fs_load_generic(fd, entries);
+		fs_load_generic(metadataFile, offsetBegin, entries);
 		for (const auto &entry : entries) {
-			gMetadata->quota_database.set(entry.entryKey.owner.ownerType,
-			                              entry.entryKey.owner.ownerId, entry.entryKey.rigor,
-			                              entry.entryKey.resource, entry.limit);
+			gMetadata->quota_database.set(
+			    entry.entryKey.owner.ownerType, entry.entryKey.owner.ownerId,
+			    entry.entryKey.rigor, entry.entryKey.resource, entry.limit);
 		}
 		gMetadata->quota_checksum = gMetadata->quota_database.checksum();
 	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "loading quotas: %s", ex.what());
 		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
-			return -1;
+			return false;
 		}
 	}
-	return 0;
+	return true;
 }
 
-static int fs_loadlocks(FILE *fd, int ignoreflag) {
+static bool fs_loadlocks(const MemoryMappedFile &metadataFile,
+                         size_t& offsetBegin, int ignoreflag) {
 	try {
-		gMetadata->flock_locks.load(fd);
-		gMetadata->posix_locks.load(fd);
+		gMetadata->flock_locks.load(metadataFile, offsetBegin);
+		gMetadata->posix_locks.load(metadataFile, offsetBegin);
 	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "loading locks: %s", ex.what());
 		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
-			return -1;
+			return false;
 		}
 	}
-	return 0;
+	return true;
 }
 
 void fs_storefree(FILE *fd) {
@@ -864,57 +854,44 @@ void fs_storefree(FILE *fd) {
 	}
 }
 
-int fs_loadfree(FILE *fd, uint64_t section_size = 0) {
-	uint8_t rbuff[8 * 1024];
+bool fs_loadfree(const MemoryMappedFile &metadataFile, size_t& offsetBegin,
+                 uint64_t sectionLength) {
 	const uint8_t *ptr;
-	uint32_t l, t;
+	uint32_t freeNodesToLoad, freeNodesNumber;
 
-	if (fread(rbuff, 1, 4, fd) != 4) {
-		safs_pretty_errlog(LOG_ERR, "loading free nodes: read error");
-		return -1;
-	}
-	ptr = rbuff;
-	t = get32bit(&ptr);
-
-	if (section_size && t != (section_size - 4) / 8) {
-		safs_pretty_errlog(LOG_INFO, "loading free nodes: section size doesn't match number of free nodes");
-		t = (section_size - 4) / 8;
+	try {
+		ptr = metadataFile.seek(offsetBegin);
+	} catch (const std::exception &e) {
+		safs_pretty_errlog(LOG_INFO, "loading free nodes: %s", e.what());
+		return false;
 	}
 
-	l = 0;
-	while (t > 0) {
-		if (l == 0) {
-			if (t > 1024) {
-				if (fread(rbuff, 1, 8 * 1024, fd) != 8 * 1024) {
-					safs_pretty_errlog(LOG_ERR,
-					                   "loading free nodes: read error");
-					return -1;
-				}
-				l = 1024;
-			} else {
-				if (fread(rbuff, 1, 8 * t, fd) != 8 * t) {
-					safs_pretty_errlog(LOG_ERR,
-					                   "loading free nodes: read error");
-					return -1;
-				}
-				l = t;
-			}
-			ptr = rbuff;
+	freeNodesNumber = get32bit(&ptr);
+
+	if (sectionLength && freeNodesNumber != (sectionLength - 4) / 8) {
+		safs_pretty_errlog(LOG_INFO,
+		                   "loading free nodes: section size doesn't match "
+		                   "number of free nodes");
+		freeNodesNumber = (sectionLength - 4) / 8;
+	}
+
+	freeNodesToLoad = 0;
+	while (freeNodesNumber > 0) {
+		if (freeNodesToLoad == 0) {
+			freeNodesToLoad = (freeNodesNumber > 1024) ? 1024 : freeNodesNumber;
 		}
-
 		uint32_t id = get32bit(&ptr);
-		uint32_t ts = get32bit(&ptr);
-
-		gMetadata->inode_pool.detain(id, ts, true);
-
-		l--;
-		t--;
+		uint32_t timestamp = get32bit(&ptr);
+		gMetadata->inode_pool.detain(id, timestamp, true);
+		freeNodesToLoad--;
+		freeNodesNumber--;
 	}
-	return 0;
+	offsetBegin = metadataFile.offset(ptr);
+	return true;
 }
 
 static int process_section(const char *label, uint8_t (&hdr)[16], uint8_t *&ptr,
-		off_t &offbegin, off_t &offend, FILE *&fd) {
+                           off_t &offbegin, off_t &offend, FILE *&fd) {
 	offend = ftello(fd);
 	memcpy(hdr, label, 8);
 	ptr = hdr + 8;
@@ -950,41 +927,49 @@ void fs_store(FILE *fd, uint8_t fver) {
 	}
 	fs_storenodes(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("NODE 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("NODE 1.0", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	fs_storeedges(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("EDGE 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("EDGE 1.0", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	fs_storefree(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("FREE 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("FREE 1.0", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		xattr_store(fd);
-		if (process_section("XATR 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("XATR 1.0", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_store_acls(fd);
-		if (process_section("ACLS 1.2", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("ACLS 1.2", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_storequotas(fd);
-		if (process_section("QUOT 1.1", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("QUOT 1.1", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_storelocks(fd);
-		if (process_section("FLCK 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("FLCK 1.0", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	chunk_store(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("CHNK 1.0", hdr, ptr, offbegin, offend, fd) != SAUNAFS_STATUS_OK) {
+		if (process_section("CHNK 1.0", hdr, ptr, offbegin, offend, fd) !=
+		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 
@@ -1016,238 +1001,316 @@ void fs_store_fd(FILE *fd) {
 	}
 }
 
-uint64_t fs_loadversion(FILE *fd) {
-	uint8_t hdr[12];
-	const uint8_t *ptr;
-	uint64_t fversion;
+static constexpr uint8_t kMetadataSectionHeaderSize = 16;
+static constexpr uint8_t kMetadataSectionNameSize = 8;
 
-	if (fread(hdr, 1, 12, fd) != 12) {
-		return 0;
-	}
-	ptr = hdr + 4;
-	fversion = get64bit(&ptr);
-	return fversion;
+//template <typename T>
+struct FutureInfo {
+	FutureInfo(std::string sectionName_, std::string sectionDescription_,
+	           std::future<bool> future_)
+	    : sectionName(std::move(sectionName_)),
+	      sectionDescription(std::move(sectionDescription_)),
+	      future(std::move(future_)) {}
+
+	std::string sectionName;
+	std::string sectionDescription;
+//	T future;
+	std::future<bool> future;
+};
+
+template <typename Func, typename... Args>
+static bool loadSectionHelper(Func callback, Args ...args) {
+	return callback(std::forward<Args>(args)...);
 }
 
-int fs_load(FILE *fd, int ignoreflag, uint8_t fver) {
-	uint8_t hdr[16];
-	const uint8_t *ptr;
-	off_t offbegin;
-	uint64_t sleng;
+//template <typename Func, typename... Args>
+//static std::future<bool> loadSectionAsync(Func callback,
+//                                          const MemoryMappedFile &metadataFile, size_t &offset,
+//                                          Args ...args) {
+//	return std::async(std::launch::async, loadSectionHelper<Func, Args ...>,
+//	                  callback, metaDataFile, offset, &args...);
+//}
 
-	if (fread(hdr, 1, 16, fd) != 16) {
-		safs_pretty_syslog(LOG_ERR, "error loading header");
-		return -1;
+//static void handleAsyncResult(FutureInfo &futureInfo) {
+//	try {
+//		if (!futureInfo.future.get()) {
+//			safs_pretty_syslog(LOG_ERR, "error reading section (%s)",
+//			                   futureInfo.sectionName.c_str());
+//		} else {
+//			safs_pretty_syslog(LOG_INFO, "Section loaded successfully (%s)",
+//			                   futureInfo.sectionName.c_str());
+//		}
+//	} catch (const std::exception &e) {
+//		safs_pretty_syslog(LOG_ERR, "Exception while processing section (%s)",
+//		                   futureInfo.sectionName.c_str());
+//		throw MetadataConsistencyException(e.what());
+//	}
+//}
+
+bool isEndOfMetadata(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataTrailer("[" SFSSIGNATURE
+	                                                   " EOF MARKER]");
+	return memcmp(sectionPtr, kMetadataTrailer.data(),
+	              ::kMetadataSectionHeaderSize) == kOpSuccess;
+}
+
+bool isNodeSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionNodes("NODE 1.0");
+	return memcmp(sectionPtr, kMetadataSectionNodes.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isEdgeSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionEdges("EDGE 1.0");
+	return memcmp(sectionPtr, kMetadataSectionEdges.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isFreeSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionFree("FREE 1.0");
+	return memcmp(sectionPtr, kMetadataSectionFree.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isXattrSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionXattr("XATR 1.0");
+	return memcmp(sectionPtr, kMetadataSectionXattr.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isAcl10Section(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionAclsV0("ACLS 1.0");
+	return memcmp(sectionPtr, kMetadataSectionAclsV0.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isAcl11Section(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionAclsV1("ACLS 1.1");
+	return memcmp(sectionPtr, kMetadataSectionAclsV1.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isAcl12Section(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionAclsV2("ACLS 1.2");
+	return memcmp(sectionPtr, kMetadataSectionAclsV2.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isQuota10Section(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionQuotasV0("QUOT 1.0");
+	return memcmp(sectionPtr, kMetadataSectionQuotasV0.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isQuota11Section(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionQuotasV1("QUOT 1.1");
+	return memcmp(sectionPtr, kMetadataSectionQuotasV1.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isLockSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionLocks("LOCK 1.0");
+	return memcmp(sectionPtr, kMetadataSectionLocks.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isFileLockSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionFileLocks("FLCK 1.0");
+	return memcmp(sectionPtr, kMetadataSectionFileLocks.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+bool isChunkSection(const uint8_t *sectionPtr) {
+	static constexpr std::string_view kMetadataSectionChunks("CHNK 1.0");
+	return memcmp(sectionPtr, kMetadataSectionChunks.data(),
+	              ::kMetadataSectionNameSize) == kOpSuccess;
+}
+
+static std::mutex gMetadataSectionHeaderMutex;
+
+int fs_load(const MemoryMappedFile &metadataFile, int ignoreflag) {
+	bool result = true;
+
+//	static constexpr uint8_t kMetadataSignatureOffset = 0;
+	static constexpr uint8_t kMetadataHeaderOffset = 8;
+
+//	static constexpr uint8_t kMetadataSectionLenghtOffset = 8;
+	static constexpr std::string_view kMetadataTrailer("[" SFSSIGNATURE
+	                                                   " EOF MARKER]");
+	static constexpr std::string_view kMetadataSectionNodes("NODE 1.0");
+	static constexpr std::string_view kMetadataSectionEdges("EDGE 1.0");
+	static constexpr std::string_view kMetadataSectionFree("FREE 1.0");
+	static constexpr std::string_view kMetadataSectionXattr("XATR 1.0");
+	static constexpr std::string_view kMetadataSectionAclsV0("ACLS 1.0");
+	static constexpr std::string_view kMetadataSectionAclsV1("ACLS 1.1");
+	static constexpr std::string_view kMetadataSectionAclsV2("ACLS 1.2");
+	static constexpr std::string_view kMetadataSectionQuotasV0("QUOT 1.0");
+	static constexpr std::string_view kMetadataSectionQuotasV1("QUOT 1.1");
+	static constexpr std::string_view kMetadataSectionLocks("LOCK 1.0");
+	static constexpr std::string_view kMetadataSectionFileLocks("FLCK 1.0");
+	static constexpr std::string_view kMetadataSectionChunks("CHNK 1.0");
+
+	/// Skip File Signature
+	const uint8_t *metadataHeaderPtr= metadataFile.seek(kMetadataHeaderOffset);
+
+	gMetadata->maxnodeid = get32bit(&metadataHeaderPtr);
+	gMetadata->metaversion = get64bit(&metadataHeaderPtr);
+	gMetadata->nextsessionid = get32bit(&metadataHeaderPtr);
+
+	size_t offsetBegin = metadataFile.offset(metadataHeaderPtr);
+	const uint8_t *sectionPtr;
+	while (true) {
+		sectionPtr = metadataFile.seek(offsetBegin);
+
+		if (isEndOfMetadata(sectionPtr)) {
+			safs_pretty_syslog(LOG_INFO, "Found last Metadata Section");
+			break;
+		}
+
+		const uint8_t *sectionHeaderPtr = sectionPtr + kMetadataSectionNameSize;
+		uint64_t sectionLength = get64bit(&sectionHeaderPtr);
+
+		offsetBegin = metadataFile.offset(sectionHeaderPtr);
+
+		if (isNodeSection(sectionPtr)) {
+			result &= fs_loadnodes(metadataFile, offsetBegin);
+#ifdef DEBUG
+			size_t expecteOffset =
+			    metadataFile.offset(sectionPtr)  /// current Section Header
+			    + kMetadataSectionNameSize       /// section name (8 bytes)
+			    + sizeof(uint64_t)  /// section length field (32 bytes)
+			    + sectionLength;    /// section length value (variable)
+			assert(expecteOffset == offsetBegin);
+#endif
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (node)"
+			                            : "error reading metadata (node)");
+			continue;
+		}
+		if (isEdgeSection(sectionPtr)) {
+			result &= fs_loadedges(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (edge)"
+			                            : "error reading metadata (edge)");
+			continue;
+		}
+		if (isFreeSection(sectionPtr)) {
+			result &= fs_loadfree(metadataFile, offsetBegin, sectionLength);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (free)"
+			                            : "error reading metadata (free)");
+			continue;
+		}
+		if (isXattrSection(sectionPtr)) {
+			result &= xattr_load(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (xattr)"
+			                            : "error reading metadata (xattr)");
+			continue;
+		}
+		if (isAcl10Section(sectionPtr)) {
+			result &=
+			    fs_load_legacy_acls(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (acl0)"
+			                            : "error reading metadata (acl0)");
+			continue;
+		}
+		if (isAcl11Section(sectionPtr)) {
+			result &= fs_load_posix_acls(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (acl1)"
+			                            : "error reading metadata (acl1)");
+			continue;
+		}
+		if (isAcl12Section(sectionPtr)) {
+			result &= fs_load_acls(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (acl2)"
+			                            : "error reading metadata (acl2)");
+			continue;
+		}
+		if (isQuota10Section(sectionPtr)) {
+			safs_pretty_syslog(LOG_WARNING,
+			                   "old quota entries found, ignoring");
+			continue;
+		}
+		if (isQuota11Section(sectionPtr)) {
+			result &= fs_loadquotas(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (quota)"
+			                            : "error reading metadata (quota)");
+			continue;
+		}
+		if (isLockSection(sectionPtr)) {
+			/// Do nothing
+			continue;
+		}
+		if (isFileLockSection(sectionPtr)) {
+			result &= fs_loadlocks(metadataFile, offsetBegin, ignoreflag);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (locks)"
+			                            : "error reading metadata (locks)");
+			continue;
+		}
+		if (isChunkSection(sectionPtr)) {
+			result &= chunk_load(metadataFile, offsetBegin, true);
+			safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
+			                   (result) ? "Section loaded successfully (chunk)"
+			                            : "error reading metadata (chunk)");
+			continue;
+		}
+		uint8_t sectionName[kMetadataSectionNameSize + 1];
+		memcpy(sectionName, sectionPtr, kMetadataSectionNameSize);
+		sectionName[kMetadataSectionNameSize] = 0;
+		if (ignoreflag) {
+			safs_pretty_syslog(LOG_WARNING,
+			                   "unknown section found (leng:%" PRIu64
+			                   ",name:%s) - all data from this section "
+			                   "will be lost",
+			                   sectionLength, sectionName);
+			offsetBegin += sectionLength;
+		} else {
+			safs_pretty_syslog(LOG_ERR,
+			                   "error: unknown section found (leng:%" PRIu64
+			                   ",name:%s)",
+			                   sectionLength, sectionName);
+			return kOpFailure;
+		}
 	}
-	ptr = hdr;
-	gMetadata->maxnodeid = get32bit(&ptr);
-	gMetadata->metaversion = get64bit(&ptr);
-	gMetadata->nextsessionid = get32bit(&ptr);
 
-	if (fver < kMetadataVersionWithSections) {
-		safs_pretty_syslog_attempt(
-		    LOG_INFO, "loading objects (files,directories,etc.) from the metadata file");
-		fflush(stderr);
-		if (fs_loadnodes(fd) < 0) {
-#ifndef METARESTORE
-			safs_pretty_syslog(LOG_ERR, "error reading metadata (node)");
-#endif
-			return -1;
-		}
-		safs_pretty_syslog_attempt(LOG_INFO, "loading names");
-		fflush(stderr);
-		if (fs_loadedges(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-			safs_pretty_syslog(LOG_ERR, "error reading metadata (edge)");
-#endif
-			return -1;
-		}
-		safs_pretty_syslog_attempt(LOG_INFO, "loading deletion timestamps from the metadata file");
-		fflush(stderr);
-		if (fs_loadfree(fd) < 0) {
-#ifndef METARESTORE
-			safs_pretty_syslog(LOG_ERR, "error reading metadata (free)");
-#endif
-			return -1;
-		}
-		safs_pretty_syslog_attempt(LOG_INFO, "loading chunks data from the metadata file");
-		fflush(stderr);
-		if (chunk_load(fd, false) < 0) {
-#ifndef METARESTORE
-			safs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
-#endif
-			return -1;
-		}
-	} else { // metadata with sections
-		while (1) {
-			if (fread(hdr, 1, 16, fd) != 16) {
-				safs_pretty_syslog(LOG_ERR, "error reading section header from the metadata file");
-				return -1;
-			}
-			if (memcmp(hdr, "[SFS EOF MARKER]", 16) == 0) {
-				break;
-			}
-			ptr = hdr + 8;
-			sleng = get64bit(&ptr);
-			offbegin = ftello(fd);
-			if (memcmp(hdr, "NODE 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_INFO,
-				                           "loading objects "
-				                           "(files,directories,etc.) from the "
-				                           "metadata file");
-				fflush(stderr);
-				if (fs_loadnodes(fd) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading metadata (node)");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "EDGE 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_INFO, "loading names from the metadata file");
-				fflush(stderr);
-				if (fs_loadedges(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading metadata (edge)");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "FREE 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_INFO,
-				                           "loading deletion timestamps from the metadata file");
-				fflush(stderr);
-				if (fs_loadfree(fd, sleng) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading metadata (free)");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "XATR 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(
-				    LOG_INFO, "loading extra attributes (xattr) from the metadata file");
-				fflush(stderr);
-				if (xattr_load(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading metadata (xattr)");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "ACLS 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_INFO,
-				                           "loading access control lists from the metadata file");
-				fflush(stderr);
-				if (fs_load_legacy_acls(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR,
-					                   "error reading access control lists");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "ACLS 1.1", 8) == 0) {
-				safs_pretty_syslog_attempt(
-				        LOG_INFO,
-				        "loading access control lists from the metadata file");
-				fflush(stderr);
-				if (fs_load_posix_acls(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading access control lists");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "ACLS 1.2", 8) == 0) {
-				safs_pretty_syslog_attempt(
-				        LOG_INFO,
-				        "loading access control lists from the metadata file");
-				fflush(stderr);
-				if (fs_load_acls(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading access control lists");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "QUOT 1.0", 8) == 0) {
-				safs_pretty_syslog(LOG_WARNING, "old quota entries found, ignoring");
-				fseeko(fd, sleng, SEEK_CUR);
-			} else if (memcmp(hdr, "QUOT 1.1", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_INFO,
-				                           "loading quota entries from the metadata file");
-				fflush(stderr);
-				if (fs_loadquotas(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading quota entries");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "LOCK 1.0", 8) == 0) {
-				fseeko(fd, sleng, SEEK_CUR);
-			} else if (memcmp(hdr, "FLCK 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_ERR, "loading file locks from the metadata file");
-				if (fs_loadlocks(fd, ignoreflag) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
-#endif
-					return -1;
-				}
-			} else if (memcmp(hdr, "CHNK 1.0", 8) == 0) {
-				safs_pretty_syslog_attempt(LOG_INFO, "loading chunks data from the metadata file");
-				fflush(stderr);
-				bool loadLockIds = (fver == kMetadataVersionWithLockIds);
-				if (chunk_load(fd, loadLockIds) < 0) {
-#ifndef METARESTORE
-					safs_pretty_syslog(LOG_ERR, "error reading metadata (chunks)");
-#endif
-					return -1;
-				}
-			} else {
-				hdr[8] = 0;
-				if (ignoreflag) {
-					safs_pretty_syslog(LOG_WARNING, "unknown section found (leng:%" PRIu64
-					                                ",name:%s) - all data from this section "
-					                                "will be lost",
-					                   sleng, hdr);
-					fseeko(fd, sleng, SEEK_CUR);
-				} else {
-					safs_pretty_syslog(LOG_ERR,
-					                   "error: unknown section found (leng:%" PRIu64 ",name:%s)",
-					                   sleng, hdr);
-					return -1;
-				}
-			}
-			if ((off_t)(offbegin + sleng) != ftello(fd)) {
-				safs_pretty_syslog(LOG_WARNING, "not all section has been read - file corrupted");
-				if (ignoreflag == 0) {
-					return -1;
-				}
-			}
-		}
-	}
-
-	safs_pretty_syslog_attempt(LOG_INFO,
-	                           "checking filesystem consistency of the metadata file");
+	safs_pretty_syslog_attempt(
+	    LOG_INFO, "checking filesystem consistency of the metadata file");
 	fflush(stderr);
 	gMetadata->root = fsnodes_id_to_node<FSNodeDirectory>(SPECIAL_INODE_ROOT);
-	if (gMetadata->root == NULL) {
-		safs_pretty_syslog(LOG_ERR, "error reading metadata (root node not found)");
-		return -1;
+	if (gMetadata->root == nullptr) {
+		safs_pretty_syslog(LOG_ERR,
+		                   "error reading metadata (root node not found)");
+		return kOpFailure;
 	}
 	if (gMetadata->root->type != FSNode::kDirectory) {
-		safs_pretty_syslog(LOG_ERR, "error reading metadata (root node not a directory)");
-		return -1;
+		safs_pretty_syslog(
+		    LOG_ERR, "error reading metadata (root node not a directory)");
+		return kOpFailure;
 	}
 	if (fs_checknodes(ignoreflag) < 0) {
-		return -1;
+		return kOpFailure;
 	}
-	return 0;
+	return kOpSuccess;
 }
 
 #ifndef METARESTORE
+
 void fs_new(void) {
 	uint32_t nodepos;
 	gMetadata->maxnodeid = SPECIAL_INODE_ROOT;
 	gMetadata->metaversion = 1;
 	gMetadata->nextsessionid = 1;
-	gMetadata->root = static_cast<FSNodeDirectory*>(FSNode::create(FSNode::kDirectory));
+	gMetadata->root =
+	    static_cast<FSNodeDirectory *>(FSNode::create(FSNode::kDirectory));
 	gMetadata->root->id = SPECIAL_INODE_ROOT;
-	gMetadata->root->ctime = gMetadata->root->mtime = gMetadata->root->atime = eventloop_time();
+	gMetadata->root->ctime = gMetadata->root->mtime = gMetadata->root->atime =
+	    eventloop_time();
 	gMetadata->root->goal = DEFAULT_GOAL;
 	gMetadata->root->trashtime = DEFAULT_TRASHTIME;
 	gMetadata->root->mode = 0777;
@@ -1264,6 +1327,7 @@ void fs_new(void) {
 	fs_checksum(ChecksumMode::kForceRecalculate);
 	fsnodes_quota_update(gMetadata->root, {{QuotaResource::kInodes, +1}});
 }
+
 #endif
 
 int fs_emergency_storeall(const std::string &fname) {
@@ -1277,10 +1341,11 @@ int fs_emergency_storeall(const std::string &fname) {
 	if (ferror(fd.get()) != 0) {
 		return -1;
 	}
-	safs_pretty_syslog(LOG_WARNING,
-	                   "metadata were stored to emergency file: %s - please copy this file to "
-	                   "your default location as '%s'",
-	                   fname.c_str(), kMetadataFilename);
+	safs_pretty_syslog(
+	    LOG_WARNING,
+	    "metadata were stored to emergency file: %s - please copy this file to "
+	    "your default location as '%s'",
+	    fname.c_str(), kMetadataFilename);
 	return 0;
 }
 
@@ -1314,16 +1379,20 @@ int fs_emergency_saves() {
 	if (fs_emergency_storeall("/usr/" + metadata_emergency_filename) == 0) {
 		return 0;
 	}
-	if (fs_emergency_storeall("/usr/share/" + metadata_emergency_filename) == 0) {
+	if (fs_emergency_storeall("/usr/share/" + metadata_emergency_filename) ==
+	    0) {
 		return 0;
 	}
-	if (fs_emergency_storeall("/usr/local/" + metadata_emergency_filename) == 0) {
+	if (fs_emergency_storeall("/usr/local/" + metadata_emergency_filename) ==
+	    0) {
 		return 0;
 	}
-	if (fs_emergency_storeall("/usr/local/var/" + metadata_emergency_filename) == 0) {
+	if (fs_emergency_storeall("/usr/local/var/" +
+	                          metadata_emergency_filename) == 0) {
 		return 0;
 	}
-	if (fs_emergency_storeall("/usr/local/share/" + metadata_emergency_filename) == 0) {
+	if (fs_emergency_storeall("/usr/local/share/" +
+	                          metadata_emergency_filename) == 0) {
 		return 0;
 	}
 	return -1;
@@ -1350,15 +1419,15 @@ void fs_load_changelogs() {
 	 * If we are master we only really care for:
 	 * "changelog.sfs.1" and "changelog.sfs" files.
 	 */
-	static const std::string changelogs[]{std::string(kChangelogFilename) + ".2",
-	                                      std::string(kChangelogFilename) + ".1",
-	                                      kChangelogFilename};
+	static const std::string changelogs[]{
+	    std::string(kChangelogFilename) + ".2",
+	    std::string(kChangelogFilename) + ".1", kChangelogFilename};
 	restore_setverblevel(gVerbosity);
 	bool oldExists = false;
 	try {
 		for (const std::string &s : changelogs) {
 			std::string fullFileName =
-			        fs::getCurrentWorkingDirectoryNoThrow() + "/" + s;
+			    fs::getCurrentWorkingDirectoryNoThrow() + "/" + s;
 			if (fs::exists(s)) {
 				oldExists = true;
 				uint64_t first = changelogGetFirstLogVersion(s);
@@ -1369,13 +1438,12 @@ void fs_load_changelogs() {
 					}
 				} else {
 					throw InitializeException(
-					        "changelog " + fullFileName +
-					        " inconsistent, "
-					        "use sfsmetarestore to recover the filesystem; "
-					        "current fs version: " +
-					        std::to_string(fs_getversion()) +
-					        ", first change in the file: " +
-					        std::to_string(first));
+					    "changelog " + fullFileName +
+					    " inconsistent, "
+					    "use sfsmetarestore to recover the filesystem; "
+					    "current fs version: " +
+					    std::to_string(fs_getversion()) +
+					    ", first change in the file: " + std::to_string(first));
 				}
 			} else if (oldExists && s != kChangelogFilename) {
 				safs_pretty_syslog(LOG_WARNING, "changelog `%s' missing",
@@ -1393,7 +1461,8 @@ void fs_load_changelogs() {
  * Load and apply given changelog file.
  */
 void fs_load_changelog(const std::string &path) {
-	std::string fullFileName = fs::getCurrentWorkingDirectoryNoThrow() + "/" + path;
+	std::string fullFileName =
+	    fs::getCurrentWorkingDirectoryNoThrow() + "/" + path;
 	std::ifstream changelog(path);
 	std::string line;
 	size_t end = 0;
@@ -1404,7 +1473,7 @@ void fs_load_changelog(const std::string &path) {
 	uint64_t skippedEntries = 0;
 	uint64_t appliedEntries = 0;
 	while (std::getline(changelog, line).good()) {
-		id = stoull(line, &end);
+		id = std::stoull(line, &end);
 		if (id < fs_getversion()) {
 			++skippedEntries;
 			continue;
@@ -1415,17 +1484,19 @@ void fs_load_changelog(const std::string &path) {
 		uint8_t status = restore(path.c_str(), id, line.c_str() + end,
 		                         RestoreRigor::kIgnoreParseErrors);
 		if (status != SAUNAFS_STATUS_OK) {
-			throw MetadataConsistencyException("can't apply changelog " + fullFileName,
-			                                   status);
+			throw MetadataConsistencyException(
+			    "can't apply changelog " + fullFileName, status);
 		}
 	}
 	if (appliedEntries > 0) {
-		safs_pretty_syslog_attempt(LOG_NOTICE, "%s: %" PRIu64 " changes applied (%" PRIu64
-		                                       " to %" PRIu64 "), %" PRIu64 " skipped",
-		                           fullFileName.c_str(), appliedEntries, first, id,
-		                           skippedEntries);
+		safs_pretty_syslog_attempt(LOG_NOTICE,
+		                           "%s: %" PRIu64 " changes applied (%" PRIu64
+		                           " to %" PRIu64 "), %" PRIu64 " skipped",
+		                           fullFileName.c_str(), appliedEntries, first,
+		                           id, skippedEntries);
 	} else if (skippedEntries > 0) {
-		safs_pretty_syslog_attempt(LOG_NOTICE, "%s: skipped all %" PRIu64 " entries",
+		safs_pretty_syslog_attempt(LOG_NOTICE,
+		                           "%s: skipped all %" PRIu64 " entries",
 		                           fullFileName.c_str(), skippedEntries);
 	} else {
 		safs_pretty_syslog_attempt(LOG_NOTICE, "%s: file empty (ignored)",
@@ -1435,70 +1506,72 @@ void fs_load_changelog(const std::string &path) {
 
 #endif
 
-void fs_loadall(const std::string& fname,int ignoreflag) {
-	cstream_t fd(fopen(fname.c_str(), "r"));
-	std::string fnameWithPath;
-	if (fname.front() == '/') {
-		fnameWithPath = fname;
-	} else {
-		fnameWithPath = fs::getCurrentWorkingDirectoryNoThrow() + "/" + fname;
-	}
-	if (fd == nullptr) {
-		throw FilesystemException("can't open metadata file: " + errorString(errno));
-	}
-	safs_pretty_syslog(LOG_INFO,"opened metadata file %s", fnameWithPath.c_str());
-	uint8_t hdr[8];
-	if (fread(hdr,1,8,fd.get())!=8) {
-		throw MetadataConsistencyException("can't read metadata header");
-	}
+bool isNewMetadataFile([[maybe_unused]]const uint8_t *headerPtr) {
+	static constexpr std::string_view kMetadataHeaderNew(SFSSIGNATURE "M NEW");
+	[[maybe_unused]]static constexpr uint8_t kMetadataHeaderSize = 8;
 #ifndef METARESTORE
-	if (metadataserver::isMaster()) {
-		if (memcmp(hdr, "SFSM NEW", 8) == 0) {    // special case - create new file system
+	if (metadataserver::isMaster()) {  // special case - create new file system
+		if (memcmp(headerPtr, kMetadataHeaderNew.data(), kMetadataHeaderSize) ==
+		    kOpSuccess) {
 			fs_new();
 			safs_pretty_syslog(LOG_NOTICE, "empty filesystem created");
-			// after creating new filesystem always create "back" file for using in metarestore
+			// after creating new filesystem always create "back" file for using
+			// in metarestore
 			fs_storeall(MetadataDumper::kForegroundDump);
-			return;
+			return true;
 		}
 	}
 #endif /* #ifndef METARESTORE */
-	uint8_t metadataVersion;
-	if (memcmp(hdr,SFSSIGNATURE "M 1.5",8)==0) {
-		metadataVersion = kMetadataVersionLegacy;
-	} else if (memcmp(hdr,SFSSIGNATURE "M 1.6",8)==0) {
-		metadataVersion = kMetadataVersionSaunaFS;
-	} else if (memcmp(hdr,SFSSIGNATURE "M 2.0",8)==0) {
-		metadataVersion = kMetadataVersionWithSections;
-	} else if (memcmp(hdr, SFSSIGNATURE "M 2.9", 8) == 0) {
-		metadataVersion = kMetadataVersionWithLockIds;
-	} else {
+	return false;
+}
+
+bool checkMetadataSignature(const MemoryMappedFile &metadataFile) {
+	static constexpr std::string_view kMetadataHeaderV2_9(SFSSIGNATURE "M 2.9");
+	static constexpr uint8_t kMetadataHeaderSize = 8;
+	size_t kMetadataHeaderOffset{0};
+	uint8_t *headerPtr;
+	try {
+		headerPtr = metadataFile.seek(kMetadataHeaderOffset);
+		safs_pretty_syslog(LOG_INFO, "opened metadata file %s",
+		                   metadataFile.filename().c_str());
+	} catch (const std::exception &e) {
+		throw e;
+	}
+	if (isNewMetadataFile(headerPtr)) {
+		return false;
+	}
+	if (memcmp(headerPtr, kMetadataHeaderV2_9.data(), kMetadataHeaderSize) !=
+	    kOpSuccess) {
 		throw MetadataConsistencyException("wrong metadata header version");
 	}
+	return true;
+}
 
-	if (fs_load(fd.get(), ignoreflag, metadataVersion) < 0) {
+void fs_loadall(const std::string &fname, int ignoreflag) {
+	MemoryMappedFile metadataFile(fname);
+	if (!checkMetadataSignature(metadataFile)) {
+		return;
+	}
+	if (fs_load(metadataFile, ignoreflag) != kOpSuccess) {
 		throw MetadataConsistencyException(MetadataStructureReadErrorMsg);
 	}
-	if (ferror(fd.get())!=0) {
-		throw MetadataConsistencyException(MetadataStructureReadErrorMsg);
-	}
-	safs_pretty_syslog_attempt(LOG_INFO,"connecting files and chunks");
+	safs_pretty_syslog_attempt(LOG_INFO, "connecting files and chunks");
 	fs_add_files_to_chunks();
 	unlink(kMetadataTmpFilename);
-	safs_pretty_syslog_attempt(LOG_INFO, "calculating checksum of the metadata");
+	safs_pretty_syslog_attempt(LOG_INFO,
+	                           "calculating checksum of the metadata");
 	fs_checksum(ChecksumMode::kForceRecalculate);
+
 #ifndef METARESTORE
-	safs_pretty_syslog(LOG_INFO,
-			"metadata file %s read ("
-			"%" PRIu32 " inodes including "
-			"%" PRIu32 " directory inodes and "
-			"%" PRIu32 " file inodes, "
-			"%" PRIu32 " chunks)",
-			fnameWithPath.c_str(),
-			gMetadata->nodes, gMetadata->dirnodes, gMetadata->filenodes, chunk_count());
+	safs_pretty_syslog(
+	    LOG_INFO,
+	    "metadata file %s read (%" PRIu32 " inodes including %" PRIu32
+	    " directory inodes and %" PRIu32 " file inodes, %" PRIu32 " chunks)",
+	    fname.c_str(), gMetadata->nodes, gMetadata->dirnodes,
+	    gMetadata->filenodes, chunk_count());
 #else
-	safs_pretty_syslog(LOG_INFO, "metadata file %s read", fnameWithPath.c_str());
+	safs_pretty_syslog(LOG_INFO, "metadata file %s read", fname.c_str());
 #endif
-	return;
 }
 
 #ifndef METARESTORE
@@ -1521,24 +1594,28 @@ bool fs_commit_metadata_dump() {
 		fs::rename(kMetadataTmpFilename, kMetadataFilename);
 		safs_silent_syslog(LOG_DEBUG, "master.fs.stored");
 		return true;
-	} catch (Exception& ex) {
+	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "renaming %s to %s failed: %s",
-				kMetadataTmpFilename, kMetadataFilename, ex.what());
+		                   kMetadataTmpFilename, kMetadataFilename, ex.what());
 	}
 
 	// The previous step didn't return, so let's try to save us in other way
-	std::string alternativeName = kMetadataFilename + std::to_string(eventloop_time());
+	std::string alternativeName =
+	    kMetadataFilename + std::to_string(eventloop_time());
 	try {
 		fs::rename(kMetadataTmpFilename, alternativeName);
-		safs_pretty_syslog(LOG_ERR, "emergency metadata file created as %s", alternativeName.c_str());
+		safs_pretty_syslog(LOG_ERR, "emergency metadata file created as %s",
+		                   alternativeName.c_str());
 		return false;
-	} catch (Exception& ex) {
+	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "renaming %s to %s failed: %s",
-				kMetadataTmpFilename, alternativeName.c_str(), ex.what());
+		                   kMetadataTmpFilename, alternativeName.c_str(),
+		                   ex.what());
 	}
 
 	// Nothing can be done...
-	safs_pretty_syslog_attempt(LOG_ERR, "trying to create emergency metadata file in foreground");
+	safs_pretty_syslog_attempt(
+	    LOG_ERR, "trying to create emergency metadata file in foreground");
 	fs_emergency_saves();
 	return false;
 }
@@ -1547,20 +1624,25 @@ bool fs_commit_metadata_dump() {
 uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 	if (gMetadata == nullptr) {
 		// Periodic dump in shadow master or a request from saunafs-admin
-		safs_pretty_syslog(LOG_INFO, "Can't save metadata because no metadata is loaded");
+		safs_pretty_syslog(LOG_INFO,
+		                   "Can't save metadata because no metadata is loaded");
 		return SAUNAFS_ERROR_NOTPOSSIBLE;
 	}
 	if (metadataDumper.inProgress()) {
-		safs_pretty_syslog(LOG_ERR, "previous metadata save process hasn't finished yet - do not start another one");
+		safs_pretty_syslog(LOG_ERR,
+		                   "previous metadata save process hasn't finished yet "
+		                   "- do not start another one");
 		return SAUNAFS_ERROR_TEMP_NOTPOSSIBLE;
 	}
 
-	fs_erase_message_from_lockfile(); // We are going to do some changes in the data dir right now
+	fs_erase_message_from_lockfile();  // We are going to do some changes in the
+	                                   // data dir right now
 	changelog_rotate();
 	matomlserv_broadcast_logrotate();
 	// child == true says that we forked
 	// bg may be changed to dump in foreground in case of a fork error
-	bool child = metadataDumper.start(dumpType, fs_checksum(ChecksumMode::kGetCurrent));
+	bool child =
+	    metadataDumper.start(dumpType, fs_checksum(ChecksumMode::kGetCurrent));
 	uint8_t status = SAUNAFS_STATUS_OK;
 
 	if (dumpType == MetadataDumper::kForegroundDump) {
@@ -1597,12 +1679,14 @@ uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 			}
 			fd.reset();
 			if (!child) {
-				// rename backups if no child was created, otherwise this is handled by pollServe
-				status = fs_commit_metadata_dump() ? SAUNAFS_STATUS_OK : SAUNAFS_ERROR_IO;
+				// rename backups if no child was created, otherwise this is
+				// handled by pollServe
+				status = fs_commit_metadata_dump() ? SAUNAFS_STATUS_OK
+				                                   : SAUNAFS_ERROR_IO;
 			}
 		}
 		if (child) {
-			printf("OK\n"); // give sfsmetarestore another chance
+			printf("OK\n");  // give sfsmetarestore another chance
 			exit(0);
 		}
 		fs_broadcast_metadata_saved(status);

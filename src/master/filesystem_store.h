@@ -24,19 +24,21 @@
 
 #include <cstdio>
 
+#include "common/cwrap.h"
 #include "common/exceptions.h"
 #include "master/metadata_dumper.h"
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataException, Exception);
-SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataFsConsistencyException, MetadataException);
+SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataFsConsistencyException,
+                               MetadataException);
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataConsistencyException, MetadataException);
 
 bool fs_commit_metadata_dump();
 
-int  fs_emergency_saves();
+int fs_emergency_saves();
 
 void fs_broadcast_metadata_saved(uint8_t status);
 void fs_load_changelogs();
 void fs_load_changelog(const std::string &path);
-void fs_loadall(const std::string& fname,int ignoreflag);
+void fs_loadall(const std::string &fname, int ignoreflag);
 void fs_store_fd(FILE *fd);
