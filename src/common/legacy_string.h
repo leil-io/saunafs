@@ -34,10 +34,10 @@
  *    length:8/16/32 data:BYTES[length]
  */
 template <typename LengthType>
-class XaunaFsString : public std::string {
+class LegacyString : public std::string {
 public:
 	template<typename... Args>
-	XaunaFsString(Args&&... args) : std::string(std::forward<Args>(args)...) {
+	LegacyString(Args&&... args) : std::string(std::forward<Args>(args)...) {
 	}
 
 	static constexpr uint32_t maxLength() {

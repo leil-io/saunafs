@@ -181,7 +181,7 @@ void KeptAliveServerConnection::startNopThread() {
 			if (threadCanRun_) {
 				// We have the lock, we can send something
 				Timeout timeout{std::chrono::milliseconds(timeout_)};
-				sendRequestGeneric(fd_, buildXaunaFsPacket(ANTOAN_NOP), timeout);
+				sendRequestGeneric(fd_, buildLegacyPacket(ANTOAN_NOP), timeout);
 			}
 		}
 	};

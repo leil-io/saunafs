@@ -363,7 +363,7 @@ static void matotsserv_serve(const std::vector<pollfd> &pdesc) {
 		}
 		if (eptr->lastWrite.elapsed_ms() > (kTapeserverTimeout_ms / 4)
 				&& eptr->outputPackets.empty()) {
-			matotsserv_createpacket(eptr.get(), buildXaunaFsPacket(ANTOAN_NOP));
+			matotsserv_createpacket(eptr.get(), buildLegacyPacket(ANTOAN_NOP));
 		}
 	}
 

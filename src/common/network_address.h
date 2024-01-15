@@ -73,7 +73,7 @@ namespace std {
 template <>
 struct hash<NetworkAddress> {
 	size_t operator()(const NetworkAddress& address) const {
-		// XaunaFS CSDB hash function
+		// Legacy CSDB hash function
 		return address.ip * 0x7b348943 + address.port;
 	}
 };

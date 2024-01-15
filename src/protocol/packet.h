@@ -29,15 +29,15 @@
 #include "protocol/SFSCommunication.h"
 #include "common/serialization.h"
 
-// Legacy XaunaFS packet format:
+// Legacy packet format:
+// This data packet format was used in to maintain backwards compatibility with
+// MooseFS. This is still required for some older parts of the software.
 //
 // type
 // length of data
 // data (type-dependent)
 //
-// New packet header contains an additional version field.
-// For backwards compatibility, length indicates total size
-// of remaining part of the packet, including version.
+// This is the current data packet format:
 //
 // type
 // length of version field and data
@@ -138,10 +138,10 @@ inline void serializePacketPrefix(std::vector<uint8_t>& destination, uint32_t ex
 }
 
 /*
- * Assembles a whole XaunaFS packet (packet without version)
+ * Assembles a whole packet without version
  */
 template<class T, class... Data>
-inline void serializeXaunaFsPacket(std::vector<uint8_t>& buffer,
+inline void serializeLegacyPacket(std::vector<uint8_t>& buffer,
 		const PacketHeader::Type& type,
 		const T& t,
 		const Data &...args) {
@@ -150,7 +150,7 @@ inline void serializeXaunaFsPacket(std::vector<uint8_t>& buffer,
 	serialize(buffer, type, length, t, args...);
 }
 
-inline void serializeXaunaFsPacket(std::vector<uint8_t>& buffer,
+inline void serializeLegacyPacket(std::vector<uint8_t>& buffer,
 		const PacketHeader::Type& type) {
 	sassert(type <= PacketHeader::kMaxOldPacketType);
 	uint32_t length = 0;
@@ -158,18 +158,18 @@ inline void serializeXaunaFsPacket(std::vector<uint8_t>& buffer,
 }
 
 template<class... Data>
-inline std::vector<uint8_t> buildXaunaFsPacket(const Data&... args) {
+inline std::vector<uint8_t> buildLegacyPacket(const Data&... args) {
 	std::vector<uint8_t> ret;
-	serializeXaunaFsPacket(ret, args...);
+	serializeLegacyPacket(ret, args...);
 	return ret;
 }
 
 /*
- * Assembles initial segment of a XaunaFS packet (without version),
+ * Assembles initial segment of a packet without version,
  * sets bigger length in the header to accommodate data appended later.
  */
 template<class... Args>
-inline void serializeXaunaFsPacketPrefix(std::vector<uint8_t>& buffer, uint32_t extraLength,
+inline void serializeLegacyPacketPrefix(std::vector<uint8_t>& buffer, uint32_t extraLength,
 		const PacketHeader::Type& type, const Args &...args) {
 	sassert(type <= PacketHeader::kMaxOldPacketType);
 	uint32_t length = serializedSize(args...) + extraLength;
@@ -183,7 +183,7 @@ inline void serializeXaunaFsPacketPrefix(std::vector<uint8_t>& buffer, uint32_t 
  *
  * Some procedures have two versions:
  *   NoHeader   - version for headerless packet fragments
- *   SkipHeader - version for packets with full XaunaFS header
+ *   SkipHeader - version for packets with full Legacy header
  *
  * If the function name contains All infix, it means that the function will throw
  * IncorrectDeserializationException when the buffer is too long
@@ -260,7 +260,7 @@ inline void deserializePacketDataSkipHeader(const std::vector<uint8_t>& source, 
 }
 
 template<class... Data>
-inline void deserializeAllXaunaFsPacketDataNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
+inline void deserializeAllLegacyPacketDataNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
 		Data &...args) {
 	uint32_t bytesNotUsed = deserialize(source, bytesInBuffer, args...);
 	if (bytesNotUsed > 0) {
@@ -269,21 +269,21 @@ inline void deserializeAllXaunaFsPacketDataNoHeader(const uint8_t* source, uint3
 }
 
 template<class... Data>
-inline void deserializeAllXaunaFsPacketDataNoHeader(const std::vector<uint8_t>& source,
+inline void deserializeAllLegacyPacketDataNoHeader(const std::vector<uint8_t>& source,
 		Data &...args) {
-	deserializeAllXaunaFsPacketDataNoHeader(source.data(), source.size(), args...);
+	deserializeAllLegacyPacketDataNoHeader(source.data(), source.size(), args...);
 }
 
 template<class... Data>
-inline void deserializeXaunaFsPacketPrefixNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
+inline void deserializeLegacyPacketPrefixNoHeader(const uint8_t* source, uint32_t bytesInBuffer,
 		Data &...args) {
 	deserialize(source, bytesInBuffer, args...);
 }
 
 template<class... Data>
-inline void deserializeXaunaFsPacketPrefixNoHeader(const std::vector<uint8_t>& source,
+inline void deserializeLegacyPacketPrefixNoHeader(const std::vector<uint8_t>& source,
 		Data &...args) {
-	deserializeXaunaFsPacketPrefixNoHeader(source.data(), source.size(), args...);
+	deserializeLegacyPacketPrefixNoHeader(source.data(), source.size(), args...);
 }
 
 // check whether a SaunaFS packet has expected version

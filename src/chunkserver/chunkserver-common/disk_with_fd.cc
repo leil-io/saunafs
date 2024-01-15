@@ -46,10 +46,10 @@ DiskInfo FDDisk::toDiskInfo() const {
 	DiskInfo diskInfo;
 
 	diskInfo.path = dataPath_;
-	if (diskInfo.path.length() > XaunaFsString<uint8_t>::maxLength()) {
+	if (diskInfo.path.length() > LegacyString<uint8_t>::maxLength()) {
 		const std::string dots("(...)");
 		const uint32_t substrSize =
-		    XaunaFsString<uint8_t>::maxLength() - dots.length();
+		    LegacyString<uint8_t>::maxLength() - dots.length();
 		diskInfo.path =
 		    dots + diskInfo.path.substr(diskInfo.path.length() - substrSize,
 		                                substrSize);

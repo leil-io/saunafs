@@ -34,9 +34,9 @@ class NopResponder : public ModuleMock {
 public:
 	void onIncomingMessage(PacketHeader::Type type, const std::vector<uint8_t>&) override {
 		for (int i = 0; i < 20; ++i) {
-			respondToCurrentClient(buildXaunaFsPacket(ANTOAN_NOP));
+			respondToCurrentClient(buildLegacyPacket(ANTOAN_NOP));
 		}
-		respondToCurrentClient(buildXaunaFsPacket(type + 1, uint32_t(123)));
+		respondToCurrentClient(buildLegacyPacket(type + 1, uint32_t(123)));
 	}
 };
 
@@ -48,13 +48,13 @@ TEST(ServerConnectionTests, SendAndReceive_ReceiveMode) {
 	ServerConnection connection(responder.address());
 
 	// Should be OK if NOPs are ignored
-	ASSERT_NO_THROW(connection.sendAndReceive(buildXaunaFsPacket(10, uint32_t(123)),
+	ASSERT_NO_THROW(connection.sendAndReceive(buildLegacyPacket(10, uint32_t(123)),
 			10 + 1, ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage));
-	ASSERT_NO_THROW(connection.sendAndReceive(buildXaunaFsPacket(21, uint32_t(123)),
+	ASSERT_NO_THROW(connection.sendAndReceive(buildLegacyPacket(21, uint32_t(123)),
 			21 + 1, ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage));
 
 	// Should throw if we don't ignore NOPs
-	ASSERT_ANY_THROW(connection.sendAndReceive(buildXaunaFsPacket(21, uint32_t(123)),
+	ASSERT_ANY_THROW(connection.sendAndReceive(buildLegacyPacket(21, uint32_t(123)),
 			21 + 1, ServerConnection::ReceiveMode::kReceiveFirstMessage));
 }
 
@@ -64,8 +64,8 @@ TEST(ServerConnectionTests, SendAndReceive_ExpectedType) {
 	ServerConnection connection(responder.address());
 
 	// Should be OK -- actual response is 21 + 1
-	ASSERT_NO_THROW(connection.sendAndReceive(buildXaunaFsPacket(21, uint32_t(123)), 21 + 1));
+	ASSERT_NO_THROW(connection.sendAndReceive(buildLegacyPacket(21, uint32_t(123)), 21 + 1));
 
 	// Should throw -- actual response is 21 + 1, not 321
-	ASSERT_ANY_THROW(connection.sendAndReceive(buildXaunaFsPacket(21, uint32_t(123)), 321));
+	ASSERT_ANY_THROW(connection.sendAndReceive(buildLegacyPacket(21, uint32_t(123)), 321));
 }

@@ -26,7 +26,7 @@
 #include "common/disk_info.h"
 #include "common/human_readable_format.h"
 #include "common/saunafs_version.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_vector.h"
 #include "common/server_connection.h"
 #include "admin/list_chunkservers_command.h"
 
@@ -112,7 +112,7 @@ static void printPorcelainStats(const HddStatistics& stats) {
 			<< ' ' << stats.fsyncops;
 }
 
-static void printPorcelainMode(const ChunkserverListEntry& cs, const XaunaFSVector<DiskInfo>& disks,
+static void printPorcelainMode(const ChunkserverListEntry& cs, const LegacyVector<DiskInfo>& disks,
 		bool verbose) {
 	for (const DiskInfo& disk : disks) {
 		std::cout << NetworkAddress(cs.servip, cs.servport).toString()
@@ -137,7 +137,7 @@ static void printPorcelainMode(const ChunkserverListEntry& cs, const XaunaFSVect
 	}
 }
 
-static void printNormalMode(const ChunkserverListEntry& cs, const XaunaFSVector<DiskInfo>& disks,
+static void printNormalMode(const ChunkserverListEntry& cs, const LegacyVector<DiskInfo>& disks,
 		bool verbose) {
 	for (const DiskInfo& disk : disks) {
 		std::string lastError;
@@ -206,11 +206,11 @@ void ListDisksCommand::run(const Options& options) const {
 			continue; // skip disconnected chunkservers -- these surely won't respond
 		}
 		std::vector<uint8_t> request, response;
-		serializeXaunaFsPacket(request, CLTOCS_HDD_LIST_V2);
+		serializeLegacyPacket(request, CLTOCS_HDD_LIST_V2);
 		ServerConnection connection(NetworkAddress(cs.servip, cs.servport));
 		response = connection.sendAndReceive(request, CSTOCL_HDD_LIST_V2);
-		XaunaFSVector<DiskInfo> disks;
-		deserializeAllXaunaFsPacketDataNoHeader(response, disks);
+		LegacyVector<DiskInfo> disks;
+		deserializeAllLegacyPacketDataNoHeader(response, disks);
 		if (options.isSet(kPorcelainMode)) {
 			printPorcelainMode(cs, disks, options.isSet(kVerboseMode));
 		} else {

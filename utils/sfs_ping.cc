@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 	eassert(tcpnumconnect(fd, ip, port) == 0);
 
 	std::vector<uint8_t> message;
-	serializeXaunaFsPacket(message, ANTOAN_PING, size);
+	serializeLegacyPacket(message, ANTOAN_PING, size);
 
 	std::vector<uint8_t> replyBuffer(size + 8);
 	uint64_t microseconds = 0;

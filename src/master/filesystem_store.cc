@@ -49,7 +49,7 @@
 #include "master/metadata_dumper.h"
 #include "master/restore.h"
 
-constexpr uint8_t kMetadataVersionXaunaFS = 0x15;
+constexpr uint8_t kMetadataVersionLegacy = 0x15;
 constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
 constexpr uint8_t kMetadataVersionWithSections = 0x20;
 constexpr uint8_t kMetadataVersionWithLockIds = 0x29;
@@ -1465,7 +1465,7 @@ void fs_loadall(const std::string& fname,int ignoreflag) {
 #endif /* #ifndef METARESTORE */
 	uint8_t metadataVersion;
 	if (memcmp(hdr,SFSSIGNATURE "M 1.5",8)==0) {
-		metadataVersion = kMetadataVersionXaunaFS;
+		metadataVersion = kMetadataVersionLegacy;
 	} else if (memcmp(hdr,SFSSIGNATURE "M 1.6",8)==0) {
 		metadataVersion = kMetadataVersionSaunaFS;
 	} else if (memcmp(hdr,SFSSIGNATURE "M 2.0",8)==0) {

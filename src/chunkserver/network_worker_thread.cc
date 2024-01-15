@@ -51,7 +51,7 @@
 #include "common/saunafs_version.h"
 #include "common/massert.h"
 #include "protocol/SFSCommunication.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_vector.h"
 #include "protocol/packet.h"
 #include "common/slogger.h"
 #include "common/sockets.h"
@@ -79,23 +79,23 @@ public:
 	virtual ~MessageSerializer() {}
 };
 
-class XaunaFsMessageSerializer : public MessageSerializer {
+class LegacyMessageSerializer : public MessageSerializer {
 public:
 	void serializePrefixOfCstoclReadData(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint32_t offset, uint32_t size) {
 		// This prefix requires CRC (uint32_t) and data (size * uint8_t) to be appended
 		uint32_t extraSpace = sizeof(uint32_t) + size;
-		serializeXaunaFsPacketPrefix(buffer, extraSpace, CSTOCL_READ_DATA, chunkId, offset, size);
+		serializeLegacyPacketPrefix(buffer, extraSpace, CSTOCL_READ_DATA, chunkId, offset, size);
 	}
 
 	void serializeCstoclReadStatus(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint8_t status) {
-		serializeXaunaFsPacket(buffer, CSTOCL_READ_STATUS, chunkId, status);
+		serializeLegacyPacket(buffer, CSTOCL_READ_STATUS, chunkId, status);
 	}
 
 	void serializeCstoclWriteStatus(std::vector<uint8_t>& buffer,
 			uint64_t chunkId, uint32_t writeId, uint8_t status) {
-		serializeXaunaFsPacket(buffer, CSTOCL_WRITE_STATUS, chunkId, writeId, status);
+		serializeLegacyPacket(buffer, CSTOCL_WRITE_STATUS, chunkId, writeId, status);
 	}
 };
 
@@ -121,7 +121,7 @@ MessageSerializer* MessageSerializer::getSerializer(PacketHeader::Type type) {
 	sassert((type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType)
 			|| type <= PacketHeader::kMaxOldPacketType);
 	if (type <= PacketHeader::kMaxOldPacketType) {
-		static XaunaFsMessageSerializer singleton;
+		static LegacyMessageSerializer singleton;
 		return &singleton;
 	} else {
 		static SaunaFsMessageSerializer singleton;
@@ -433,7 +433,7 @@ void worker_read_init(csserventry *eptr, const uint8_t *data,
 				eptr->chunkType = legacy_type;
 			}
 		} else {
-			deserializeAllXaunaFsPacketDataNoHeader(data, length,
+			deserializeAllLegacyPacketDataNoHeader(data, length,
 					eptr->chunkid,
 					eptr->version,
 					eptr->offset,
@@ -568,12 +568,12 @@ void serializeCltocsWriteInit(std::vector<uint8_t>& buffer,
 			(legacy::ChunkPartType)chunkType, legacy_chain);
 	} else {
 		assert(slice_traits::isStandard(chunkType));
-		XaunaFSVector<NetworkAddress> xauna_chain;
-		xauna_chain.reserve(chain.size());
+		LegacyVector<NetworkAddress> legacy_chain;
+		legacy_chain.reserve(chain.size());
 		for (const auto &entry : chain) {
-			xauna_chain.push_back(entry.address);
+			legacy_chain.push_back(entry.address);
 		}
-		serializeXaunaFsPacket(buffer, CLTOCS_WRITE, chunkId, chunkVersion, xauna_chain);
+		serializeLegacyPacket(buffer, CLTOCS_WRITE, chunkId, chunkVersion, legacy_chain);
 	}
 }
 
@@ -601,10 +601,10 @@ void worker_write_init(csserventry *eptr,
 				}
 			}
 		} else {
-			XaunaFSVector<NetworkAddress> xaunaFSChain;
-			deserializeAllXaunaFsPacketDataNoHeader(data, length,
-				eptr->chunkid, eptr->version, xaunaFSChain);
-			for (const auto &address : xaunaFSChain) {
+			LegacyVector<NetworkAddress> legacyChain;
+			deserializeAllLegacyPacketDataNoHeader(data, length,
+				eptr->chunkid, eptr->version, legacyChain);
+			for (const auto &address : legacyChain) {
 				chain.push_back(ChunkTypeWithAddress(address, slice_traits::standard::ChunkPartType(), kStdVersion));
 			}
 			eptr->chunkType = slice_traits::standard::ChunkPartType();
@@ -668,7 +668,7 @@ void worker_write_data(csserventry *eptr,
 			dataToWrite = data + cltocs::writeData::kPrefixSize;
 		} else {
 			uint16_t offset16;
-			deserializeAllXaunaFsPacketDataNoHeader(data, length,
+			deserializeAllLegacyPacketDataNoHeader(data, length,
 				chunkId, writeId, blocknum, offset16, size, crc, dataToWrite);
 			offset = offset16;
 			sassert(eptr->chunkType == slice_traits::standard::ChunkPartType());
@@ -724,7 +724,7 @@ void worker_write_status(csserventry *eptr,
 			std::vector<uint8_t> message(data, data + length);
 			cstocl::writeStatus::deserialize(message, chunkId, writeId, status);
 		} else {
-			deserializeAllXaunaFsPacketDataNoHeader(data, length, chunkId, writeId, status);
+			deserializeAllLegacyPacketDataNoHeader(data, length, chunkId, writeId, status);
 			sassert(eptr->chunkType == slice_traits::standard::ChunkPartType());
 		}
 	} catch (IncorrectDeserializationException&) {
@@ -828,7 +828,7 @@ void worker_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	csserventry *eptr = (csserventry*) extra;
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
-	serializeXaunaFsPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS,
+	serializeLegacyPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS,
 			eptr->chunkid, eptr->version, eptr->getBlocksJobResult, status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = IDLE;
@@ -860,7 +860,7 @@ void worker_sau_get_chunk_blocks(csserventry *eptr, const uint8_t *data, uint32_
 
 void worker_get_chunk_blocks(csserventry *eptr, const uint8_t *data,
 		uint32_t length) {
-	deserializeAllXaunaFsPacketDataNoHeader(data, length, eptr->chunkid, eptr->version);
+	deserializeAllLegacyPacketDataNoHeader(data, length, eptr->chunkid, eptr->version);
 	eptr->chunkType = slice_traits::standard::ChunkPartType();
 	eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
 			worker_get_chunk_blocks_finished, eptr, eptr->chunkid, eptr->version,

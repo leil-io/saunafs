@@ -89,7 +89,7 @@ static void* masterproxy_server(void *args) {
 			}
 
 			buffer.clear();
-			serializeXaunaFsPacket(buffer, MATOCL_FUSE_REGISTER, uint8_t(SAUNAFS_STATUS_OK));
+			serializeLegacyPacket(buffer, MATOCL_FUSE_REGISTER, uint8_t(SAUNAFS_STATUS_OK));
 
 		} else {
 			if (fs_custom(buffer) != SAUNAFS_STATUS_OK) {

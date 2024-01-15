@@ -50,10 +50,10 @@ void InfoCommand::run(const Options& options) const {
 
 	ServerConnection connection(options.argument(0), options.argument(1));
 	std::vector<uint8_t> request, response;
-	serializeXaunaFsPacket(request, CLTOMA_INFO);
+	serializeLegacyPacket(request, CLTOMA_INFO);
 	response = connection.sendAndReceive(request, MATOCL_INFO);
 	SaunaFsStatistics info;
-	deserializeAllXaunaFsPacketDataNoHeader(response, info);
+	deserializeAllLegacyPacketDataNoHeader(response, info);
 	if (options.isSet(kPorcelainMode)) {
 		std::cout << saunafsVersionToString(info.version)
 				<< ' ' << info.memoryUsage

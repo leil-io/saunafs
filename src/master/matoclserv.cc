@@ -57,7 +57,7 @@
 #include "common/massert.h"
 #include "common/md5.h"
 #include "common/metadata.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_vector.h"
 #include "common/network_address.h"
 #include "common/random.h"
 #include "common/serialized_goal.h"
@@ -301,7 +301,7 @@ public:
 			uint32_t& uid, uint32_t& gid, uint64_t& length) const = 0;
 };
 
-class XaunaFsPacketSerializer : public PacketSerializer {
+class LegacyPacketSerializer : public PacketSerializer {
 public:
 	virtual bool isSaunaFsPacketSerializer() const {
 		return false;
@@ -309,26 +309,26 @@ public:
 
 	virtual void serializeFuseReadChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const {
-		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, status);
+		serializeLegacyPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, status);
 	}
 
 	virtual void serializeFuseReadChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint64_t fileLength, uint64_t chunkId, uint32_t chunkVersion,
 			const std::vector<ChunkTypeWithAddress>& chunkCopies) const {
-		XaunaFSVector<NetworkAddress> standardChunkCopies;
+		LegacyVector<NetworkAddress> standardChunkCopies;
 		getStandardChunkCopies(chunkCopies, standardChunkCopies);
-		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, fileLength,
+		serializeLegacyPacket(packetBuffer, MATOCL_FUSE_READ_CHUNK, messageId, fileLength,
 				chunkId, chunkVersion, standardChunkCopies);
 	}
 
 	virtual void deserializeFuseReadChunk(const std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint32_t& inode, uint32_t& chunkIndex) const {
-		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
+		deserializeAllLegacyPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
 	}
 
 	virtual void serializeFuseWriteChunk(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const {
-		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, status);
+		serializeLegacyPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, status);
 	}
 
 	virtual void serializeFuseWriteChunk(std::vector<uint8_t>& packetBuffer,
@@ -336,27 +336,27 @@ public:
 			uint64_t chunkId, uint32_t chunkVersion, uint32_t lockId,
 			const std::vector<ChunkTypeWithAddress>& chunkCopies) const {
 		sassert(lockId == 1);
-		XaunaFSVector<NetworkAddress> standardChunkCopies;
+		LegacyVector<NetworkAddress> standardChunkCopies;
 		getStandardChunkCopies(chunkCopies, standardChunkCopies);
-		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, fileLength,
+		serializeLegacyPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK, messageId, fileLength,
 						chunkId, chunkVersion, standardChunkCopies);
 	}
 
 	virtual void deserializeFuseWriteChunk(const std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint32_t& inode, uint32_t& chunkIndex, uint32_t& lockId) const {
-		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
+		deserializeAllLegacyPacketDataNoHeader(packetBuffer, messageId, inode, chunkIndex);
 		lockId = 1;
 	}
 
 	virtual void serializeFuseWriteChunkEnd(std::vector<uint8_t>& packetBuffer,
 			uint32_t messageId, uint8_t status) const {
-		serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK_END, messageId, status);
+		serializeLegacyPacket(packetBuffer, MATOCL_FUSE_WRITE_CHUNK_END, messageId, status);
 	}
 
 	virtual void deserializeFuseWriteChunkEnd(const std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint64_t& chunkId, uint32_t& lockId,
 			uint32_t& inode, uint64_t& fileLength) const {
-		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer,
+		deserializeAllLegacyPacketDataNoHeader(packetBuffer,
 				messageId, chunkId, inode, fileLength);
 		lockId = 1;
 	}
@@ -365,10 +365,10 @@ public:
 			uint32_t type, uint32_t messageId, uint8_t status) const {
 		sassert(type == FUSE_TRUNCATE || type == FUSE_TRUNCATE_END);
 		if (type == FUSE_TRUNCATE) {
-			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, status);
+			serializeLegacyPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, status);
 		} else {
 			// this should never happen, so do anything
-			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
+			serializeLegacyPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
 					messageId, uint8_t(SAUNAFS_ERROR_ENOTSUP));
 		}
 	}
@@ -377,10 +377,10 @@ public:
 			uint32_t type, uint32_t messageId, const Attributes& attributes) const {
 		sassert(type == FUSE_TRUNCATE || type == FUSE_TRUNCATE_END);
 		if (type == FUSE_TRUNCATE) {
-			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, attributes);
+			serializeLegacyPacket(packetBuffer, MATOCL_FUSE_TRUNCATE, messageId, attributes);
 		} else {
 			// this should never happen, so do anything
-			serializeXaunaFsPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
+			serializeLegacyPacket(packetBuffer, MATOCL_FUSE_TRUNCATE,
 					messageId, uint8_t(SAUNAFS_ERROR_ENOTSUP));
 		}
 
@@ -389,7 +389,7 @@ public:
 	virtual void deserializeFuseTruncate(std::vector<uint8_t>& packetBuffer,
 			uint32_t& messageId, uint32_t& inode, bool& isOpened,
 			uint32_t& uid, uint32_t& gid, uint64_t& length) const {
-		deserializeAllXaunaFsPacketDataNoHeader(packetBuffer,
+		deserializeAllLegacyPacketDataNoHeader(packetBuffer,
 				messageId, inode, isOpened, uid, gid, length);
 
 	}
@@ -514,7 +514,7 @@ const PacketSerializer* PacketSerializer::getSerializer(PacketHeader::Type type,
 	sassert((type >= PacketHeader::kMinSauPacketType && type <= PacketHeader::kMaxSauPacketType)
 			|| type <= PacketHeader::kMaxOldPacketType);
 	if (type <= PacketHeader::kMaxOldPacketType) {
-		static XaunaFsPacketSerializer singleton;
+		static LegacyPacketSerializer singleton;
 		return &singleton;
 	} else {
 		static SaunaFsPacketSerializer singleton;
@@ -1417,7 +1417,7 @@ void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) 
 	chunk_info(&statistics.chunks, &statistics.chunkCopies, &statistics.regularCopies);
 	statistics.memoryUsage = chartsdata_memusage();
 	std::vector<uint8_t> response;
-	serializeXaunaFsPacket(response, MATOCL_INFO, statistics);
+	serializeLegacyPacket(response, MATOCL_INFO, statistics);
 	matoclserv_createpacket(eptr, response);
 }
 
@@ -1536,7 +1536,7 @@ static void matoclserv_broadcast_iolimits_cfg() {
 
 void matoclserv_ping(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t size;
-	deserializeAllXaunaFsPacketDataNoHeader(data, length, size);
+	deserializeAllLegacyPacketDataNoHeader(data, length, size);
 	matoclserv_createpacket(eptr, ANTOAN_PING_REPLY, size);
 }
 
@@ -2417,12 +2417,12 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 
 void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
 	uint32_t messageId, inode, uid, gid, rdev;
-	XaunaFsString<uint8_t> name;
+	LegacyString<uint8_t> name;
 	uint8_t type;
 	uint16_t mode, umask;
 
 	if (header.type == CLTOMA_FUSE_MKNOD) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
+		deserializeAllLegacyPacketDataNoHeader(data, header.length,
 				messageId, inode, name, type, mode, uid, gid, rdev);
 		umask = 0;
 	} else if (header.type == SAU_CLTOMA_FUSE_MKNOD) {
@@ -2446,13 +2446,13 @@ void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uin
 
 	MessageBuffer reply;
 	if (status == SAUNAFS_STATUS_OK && header.type == CLTOMA_FUSE_MKNOD) {
-		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKNOD, messageId, newinode, attr);
+		serializeLegacyPacket(reply, MATOCL_FUSE_MKNOD, messageId, newinode, attr);
 	} else if (status == SAUNAFS_STATUS_OK && header.type == SAU_CLTOMA_FUSE_MKNOD) {
 		matocl::fuseMknod::serialize(reply, messageId, newinode, attr);
 	} else if (header.type == SAU_CLTOMA_FUSE_MKNOD) {
 		matocl::fuseMknod::serialize(reply, messageId, status);
 	} else {
-		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKNOD, messageId, status);
+		serializeLegacyPacket(reply, MATOCL_FUSE_MKNOD, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
 	if (eptr->sesdata) {
@@ -2462,16 +2462,16 @@ void matoclserv_fuse_mknod(matoclserventry *eptr, PacketHeader header, const uin
 
 void matoclserv_fuse_mkdir(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
 	uint32_t messageId, inode, uid, gid;
-	XaunaFsString<uint8_t> name;
+	LegacyString<uint8_t> name;
 	bool copysgid;
 	uint16_t mode, umask;
 
 	if (header.type == CLTOMA_FUSE_MKDIR) {
 		if (eptr->version >= saunafsVersion(1, 6, 25)) {
-			deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
+			deserializeAllLegacyPacketDataNoHeader(data, header.length,
 					messageId, inode, name, mode, uid, gid, copysgid);
 		} else {
-			deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
+			deserializeAllLegacyPacketDataNoHeader(data, header.length,
 					messageId, inode, name, mode, uid, gid);
 			copysgid = false;
 		}
@@ -2496,13 +2496,13 @@ void matoclserv_fuse_mkdir(matoclserventry *eptr, PacketHeader header, const uin
 
 	MessageBuffer reply;
 	if (status == SAUNAFS_STATUS_OK && header.type == CLTOMA_FUSE_MKDIR) {
-		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKDIR, messageId, newinode, attr);
+		serializeLegacyPacket(reply, MATOCL_FUSE_MKDIR, messageId, newinode, attr);
 	} else if (status == SAUNAFS_STATUS_OK && header.type == SAU_CLTOMA_FUSE_MKDIR) {
 		matocl::fuseMkdir::serialize(reply, messageId, newinode, attr);
 	} else if (header.type == SAU_CLTOMA_FUSE_MKDIR) {
 		matocl::fuseMkdir::serialize(reply, messageId, status);
 	} else {
-		serializeXaunaFsPacket(reply, MATOCL_FUSE_MKDIR, messageId, status);
+		serializeLegacyPacket(reply, MATOCL_FUSE_MKDIR, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
 	if (eptr->sesdata) {
@@ -2971,7 +2971,7 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr, PacketHeader header, con
 	uint32_t min_server_version
 		= header.type == SAU_CLTOMA_FUSE_WRITE_CHUNK ? kFirstXorVersion : 0;
 
-	// Original XaunaFS (1.6.27) does not use lock ID's
+	// Original Legacy (1.6.27) does not use lock ID's
 	bool useDummyLockId = (header.type == CLTOMA_FUSE_WRITE_CHUNK);
 	status = fs_writechunk(matoclserv_get_context(eptr), inode, chunkIndex, useDummyLockId,
 			&lockId, &chunkId, &opflag, &fileLength, min_server_version);
@@ -3176,13 +3176,13 @@ void matoclserv_fuse_settrashtime_wake_up(uint32_t session_id, uint32_t msgid,
 
 	MessageBuffer reply;
 	if (status != SAUNAFS_STATUS_OK) {
-		serializeXaunaFsPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, status);
+		serializeLegacyPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, status);
 	} else {
 		uint32_t changed, notchanged, notpermitted;
 		changed = (*settrashtime_stats)[SetTrashtimeTask::kChanged];
 		notchanged = (*settrashtime_stats)[SetTrashtimeTask::kNotChanged];
 		notpermitted = (*settrashtime_stats)[SetTrashtimeTask::kNotPermitted];
-		serializeXaunaFsPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, changed,
+		serializeLegacyPacket(reply, MATOCL_FUSE_SETTRASHTIME, msgid, changed,
 				       notchanged, notpermitted);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3192,7 +3192,7 @@ void matoclserv_fuse_settrashtime(matoclserventry *eptr, PacketHeader header, co
 	uint32_t inode, uid, trashtime, msgid;
 	uint8_t smode, status;
 
-	deserializeAllXaunaFsPacketDataNoHeader(data, header.length, msgid, inode,
+	deserializeAllLegacyPacketDataNoHeader(data, header.length, msgid, inode,
 							uid, trashtime, smode);
 // limits check
 	status = SAUNAFS_STATUS_OK;
@@ -3236,7 +3236,7 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr, PacketHeader header, const u
 	uint8_t gmode;
 
 	if (header.type == CLTOMA_FUSE_GETGOAL) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, header.length, msgid, inode, gmode);
+		deserializeAllLegacyPacketDataNoHeader(data, header.length, msgid, inode, gmode);
 	} else if (header.type == SAU_CLTOMA_FUSE_GETGOAL) {
 		cltoma::fuseGetGoal::deserialize(data, header.length, msgid, inode, gmode);
 	} else {
@@ -3251,33 +3251,33 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr, PacketHeader header, const u
 	if (status == SAUNAFS_STATUS_OK) {
 		const std::map<int, Goal>& goalDefinitions = fs_get_goal_definitions();
 		std::vector<FuseGetGoalStats> sauReply;
-		XaunaFSVector<std::pair<uint8_t, uint32_t>> xaunaFsReplyFiles, xaunaFsReplyDirectories;
+		LegacyVector<std::pair<uint8_t, uint32_t>> legacyReplyFiles, legacyReplyDirectories;
 		for (const auto &goal : goalDefinitions) {
 			if (fgtab[goal.first] || dgtab[goal.first]) {
 				sauReply.emplace_back(goal.second.getName(), fgtab[goal.first], dgtab[goal.first]);
 			}
 			if (fgtab[goal.first] > 0) {
-				xaunaFsReplyFiles.emplace_back(goal.first, fgtab[goal.first]);
+				legacyReplyFiles.emplace_back(goal.first, fgtab[goal.first]);
 			}
 			if (dgtab[goal.first] > 0) {
-				xaunaFsReplyDirectories.emplace_back(goal.first, dgtab[goal.first]);
+				legacyReplyDirectories.emplace_back(goal.first, dgtab[goal.first]);
 			}
 		}
 		if (header.type == SAU_CLTOMA_FUSE_GETGOAL) {
 			matocl::fuseGetGoal::serialize(reply, msgid, sauReply);
 		} else {
-			serializeXaunaFsPacket(reply, MATOCL_FUSE_GETGOAL,
+			serializeLegacyPacket(reply, MATOCL_FUSE_GETGOAL,
 					msgid,
-					uint8_t(xaunaFsReplyFiles.size()),
-					uint8_t(xaunaFsReplyDirectories.size()),
-					xaunaFsReplyFiles,
-					xaunaFsReplyDirectories);
+					uint8_t(legacyReplyFiles.size()),
+					uint8_t(legacyReplyDirectories.size()),
+					legacyReplyFiles,
+					legacyReplyDirectories);
 		}
 	} else {
 		if (header.type == SAU_CLTOMA_FUSE_GETGOAL) {
 			matocl::fuseGetGoal::serialize(reply, msgid, status);
 		} else {
-			serializeXaunaFsPacket(reply, MATOCL_FUSE_GETGOAL, msgid, status);
+			serializeLegacyPacket(reply, MATOCL_FUSE_GETGOAL, msgid, status);
 		}
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3301,14 +3301,14 @@ void matoclserv_fuse_setgoal_wake_up(uint32_t session_id, uint32_t msgid, uint32
 		if (type == SAU_CLTOMA_FUSE_SETGOAL) {
 			matocl::fuseSetGoal::serialize(reply, msgid, changed, notchanged, notpermitted);
 		} else {
-			serializeXaunaFsPacket(reply, MATOCL_FUSE_SETGOAL,
+			serializeLegacyPacket(reply, MATOCL_FUSE_SETGOAL,
 					msgid, changed, notchanged, notpermitted);
 		}
 	} else {
 		if (type == SAU_CLTOMA_FUSE_SETGOAL) {
 			matocl::fuseSetGoal::serialize(reply, msgid, status);
 		} else {
-			serializeXaunaFsPacket(reply, MATOCL_FUSE_SETGOAL, msgid, status);
+			serializeLegacyPacket(reply, MATOCL_FUSE_SETGOAL, msgid, status);
 		}
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3320,7 +3320,7 @@ void matoclserv_fuse_setgoal(matoclserventry *eptr, PacketHeader header, const u
 	uint8_t status = SAUNAFS_STATUS_OK;
 
 	if (header.type == CLTOMA_FUSE_SETGOAL) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
+		deserializeAllLegacyPacketDataNoHeader(data, header.length,
 				msgid, inode, uid, goalId, smode);
 	} else if (header.type == SAU_CLTOMA_FUSE_SETGOAL) {
 		std::string goalName;
@@ -3608,7 +3608,7 @@ void matoclserv_fuse_snapshot_wake_up(uint32_t type, uint32_t session_id, uint32
 	if (type == SAU_CLTOMA_FUSE_SNAPSHOT) {
 		matocl::snapshot::serialize(buffer, msgid, status);
 	} else {
-		serializeXaunaFsPacket(buffer, MATOCL_FUSE_SNAPSHOT, msgid, status);
+		serializeLegacyPacket(buffer, MATOCL_FUSE_SNAPSHOT, msgid, status);
 	}
 	matoclserv_createpacket(eptr, std::move(buffer));
 }
@@ -3622,10 +3622,10 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr, PacketHeader header, const 
 	uint32_t job_id;
 	uint8_t ignore_missing_src = 0;
 	uint32_t initial_batch_size = 0;
-	XaunaFsString<uint8_t> name_dst;
+	LegacyString<uint8_t> name_dst;
 
 	if (header.type == CLTOMA_FUSE_SNAPSHOT) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, header.length,
+		deserializeAllLegacyPacketDataNoHeader(data, header.length,
 				msgid, inode, inode_dst, name_dst, uid, gid, canoverwrite);
 		job_id = fs_reserve_job_id();
 	} else if (header.type == SAU_CLTOMA_FUSE_SNAPSHOT) {

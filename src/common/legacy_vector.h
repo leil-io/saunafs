@@ -24,15 +24,17 @@
 
 #include "common/serialization.h"
 
-// This class behaves just as std::vector, with the exception that it is serialized
-// differently. XaunaFS does not send array length when serializing it, SaunaFS does.
+// This class behaves just as std::vector, with the exception that it is
+// serialized differently. MooseFS did not send array length when serializing
+// it, SaunaFS does. Some older parts of SaunaFS still use MooseFS
+// serialization, so this class is still needed
 template <class T>
-class XaunaFSVector : public std::vector<T> {
+class LegacyVector : public std::vector<T> {
 public:
 	// Gcc 4.6 which we support don't support inherited constructors,
 	// so a workaround was needed:
 	template<typename... Args>
-	XaunaFSVector(Args&&... args) : std::vector<T>(std::forward<Args>(args)...) {
+	LegacyVector(Args&&... args) : std::vector<T>(std::forward<Args>(args)...) {
 	}
 
 	uint32_t serializedSize() const {

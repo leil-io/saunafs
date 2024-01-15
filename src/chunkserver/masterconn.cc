@@ -47,7 +47,7 @@
 #include "common/loop_watchdog.h"
 #include "common/main.h"
 #include "common/massert.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_vector.h"
 #include "common/output_packet.h"
 #include "common/random.h"
 #include "common/slogger.h"
@@ -156,10 +156,10 @@ void masterconn_create_attached_packet(masterconn *eptr, MessageBuffer serialize
 }
 
 template<class... Data>
-void masterconn_create_attached_xaunafs_packet(masterconn *eptr,
+void masterconn_create_attached_no_version_packet(masterconn *eptr,
 		PacketHeader::Type type, const Data&... data) {
 	std::vector<uint8_t> buffer;
-	serializeXaunaFsPacket(buffer, type, data...);
+	serializeLegacyPacket(buffer, type, data...);
 	masterconn_create_attached_packet(eptr, std::move(buffer));
 }
 
@@ -214,13 +214,13 @@ void masterconn_check_hdd_reports() {
 			uint32_t chunkcount,tdchunkcount;
 			hddGetTotalSpace(&usedspace, &totalspace, &chunkcount, &tdusedspace, &tdtotalspace,
 					&tdchunkcount);
-			masterconn_create_attached_xaunafs_packet(
+			masterconn_create_attached_no_version_packet(
 					eptr, CSTOMA_SPACE,
 					usedspace, totalspace, chunkcount, tdusedspace, tdtotalspace, tdchunkcount);
 		}
 		errorcounter = hddGetAndResetErrorCounter();
 		while (errorcounter) {
-			masterconn_create_attached_xaunafs_packet(eptr, CSTOMA_ERROR_OCCURRED);
+			masterconn_create_attached_no_version_packet(eptr, CSTOMA_ERROR_OCCURRED);
 			errorcounter--;
 		}
 
@@ -737,7 +737,7 @@ void masterconn_serve(const std::vector<pollfd> &pdesc) {
 				eptr->mode = KILL;
 			}
 			if ((eptr->mode == CONNECTED) && eptr->lastwrite.elapsed_ms() > (Timeout_ms/3) && eptr->outputPackets.empty()) {
-				masterconn_create_attached_xaunafs_packet(eptr, ANTOAN_NOP);
+				masterconn_create_attached_no_version_packet(eptr, ANTOAN_NOP, 0);
 			}
 		}
 	}

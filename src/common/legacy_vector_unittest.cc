@@ -19,22 +19,22 @@
  */
 
 #include "common/platform.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_vector.h"
 
 #include <gtest/gtest.h>
 
 #include "unittests/inout_pair.h"
 
-TEST(XaunaFSVectorTest, GeneralBehaviour) {
-	XaunaFSVector<int>    vec1_A;
+TEST(LegacyVectorTest, GeneralBehaviour) {
+	LegacyVector<int>    vec1_A;
 	std::vector<int>      vec1_B;
 	EXPECT_EQ(vec1_A, vec1_B);
 
-	XaunaFSVector<double> vec2_A(5, 1.0);
+	LegacyVector<double> vec2_A(5, 1.0);
 	std::vector<double>   vec2_B(5, 1.0);
 	EXPECT_EQ(vec2_A, vec2_B);
 
-	XaunaFSVector<double> vec3_A(vec2_B);
+	LegacyVector<double> vec3_A(vec2_B);
 	std::vector<double>   vec3_B(vec2_A);
 	EXPECT_EQ(vec2_B, vec3_A);
 	EXPECT_EQ(vec2_A, vec3_B);
@@ -45,14 +45,14 @@ TEST(XaunaFSVectorTest, GeneralBehaviour) {
 	EXPECT_NE(vec2_A, vec2_B);
 }
 
-TEST(XaunaFSVectorTest, Serialization) {
+TEST(LegacyVectorTest, Serialization) {
 	typedef std::vector<uint16_t>   OrdinaryVec;
-	typedef XaunaFSVector<uint16_t> XaunaFsVec;
+	typedef LegacyVector<uint16_t> LegacyVec;
 
 	OrdinaryVec o1 {1, 20, 300, 400};
 	OrdinaryVec o2 (o1);
-	XaunaFsVec  m1 (o1);
-	XaunaFsVec  m2 (o1);
+	LegacyVec  m1 (o1);
+	LegacyVec  m2 (o1);
 
 	std::vector<uint8_t> o_buffers[2];
 	serialize(o_buffers[0], o1);
@@ -62,15 +62,15 @@ TEST(XaunaFSVectorTest, Serialization) {
 	serialize(m_buffers[0], m1);
 	serialize(m_buffers[1], m2);
 
-	// Check if XaunaFSVector is serialized differently then std::vector:
+	// Check if LegacyVector is serialized differently then std::vector:
 	ASSERT_NE(o_buffers[0], m_buffers[0]);
 
-	// Check if XaunaFSVectors is always serialized the same way:
+	// Check if LegacyVectors is always serialized the same way:
 	ASSERT_EQ(m_buffers[0], m_buffers[1]);
 	// Same about std::vector:
 	ASSERT_EQ(o_buffers[0], o_buffers[1]);
 
-	XaunaFsVec m1_deserialized;
+	LegacyVec m1_deserialized;
 	ASSERT_NE(m1, m1_deserialized);
 	deserialize(m_buffers[0], m1_deserialized);
 	ASSERT_EQ(m1, m1_deserialized);

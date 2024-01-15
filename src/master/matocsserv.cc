@@ -627,7 +627,7 @@ int matocsserv_send_createchunk(matocsserventry *eptr, uint64_t chunkId, ChunkPa
 		if (eptr->version < kFirstXorVersion) {
 			// send old packet when chunkserver doesn't support xor chunks
 			sassert(slice_traits::isStandard(chunkType));
-			serializeXaunaFsPacket(eptr->outputPackets.back().packet, MATOCS_CREATE, chunkId,
+			serializeLegacyPacket(eptr->outputPackets.back().packet, MATOCS_CREATE, chunkId,
 					chunkVersion);
 		} else if (eptr->version < kFirstECVersion) {
 			sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -647,7 +647,7 @@ void matocsserv_got_createchunk_status(matocsserventry *eptr, const std::vector<
 	uint8_t status;
 	if (eptr->version < kFirstXorVersion) {
 		// get old packet when chunkserver doesn't support xor chunks
-		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllLegacyPacketDataNoHeader(data, chunkId, status);
 	}
 	else {
 		PacketVersion v;
@@ -674,7 +674,7 @@ int matocsserv_send_deletechunk(matocsserventry *eptr, uint64_t chunkId, uint32_
 		if (eptr->version < kFirstXorVersion) {
 			// send old packet when chunkserver doesn't support xor chunks
 			sassert(chunkType == slice_traits::standard::ChunkPartType());
-			serializeXaunaFsPacket(eptr->outputPackets.back().packet, MATOCS_DELETE,
+			serializeLegacyPacket(eptr->outputPackets.back().packet, MATOCS_DELETE,
 					chunkId, chunkVersion);
 		}
 		else if (eptr->version < kFirstECVersion) {
@@ -696,7 +696,7 @@ void matocsserv_got_deletechunk_status(matocsserventry *eptr, const std::vector<
 	uint8_t status;
 
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllLegacyPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -798,7 +798,7 @@ int matocsserv_send_setchunkversion(matocsserventry *eptr, uint64_t chunkId, uin
 		if (eptr->version < kFirstXorVersion) {
 			// send old packet when chunkserver doesn't support xor chunks
 			sassert(chunkType == slice_traits::standard::ChunkPartType());
-			serializeXaunaFsPacket(eptr->outputPackets.back().packet, MATOCS_SET_VERSION,
+			serializeLegacyPacket(eptr->outputPackets.back().packet, MATOCS_SET_VERSION,
 					chunkId, newVersion, chunkVersion);
 		} else if (eptr->version < kFirstECVersion) {
 			sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -819,7 +819,7 @@ void matocsserv_got_setchunkversion_status(matocsserventry *eptr,
 	uint8_t status;
 
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllLegacyPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -849,7 +849,7 @@ int matocsserv_send_duplicatechunk(matocsserventry* eptr, uint64_t newChunkId, u
 	if (eptr->version < kFirstXorVersion) {
 		sassert(slice_traits::isStandard(chunkType));
 		// Legacy support
-		serializeXaunaFsPacket(outPacket.packet, MATOCS_DUPLICATE, newChunkId, newChunkVersion,
+		serializeLegacyPacket(outPacket.packet, MATOCS_DUPLICATE, newChunkId, newChunkVersion,
 				chunkId, chunkVersion);
 	} else if (eptr->version < kFirstECVersion) {
 		sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -868,7 +868,7 @@ void matocsserv_got_duplicatechunk_status(matocsserventry* eptr, const std::vect
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
 	uint8_t status;
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllLegacyPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);
@@ -898,7 +898,7 @@ void matocsserv_send_truncatechunk(matocsserventry* eptr, uint64_t chunkid, Chun
 	}
 	if (eptr->version < kFirstXorVersion) {
 		sassert(slice_traits::isStandard(chunkType));
-		// For XaunaFS 1.6.27
+		// Legacy code
 		data = matocsserv_createpacket(eptr,MATOCS_TRUNCATE,8+4+4+4);
 		put64bit(&data,chunkid);
 		put32bit(&data,length);
@@ -969,7 +969,7 @@ int matocsserv_send_duptruncchunk(matocsserventry* eptr, uint64_t newChunkId, ui
 	if (eptr->version < kFirstXorVersion) {
 		sassert(slice_traits::isStandard(chunkType));
 		// Legacy support
-		serializeXaunaFsPacket(outPacket.packet, MATOCS_DUPTRUNC, newChunkId, newChunkVersion,
+		serializeLegacyPacket(outPacket.packet, MATOCS_DUPTRUNC, newChunkId, newChunkVersion,
 				chunkId, chunkVersion, newChunkLength);
 	} else if (eptr->version < kFirstECVersion) {
 		sassert((int)chunkType.getSliceType() < Goal::Slice::Type::kECFirst);
@@ -988,7 +988,7 @@ void matocsserv_got_duptruncchunk_status(matocsserventry* eptr, const std::vecto
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
 	uint8_t status;
 	if (eptr->version < kFirstXorVersion) {
-		deserializeAllXaunaFsPacketDataNoHeader(data, chunkId, status);
+		deserializeAllLegacyPacketDataNoHeader(data, chunkId, status);
 	} else {
 		PacketVersion v;
 		deserializePacketVersionNoHeader(data, v);

@@ -19,17 +19,17 @@
  */
 
 #include "common/platform.h"
-#include "common/xaunafs_string.h"
+#include "common/legacy_string.h"
 
 #include <gtest/gtest.h>
 
 #include "unittests/inout_pair.h"
 
-TEST(XaunaFsStringTests, Serialization8Bit) {
+TEST(LegacyStringTests, Serialization8Bit) {
 	std::vector<uint8_t> buffer;
-	SAUNAFS_DEFINE_INOUT_PAIR(XaunaFsString<uint8_t>,   string8, "", "");
-	SAUNAFS_DEFINE_INOUT_PAIR(XaunaFsString<uint16_t>, string16, "", "");
-	SAUNAFS_DEFINE_INOUT_PAIR(XaunaFsString<uint32_t>, string32, "", "");
+	SAUNAFS_DEFINE_INOUT_PAIR(LegacyString<uint8_t>,   string8, "", "");
+	SAUNAFS_DEFINE_INOUT_PAIR(LegacyString<uint16_t>, string16, "", "");
+	SAUNAFS_DEFINE_INOUT_PAIR(LegacyString<uint32_t>, string32, "", "");
 
 	std::stringstream ss;
 	for (int i = 0; i < 1000; ++i) {
@@ -58,13 +58,13 @@ TEST(XaunaFsStringTests, Serialization8Bit) {
 	SAUNAFS_VERIFY_INOUT_PAIR(string32);
 }
 
-TEST(XaunaFsStringTests, MaxLength) {
+TEST(LegacyStringTests, MaxLength) {
 	std::vector<uint8_t> buffer;
-	uint32_t maxLength8 = XaunaFsString<uint8_t>::maxLength();
-	ASSERT_ANY_THROW(serialize(buffer, XaunaFsString<uint8_t>(maxLength8 + 1, 'x')));
+	uint32_t maxLength8 = LegacyString<uint8_t>::maxLength();
+	ASSERT_ANY_THROW(serialize(buffer, LegacyString<uint8_t>(maxLength8 + 1, 'x')));
 	ASSERT_TRUE(buffer.empty());
-	ASSERT_NO_THROW(serialize(buffer, XaunaFsString<uint8_t>(maxLength8, 'x')));
-	XaunaFsString<uint8_t> out;
+	ASSERT_NO_THROW(serialize(buffer, LegacyString<uint8_t>(maxLength8, 'x')));
+	LegacyString<uint8_t> out;
 	deserialize(buffer, out);
-	EXPECT_EQ(XaunaFsString<uint8_t>(maxLength8, 'x'), out);
+	EXPECT_EQ(LegacyString<uint8_t>(maxLength8, 'x'), out);
 }

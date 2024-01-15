@@ -27,7 +27,7 @@
 #include "common/access_control_list.h"
 #include "common/acl_type.h"
 #include "common/legacy_acl.h"
-#include "common/xaunafs_string.h"
+#include "common/legacy_string.h"
 #include "common/richacl.h"
 #include "common/serialization_macros.h"
 #include "common/small_vector.h"
@@ -50,7 +50,7 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(cltoma, updateCredentials, SAU_CLTOMA_UPDATE
 SAUNAFS_DEFINE_PACKET_SERIALIZATION(cltoma, fuseMknod, SAU_CLTOMA_FUSE_MKNOD, 0,
 		uint32_t, messageId,
 		uint32_t, inode,
-		XaunaFsString<uint8_t>, name,
+		LegacyString<uint8_t>, name,
 		uint8_t, nodeType,
 		uint16_t, mode,
 		uint16_t, umask,
@@ -61,7 +61,7 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(cltoma, fuseMknod, SAU_CLTOMA_FUSE_MKNOD, 0,
 SAUNAFS_DEFINE_PACKET_SERIALIZATION(cltoma, fuseMkdir, SAU_CLTOMA_FUSE_MKDIR, 0,
 		uint32_t, messageId,
 		uint32_t, inode,
-		XaunaFsString<uint8_t>, name,
+		LegacyString<uint8_t>, name,
 		uint16_t, mode,
 		uint16_t, umask,
 		uint32_t, uid,

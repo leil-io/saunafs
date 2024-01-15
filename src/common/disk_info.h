@@ -25,7 +25,7 @@
 #include <atomic>
 #include <string>
 
-#include "common/xaunafs_string.h"
+#include "common/legacy_string.h"
 #include "common/serialization_macros.h"
 
 struct HddAtomicStatistics {
@@ -83,7 +83,7 @@ SERIALIZABLE_CLASS_END;
 SERIALIZABLE_CLASS_BEGIN(DiskInfo)
 SERIALIZABLE_CLASS_BODY(DiskInfo,
 		uint16_t, entrySize,
-		XaunaFsString<uint8_t>, path,
+		LegacyString<uint8_t>, path,
 		uint8_t, flags,
 		uint64_t, errorChunkId,
 		uint32_t, errorTimeStamp,

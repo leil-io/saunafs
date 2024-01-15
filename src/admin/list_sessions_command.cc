@@ -15,8 +15,8 @@
 #include "list_sessions_command.h"
 
 #include "common/human_readable_format.h"
-#include "common/xaunafs_string.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_string.h"
+#include "common/legacy_vector.h"
 #include "common/platform.h"
 #include "common/sessions_file.h"
 #include "common/serialization_macros.h"
@@ -47,7 +47,7 @@ void ListSessionsCommand::run(const Options& options) const {
 		throw WrongUsageException("Expected <master ip> and <master port> for " + name());
 	}
 	ServerConnection connection(options.argument(0), options.argument(1));
-	XaunaFSVector<SessionFiles> sessions;
+	LegacyVector<SessionFiles> sessions;
 
 	auto request = cltoma::listSessions::build();
 	auto response = connection.sendAndReceive(request, SAU_MATOCL_SESSION_FILES);

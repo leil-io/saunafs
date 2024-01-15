@@ -29,8 +29,8 @@
 #include "common/goal.h"
 #include "common/human_readable_format.h"
 #include "common/saunafs_version.h"
-#include "common/xaunafs_string.h"
-#include "common/xaunafs_vector.h"
+#include "common/legacy_string.h"
+#include "common/legacy_vector.h"
 #include "protocol/packet.h"
 #include "common/serialization.h"
 #include "common/serialization_macros.h"
@@ -43,8 +43,8 @@ SERIALIZABLE_CLASS_BODY(MountEntry,
 		uint32_t, sessionId,
 		uint32_t, peerIp,
 		uint32_t, version,
-		XaunaFsString<uint32_t>, info,
-		XaunaFsString<uint32_t>, path,
+		LegacyString<uint32_t>, info,
+		LegacyString<uint32_t>, path,
 		uint8_t, flags,
 		uint32_t, rootuid,
 		uint32_t, rootgid,
@@ -80,13 +80,13 @@ void ListMountsCommand::run(const Options& options) const {
 	}
 
 	ServerConnection connection(options.argument(0), options.argument(1));
-	XaunaFSVector<MountEntry> mounts;
+	LegacyVector<MountEntry> mounts;
 	std::vector<uint8_t> request, response;
-	serializeXaunaFsPacket(request, CLTOMA_SESSION_LIST, true);
+	serializeLegacyPacket(request, CLTOMA_SESSION_LIST, true);
 	response = connection.sendAndReceive(request, MATOCL_SESSION_LIST);
 	// There is uint16_t SESSION_STATS = 16 at the beginning of response
 	uint16_t dummy;
-	deserializeAllXaunaFsPacketDataNoHeader(response, dummy, mounts);
+	deserializeAllLegacyPacketDataNoHeader(response, dummy, mounts);
 
 	std::sort(mounts.begin(), mounts.end(),
 			[](const MountEntry& a, const MountEntry& b) -> bool

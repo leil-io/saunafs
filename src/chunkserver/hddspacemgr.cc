@@ -82,12 +82,12 @@
 #include "common/event_loop.h"
 #include "common/exceptions.h"
 #include "common/massert.h"
+#include "common/legacy_vector.h"
 #include "common/serialization.h"
 #include "common/slice_traits.h"
 #include "common/slogger.h"
 #include "common/time_utils.h"
 #include "common/unique_queue.h"
-#include "common/xaunafs_vector.h"
 #include "devtools/TracePrinter.h"
 #include "devtools/request_log.h"
 #include "protocol/SFSCommunication.h"
@@ -184,7 +184,7 @@ void hddSerializeAllDiskInfosV2(uint8_t *buff) {
 	TRACETHIS();
 
 	if (buff) {
-		XaunaFSVector<DiskInfo> diskInfoVector;
+		LegacyVector<DiskInfo> diskInfoVector;
 
 		for (const auto& disk : gDisks) {
 			diskInfoVector.emplace_back(disk->toDiskInfo());

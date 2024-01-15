@@ -27,9 +27,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "common/datapack.h"
 #include "common/lambda_guard.h"
-#include "common/xaunafs_string.h"
 #include "common/server_connection.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
@@ -93,7 +91,7 @@ static int make_snapshot(const char *dstdir, const char *dstbase, const char *sr
 			kill(getpid(), SIGUSR1);
 			signal_thread.join();
 		});
-		request = cltoma::snapshot::build(msgid, job_id, srcinode, dstinode, XaunaFsString<uint8_t>(dstbase),
+		request = cltoma::snapshot::build(msgid, job_id, srcinode, dstinode, dstbase,
 		                                  uid, gid, canoverwrite, ignore_missing_src, initial_batch_size);
 		response = ServerConnection::sendAndReceive(fd, request, SAU_MATOCL_FUSE_SNAPSHOT,
 				ServerConnection::ReceiveMode::kReceiveFirstNonNopMessage,

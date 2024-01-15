@@ -24,7 +24,7 @@
 #include <tuple>
 #include <gtest/gtest.h>
 
-#include "common/xaunafs_string.h"
+#include "common/legacy_string.h"
 #include "unittests/inout_pair.h"
 #include "unittests/packet.h"
 
@@ -95,7 +95,7 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		somebodyToSomebodyElse, communicate, SAU_CLTOMA_FUSE_MKNOD, kNonEmptyVersion,
 		uint32_t, messageId,
 		uint32_t, inode,
-		XaunaFsString<uint8_t>, name,
+		LegacyString<uint8_t>, name,
 		uint8_t, nodeType,
 		uint16_t, mode,
 		uint16_t, umask,
@@ -109,7 +109,7 @@ TEST(PacketSerializationTests, SerializeAndDeserialize) {
 	ASSERT_EQ(3210U, somebodyToSomebodyElse::communicate::kNonEmptyVersion);
 	SAUNAFS_DEFINE_INOUT_PAIR(uint32_t, messageId, 65432, 0);
 	SAUNAFS_DEFINE_INOUT_PAIR(uint32_t, inode, 36, 0);
-	SAUNAFS_DEFINE_INOUT_PAIR(XaunaFsString<uint8_t>, name, "kobyla ma maly bok", "");
+	SAUNAFS_DEFINE_INOUT_PAIR(LegacyString<uint8_t>, name, "kobyla ma maly bok", "");
 	SAUNAFS_DEFINE_INOUT_PAIR(uint8_t, nodeType, 0xF1, 0x00);
 	SAUNAFS_DEFINE_INOUT_PAIR(uint16_t, mode, 0725, 0000);
 	SAUNAFS_DEFINE_INOUT_PAIR(uint16_t, umask, 0351, 0000);

@@ -363,14 +363,14 @@ static bool fs_threc_send_receive(threc *rec, bool filter, PacketHeader::Type ex
 }
 
 const uint8_t* fs_sendandreceive(threc *rec, uint32_t expected_cmd, uint32_t *answer_leng) {
-	// this function is only for compatibility with XaunaFS code
+	// this function is only for compatibility with Legacy code
 	sassert(expected_cmd <= PacketHeader::kMaxOldPacketType);
 	if (fs_threc_send_receive(rec, true, expected_cmd)) {
 		const uint8_t *answer;
 		answer = rec->inputBuffer.data();
 		*answer_leng = rec->inputBuffer.size();
 
-		// XaunaFS code doesn't expect message id, skip it
+		// Legacy code doesn't expect message id, skip it
 		answer += 4;
 		*answer_leng -= 4;
 
@@ -1644,7 +1644,7 @@ uint8_t fs_mknod(uint32_t parent, uint8_t nleng, const uint8_t *name, uint8_t ty
 		uint32_t &inode, Attributes& attr) {
 	threc* rec = fs_get_my_threc();
 	auto message = cltoma::fuseMknod::build(rec->packetId, parent,
-			XaunaFsString<uint8_t>(reinterpret_cast<const char*>(name), nleng),
+			LegacyString<uint8_t>(reinterpret_cast<const char*>(name), nleng),
 			type, mode, umask, uid, gid, rdev);
 	if (!fs_saucreatepacket(rec, message)) {
 		return SAUNAFS_ERROR_IO;
@@ -1685,7 +1685,7 @@ uint8_t fs_mkdir(uint32_t parent, uint8_t nleng, const uint8_t *name,
 		uint8_t copysgid,uint32_t &inode, Attributes& attr) {
 	threc* rec = fs_get_my_threc();
 	auto message = cltoma::fuseMkdir::build(rec->packetId, parent,
-			XaunaFsString<uint8_t>(reinterpret_cast<const char*>(name), nleng),
+			LegacyString<uint8_t>(reinterpret_cast<const char*>(name), nleng),
 			mode, umask, uid, gid, copysgid);
 	if (!fs_saucreatepacket(rec, message)) {
 		return SAUNAFS_ERROR_IO;

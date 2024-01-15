@@ -65,7 +65,7 @@ uint32_t ChunkReplicator::getChunkBlocks(uint64_t chunk_id, uint32_t chunk_versi
 		cstocs::getChunkBlocks::serialize(output_buffer, chunk_id, chunk_version, (legacy::ChunkPartType)chunk_type);
 	} else {
 		assert(slice_traits::isStandard(chunk_type));
-		serializeXaunaFsPacket(output_buffer, CSTOCS_GET_CHUNK_BLOCKS, chunk_id, chunk_version);
+		serializeLegacyPacket(output_buffer, CSTOCS_GET_CHUNK_BLOCKS, chunk_id, chunk_version);
 	}
 	tcptowrite(fd, output_buffer.data(), output_buffer.size(), 1000);
 
@@ -97,7 +97,7 @@ uint32_t ChunkReplicator::getChunkBlocks(uint64_t chunk_id, uint32_t chunk_versi
 			rx_chunk_type = legacy_type;
 		}
 	} else {
-		deserializeAllXaunaFsPacketDataNoHeader(input_buffer.data(), input_buffer.size(),
+		deserializeAllLegacyPacketDataNoHeader(input_buffer.data(), input_buffer.size(),
 				rx_chunk_id, rx_chunk_version, nr_of_blocks, status);
 	}
 	auto expected =

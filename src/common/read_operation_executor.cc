@@ -67,7 +67,7 @@ void ReadOperationExecutor::sendReadRequest(const Timeout& timeout) {
 		cltocs::read::serialize(message, chunkId_, chunkVersion_, (legacy::ChunkPartType)chunkType_,
 			readOperation_.request_offset, readOperation_.request_size);
 	} else {
-		serializeXaunaFsPacket(message, CLTOCS_READ,
+		serializeLegacyPacket(message, CLTOCS_READ,
 			chunkId_, chunkVersion_, readOperation_.request_offset,
 			readOperation_.request_size);
 	}
@@ -189,7 +189,7 @@ void ReadOperationExecutor::processReadDataMessageReceived() {
 		cstocl::readData::deserializePrefix(messageBuffer_, readChunkId, readOffset, readSize,
 			currentlyReadBlockCrc_);
 	} else {
-		deserializeXaunaFsPacketPrefixNoHeader(messageBuffer_.data(), messageBuffer_.size(),
+		deserializeLegacyPacketPrefixNoHeader(messageBuffer_.data(), messageBuffer_.size(),
 			readChunkId, readOffset, readSize, currentlyReadBlockCrc_);
 	}
 
@@ -224,7 +224,7 @@ void ReadOperationExecutor::processReadStatusMessageReceived() {
 	if (server_version_ >= kFirstXorVersion) {
 		cstocl::readStatus::deserialize(messageBuffer_, readChunkId, readStatus);
 	} else {
-		deserializeAllXaunaFsPacketDataNoHeader(messageBuffer_.data(), messageBuffer_.size(),
+		deserializeAllLegacyPacketDataNoHeader(messageBuffer_.data(), messageBuffer_.size(),
 			readChunkId, readStatus);
 	}
 
