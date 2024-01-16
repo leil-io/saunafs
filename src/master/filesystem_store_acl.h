@@ -25,14 +25,11 @@
 #include "common/exceptions.h"
 #include "master/metadata_dumper.h"
 
-int fs_load_legacy_acls(const MemoryMappedFile &metadataFile, size_t& offsetBegin,
-                        int ignoreflag);
+int fs_load_legacy_acls(const MetadataSectionLoaderOptions&);
 
-int fs_load_posix_acls(const MemoryMappedFile &metadataFile, size_t& offsetBegin,
-                       int ignoreflag);
+int fs_load_posix_acls(const MetadataSectionLoaderOptions&);
 
-int fs_load_acls(const MemoryMappedFile &metadataFile, size_t& offsetBegin,
-                 int ignoreflag);
+int fs_load_acls(const MetadataSectionLoaderOptions&);
 
 void fs_store_acls(FILE *fd);
 

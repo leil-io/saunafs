@@ -223,11 +223,10 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 	}
 }
 
-bool fs_load_legacy_acls(const MemoryMappedFile &metadataFile,
-                         size_t &offsetBegin, int ignoreflag) {
+bool fs_load_legacy_acls(const MetadataSectionLoaderOptions& options) {
 	int s = 0;
 	do {
-		s = fs_load_legacy_acl(metadataFile, offsetBegin, ignoreflag);
+		s = fs_load_legacy_acl(options.metadataFile, options.offset, options.ignoreflag);
 		if (s < 0) {
 			return false;
 		}
@@ -235,19 +234,18 @@ bool fs_load_legacy_acls(const MemoryMappedFile &metadataFile,
 	return true;
 }
 
-bool fs_load_posix_acls(const MemoryMappedFile &metadataFile,
-                        size_t& offsetBegin, int ignoreflag) {
+bool fs_load_posix_acls(const MetadataSectionLoaderOptions& options) {
 	int s;
 
 	do {
-		s = fs_load_posix_acl(metadataFile, offsetBegin, ignoreflag, false);
+		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreflag, false);
 		if (s < 0) {
 			return false;
 		}
 	} while (s == 0);
 
 	do {
-		s = fs_load_posix_acl(metadataFile, offsetBegin, ignoreflag, true);
+		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreflag, true);
 		if (s < 0) {
 			return false;
 		}
@@ -309,12 +307,11 @@ static int fs_load_acl(const MemoryMappedFile &metadataFile,
 	}
 }
 
-bool fs_load_acls(const MemoryMappedFile &metadataFile,
-                  size_t&  offsetBegin, int ignoreflag) {
+bool fs_load_acls(const MetadataSectionLoaderOptions& options) {
 	int s;
 
 	do {
-		s = fs_load_acl(metadataFile, offsetBegin, ignoreflag);
+		s = fs_load_acl(options.metadataFile, options.offset, options.ignoreflag);
 		if (s < 0) {
 			return false;
 		}

@@ -2653,22 +2653,21 @@ void chunk_dump(void) {
 
 #endif
 
-bool chunk_load(const MemoryMappedFile &metadataFile, size_t &offsetBegin,
-                bool loadLockIds) {
+bool chunk_load(const MetadataSectionLoaderOptions& options) {
 	const uint8_t *ptr;
 	Chunk *c;
 	uint64_t chunkid;
 
-	ptr = metadataFile.seek(offsetBegin);
+	ptr = options.metadataFile.seek(options.offset);
 
 	gChunksMetadata->nextchunkid = get64bit(&ptr);
-	offsetBegin = metadataFile.offset(ptr);
+	options.offset = options.metadataFile.offset(ptr);
 	for (;;) {
 		chunkid = get64bit(&ptr);
 		uint32_t version = get32bit(&ptr);
 		uint32_t lockedto = get32bit(&ptr);
 		uint32_t lockid = 0;
-		if (loadLockIds) {
+		if (options.loadLockIds) {
 			lockid = get32bit(&ptr);
 		}
 		if (chunkid > 0) {
@@ -2677,7 +2676,7 @@ bool chunk_load(const MemoryMappedFile &metadataFile, size_t &offsetBegin,
 			c->lockid = lockid;
 			continue;
 		}
-		offsetBegin = metadataFile.offset(ptr);
+		options.offset = options.metadataFile.offset(ptr);
 		if (version == 0 && lockedto == 0) {
 			return true;
 		} else {

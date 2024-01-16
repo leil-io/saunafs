@@ -30,6 +30,7 @@
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
 #include "common/memory_file.h"
+#include "filesystem_store.h"
 #include "master/checksum.h"
 #include "protocol/cltoma.h"
 
@@ -100,7 +101,7 @@ int chunk_invalidate_goal_cache();
 
 #endif
 
-bool chunk_load(const MemoryMappedFile &metadataFile, size_t& offsetBegin, bool loadLockIds = true);
+bool chunk_load(const MetadataSectionLoaderOptions&);
 void chunk_store(FILE *fd);
 void chunk_unload(void);
 void chunk_newfs(void);
