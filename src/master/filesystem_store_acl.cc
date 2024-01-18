@@ -223,7 +223,7 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 	}
 }
 
-bool fs_load_legacy_acls(const MetadataSectionLoaderOptions& options) {
+bool fs_load_legacy_acls(MetadataSectionLoaderOptions options) {
 	int s = 0;
 	do {
 		s = fs_load_legacy_acl(options.metadataFile, options.offset, options.ignoreflag);
@@ -234,7 +234,7 @@ bool fs_load_legacy_acls(const MetadataSectionLoaderOptions& options) {
 	return true;
 }
 
-bool fs_load_posix_acls(const MetadataSectionLoaderOptions& options) {
+bool fs_load_posix_acls(MetadataSectionLoaderOptions options) {
 	int s;
 
 	do {
@@ -307,7 +307,7 @@ static int fs_load_acl(const MemoryMappedFile &metadataFile,
 	}
 }
 
-bool fs_load_acls(const MetadataSectionLoaderOptions& options) {
+bool fs_load_acls(MetadataSectionLoaderOptions options) {
 	int s;
 
 	do {

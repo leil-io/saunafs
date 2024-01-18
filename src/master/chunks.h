@@ -101,7 +101,7 @@ int chunk_invalidate_goal_cache();
 
 #endif
 
-bool chunk_load(const MetadataSectionLoaderOptions&);
+bool chunk_load(MetadataSectionLoaderOptions);
 void chunk_store(FILE *fd);
 void chunk_unload(void);
 void chunk_newfs(void);

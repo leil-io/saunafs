@@ -36,7 +36,7 @@ SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataConsistencyException, MetadataException);
 
 struct MetadataSectionLoaderOptions {
 	MetadataSectionLoaderOptions(const MemoryMappedFile &metadataFile_,
-	                             size_t &offset_, int ignoreflag_,
+	                             size_t offset_, int ignoreflag_,
 	                             uint64_t sectionLength_, bool loadLockIds_)
 	    : metadataFile(metadataFile_),
 	      offset(offset_),
@@ -45,7 +45,7 @@ struct MetadataSectionLoaderOptions {
 	      loadLockIds(loadLockIds_) {}
 
 	const MemoryMappedFile &metadataFile;
-	size_t& offset;
+	size_t offset;
 	int ignoreflag;
 	uint64_t sectionLength;
 	bool loadLockIds;

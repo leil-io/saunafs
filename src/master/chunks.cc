@@ -2653,7 +2653,7 @@ void chunk_dump(void) {
 
 #endif
 
-bool chunk_load(const MetadataSectionLoaderOptions& options) {
+bool chunk_load(MetadataSectionLoaderOptions options) {
 	const uint8_t *ptr;
 	Chunk *c;
 	uint64_t chunkid;

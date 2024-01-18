@@ -59,10 +59,9 @@ constexpr uint8_t kMetadataVersionWithLockIds = 0x29;
 static constexpr int8_t kOpSuccess = 0;
 static constexpr int8_t kOpFailure = -1;
 static std::mutex gOffsetBeginMutex;
-
+static std::mutex gMetadataSectionHeaderMutex;
 char const MetadataStructureReadErrorMsg[] =
     "error reading metadata (structure)";
-
 
 void xattr_store(FILE *fd) {
 	uint8_t hdrbuff[4 + 1 + 4];
@@ -101,8 +100,7 @@ void xattr_store(FILE *fd) {
 	}
 }
 
-bool xattr_load(const MetadataSectionLoaderOptions& options) {
-//	constexpr uint8_t kBufferXattrSize = 4 + 1 + 4;
+bool xattr_load(MetadataSectionLoaderOptions options) {
 	const uint8_t *ptr;
 	uint32_t inode;
 	uint8_t anleng;
@@ -295,8 +293,6 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 	const uint8_t* pSrc = metadataFile.seek(sectionOffset);
 	parentId = get32bit(&pSrc);
 	childId = get32bit(&pSrc);
-	sectionOffset += (sizeof(uint32_t) << 1);
-
 	uint16_t edgeNameSize = get16bit(&pSrc);
 	sectionOffset = metadataFile.offset(pSrc);
 
@@ -553,13 +549,11 @@ void fs_storenode(FSNode *f, FILE *fd) {
  */
 int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset) {
 	static constexpr uint32_t kChunkSize = (1 << 16);
-//	static constexpr uint8_t kNodeSize = 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4;
 
 	uint8_t type;
 	FSNode *node;
 	const uint8_t *pSrc = metadataFile.seek(sectionOffset);
 	type = get8bit(&pSrc);
-//	sectionOffset++;
 	if (!type) {  // last node
 		sectionOffset = metadataFile.offset(pSrc);
 		return 1;
@@ -576,7 +570,6 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 	node->mtime = get32bit(&pSrc);
 	node->ctime = get32bit(&pSrc);
 	node->trashtime = get32bit(&pSrc);
-//	sectionOffset += kNodeSize;
 	FSNodeFile *nodeFile = static_cast<FSNodeFile *>(node);
 
 	uint32_t nodeNameLength;
@@ -594,44 +587,35 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 	case FSNode::kBlockDev:
 	case FSNode::kCharDev:
 		static_cast<FSNodeDevice *>(node)->rdev = get32bit(&pSrc);
-//		sectionOffset += sizeof(uint32_t);
 		break;
 	case FSNode::kSymlink:
 		nodeNameLength = get32bit(&pSrc);
-//		sectionOffset += sizeof(uint32_t);
 		static_cast<FSNodeSymlink *>(node)->path_length = nodeNameLength;
 		if (nodeNameLength > 0) {  /// TODO check if pointer is shifted by
 			                       /// memcpy
 			std::memcpy(&(static_cast<FSNodeSymlink *>(node)->path.data()),
 			            pSrc, nodeNameLength);
-//			sectionOffset += nodeNameLength;
 		}
 		break;
 	case FSNode::kFile:
 	case FSNode::kTrash:
 	case FSNode::kReserved:
 		nodeFile->length = get64bit(&pSrc);
-//		sectionOffset += sizeof(uint64_t);
 		chunkAmount = get32bit(&pSrc);
-//		sectionOffset += sizeof(uint32_t);
 		sessionIds = get16bit(&pSrc);
-//		sectionOffset += sizeof(uint16_t);
 		nodeFile->chunks.resize(chunkAmount);
 		index = 0;
 		while (chunkAmount > kChunkSize) {
 			for (uint32_t i = 0; i < kChunkSize; i++) {
 				nodeFile->chunks[index++] = get64bit(&pSrc);
-//				sectionOffset += sizeof(uint64_t);
 			}
 			chunkAmount -= kChunkSize;
 		}
 		for (uint32_t i = 0; i < chunkAmount; i++) {
 			nodeFile->chunks[index++] = get64bit(&pSrc);
-//			sectionOffset += sizeof(uint64_t);
 		}
 		while (sessionIds) {
 			uint32_t sessionId = get32bit(&pSrc);
-//			sectionOffset += sizeof(uint32_t);
 			nodeFile->sessionid.push_back(sessionId);
 #ifndef METARESTORE
 			matoclserv_add_open_file(sessionId, node->id);
@@ -763,7 +747,7 @@ int fs_checknodes(int ignoreflag) {
 	return 1;
 }
 
-bool fs_loadnodes(const MetadataSectionLoaderOptions& options) {
+bool fs_loadnodes(MetadataSectionLoaderOptions options) {
 	int8_t s;
 	do {
 		s = fs_parseNode(options.metadataFile, options.offset);
@@ -774,7 +758,7 @@ bool fs_loadnodes(const MetadataSectionLoaderOptions& options) {
 	return true;
 }
 
-bool fs_loadedges(const MetadataSectionLoaderOptions& options) {
+bool fs_loadedges(MetadataSectionLoaderOptions options) {
 	int s;
 	fs_parseEdge(options.metadataFile, options.offset, options.ignoreflag, true);
 	do {
@@ -786,7 +770,7 @@ bool fs_loadedges(const MetadataSectionLoaderOptions& options) {
 	return true;
 }
 
-static bool fs_loadquotas(const MetadataSectionLoaderOptions& options) {
+static bool fs_loadquotas(MetadataSectionLoaderOptions options) {
 	try {
 		std::vector<QuotaEntry> entries;
 		fs_load_generic(options.metadataFile, options.offset, entries);
@@ -805,7 +789,7 @@ static bool fs_loadquotas(const MetadataSectionLoaderOptions& options) {
 	return true;
 }
 
-static bool fs_loadlocks(const MetadataSectionLoaderOptions& options) {
+static bool fs_loadlocks(MetadataSectionLoaderOptions options) {
 	try {
 		gMetadata->flock_locks.load(options.metadataFile, options.offset);
 		gMetadata->posix_locks.load(options.metadataFile, options.offset);
@@ -853,7 +837,7 @@ void fs_storefree(FILE *fd) {
 	}
 }
 
-bool fs_loadfree(const MetadataSectionLoaderOptions& options) {
+bool fs_loadfree(MetadataSectionLoaderOptions options) {
 	const uint8_t *ptr;
 	uint32_t freeNodesToLoad, freeNodesNumber;
 
@@ -1002,57 +986,22 @@ void fs_store_fd(FILE *fd) {
 static constexpr uint8_t kMetadataSectionHeaderSize = 16;
 static constexpr uint8_t kMetadataSectionNameSize = 8;
 
-
 struct FutureInfo {
-	FutureInfo(std::string sectionName_, std::string sectionDescription_,
-	           std::future<bool> future_)
-	    : sectionName(std::move(sectionName_)),
-	      sectionDescription(std::move(sectionDescription_)),
-	      future(std::move(future_)) {}
-
 	std::string sectionName;
 	std::string sectionDescription;
 	std::future<bool> future;
 };
 
-//template <typename Func, typename... Args>
-//static bool loadSectionHelper(Func callback, Args ...args) {
-//	return callback(std::forward<Args>(args)...);
-//}
-
-//template <typename Func, typename... Args>
-//static std::future<bool> loadSectionAsync(Func callback, Args ...args) {
-//	return std::async(std::launch::async, loadSectionHelper<Func, Args ...>,
-//	                  callback, &args...);
-//}
-
-//static void handleAsyncResult(FutureInfo &futureInfo) {
-//	try {
-//		if (!futureInfo.future.get()) {
-//			safs_pretty_syslog(LOG_ERR, "error reading section (%s)",
-//			                   futureInfo.sectionName.c_str());
-//		} else {
-//			safs_pretty_syslog(LOG_INFO, "Section loaded successfully (%s)",
-//			                   futureInfo.sectionName.c_str());
-//		}
-//	} catch (const std::exception &e) {
-//		safs_pretty_syslog(LOG_ERR, "Exception while processing section (%s)",
-//		                   futureInfo.sectionName.c_str());
-//		throw MetadataConsistencyException(e.what());
-//	}
-//}
-
-
 struct MetadataSection {
-	static const size_t kNameSize=8;
-
 	MetadataSection(
 	    std::string_view name_, std::string_view description_,
-	    std::function<bool(const MetadataSectionLoaderOptions &)> load_,
+	    std::function<bool(MetadataSectionLoaderOptions)> load_,
+	    bool asyncLoad_ = true,
 	    bool isLegacy_ = false)
 	    : name(name_),
 	      description(description_),
 	      load(std::move(load_)),
+	      asyncLoad(asyncLoad_),
 	      isLegacy(isLegacy_) {}
 
 	bool isSection(const uint8_t *sectionPtr) const {
@@ -1061,12 +1010,15 @@ struct MetadataSection {
 
 	std::string_view name;
 	std::string_view description;
-	std::function<bool(const MetadataSectionLoaderOptions&)> load;
+	std::function<bool(MetadataSectionLoaderOptions)> load;
+	bool asyncLoad;
 	bool isLegacy;
 };
 
 static const std::vector<MetadataSection> kMetadataSections = {
-    MetadataSection("NODE 1.0", "Nodes", fs_loadnodes),
+    /// Synchronously loaded sections (in order)
+    MetadataSection("NODE 1.0", "Nodes", fs_loadnodes, false),
+    /// Asynchronously loaded sections:
     MetadataSection("EDGE 1.0", "Edges", fs_loadedges),
     MetadataSection("FREE 1.0", "Free Nodes", fs_loadfree),
     MetadataSection("XATR 1.0", "Extended Attributes", xattr_load),
@@ -1078,30 +1030,48 @@ static const std::vector<MetadataSection> kMetadataSections = {
     MetadataSection("CHNK 1.0", "Chunks", chunk_load),
     /// Legacy Sections (won't be loaded):
     MetadataSection("QUOT 1.0", "Quotas",
-                    [](const MetadataSectionLoaderOptions &) { return true; }, true),
+                    [](const MetadataSectionLoaderOptions &) { return true; }, true, true),
     MetadataSection("LOCK 1.0", "Locks",
-                    [](const MetadataSectionLoaderOptions &) { return true; }, true),
+                    [](const MetadataSectionLoaderOptions &) { return true; }, true, true),
 };
 
 bool fileMatchesMetadataSection(const uint8_t *sectionPtr, const MetadataSection &section) {
 	return section.isSection(sectionPtr);
 }
 
-//bool loadSection(const MemoryMappedFile &metadataFile, size_t &offsetBegin,
-//				 const MetadataSection &section, int ignoreflag) {
-//	return section.loadSection(MetadataSectionLoaderOptions(metadataFile,
-//	                                                        offsetBegin,
-//	                                                        ignoreflag,
-//	                                                        0,
-//	                                                        false))
-//}
+bool loadSection(const MetadataSection &section,
+                 const MetadataSectionLoaderOptions options) {
+	    try {
+			if (section.load(options)) {
+				safs_pretty_syslog(LOG_INFO, "Section loaded successfully (%s)",
+								   section.name.data());
+			    return true;
+			} else {
+				safs_pretty_syslog(LOG_ERR, "error reading section (%s)",
+								   section.name.data());
+			}
+		} catch (const std::exception &e) {
+		    safs_pretty_syslog(LOG_ERR, "Exception while processing section (%s)",
+		                       section.name.data());
+		    throw MetadataConsistencyException(e.what());
+	    }
+	    return false;
+}
 
-//std::future<bool> loadSectionAsync(const MemoryMappedFile &metadataFile, size_t &offsetBegin,
-//                 const MetadataSection &section, int ignoreflag) {
-//	return std::async(std::launch::async, loadSection, metadataFile,
-//							std::ref(offsetBegin), std::ref(section),
-//							ignoreflag);
-//}
+std::future<bool> loadSectionAsync(const MetadataSection &section,
+                                   MetadataSectionLoaderOptions options) {
+		return std::async(std::launch::async, loadSection, section, options);
+}
+
+void loadSectionAsync(const MetadataSection &section,
+					  MetadataSectionLoaderOptions options,
+					  std::vector<FutureInfo> &futures) {
+	FutureInfo future;
+	future.sectionName = section.name;
+	future.sectionDescription = section.description;
+	future.future = loadSectionAsync(section, options);
+	futures.push_back(std::move(future));
+}
 
 bool isEndOfMetadata(const uint8_t *sectionPtr) {
 	static constexpr std::string_view kMetadataTrailer("[" SFSSIGNATURE
@@ -1110,15 +1080,6 @@ bool isEndOfMetadata(const uint8_t *sectionPtr) {
 	              ::kMetadataSectionHeaderSize) == kOpSuccess;
 }
 
-bool handleLoadResult(bool result, const char* sectionName){
-	safs_pretty_syslog((result) ? LOG_INFO : LOG_ERR,
-	                   (result) ? "Section loaded successfully (%s)"
-	                                : "error reading section (%s)",
-	                   sectionName);
-	return result;
-}
-
-static std::mutex gMetadataSectionHeaderMutex;
 
 int fs_load(const MemoryMappedFile &metadataFile, int ignoreflag) {
 
@@ -1132,63 +1093,52 @@ int fs_load(const MemoryMappedFile &metadataFile, int ignoreflag) {
 	gMetadata->nextsessionid = get32bit(&metadataHeaderPtr);
 
 	size_t offsetBegin = metadataFile.offset(metadataHeaderPtr);
-	const uint8_t *sectionPtr;
 
-//	std::vector<FutureInfo> futures;
-	std::string_view currentSectionName = "unknown";
-
-	uint64_t sectionLength = 0;
-
-	while (true) {
-		sectionPtr = metadataFile.seek(offsetBegin);
-
-		if (isEndOfMetadata(sectionPtr)) {
-			safs_pretty_syslog(LOG_INFO, "Found last Metadata Section");
-			break;
-		}
-
+	/// First secuential pass to gather all section lengths
+	std::unordered_map<std::string_view, std::pair<size_t, uint64_t>>
+	    sectionMarkers;
+	uint8_t *sectionPtr = metadataFile.seek(offsetBegin);
+	while (!isEndOfMetadata(sectionPtr)) {
 		const uint8_t *sectionLengthPtr = sectionPtr + kMetadataSectionNameSize;
-		sectionLength = get64bit(&sectionLengthPtr);
-		offsetBegin = metadataFile.offset(sectionLengthPtr);
-
-		bool foundSection = false;
+		uint64_t sectionLength = get64bit(&sectionLengthPtr);
+		const uint8_t *sectionDataPtr = sectionLengthPtr;
 		for (const auto &section : kMetadataSections) {
 			if (fileMatchesMetadataSection(sectionPtr, section)) {
-				foundSection = true;
-				currentSectionName = section.name;
-				if (section.isLegacy) {
-					safs_pretty_syslog(LOG_WARNING, "legacy section found (%s)",
-					                   section.name.data());
-					break;
-				}
-				bool loadResult = section.load({metadataFile, offsetBegin,
-				                                ignoreflag, sectionLength, true});
-				handleLoadResult(loadResult, section.name.data());
+				sectionMarkers[section.name] = {
+				    metadataFile.offset(sectionDataPtr), sectionLength};
 				break;
 			}
 		}
-		if (foundSection) {
+		sectionPtr = metadataFile.seek(
+		    offsetBegin += sectionLength + kMetadataSectionHeaderSize);
+	}
+
+	std::vector<FutureInfo> futures;
+	for (const auto &section : kMetadataSections) {
+		if (sectionMarkers.find(section.name) == sectionMarkers.end()) {
 			continue;
 		}
-//		/// Wait for all futures to finish
-//		for (auto &future : futures) {
-//			handleLoadResult(future.future.get(), future.sectionName.c_str());
-//		}
-//		futures.clear();
-		if (ignoreflag) {
-			safs_pretty_syslog(LOG_WARNING,
-			                   "unknown section found (leng:%" PRIu64
-			                   ",name:%s) - all data from this section "
-			                   "will be lost",
-			                   sectionLength, currentSectionName.data());
-			offsetBegin += sectionLength;
-		} else {
-			safs_pretty_syslog(LOG_ERR,
-			                   "error: unknown section found (leng:%" PRIu64
-			                   ",name:%s)",
-			                   sectionLength, currentSectionName.data());
-			return kOpFailure;
+		size_t sectionOffset = sectionMarkers[section.name].first;
+		uint64_t sectionLength = sectionMarkers[section.name].second;
+		if (section.isLegacy) {
+			safs_pretty_syslog(LOG_WARNING, "legacy section found (%s)",
+			                   section.name.data());
+			continue;
 		}
+		auto options = MetadataSectionLoaderOptions{
+		    metadataFile, sectionOffset,
+		    ignoreflag, sectionLength, true};
+
+		if (!section.asyncLoad) {
+			loadSection(section, options);
+		} else {
+			MetadataSectionLoaderOptions asyncOptionsCopy = options;
+			loadSectionAsync(section, asyncOptionsCopy, futures);
+		}
+	}
+	/// Wait for all futures to finish
+	for (auto &future : futures) {
+		future.future.wait();
 	}
 
 	safs_pretty_syslog_attempt(
