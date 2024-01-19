@@ -18,8 +18,6 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "common/platform.h"
-#include "master/filesystem_store.h"
 
 #include <cstdio>
 #include <vector>
@@ -41,10 +39,10 @@
 #include "master/filesystem_operations.h"
 #include "master/filesystem_checksum.h"
 #include "master/locks.h"
-#include "master/matoclserv.h"
 #include "master/matomlserv.h"
 #include "master/metadata_dumper.h"
-#include "master/restore.h"
+
+#include "master/filesystem_store_acl.h"
 
 static void fs_store_marker(FILE *fd) {
 	static std::vector<uint8_t> buffer;
@@ -82,13 +80,13 @@ void fs_store_acls(FILE *fd) {
 
 static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
                              size_t& offsetBegin,
-                             int ignoreflag,
+                             int ignoreFlag,
                              bool default_acl) {
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
         uint32_t sizeofsize = sizeof(size);
-		uint8_t *ptr = nullptr;
+		uint8_t *ptr;
 		try{
 			ptr = metadataFile.seek(offsetBegin);
 		} catch (const std::exception &e) {
@@ -148,7 +146,7 @@ static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
 		return 0;
 	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
+		if (!ignoreFlag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		} else {
 			return 0;
@@ -158,12 +156,12 @@ static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
 
 static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
                               size_t& offsetBegin,
-                              int ignoreflag) {
+                              int ignoreFlag) {
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
         uint32_t sizeofsize = sizeof(size);
-		uint8_t *ptr = nullptr;
+		uint8_t *ptr;
         try {
 			ptr = metadataFile.seek(offsetBegin);
         } catch (const std::exception &e) {
@@ -215,7 +213,7 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 		return 0;
 	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
+		if (!ignoreFlag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		} else {
 			return 0;
@@ -223,29 +221,29 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 	}
 }
 
-bool fs_load_legacy_acls(MetadataSectionLoaderOptions options) {
-	int s = 0;
-	do {
-		s = fs_load_legacy_acl(options.metadataFile, options.offset, options.ignoreflag);
-		if (s < 0) {
-			return false;
-		}
-	} while (s == 0);
-	return true;
-}
-
-bool fs_load_posix_acls(MetadataSectionLoaderOptions options) {
+bool fs_load_legacy_acls(MetadataLoader::Options options) {
 	int s;
 
 	do {
-		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreflag, false);
+		s = fs_load_legacy_acl(options.metadataFile, options.offset, options.ignoreFlag);
+		if (s < 0) {
+			return false;
+		}
+	} while (s == 0);
+	return true;
+}
+
+bool fs_load_posix_acls(MetadataLoader::Options options) {
+	int s;
+	do {
+		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreFlag, false);
 		if (s < 0) {
 			return false;
 		}
 	} while (s == 0);
 
 	do {
-		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreflag, true);
+		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreFlag, true);
 		if (s < 0) {
 			return false;
 		}
@@ -254,14 +252,14 @@ bool fs_load_posix_acls(MetadataSectionLoaderOptions options) {
 	return true;
 }
 
-static int fs_load_acl(const MemoryMappedFile &metadataFile,
+int fs_load_acl(const MemoryMappedFile &metadataFile,
                        size_t& offsetBegin,
-                       int ignoreflag) {
+                       int ignoreFlag) {
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
         uint32_t sizeofsize = sizeof(size);
-		uint8_t *ptr = nullptr;
+		uint8_t *ptr;
         try {
 			ptr = metadataFile.seek(offsetBegin);
         } catch (const std::exception &e) {
@@ -299,7 +297,7 @@ static int fs_load_acl(const MemoryMappedFile &metadataFile,
 		return 0;
 	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
-		if (!ignoreflag || ex.status() != SAUNAFS_STATUS_OK) {
+		if (!ignoreFlag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
 		} else {
 			return 0;
@@ -307,11 +305,11 @@ static int fs_load_acl(const MemoryMappedFile &metadataFile,
 	}
 }
 
-bool fs_load_acls(MetadataSectionLoaderOptions options) {
+bool fs_load_acls(MetadataLoader::Options options) {
 	int s;
 
 	do {
-		s = fs_load_acl(options.metadataFile, options.offset, options.ignoreflag);
+		s = fs_load_acl(options.metadataFile, options.offset, options.ignoreFlag);
 		if (s < 0) {
 			return false;
 		}

@@ -105,6 +105,7 @@ MemoryMappedFile::~MemoryMappedFile() {
 	::close(this->fd);
 }
 
+
 uint8_t *MemoryMappedFile::seek(size_t offset) const {
 	if (this->map == nullptr) {
 		throw std::runtime_error("File is not mapped");

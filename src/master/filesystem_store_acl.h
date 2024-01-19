@@ -25,11 +25,11 @@
 #include "common/exceptions.h"
 #include "master/metadata_dumper.h"
 
-int fs_load_legacy_acls(MetadataSectionLoaderOptions);
+bool fs_load_legacy_acls(MetadataLoader::Options);
 
-int fs_load_posix_acls(MetadataSectionLoaderOptions);
+bool fs_load_posix_acls(MetadataLoader::Options);
 
-int fs_load_acls(MetadataSectionLoaderOptions);
+bool fs_load_acls(MetadataLoader::Options);
 
 void fs_store_acls(FILE *fd);
 
