@@ -38,20 +38,27 @@ public:
 };
 
 MemoryMappedFile::MemoryMappedFile(const std::string &path) {
-	this->path = path;
-	this->fd = ::open(path.c_str(), O_RDONLY);
-	if (this->fd == -1) {
-		throw std::runtime_error("Failed to open file '" + path +
-		                         "' for reading");
-	}
-	this->file_size = MemoryMapUtils::getFileSizeFromFd(this->fd);
-	this->map_size =
-	    MemoryMapUtils::calculateMapSizeFromFilesize(this->file_size);
+	try {
+		this->path = path;
+		this->fd = ::open(path.c_str(), O_RDONLY);
+		if (this->fd == -1) {
+			std::string errorMsg = "Failed to open file '" + path + "' for reading: " +
+								   std::string(strerror(errno));
+			throw std::runtime_error(errorMsg);
+		}
+		this->file_size = MemoryMapUtils::getFileSizeFromFd(this->fd);
+		this->map_size =
+			MemoryMapUtils::calculateMapSizeFromFilesize(this->file_size);
 
-	this->map =
-	    (uint8_t *)::mmap(nullptr, map_size, PROT_READ, MAP_SHARED, fd, 0);
-	if (this->map == MAP_FAILED) {
-		throw std::runtime_error("Failed to mmap file '" + path + "'");
+		this->map =
+			(uint8_t *)::mmap(nullptr, map_size, PROT_READ, MAP_SHARED, fd, 0);
+		if (this->map == MAP_FAILED) {
+			throw std::runtime_error("Failed to mmap file '" + path + "'");
+		}
+	} catch (std::exception &e) {
+		safs_pretty_syslog(LOG_ERR, "Failed to map file '%s': %s",
+		                   path.c_str(), e.what());
+		throw e;
 	}
 }
 
@@ -59,7 +66,7 @@ MemoryMappedFile::~MemoryMappedFile() {
 	try {
 		::munmap(this->map, this->map_size);
 	} catch (...) {
-		// Ignore, so the fd is closed
+		safs_pretty_syslog(LOG_ERR, "Failed to unmap file '%s'", path.c_str());
 	}
 	::close(this->fd);
 }
