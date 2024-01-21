@@ -1,24 +1,12 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/syslog.h>
 #include <unistd.h>
 #include <stdexcept>
 #include <vector>
 
 #include "memory_file.h"
 #include "slogger.h"
-
-struct Range {
-	Range(uint64_t start, uint64_t end) : start(start), end(end) {}
-	Range() : start(0), end(0) {}
-
-public:
-	uint64_t start;
-	uint64_t end;
-};
-
-using RangedChunks = std::vector<Range>;
 
 class MemoryMapUtils {
 public:
@@ -35,36 +23,6 @@ public:
 			map_size += page_size - remainder;
 		}
 		return map_size;
-	}
-
-	static RangedChunks getMemoryChunksToFitInMemory(size_t file_size,
-	                                                 size_t memory_size = 0) {
-		RangedChunks chunks;
-		if (memory_size == 0) {
-			memory_size = MemoryMapUtils::getAllocatableMemorySize();
-		}
-		size_t map_size =
-		    MemoryMapUtils::calculateMapSizeFromFilesize(file_size);
-		if (map_size >= memory_size) {
-			size_t step_offset = 0;
-			while (step_offset < map_size) {
-				size_t step_size =
-				    std::min(map_size - step_offset, memory_size);
-				chunks.emplace_back(step_offset, step_offset + step_size);
-				step_offset += step_size;
-			}
-		} else {
-			chunks.emplace_back(0, map_size);
-		}
-		return chunks;
-	}
-
-	inline static size_t getMemorySize() {
-		return sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGESIZE);
-	}
-
-	inline static size_t getAllocatableMemorySize() {
-		return sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
 	}
 
 	inline static size_t pageSize() { return sysconf(_SC_PAGESIZE); }
