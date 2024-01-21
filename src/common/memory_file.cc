@@ -72,7 +72,8 @@ public:
 	inline static size_t getFileSizeFromFd(int fd) {
 		struct stat st {};
 		if (fstat(fd, &st) == -1) {
-			throw std::runtime_error("Failed to fstat file");
+			std::string errorMsg = "Failed to fstat file: " + std::string(strerror(errno));
+			throw std::runtime_error(errorMsg);
 		}
 		return st.st_size;
 	}
