@@ -19,11 +19,11 @@
 */
 
 #include "fileinfo_cache.h"
-#include "safs_fsal_types.h"
+#include "saunafs_fsal_types.h"
 
-#include <time.h>
 #include <abstract_mem.h>
 #include <avltree.h>
+#include <time.h>
 
 const uint64_t kMillisecondsInOneSecond = 1000LL;
 const uint64_t kNanosecondsInOneMicrosecond = 1000LL;
@@ -129,7 +129,8 @@ void destroyFileInfoCache(FileInfoCache_t *cache) {
 	gsh_free(cache);
 }
 
-FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache, sau_inode_t inode) {
+FileInfoEntry_t *acquireFileInfoCache(FileInfoCache_t *cache,
+                                      sau_inode_t inode) {
 	FileInfoEntry_t key;
 	FileInfoEntry_t *entry = NULL;
 

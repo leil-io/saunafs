@@ -19,29 +19,32 @@
  */
 
 #include "context_wrap.h"
-#include "safs_fsal_methods.h"
-
-/**
- * @brief Convert an FSAL ACL to a SaunaFS ACL.
- *
- * @param[in] fsalACL     FSAL ACL
- * @param[in] mode        Mode used to create the acl and set POSIX permission flags
- *
- * @returns: Converted SaunaFS ACL
- */
+#include "saunafs_internal.h"
 
 const uint ByteMaxValue = 0xFF;
 
-sau_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
-                                     unsigned int mode) {
-	sau_acl_t *nativeACL = NULL;
+/**
+ * @brief Convert a given ACL in FSAL format to the corresponding SaunaFS ACL.
+ * The mode is used to create a default ACL and set POSIX permission flags.
+ * The new ACL is filled with the ACEs from the original ACL to have the same
+ * permissions and flags.
+ *
+ * @param[in] fsalACL     FSAL ACL
+ * @param[in] mode        Mode used to create the acl and set POSIX permission
+ *                        flags
+ *
+ * @returns: SaunaFS ACL
+ */
+sau_acl_t *convertFsalACLToSaunafsACL(const fsal_acl_t *fsalACL,
+                                      unsigned int mode) {
+	sau_acl_t *saunafsACL = NULL;
 
 	if (!fsalACL || (!fsalACL->aces && fsalACL->naces > 0)) {
 		return NULL;
 	}
 
-	nativeACL = sau_create_acl_from_mode(mode);
-	if (!nativeACL) {
+	saunafsACL = sau_create_acl_from_mode(mode);
+	if (!saunafsACL) {
 		return NULL;
 	}
 
@@ -85,59 +88,61 @@ sau_acl_t *convertFsalACLToNativeACL(const fsal_acl_t *fsalACL,
 			}
 		}
 
-		sau_add_acl_entry(nativeACL, &ace);
+		sau_add_acl_entry(saunafsACL, &ace);
 	}
 
-	return nativeACL;
+	return saunafsACL;
 }
 
 /**
- * @brief Convert a SaunaFS ACL to an FSAL ACL.
+ * @brief Convert a given SaunaFS ACL to the corresponding ACL in FSAL format.
+ * This function copies the ACEs from the original SaunaFS ACL to have the same
+ * permissions and flags in the new ACL.
  *
- * @param[in] nativeACL     SaunaFS ACL
+ * @param[in] saunafsACL     SaunaFS ACL
  *
- * @returns: Converted FSAL ACL
+ * @returns: ACL in FSAL format
  */
-fsal_acl_t *convertNativeACLToFsalACL(const sau_acl_t *nativeACL) {
-	fsal_acl_data_t ACLData;
-	fsal_acl_status_t ACLStatus = 0;
-	fsal_acl_t *fsalACL = NULL;
+fsal_acl_t *convertSaunafsACLToFsalACL(const sau_acl_t *saunafsACL) {
+	fsal_acl_data_t aclData;
+	fsal_acl_status_t status = 0;
 
-	if (!nativeACL) {
+	if (!saunafsACL) {
 		return NULL;
 	}
 
-	ACLData.naces = sau_get_acl_size(nativeACL);
-	ACLData.aces = nfs4_ace_alloc(ACLData.naces);
+	aclData.naces = sau_get_acl_size(saunafsACL);
+	aclData.aces = nfs4_ace_alloc(aclData.naces);
 
-	if (!ACLData.aces) {
+	if (!aclData.aces) {
 		return NULL;
 	}
 
-	for (size_t aceIterator = 0; aceIterator < ACLData.naces; ++aceIterator) {
-		fsal_ace_t *fsalACE = ACLData.aces + aceIterator;
-		sau_acl_ace_t nativeACE;
+	for (size_t aceEntry = 0; aceEntry < aclData.naces; ++aceEntry) {
+		fsal_ace_t *fsalACE = aclData.aces + aceEntry;
+		sau_acl_ace_t saunafsACE;
 
-		int retvalue = sau_get_acl_entry(nativeACL, aceIterator, &nativeACE);
+		int retvalue = sau_get_acl_entry(saunafsACL, aceEntry, &saunafsACE);
 
 		(void) retvalue;
 		assert(retvalue == 0);
 
-		fsalACE->type  = nativeACE.type;
-		fsalACE->flag  = nativeACE.flags & ByteMaxValue;
-		fsalACE->iflag = (nativeACE.flags & (unsigned)SAU_ACL_SPECIAL_WHO) ?
-		            FSAL_ACE_IFLAG_SPECIAL_ID : 0;
-		fsalACE->perm = nativeACE.mask;
+		fsalACE->type  = saunafsACE.type;
+		fsalACE->flag  = saunafsACE.flags & ByteMaxValue;
+		fsalACE->iflag = (saunafsACE.flags & (unsigned)SAU_ACL_SPECIAL_WHO)
+		                      ? FSAL_ACE_IFLAG_SPECIAL_ID
+		                      : 0;
+		fsalACE->perm = saunafsACE.mask;
 
 		if (IS_FSAL_ACE_GROUP_ID(*fsalACE)) {
-			fsalACE->who.gid = nativeACE.id;
+			fsalACE->who.gid = saunafsACE.id;
 		}
 		else {
-			fsalACE->who.uid = nativeACE.id;
+			fsalACE->who.uid = saunafsACE.id;
 		}
 
 		if (IS_FSAL_ACE_SPECIAL_ID(*fsalACE)) {
-			switch (nativeACE.id) {
+			switch (saunafsACE.id) {
 			case SAU_ACL_OWNER_SPECIAL_ID:
 				fsalACE->who.uid = FSAL_ACE_SPECIAL_OWNER;
 				break;
@@ -151,38 +156,38 @@ fsal_acl_t *convertNativeACLToFsalACL(const sau_acl_t *nativeACL) {
 				fsalACE->who.uid = FSAL_ACE_NORMAL_WHO;
 				LogWarn(COMPONENT_FSAL,
 				        "Invalid SaunaFS ACE special id type (%u)",
-				        (unsigned int)nativeACE.id);
+				        (unsigned int)saunafsACE.id);
 			}
 		}
 	}
 
-	fsalACL = nfs4_acl_new_entry(&ACLData, &ACLStatus);
-	return fsalACL;
+	return nfs4_acl_new_entry(&aclData, &status);
 }
 
 /**
  * @brief Get ACL from a file.
  *
- * This function returns the FSAL ACL of the file.
+ * This function returns the ACL of the file in FSAL format.
  *
  * @param[in] export       SaunaFS export instance
- * @param[in] inode        inode of the file
- * @param[in] ownerId      ownerId of the file
- * @param[in] fsalACL      Buffer to fill with information
+ * @param[in] inode        Inode of the file
+ * @param[in] ownerId      Owner id of the file
+ * @param[in] acl          Buffer to fill with information
  *
  * @returns: FSAL status.
  */
-fsal_status_t getACL(struct FSExport *export, uint32_t inode, uint32_t ownerId,
-                     fsal_acl_t **fsalACL) {
-	if (*fsalACL) {
-		nfs4_acl_release_entry(*fsalACL);
-		*fsalACL = NULL;
+fsal_status_t getACL(struct SaunaFSExport *export, uint32_t inode,
+                     uint32_t ownerId, fsal_acl_t **acl) {
+	if (*acl) {
+		nfs4_acl_release_entry(*acl);
+		*acl = NULL;
 	}
 
-	sau_acl_t *nativeACL = NULL;
-	int ret = fs_getacl(export->fsInstance, &op_ctx->creds, inode, &nativeACL);
+	sau_acl_t *saunafsACL = NULL;
+	int status =
+	    saunafs_getacl(export->fsInstance, &op_ctx->creds, inode, &saunafsACL);
 
-	if (ret < 0) {
+	if (status < 0) {
 		LogFullDebug(COMPONENT_FSAL,
 		             "getacl status = %s export=%" PRIu16 " inode=%" PRIu32,
 		             sau_error_string(sau_last_err()), export->export.export_id,
@@ -191,14 +196,14 @@ fsal_status_t getACL(struct FSExport *export, uint32_t inode, uint32_t ownerId,
 		return fsalLastError();
 	}
 
-	sau_acl_apply_masks(nativeACL, ownerId);
+	sau_acl_apply_masks(saunafsACL, ownerId);
 
-	*fsalACL = convertNativeACLToFsalACL(nativeACL);
-	sau_destroy_acl(nativeACL);
+	*acl = convertSaunafsACLToFsalACL(saunafsACL);
+	sau_destroy_acl(saunafsACL);
 
-	if (*fsalACL == NULL) {
+	if (*acl == NULL) {
 		LogFullDebug(COMPONENT_FSAL,
-		             "Failed to convert safs acl to nfs4 acl, export=%"
+		             "Failed to convert saunafs acl to nfs4 acl, export=%"
 		             PRIu16 " inode=%" PRIu32,
 		             export->export.export_id, inode);
 		return fsalstat(ERR_FSAL_FAULT, 0);
@@ -210,32 +215,35 @@ fsal_status_t getACL(struct FSExport *export, uint32_t inode, uint32_t ownerId,
 /**
  * @brief Set ACL to a file.
  *
- * This function sets the native ACL to a file from the FSAL ACL.
+ * This function receives an ACL in FSAL format, transform it to a SaunaFS ACL
+ * using the given mode and then set it to the file with the given inode.
  *
  * @param[in] export      SaunaFS export instance
- * @param[in] inode       inode of the file
- * @param[in] fsalACL     FSAL ACL to set
- * @param[in] mode        Mode used to create the acl and set POSIX permission flags
+ * @param[in] inode       Inode of the file
+ * @param[in] acl         FSAL ACL to set
+ * @param[in] mode        Mode used to create the acl and set POSIX permission
+ *                        flags
  *
  * @returns: FSAL status.
  */
-fsal_status_t setACL(struct FSExport *export, uint32_t inode,
-                     const fsal_acl_t *fsalACL, unsigned int mode) {
-	if (!fsalACL) {
+fsal_status_t setACL(struct SaunaFSExport *export, uint32_t inode,
+                     const fsal_acl_t *acl, unsigned int mode) {
+	if (!acl) {
 		return fsalstat(ERR_FSAL_NO_ERROR, 0);
 	}
 
-	sau_acl_t *nativeACL = convertFsalACLToNativeACL(fsalACL, mode);
+	sau_acl_t *saunafsACL = convertFsalACLToSaunafsACL(acl, mode);
 
-	if (!nativeACL) {
+	if (!saunafsACL) {
 		LogFullDebug(COMPONENT_FSAL, "Failed to convert acl");
 		return fsalstat(ERR_FSAL_FAULT, 0);
 	}
 
-	int ret = fs_setacl(export->fsInstance, &op_ctx->creds, inode, nativeACL);
-	sau_destroy_acl(nativeACL);
+	int status =
+	    saunafs_setacl(export->fsInstance, &op_ctx->creds, inode, saunafsACL);
+	sau_destroy_acl(saunafsACL);
 
-	if (ret < 0) {
+	if (status < 0) {
 		return fsalLastError();
 	}
 

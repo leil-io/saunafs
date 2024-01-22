@@ -19,12 +19,14 @@
  */
 
 #include "gsh_config.h"
+#include "nfs-ganesha/saunafs_fsal_types.h"
 #include "pnfs_utils.h"
+#include <stdlib.h>
 
 #include "context_wrap.h"
-#include "safs_fsal_methods.h"
 #include "mount/client/saunafs_c_api.h"
 #include "protocol/SFSCommunication.h"
+#include "saunafs_internal.h"
 
 const int MaxBufferSize = 0x100;
 const int ChunkAddressSizeInBytes = 40;
@@ -68,7 +70,7 @@ static int isChunkserverDisconnected(const void *chunkserver, void *unused) {
 	(void) unused;
 
 	return ((const sau_chunkserver_info_t *)chunkserver)->version ==
-	        kDisconnectedChunkServerVersion;
+	       kDisconnectedChunkServerVersion;
 }
 
 /**
@@ -90,7 +92,7 @@ static int adjacentChunkserversWithSameIp(const void *chunkserver, void *base) {
 	}
 
 	return ((const sau_chunkserver_info_t *)chunkserver)->ip ==
-	        ((const sau_chunkserver_info_t *)chunkserver - 1)->ip;
+	       ((const sau_chunkserver_info_t *)chunkserver - 1)->ip;
 }
 
 /**
@@ -135,8 +137,9 @@ static void shuffle(void *data, size_t size, size_t itemSize) {
 		return;
 	}
 
+	srandom(time(NULL));
 	for (size_t index = 0; index < size - 1; ++index) {
-		size_t start = index + rand() % (size - index);
+		size_t start = index + random() % (size - index);
 
 		memcpy(temp, (uint8_t *)data + index * itemSize, itemSize);
 
@@ -156,15 +159,15 @@ static void shuffle(void *data, size_t size, size_t itemSize) {
  * @returns: Randomized chunkservers list.
  */
 static sau_chunkserver_info_t *randomizedChunkserverList(
-        struct FSExport *export, uint32_t *chunkserverCount) {
+    struct SaunaFSExport *export, uint32_t *chunkserverCount) {
 	sau_chunkserver_info_t *chunkserverInfo = NULL;
 
-	chunkserverInfo = gsh_malloc(SAFS_BIGGEST_STRIPE_COUNT *
+	chunkserverInfo = gsh_malloc(SAUNAFS_BIGGEST_STRIPE_COUNT *
 	                             sizeof(sau_chunkserver_info_t));
 
-	int retvalue =
-	    sau_get_chunkservers_info(export->fsInstance, chunkserverInfo,
-	                              SAFS_BIGGEST_STRIPE_COUNT, chunkserverCount);
+	int retvalue = sau_get_chunkservers_info(
+	    export->fsInstance, chunkserverInfo, SAUNAFS_BIGGEST_STRIPE_COUNT,
+	    chunkserverCount);
 
 	if (retvalue < 0) {
 		*chunkserverCount = 0;
@@ -213,11 +216,9 @@ static int fillChunkDataServerList(XDR *da_addr_body,
                                    uint32_t chunkCount, uint32_t stripeCount,
                                    uint32_t chunkserverCount,
                                    uint32_t *chunkserverIndex) {
-	fsal_multipath_member_t host[SAFS_EXPECTED_BACKUP_DS_COUNT];
-
+	fsal_multipath_member_t host[SAUNAFS_EXPECTED_BACKUP_DS_COUNT];
 	uint32_t size = MIN(chunkCount, stripeCount);
-
-	const int upperBound = SAFS_EXPECTED_BACKUP_DS_COUNT;
+	const int upperBound = SAUNAFS_EXPECTED_BACKUP_DS_COUNT;
 
 	for (uint32_t chunkIndex = 0; chunkIndex < size; ++chunkIndex) {
 		sau_chunk_info_t *chunk = &chunkInfo[chunkIndex];
@@ -226,9 +227,9 @@ static int fillChunkDataServerList(XDR *da_addr_body,
 		memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
 
 		// prefer std chunk part type
-		for (size_t i = 0; i < chunk->parts_size &&
-		     serverCount < upperBound; ++i) {
-			if (chunk->parts[i].part_type_id != SAFS_STD_CHUNK_PART_TYPE) {
+		for (size_t i = 0; i < chunk->parts_size && serverCount < upperBound;
+		     ++i) {
+			if (chunk->parts[i].part_type_id != SAUNAFS_STD_CHUNK_PART_TYPE) {
 				continue;
 			}
 
@@ -238,9 +239,9 @@ static int fillChunkDataServerList(XDR *da_addr_body,
 			++serverCount;
 		}
 
-		for (size_t i = 0; i < chunk->parts_size
-		     && serverCount < upperBound; ++i) {
-			if (chunk->parts[i].part_type_id == SAFS_STD_CHUNK_PART_TYPE) {
+		for (size_t i = 0; i < chunk->parts_size && serverCount < upperBound;
+		     ++i) {
+			if (chunk->parts[i].part_type_id == SAUNAFS_STD_CHUNK_PART_TYPE) {
 				continue;
 			}
 
@@ -261,19 +262,20 @@ static int fillChunkDataServerList(XDR *da_addr_body,
 		}
 
 		// encode ds entry
-		nfsstat4 nfs_status = FSAL_encode_v4_multipath(da_addr_body,
-		                                               serverCount, host);
+		nfsstat4 status =
+		    FSAL_encode_v4_multipath(da_addr_body, serverCount, host);
 
-		if (nfs_status != NFS4_OK) {
-			return -1;
+		if (status != NFS4_OK) {
+			return kNFS4_ERROR;
 		}
 	}
 
-	return 0;
+	return NFS4_OK;
 }
 
 /**
- * @brief Fill unused part of DS list with servers from randomized chunkserver list.
+ * @brief Fill unused part of DS list with servers from randomized chunkserver
+ *        list.
  *
  * @param[in] xdrStream             XDR stream
  * @param[in] chunkserverInfo       Collection of chunkservers
@@ -289,15 +291,12 @@ static int fillChunkDataServerList(XDR *da_addr_body,
  */
 static int fillUnusedDataServerList(XDR *xdrStream,
                                     sau_chunkserver_info_t *chunkserverInfo,
-                                    uint32_t chunkCount,
-                                    uint32_t stripeCount,
+                                    uint32_t chunkCount, uint32_t stripeCount,
                                     uint32_t chunkserverCount,
                                     uint32_t *chunkserverIndex) {
-	fsal_multipath_member_t host[SAFS_EXPECTED_BACKUP_DS_COUNT];
-
+	fsal_multipath_member_t host[SAUNAFS_EXPECTED_BACKUP_DS_COUNT];
 	uint32_t size = MIN(chunkCount, stripeCount);
-
-	const int upperBound = SAFS_EXPECTED_BACKUP_DS_COUNT;
+	const int upperBound = SAUNAFS_EXPECTED_BACKUP_DS_COUNT;
 
 	for (uint32_t chunkIndex = size; chunkIndex < stripeCount; ++chunkIndex) {
 		int serverCount = 0;
@@ -305,7 +304,7 @@ static int fillUnusedDataServerList(XDR *xdrStream,
 
 		memset(host, 0, upperBound * sizeof(fsal_multipath_member_t));
 
-		while (serverCount < SAFS_EXPECTED_BACKUP_DS_COUNT) {
+		while (serverCount < SAUNAFS_EXPECTED_BACKUP_DS_COUNT) {
 			index = (*chunkserverIndex + serverCount) % chunkserverCount;
 
 			host[serverCount].proto = TCP_PROTO_NUMBER;
@@ -323,7 +322,27 @@ static int fillUnusedDataServerList(XDR *xdrStream,
 		}
 	}
 
-	return 0;
+	return NFS4_OK;
+}
+
+/**
+ * @brief Release resources.
+ *
+ * @param[in] chunkInfo             Chunk information including id, type and all
+ *                                  parts
+ * @param[in] chunkserverInfo       Chunkserver information including version,
+ *                                  ip, port, used space and total space
+ */
+static void releaseResources(sau_chunk_info_t *chunkInfo,
+                             sau_chunkserver_info_t *chunkserverInfo) {
+	if (chunkInfo) {
+		sau_destroy_chunks_info(chunkInfo);
+		gsh_free(chunkInfo);
+	}
+
+	if (chunkserverInfo) {
+		gsh_free(chunkserverInfo);
+	}
 }
 
 /**
@@ -334,38 +353,41 @@ static int fillUnusedDataServerList(XDR *xdrStream,
  *
  * The function converts SaunaFS file's chunk information to pNFS device info.
  *
- * Linux pNFS client imposes limit on stripe size (SAFS_BIGGEST_STRIPE_COUNT = 4096).
- * If we would use straight forward approach of converting each chunk to stripe entry,
- * we would be limited to file size of 256 GB (4096 * 64MB).
+ * Linux pNFS client imposes limit on stripe size (SAUNAFS_BIGGEST_STRIPE_COUNT
+ * = 4096). If we would use straight forward approach of converting each chunk
+ * to stripe entry, we would be limited to file size of 256 GB (4096 * 64MB).
  *
- * To avoid this problem each DS can read/write data from any chunk (Remember that pNFS client
- * takes DS address from DS list in round robin fashion). Of course it's more efficient
- * if DS is answering queries about chunks residing locally.
+ * To avoid this problem each DS can read/write data from any chunk (Remember
+ * that pNFS client takes DS address from DS list in round robin fashion). Of
+ * course it's more efficient if DS is answering queries about chunks residing
+ * locally.
  *
  * To achieve the best performance we fill the DS list in a following way:
  *
  * First we prepare randomized list of all chunkservers (RCSL).
- * Then for each chunk we fill multipath DS list entry with addresses of chunkservers storing
- * this chunk. If there is less chunkservers than SAFS_EXPECTED_BACKUP_DS_COUNT then
- * we use chunkservers from RCSL.
+ * Then for each chunk we fill multipath DS list entry with addresses of
+ * chunkservers storing this chunk. If there is less chunkservers than
+ * SAUNAFS_EXPECTED_BACKUP_DS_COUNT then we use chunkservers from RCSL.
  *
- * If we didn't use all the possible space in DS list (SAFS_BIGGEST_STRIPE_COUNT), then we fill
- * rest of the stripe entries with addresses from RCSL (again SAFS_EXPECTED_BACKUP_DS_COUNT
- * addresses for each stripe entry).
+ * If we didn't use all the possible space in DS list
+ * (SAUNAFS_BIGGEST_STRIPE_COUNT), then we fill rest of the stripe entries with
+ * addresses from RCSL (again SAUNAFS_EXPECTED_BACKUP_DS_COUNT addresses for
+ * each stripe entry).
  *
- * @param[in] FSALModule      FSAL module
- * @param[out] xdrStream      An XDR stream to which the FSAL is to write the layout
- *                            type-specific information corresponding to the deviceid.
- * @param[in] type            The type of layout that specified the device
- * @param[in] deviceid        The device to look up
+ * @param[in]  module         FSAL module
+ * @param[out] xdrStream      XDR stream to which the FSAL is to write the
+ *                            layout type-specific information corresponding to
+                              the deviceid.
+ * @param[in]  type           The type of layout that specified the device
+ * @param[in]  deviceid       The device to look up
  *
  * @returns: Valid error codes in RFC 5661, p. 365.
  */
-static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
+static nfsstat4 getdeviceinfo(struct fsal_module *module, XDR *xdrStream,
                               const layouttype4 type,
                               const struct pnfs_deviceid *deviceid) {
 	struct fsal_export *exportHandle = NULL;
-	struct FSExport *export = NULL;
+	struct SaunaFSExport *export = NULL;
 
 	sau_chunk_info_t *chunkInfo = NULL;
 	sau_chunkserver_info_t *chunkserverInfo = NULL;
@@ -385,11 +407,11 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 
 	uint16_t export_id = deviceid->device_id2;
 
-	glist_for_each_safe(glist, glistn, &FSALModule->exports) {
+	glist_for_each_safe(glist, glistn, &module->exports) {
 		exportHandle = glist_entry(glist, struct fsal_export, exports);
 
 		if (exportHandle->export_id == export_id) {
-			export = container_of(exportHandle, struct FSExport, export);
+			export = container_of(exportHandle, struct SaunaFSExport, export);
 			break;
 		}
 	}
@@ -402,18 +424,20 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 	}
 
 	// get the chunk list for file
-	chunkInfo = gsh_malloc(SAFS_BIGGEST_STRIPE_COUNT * sizeof(sau_chunk_info_t));
+	chunkInfo =
+	    gsh_malloc(SAUNAFS_BIGGEST_STRIPE_COUNT * sizeof(sau_chunk_info_t));
 
-	int retvalue = fs_get_chunks_info(export->fsInstance, &op_ctx->creds,
-	                                  deviceid->devid, 0, chunkInfo,
-	                                  SAFS_BIGGEST_STRIPE_COUNT, &chunkCount);
+	int retvalue = saunafs_get_chunks_info(
+	    export->fsInstance, &op_ctx->creds, deviceid->devid, 0, chunkInfo,
+	    SAUNAFS_BIGGEST_STRIPE_COUNT, &chunkCount);
 
 	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS,
 		        "Failed to get SaunaFS layout for export = %"
 		        PRIu16 " inode = %" PRIu64, export_id, deviceid->devid);
 
-		goto generic_err;
+		releaseResources(chunkInfo, chunkserverInfo);
+		return NFS4ERR_SERVERFAULT;
 	}
 
 	chunkserverInfo = randomizedChunkserverList(export, &chunkserverCount);
@@ -423,32 +447,58 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 		        "Failed to get SaunaFS layout for export = %" PRIu16
 		        " inode = %" PRIu64, export_id, deviceid->devid);
 
-		goto generic_err;
+		releaseResources(chunkInfo, chunkserverInfo);
+		return NFS4ERR_SERVERFAULT;
 	}
 
 	chunkserverIndex = 0;
-	stripeCount = MIN(chunkCount + chunkserverCount, SAFS_BIGGEST_STRIPE_COUNT);
+	stripeCount =
+	    MIN(chunkCount + chunkserverCount, SAUNAFS_BIGGEST_STRIPE_COUNT);
 
 	if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
-		goto encode_err;
+		LogCrit(COMPONENT_PNFS,
+		        "Failed to encode device information for export = %" PRIu16
+		        " inode = %" PRIu64,
+		        export_id, deviceid->devid);
+
+		releaseResources(chunkInfo, chunkserverInfo);
+		return NFS4ERR_SERVERFAULT;
 	}
 
 	for (uint32_t chunkIndex = 0; chunkIndex < stripeCount; ++chunkIndex) {
 		if (!inline_xdr_u_int32_t(xdrStream, &chunkIndex)) {
-			goto encode_err;
+			LogCrit(COMPONENT_PNFS,
+			        "Failed to encode device information for export = %" PRIu16
+			        " inode = %" PRIu64,
+			        export_id, deviceid->devid);
+
+			releaseResources(chunkInfo, chunkserverInfo);
+			return NFS4ERR_SERVERFAULT;
 		}
 	}
 
 	if (!inline_xdr_u_int32_t(xdrStream, &stripeCount)) {
-		goto encode_err;
+		LogCrit(COMPONENT_PNFS,
+		        "Failed to encode device information for export = %" PRIu16
+		        " inode = %" PRIu64,
+		        export_id, deviceid->devid);
+
+		releaseResources(chunkInfo, chunkserverInfo);
+		return NFS4ERR_SERVERFAULT;
 	}
 
 	retvalue = fillChunkDataServerList(xdrStream, chunkInfo, chunkserverInfo,
-	                             chunkCount, stripeCount, chunkserverCount,
-	                             &chunkserverIndex);
+	                                   chunkCount, stripeCount,
+	                                   chunkserverCount, &chunkserverIndex);
 
 	if (retvalue < 0) {
-		goto encode_err;
+		LogCrit(COMPONENT_PNFS,
+		        "Failed to encode device information for export = %" PRIu16
+		        " inode = %" PRIu64,
+		        export_id, deviceid->devid);
+
+		releaseResources(chunkInfo, chunkserverInfo);
+		return NFS4ERR_SERVERFAULT;
 	}
 
 	retvalue = fillUnusedDataServerList(xdrStream, chunkserverInfo, chunkCount,
@@ -456,7 +506,13 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 	                                    &chunkserverIndex);
 
 	if (retvalue < 0) {
-		goto encode_err;
+		LogCrit(COMPONENT_PNFS,
+		        "Failed to encode device information for export = %" PRIu16
+		        " inode = %" PRIu64,
+		        export_id, deviceid->devid);
+
+		releaseResources(chunkInfo, chunkserverInfo);
+		return NFS4ERR_SERVERFAULT;
 	}
 
 	sau_destroy_chunks_info(chunkInfo);
@@ -465,23 +521,6 @@ static nfsstat4 getdeviceinfo(struct fsal_module *FSALModule, XDR *xdrStream,
 	gsh_free(chunkserverInfo);
 
 	return NFS4_OK;
-
-encode_err:
-	LogCrit(COMPONENT_PNFS,
-	        "Failed to encode device information for export = %" PRIu16
-	        " inode = %" PRIu64, export_id, deviceid->devid);
-
-generic_err:
-	if (chunkInfo) {
-		sau_destroy_chunks_info(chunkInfo);
-		gsh_free(chunkInfo);
-	}
-
-	if (chunkserverInfo) {
-		gsh_free(chunkserverInfo);
-	}
-
-	return NFS4ERR_SERVERFAULT;
 }
 
 /**
@@ -489,11 +528,12 @@ generic_err:
  *
  * This function should populate calls cb values representing the low quad of
  * deviceids it wishes to make the available to the caller. it should continue
- * calling cb until cb returns false or it runs out of deviceids to make available.
+ * calling cb until cb returns false or it runs out of deviceids to make
+ * available.
  *
  * If cb returns false, it should assume that cb has not stored the most recent
- * deviceid and set res->cookie to a value that will begin with the most recently
- * provided.
+ * deviceid and set res->cookie to a value that will begin with the most
+ * recently provided.
  *
  * If it wishes to return no deviceids, it may set res->eof to true without
  * calling cb at all.
@@ -506,10 +546,11 @@ generic_err:
  *
  * @returns: Valid error codes in RFC 5661, p. 365-6.
  */
-static nfsstat4
-getdevicelist(struct fsal_export *exportHandle, layouttype4 type, void *opaque,
-              bool (*callback)(void *opaque, const uint64_t identifier),
-              struct fsal_getdevicelist_res *res) {
+static nfsstat4 getdevicelist(struct fsal_export *exportHandle,
+                              layouttype4 type, void *opaque,
+                              bool (*callback)(void *opaque,
+                                               const uint64_t identifier),
+                              struct fsal_getdevicelist_res *res) {
 	(void)exportHandle;
 	(void)type;
 	(void)opaque;
@@ -522,13 +563,14 @@ getdevicelist(struct fsal_export *exportHandle, layouttype4 type, void *opaque,
 /**
  * @brief Get layout types supported by export.
  *
- * This function is the handler of the NFS4.1 FATTR4_FS_LAYOUT_TYPES file attribute.
+ * This function is the handler of the NFS4.1 FATTR4_FS_LAYOUT_TYPES file
+ * attribute.
  *
  * @param[in]  exportHandle      Filesystem to interrogate
  * @param[out] count             Number of layout types in array
- * @param[out] types             Static array of layout types that must not be freed
- *                               or modified and must not be dereferenced after
- *                               export reference is relinquished
+ * @param[out] types             Static array of layout types that must not be
+ *                               freed or modified and must not be dereferenced
+                                 after export reference is relinquished.
  */
 static void fs_layouttypes(struct fsal_export *exportHandle, int32_t *count,
                            const layouttype4 **types) {
@@ -550,12 +592,12 @@ static void fs_layouttypes(struct fsal_export *exportHandle, int32_t *count,
  * NOTE: The Linux client only asks for this in blocks-layout, where this is
  * the filesystem wide block-size. (Minimum write size and alignment).
  *
- * @param[in] exportHandle      Filesystem to interrogate
+ * @param[in] export      Filesystem to interrogate
  *
  * @returns: The preferred layout block size.
  */
-static uint32_t fs_layout_blocksize(struct fsal_export *exportHandle) {
-	(void)exportHandle;
+static uint32_t fs_layout_blocksize(struct fsal_export *export) {
+	(void)export;
 
 	return SFSCHUNKSIZE;
 }
@@ -567,12 +609,12 @@ static uint32_t fs_layout_blocksize(struct fsal_export *exportHandle) {
  * construct the response to any single layoutget call. Bear in mind that
  * current clients only support 1 segment.
  *
- * @param[in] exportHandle      Filesystem to interrogate
+ * @param[in] export      Filesystem to interrogate
  *
  * @returns: The Maximum number of layout segments in a compound layoutget.
  */
-static uint32_t fs_maximum_segments(struct fsal_export *exportHandle) {
-	(void)exportHandle;
+static uint32_t fs_maximum_segments(struct fsal_export *export) {
+	(void)export;
 
 	return 1;
 }
@@ -585,12 +627,12 @@ static uint32_t fs_maximum_segments(struct fsal_export *exportHandle) {
  * client can take return ~0UL. In any case the buffer allocated will not be
  * bigger than client's requested maximum.
  *
- * @param[in] exportHandle      Filesystem to interrogate
+ * @param[in] export      Filesystem to interrogate
  *
  * @returns: Max size of the buffer needed for a loc_body.
  */
-static size_t fs_loc_body_size(struct fsal_export *exportHandle) {
-	(void)exportHandle;
+static size_t fs_loc_body_size(struct fsal_export *export) {
+	(void)export;
 
 	return MaxBufferSize;  // typical value in NFS FSAL plugins
 }
@@ -603,20 +645,20 @@ static size_t fs_loc_body_size(struct fsal_export *exportHandle) {
  * what the client can take return ~0UL. In any case the buffer allocated
  * will not be bigger than client's requested maximum.
  *
- * @param[in] FSALModule      FSAL Module
+ * @param[in] module      FSAL Module
  *
  * @returns: Max size of the buffer needed for a da_addr_body.
  */
-static size_t fs_da_addr_size(struct fsal_module *FSALModule) {
-	(void)FSALModule;
+static size_t fs_da_addr_size(struct fsal_module *module) {
+	(void)module;
 
 	// one stripe index + number of addresses +
-	// SAFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes
+	// SAUNAFS_EXPECTED_BACKUP_DS_COUNT addresses per chunk each address takes
 	// 37 bytes (we use 40 for safety) we add 32 bytes of overhead
 	// (includes stripe count and DS count)
-	return SAFS_BIGGEST_STRIPE_COUNT *
-	        (4 + (4 + SAFS_EXPECTED_BACKUP_DS_COUNT * ChunkAddressSizeInBytes))
-	       + ChunkDataOverhead;
+	return SAUNAFS_BIGGEST_STRIPE_COUNT *
+	      (4 + (4 + SAUNAFS_EXPECTED_BACKUP_DS_COUNT * ChunkAddressSizeInBytes))
+	      + ChunkDataOverhead;
 }
 
 /**
@@ -624,7 +666,7 @@ static size_t fs_da_addr_size(struct fsal_module *FSALModule) {
  *
  * @param[in] ops      Export operations vector
  */
-void initializePnfsExportOperations(struct export_ops *ops) {
+void exportOperationsPnfs(struct export_ops *ops) {
 	ops->getdevicelist = getdevicelist;
 	ops->fs_layouttypes = fs_layouttypes;
 	ops->fs_layout_blocksize = fs_layout_blocksize;
@@ -637,7 +679,7 @@ void initializePnfsExportOperations(struct export_ops *ops) {
  *
  * @param[in] ops      Export operations vector
  */
-void initializePnfsOperations(struct fsal_ops *ops) {
+void pnfsMdsOperationsInit(struct fsal_ops *ops) {
 	ops->getdeviceinfo = getdeviceinfo;
 	ops->fs_da_addr_size = fs_da_addr_size;
 }

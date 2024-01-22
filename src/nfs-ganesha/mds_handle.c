@@ -21,8 +21,8 @@
 #include "pnfs_utils.h"
 
 #include "context_wrap.h"
-#include "safs_fsal_methods.h"
 #include "protocol/SFSCommunication.h"
+#include "saunafs_internal.h"
 
 /**
  * @brief Grant a layout segment.
@@ -50,19 +50,19 @@
 static nfsstat4 layoutget(struct fsal_obj_handle *objectHandle, XDR *xdrStream,
                           const struct fsal_layoutget_arg *arguments,
                           struct fsal_layoutget_res *output) {
-	struct FSHandle *handle = NULL;
-	struct DataServerWire dataServerWire;
+	struct SaunaFSHandle *handle = NULL;
+	struct DSWire dataServerWire;
 
-	struct gsh_buffdesc dsBufferDescriptor = {
+	struct gsh_buffdesc dsBuffer = {
 		.addr = &dataServerWire,
-		.len = sizeof(struct DataServerWire)
+		.len = sizeof(struct DSWire)
 	};
 
 	struct pnfs_deviceid deviceid = DEVICE_ID_INIT_ZERO(FSAL_ID_EXPERIMENTAL);
-	nfl_util4 layout_util = 0;
-	nfsstat4 nfs_status = NFS4_OK;
+	nfl_util4 layoutUtil = 0;
+	nfsstat4 status = NFS4_OK;
 
-	handle = container_of(objectHandle, struct FSHandle, fileHandle);
+	handle = container_of(objectHandle, struct SaunaFSHandle, handle);
 
 	if (arguments->type != LAYOUT4_NFSV4_1_FILES) {
 		LogMajor(COMPONENT_PNFS, "Unsupported layout type: %x",
@@ -79,21 +79,21 @@ static nfsstat4 layoutget(struct fsal_obj_handle *objectHandle, XDR *xdrStream,
 	deviceid.devid = handle->inode;
 
 	dataServerWire.inode = handle->inode;
-	layout_util = SFSCHUNKSIZE;
+	layoutUtil = SFSCHUNKSIZE;
 
-	nfs_status = FSAL_encode_file_layout(xdrStream, &deviceid, layout_util,
-	                                     0, 0, &op_ctx->ctx_export->export_id,
-	                                     1, &dsBufferDescriptor);
+	status =
+	    FSAL_encode_file_layout(xdrStream, &deviceid, layoutUtil, 0, 0,
+	                            &op_ctx->ctx_export->export_id, 1, &dsBuffer);
 
-	if (nfs_status) {
+	if (status) {
 		LogMajor(COMPONENT_PNFS, "Failed to encode nfsv4_1_file_layout.");
-		return nfs_status;
+		return status;
 	}
 
 	output->return_on_close = true;
 	output->last_segment = true;
 
-	return nfs_status;
+	return status;
 }
 
 /**
@@ -104,15 +104,18 @@ static nfsstat4 layoutget(struct fsal_obj_handle *objectHandle, XDR *xdrStream,
  * layouts corresponding to a given stateid on last close, lease expiry, or
  * a layoutreturn with a return-type of FSID or ALL. Whether it is called in
  * the former or latter case is indicated by the synthetic flag in the arg
- * structure, with synthetic being true in the case of last-close or lease expiry.
+ * structure, with synthetic being true in the case of last-close or lease
+ * expiry.
  *
- * If arg->dispose is true, all resources associated with the layout must be freed.
+ * If arg->dispose is true, all resources associated with the layout must be
+ * freed.
  *
  * @param[in] objectHandle      The object on which a segment is to be returned
- * @param[in] xdrStream         In the case of a non-synthetic return, this is an
- *                              XDR stream corresponding to the layout type-specific
- *                              argument to LAYOUTRETURN. In the case of a synthetic
- *                              or bulk return, this is a NULL pointer
+ * @param[in] xdrStream         In the case of a non-synthetic return, this is
+ *                              an XDR stream corresponding to the layout
+ *                              type-specific argument to LAYOUTRETURN. In the
+ *                              case of a synthetic or bulk return, this is a
+ *                              NULL pointer.
  * @param[in] arguments         Input arguments of the function
  *
  * @returns: Valid error codes in RFC 5661, p. 367.
@@ -160,9 +163,10 @@ bool isOffsetChangedByClient(const struct fsal_layoutcommit_arg *arguments,
 bool hasRecentModificationTime(const struct fsal_layoutcommit_arg *arguments,
                                struct sau_attr_reply previousReply) {
 	return arguments->time_changed &&
-	       (arguments->new_time.seconds  > previousReply.attr.st_mtim.tv_sec ||
-	       (arguments->new_time.seconds == previousReply.attr.st_mtim.tv_sec &&
-	        arguments->new_time.nseconds > previousReply.attr.st_mtim.tv_nsec));
+	       (arguments->new_time.seconds > previousReply.attr.st_mtim.tv_sec ||
+	        (arguments->new_time.seconds == previousReply.attr.st_mtim.tv_sec &&
+	         arguments->new_time.nseconds >
+	             previousReply.attr.st_mtim.tv_nsec));
 }
 
 /**
@@ -189,22 +193,20 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
                              struct fsal_layoutcommit_res *output) {
 	(void) xdrStream;
 
-	struct FSExport *export = NULL;
-	struct FSHandle *handle = NULL;
+	struct SaunaFSExport *export = NULL;
+	struct SaunaFSHandle *handle = NULL;
 	struct sau_attr_reply previousReply;
-
-	// FIXME(haze): Does this function make sense for our implementation ?
 
 	if (arguments->type != LAYOUT4_NFSV4_1_FILES) {
 		LogCrit(COMPONENT_PNFS, "Unsupported layout type: %x", arguments->type);
 		return NFS4ERR_UNKNOWN_LAYOUTTYPE;
 	}
 
-	export = container_of(op_ctx->fsal_export, struct FSExport, export);
-	handle = container_of(objectHandle, struct FSHandle, fileHandle);
+	export = container_of(op_ctx->fsal_export, struct SaunaFSExport, export);
+	handle = container_of(objectHandle, struct SaunaFSHandle, handle);
 
-	int retvalue = fs_getattr(export->fsInstance, &op_ctx->creds, handle->inode,
-	                          &previousReply);
+	int retvalue = saunafs_getattr(export->fsInstance, &op_ctx->creds,
+	                               handle->inode, &previousReply);
 
 	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to get "
@@ -212,7 +214,7 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
 		        sau_error_string(sau_last_err()),
 		        (long long)handle->inode);
 
-		return Nfs4LastError();
+		return nfs4LastError();
 	}
 
 	struct stat posixAttributes;
@@ -235,14 +237,15 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
 	}
 
 	sau_attr_reply_t reply;
-	retvalue = fs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
-	                      &posixAttributes, (int)mask, &reply);
+	retvalue =
+	    saunafs_setattr(export->fsInstance, &op_ctx->creds, handle->inode,
+	                    &posixAttributes, (int)mask, &reply);
 
 	if (retvalue < 0) {
 		LogCrit(COMPONENT_PNFS, "Error '%s' in attempt to set attributes "
 		        "of file %lli.", sau_error_string(sau_last_err()),
 		        (long long)handle->inode);
-		return Nfs4LastError();
+		return nfs4LastError();
 	}
 
 	output->commit_done = true;
@@ -254,7 +257,7 @@ static nfsstat4 layoutcommit(struct fsal_obj_handle *objectHandle,
  *
  * @param[in] ops      FSAL object operations vector
  */
-void initializeMetaDataServerOperations(struct fsal_obj_ops *ops) {
+void handleOperationsPnfs(struct fsal_obj_ops *ops) {
 	ops->layoutget = layoutget;
 	ops->layoutreturn = layoutreturn;
 	ops->layoutcommit = layoutcommit;

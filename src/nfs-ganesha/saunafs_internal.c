@@ -1,9 +1,15 @@
+/**
+ * @file   saunafs_internal.c
+ * @author Crash <crash@leil.io>
+ *
+ * @brief Function definitions for SaunaFS FSAL
+ */
 #include "fsal_convert.h"
 #include "pnfs_utils.h"
 
-#include "safs_fsal_methods.h"
+#include "saunafs_internal.h"
 
-sau_context_t *createFSALContext(sau_t *instance, struct user_cred *cred) {
+sau_context_t *createContext(sau_t *instance, struct user_cred *cred) {
 	if (cred == NULL) {
 		return sau_create_user_context(0, 0, 0, 0);
 	}
@@ -33,28 +39,6 @@ sau_context_t *createFSALContext(sau_t *instance, struct user_cred *cred) {
 	return ctx;
 }
 
-bool setCredentials(const struct user_cred *creds,
-                    const struct fsal_module *fsal_module) {
-	bool onlyOneUser = container_of(fsal_module, struct FSModule,
-	                                module)->onlyOneUser;
-
-	if (onlyOneUser) {
-		return fsal_set_credentials_only_one_user(creds);
-	}
-
-	fsal_set_credentials(creds);
-	return true;
-}
-
-void restoreGaneshaCredentials(const struct fsal_module *fsal_module) {
-	bool onlyOneUser = container_of(fsal_module, struct FSModule,
-	                                module)->onlyOneUser;
-
-	if (!onlyOneUser) {
-		fsal_restore_ganesha_credentials();
-	}
-}
-
 nfsstat4 saunafsToNfs4Error(int errorCode) {
 	if (!errorCode) {
 		LogWarn(COMPONENT_FSAL, "appropriate errno not set");
@@ -82,6 +66,6 @@ fsal_status_t fsalLastError(void) {
 	return saunafsToFsalError(sau_last_err());
 }
 
-nfsstat4 Nfs4LastError(void) {
+nfsstat4 nfs4LastError(void) {
 	return saunafsToNfs4Error(sau_last_err());
 }
