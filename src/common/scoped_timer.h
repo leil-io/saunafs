@@ -1,8 +1,26 @@
-// src/common/scoped_timer.h
+/*
+	Copyright 2023-2024 Leil Storage OÜ
+
+	This file is part of SaunaFS.
+
+	SaunaFS is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, version 3.
+
+	SaunaFS is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #pragma once
 
-#include <chrono>
+#include "common/platform.h"
+
+#include <memory>
 #include <string>
 
 namespace util {
@@ -31,16 +49,21 @@ public:
 	/**
 	 * Constructor
 	 * @param message The message to log, it is prepended with the elapsed time
-	 * @param time_unit The time unit to use for the elapsed time
 	 */
-
-	void setTimeUnit(TimeUnit time_unit);
-
 	explicit ScopedTimer(const std::string &);
 
+	/**
+	 * Constructor
+	 * @param time_unit The time unit to use for the elapsed time
+	 */
 	explicit ScopedTimer(TimeUnit);
 
-	explicit ScopedTimer(const std::string &, TimeUnit);
+	/**
+	 * Constructor
+	 * @param message The message to log, it is prepended with the elapsed time
+	 * @param time_unit The time unit to use for the elapsed time
+	 */
+	ScopedTimer(const std::string &, TimeUnit);
 
 	/**
 	 * Destructor
@@ -48,14 +71,21 @@ public:
 	 */
 	virtual ~ScopedTimer();
 
+	/**
+	 * Set the time unit to use
+	 * @param time_unit The time unit to use for the elapsed time
+	 */
+	void setTimeUnit(TimeUnit time_unit);
+
+	/**
+	 * Get the elapsed time as a string
+	 * @return The elapsed time as a string
+	 */
 	std::string sayElapsed();
 
 private:
-	std::string message_{"elapsed time"};
-	std::chrono::time_point<std::chrono::high_resolution_clock> start_;
-	TimeUnit timeUnit_{TimeUnit::TU_SEC};
-
-	void init(const std::string &, TimeUnit);
+	class Impl;
+	std::unique_ptr<Impl> pimpl_;
 };
 
 }  // namespace util

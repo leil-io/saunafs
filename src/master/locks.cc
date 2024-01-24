@@ -23,7 +23,7 @@
 
 #include <functional>
 
-#include "common/memory_file.h"
+#include "common/memory_mapped_file.h"
 #include "common/slogger.h"
 
 #include "master/locks.h"
@@ -366,14 +366,14 @@ void FileLocks::copyPendingToVector(uint32_t inode, int64_t index, int64_t count
 }
 
 template <typename Inserter>
-void load(const MemoryMappedFile &metadataFile, size_t &offsetBegin,
-          Inserter insert) {
+void load(const std::shared_ptr<MemoryMappedFile> &metadataFile,
+          size_t& offsetBegin, Inserter insert) {
 	constexpr std::uint8_t kSize = sizeof(std::uint64_t);
 
 	uint64_t count;
 	uint8_t *ptr = nullptr;
 	try{
-		ptr = metadataFile.seek(offsetBegin);
+		ptr = metadataFile->seek(offsetBegin);
 	} catch (const std::exception &e) {
 		safs_pretty_syslog(LOG_ERR, "loading flock: %s", e.what());
 		throw Exception("fread error (size)");
@@ -386,7 +386,7 @@ void load(const MemoryMappedFile &metadataFile, size_t &offsetBegin,
 	for (uint64_t i = 0; i < count; ++i) {
 		safs_locks::Info info;
 		try{
-			ptr = metadataFile.seek(offsetBegin);
+			ptr = metadataFile->seek(offsetBegin);
 		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading flock: %s", e.what());
 			throw Exception("fread error (size)");
@@ -435,9 +435,14 @@ void store(FILE *file, const Container &data) {
 	}
 }
 
-void FileLocks::load(const MemoryMappedFile &metadataFile, size_t& offsetBegin) {
-	::load(metadataFile, offsetBegin, [this](uint32_t inode, Lock &lock) { active_locks_[inode].insert(lock); });
-	::load(metadataFile, offsetBegin, [this](uint32_t inode, Lock &lock) { pending_locks_[inode].push_back(lock); });
+void FileLocks::load(const std::shared_ptr<MemoryMappedFile> &metadataFile,
+                     size_t &offsetBegin) {
+	::load(metadataFile, offsetBegin, [this](uint32_t inode, Lock &lock) {
+		active_locks_[inode].insert(lock);
+	});
+	::load(metadataFile, offsetBegin, [this](uint32_t inode, Lock &lock) {
+		pending_locks_[inode].push_back(lock);
+	});
 }
 
 void FileLocks::store(FILE *file) {

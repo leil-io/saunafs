@@ -19,11 +19,9 @@
 */
 
 #include "common/platform.h"
-
-#include "common/main.h"
-#include "master/filesystem_metadata.h"
-
 #include "master/filesystem_freenode.h"
+
+#include "master/filesystem_metadata.h"
 
 uint32_t fsnodes_get_next_id(uint32_t ts, uint32_t req_inode) {
 	if(req_inode == 0 || !gMetadata->inode_pool.markAsAcquired(req_inode,ts)) {

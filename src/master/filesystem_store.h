@@ -21,13 +21,7 @@
 #pragma once
 
 #include "common/platform.h"
-
-#include <cstdio>
-
-#include "common/cwrap.h"
 #include "common/exceptions.h"
-#include "common/memory_file.h"
-#include "master/metadata_dumper.h"
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataException, Exception);
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataFsConsistencyException,

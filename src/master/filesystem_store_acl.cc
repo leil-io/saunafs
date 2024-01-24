@@ -18,31 +18,14 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "common/platform.h"
+#include "master/filesystem_store_acl.h"
 
 #include <cstdio>
 #include <vector>
 
-#include "common/cwrap.h"
-#include "common/main.h"
-#include "common/setup.h"
-#include "common/saunafs_version.h"
-#include "common/metadata.h"
-#include "common/rotate_files.h"
-#include "common/setup.h"
-
-#include "master/changelog.h"
-#include "master/filesystem.h"
-#include "master/filesystem_xattr.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_node.h"
-#include "master/filesystem_freenode.h"
-#include "master/filesystem_operations.h"
-#include "master/filesystem_checksum.h"
-#include "master/locks.h"
-#include "master/matomlserv.h"
-#include "master/metadata_dumper.h"
-
-#include "master/filesystem_store_acl.h"
 
 static void fs_store_marker(FILE *fd) {
 	static std::vector<uint8_t> buffer;
@@ -78,17 +61,20 @@ void fs_store_acls(FILE *fd) {
 	fs_store_marker(fd);
 }
 
-static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
+static int fs_load_posix_acl(const std::shared_ptr<MemoryMappedFile> &metadataFile,
                              size_t& offsetBegin,
                              int ignoreFlag,
                              bool default_acl) {
+	static const int8_t kError = -1;
+	static const int8_t kSuccess = 0;
+	static const int8_t kEndReached = 1;
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
         uint32_t sizeofsize = sizeof(size);
 		uint8_t *ptr;
 		try{
-			ptr = metadataFile.seek(offsetBegin);
+			ptr = metadataFile->seek(offsetBegin);
 		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
@@ -98,16 +84,18 @@ static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
 
 		if (size == 0) {
 			// this is end marker
-			return 1;
-		} else if (size > 10000000) {
+			return kEndReached;
+		}
+
+		if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
 			                SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
-        try {
-			ptr = metadataFile.seek(offsetBegin);
-        } catch (const std::exception &e) {
+		try {
+			ptr = metadataFile->seek(offsetBegin);
+		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
 		}
@@ -122,39 +110,33 @@ static int fs_load_posix_acl(const MemoryMappedFile&metadataFile,
 			throw Exception("unknown inode: " + std::to_string(inode));
 		}
 
-		if (default_acl) {
-			RichACL new_acl;
-			const RichACL *node_acl = gMetadata->acl_storage.get(p->id);
-			if (p->type != FSNode::kDirectory) {
-				throw Exception("Trying to set default acl for non-directory inode: " + std::to_string(inode));
+		const RichACL *node_acl = gMetadata->acl_storage.get(p->id);
+		if (node_acl != nullptr) {
+			RichACL new_acl = *node_acl;
+			if (default_acl) {
+				if (p->type != FSNode::kDirectory) {
+					throw Exception(
+						"Trying to set default acl for non-directory inode: " +
+						std::to_string(inode));
+				}
+				new_acl.appendDefaultPosixACL(posix_acl);
+			} else {
+				new_acl.appendPosixACL(posix_acl, p->type == FSNode::kDirectory);
+				p->mode = (p->mode & ~0777) | (new_acl.getMode() & 0777);
 			}
-			if (node_acl) {
-				new_acl = *node_acl;
-			}
-			new_acl.appendDefaultPosixACL(posix_acl);
-			gMetadata->acl_storage.set(p->id, std::move(new_acl));
-		} else {
-			RichACL new_acl;
-			const RichACL *node_acl = gMetadata->acl_storage.get(p->id);
-			if (node_acl) {
-				new_acl = *node_acl;
-			}
-			new_acl.appendPosixACL(posix_acl, p->type == FSNode::kDirectory);
-			p->mode = (p->mode & ~0777) | (new_acl.getMode() & 0777);
 			gMetadata->acl_storage.set(p->id, std::move(new_acl));
 		}
-		return 0;
 	} catch (Exception &ex) {
 		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
 		if (!ignoreFlag || ex.status() != SAUNAFS_STATUS_OK) {
-			return -1;
-		} else {
-			return 0;
+			return kError;
 		}
+		return kSuccess;
 	}
+	return kSuccess;
 }
 
-static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
+static int fs_load_legacy_acl(const std::shared_ptr<MemoryMappedFile> &metadataFile,
                               size_t& offsetBegin,
                               int ignoreFlag) {
 	try {
@@ -163,7 +145,7 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
         uint32_t sizeofsize = sizeof(size);
 		uint8_t *ptr;
         try {
-			ptr = metadataFile.seek(offsetBegin);
+			ptr = metadataFile->seek(offsetBegin);
         } catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
@@ -173,14 +155,15 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 		if (size == 0) {
 			// this is end marker
 			return 1;
-		} else if (size > 10000000) {
+		}
+		if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
 			                SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
         try {
-			ptr = metadataFile.seek(offsetBegin);
+			ptr = metadataFile->seek(offsetBegin);
         } catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
@@ -199,12 +182,12 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 
 		RichACL new_acl;
 		if (extended_acl) {
-			AccessControlList posix_acl = (AccessControlList)*extended_acl;
+			auto posix_acl = AccessControlList{*extended_acl};
 			new_acl.appendPosixACL(posix_acl, p->type == FSNode::kDirectory);
 			p->mode = (p->mode & ~0777) | (new_acl.getMode() & 0777);
 		}
 		if (default_acl && p->type == FSNode::kDirectory) {
-			AccessControlList posix_acl = (AccessControlList)*default_acl;
+			auto posix_acl = AccessControlList{*default_acl};
 			new_acl.appendDefaultPosixACL(posix_acl);
 		}
 		if (new_acl.size() > 0) {
@@ -215,9 +198,8 @@ static int fs_load_legacy_acl(const MemoryMappedFile &metadataFile,
 		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
 		if (!ignoreFlag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
-		} else {
-			return 0;
 		}
+		return 0;
 	}
 }
 
@@ -252,16 +234,15 @@ bool fs_load_posix_acls(MetadataLoader::Options options) {
 	return true;
 }
 
-int fs_load_acl(const MemoryMappedFile &metadataFile,
-                       size_t& offsetBegin,
-                       int ignoreFlag) {
+int fs_load_acl(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_t &offsetBegin,
+                int ignoreFlag) {
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
-        uint32_t sizeofsize = sizeof(size);
+		uint32_t sizeofsize = sizeof(size);
 		uint8_t *ptr;
         try {
-			ptr = metadataFile.seek(offsetBegin);
+			ptr = metadataFile->seek(offsetBegin);
         } catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
@@ -271,15 +252,16 @@ int fs_load_acl(const MemoryMappedFile &metadataFile,
 		if (size == 0) {
 			// this is end marker
 			return 1;
-		} else if (size > 10000000) {
+		}
+		if (size > 10000000) {
 			throw Exception("strange size of entry: " + std::to_string(size),
 				SAUNAFS_ERROR_ERANGE);
 		}
 
 		// Read the entry
-        try {
-			ptr = metadataFile.seek(offsetBegin);
-        } catch (const std::exception &e) {
+		try {
+			ptr = metadataFile->seek(offsetBegin);
+		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
 		}
@@ -299,9 +281,8 @@ int fs_load_acl(const MemoryMappedFile &metadataFile,
 		safs_pretty_syslog(LOG_ERR, "loading acl: %s", ex.what());
 		if (!ignoreFlag || ex.status() != SAUNAFS_STATUS_OK) {
 			return -1;
-		} else {
-			return 0;
 		}
+		return 0;
 	}
 }
 
@@ -309,10 +290,9 @@ bool fs_load_acls(MetadataLoader::Options options) {
 	int s;
 
 	do {
-		s = fs_load_acl(options.metadataFile, options.offset, options.ignoreFlag);
-		if (s < 0) {
-			return false;
-		}
+		s = fs_load_acl(options.metadataFile, options.offset,
+		                options.ignoreFlag);
+		if (s < 0) { return false; }
 	} while (s == 0);
 
 	return true;

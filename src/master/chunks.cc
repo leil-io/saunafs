@@ -523,7 +523,7 @@ struct ChunksMetadata {
 	Chunk *lastchunkptr;
 
 	// other chunks metadata information
-	uint64_t nextchunkid;
+	uint64_t nextchunkid; /// serial id of the next chunk to be created
 	uint64_t chunksChecksum;
 	uint64_t chunksChecksumRecalculated;
 	uint32_t checksumRecalculationPosition;
@@ -2653,37 +2653,28 @@ void chunk_dump(void) {
 
 #endif
 
-bool chunk_load(MetadataLoader::Options options) {
-	const uint8_t *ptr;
-	Chunk *c;
-	uint64_t chunkid;
-
-	ptr = options.metadataFile.seek(options.offset);
-
+bool chunksLoadFromFile(MetadataLoader::Options options) {
+	const uint8_t *ptr = options.metadataFile->seek(options.offset);
 	gChunksMetadata->nextchunkid = get64bit(&ptr);
-	options.offset = options.metadataFile.offset(ptr);
-	for (;;) {
-		chunkid = get64bit(&ptr);
+	options.offset = options.metadataFile->offset(ptr);
+
+	while (true) {
+		uint64_t chunkId = get64bit(&ptr);
 		uint32_t version = get32bit(&ptr);
-		uint32_t lockedto = get32bit(&ptr);
-		uint32_t lockid = 0;
+		uint32_t lockedTo = get32bit(&ptr);
+		uint32_t lockId = 0;
 		if (options.loadLockIds) {
-			lockid = get32bit(&ptr);
+			lockId = get32bit(&ptr);
 		}
-		if (chunkid > 0) {
-			c = chunk_new(chunkid, version);
-			c->lockedto = lockedto;
-			c->lockid = lockid;
+		if (chunkId > 0) {
+			Chunk * chunk = chunk_new(chunkId, version);
+			chunk->lockedto = lockedTo;
+			chunk->lockid = lockId;
 			continue;
 		}
-		options.offset = options.metadataFile.offset(ptr);
-		if (version == 0 && lockedto == 0) {
-			return true;
-		} else {
-			return false;
-		}
+		options.offset = options.metadataFile->offset(ptr);
+		return (version == 0 && lockedTo == 0);
 	}
-	return true;  // unreachable
 }
 
 void chunk_store(FILE *fd) {

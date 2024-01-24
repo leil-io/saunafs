@@ -90,11 +90,7 @@ uint64_t metadataGetVersion(const std::string& file) {
 		throw MetadataCheckException("Can't read the metadata file");
 	}
 
-	if (memcmp(chkbuff,SFSSIGNATURE "M 1.",7)==0 && chkbuff[7]>='5' && chkbuff[7]<='6') {
-		memset(eofmark,0,16);
-	} else if (memcmp(chkbuff,SFSSIGNATURE "M 2.0",8)==0) {
-		memcpy(eofmark,"[SFS EOF MARKER]",16);
-	} else if (memcmp(chkbuff, SFSSIGNATURE "M 2.9", 8) == 0) {
+	if (memcmp(chkbuff, SFSSIGNATURE "M 2.9", strlen(SFSSIGNATURE "M 2.9")) == 0) {
 		memcpy(eofmark,"[SFS EOF MARKER]",16);
 	} else {
 		close(fd);

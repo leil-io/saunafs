@@ -145,11 +145,11 @@ struct FSNode {
  * Avg size (assuming 1 chunk and session id) = 104 + 8 + 4 ~ 120B
  */
 struct FSNodeFile : public FSNode {
-	uint64_t length;
+	uint64_t length{};
 	compact_vector<uint32_t> sessionid;
 	compact_vector<uint64_t, uint32_t> chunks;
 
-	FSNodeFile(uint8_t t) : FSNode(t), length(), sessionid(), chunks() {
+	explicit FSNodeFile(uint8_t t) : FSNode(t) {
 		assert(t == kFile || t == kTrash || t == kReserved);
 	}
 
@@ -170,9 +170,9 @@ struct FSNodeFile : public FSNode {
  */
 struct FSNodeSymlink : public FSNode {
 	hstorage::Handle path;
-	uint16_t path_length;
+	uint16_t path_length{};
 
-	FSNodeSymlink() : FSNode(kSymlink), path_length() {
+	explicit FSNodeSymlink() : FSNode(kSymlink) {
 	}
 };
 

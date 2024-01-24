@@ -23,7 +23,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
-#include <future>
 #include <utility>
 #include <vector>
 
@@ -34,7 +33,7 @@
 #include "common/saunafs_version.h"
 #include "common/setup.h"
 
-#include "common/memory_file.h"
+#include "common/memory_mapped_file.h"
 #include "master/changelog.h"
 #include "master/filesystem.h"
 #include "master/filesystem_checksum.h"
@@ -53,6 +52,7 @@
 
 #include "master/filesystem_store.h"
 
+// TODO (Baldor): Review the need for these constants below
 constexpr uint8_t kMetadataVersionLegacy = 0x15;
 constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
 constexpr uint8_t kMetadataVersionWithSections = 0x20;
@@ -110,7 +110,7 @@ bool xattr_load(MetadataLoader::Options options) {
 
 	while (true) {
 		try {
-			ptr = options.metadataFile.seek(options.offset);
+			ptr = options.metadataFile->seek(options.offset);
 		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: can't read xattr");
 			return false;
@@ -118,7 +118,7 @@ bool xattr_load(MetadataLoader::Options options) {
 		inode = get32bit(&ptr);
 		anleng = get8bit(&ptr);
 		avleng = get32bit(&ptr);
-		options.offset = options.metadataFile.offset(ptr);
+		options.offset = options.metadataFile->offset(ptr);
 		if (inode == 0) {
 			return true;
 		}
@@ -126,31 +126,29 @@ bool xattr_load(MetadataLoader::Options options) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: empty name");
 			if (options.ignoreFlag) {
 				continue;
-			} else {
-				return false;
 			}
+			return false;
 		}
 		if (avleng > SFS_XATTR_SIZE_MAX) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: value oversized");
 			if (options.ignoreFlag) {
 				continue;
-			} else {
-				return false;
 			}
+			return false;
 		}
 
 		ihash = xattr_inode_hash_fn(inode);
-		for (ih = gMetadata->xattr_inode_hash[ihash]; ih && ih->inode != inode;
-		     ih = ih->next)
-			;
+		ih = gMetadata->xattr_inode_hash[ihash];
+		while (ih && ih->inode != inode) {
+			ih = ih->next;
+		}
 
 		if (ih && ih->anleng + anleng + 1 > SFS_XATTR_LIST_MAX) {
 			safs_pretty_syslog(LOG_ERR, "loading xattr: name list too long");
 			if (options.ignoreFlag) {
 				continue;
-			} else {
-				return false;
 			}
+			return false;
 		}
 
 		xa = new xattr_data_entry;
@@ -168,7 +166,7 @@ bool xattr_load(MetadataLoader::Options options) {
 		} else {
 			xa->attrvalue = NULL;
 		}
-		options.offset = options.metadataFile.offset(ptr);
+		options.offset = options.metadataFile->offset(ptr);
 		xa->avleng = avleng;
 		hash = xattr_data_hash_fn(inode, xa->anleng, xa->attrname);
 		xa->next = gMetadata->xattr_data_hash[hash];
@@ -214,14 +212,17 @@ static void fs_store_generic(FILE *fd, Args &&...args) {
 	}
 }
 
+// TODO (Baldor): Despite the name, below function is called only once
+//               so the value of polymorphism is questionable here
+//               it seems a candidate for refactoring.
 template <class... Args>
-static bool fs_load_generic(const MemoryMappedFile &metadataFile,
+static bool fs_load_generic(const std::shared_ptr<MemoryMappedFile> &metadataFile,
                             size_t& offsetBegin, Args &&...args) {
 	constexpr uint8_t kSize = sizeof(std::uint32_t);
-	uint32_t size;
+	uint32_t size = 0;
 	uint8_t *ptr;
 	try {
-		ptr = metadataFile.seek(offsetBegin);
+		ptr = metadataFile->seek(offsetBegin);
 	} catch (const std::exception &e) {
 		safs_pretty_syslog(LOG_ERR, "loading node: %s", e.what());
 		throw Exception("fread error (size)");
@@ -233,7 +234,7 @@ static bool fs_load_generic(const MemoryMappedFile &metadataFile,
 		return false;
 	}
 	try {
-		ptr = metadataFile.seek(offsetBegin);
+		ptr = metadataFile->seek(offsetBegin);
 	} catch (const std::exception &e) {
 		safs_pretty_syslog(LOG_ERR, "loading node: %s", e.what());
 		throw Exception("fread error (size)");
@@ -256,11 +257,7 @@ void fs_storeedge(FSNodeDirectory *parent, FSNode *child,
 		return;
 	}
 	ptr = uedgebuff;
-	if (parent == nullptr) {
-		put32bit(&ptr, 0);
-	} else {
-		put32bit(&ptr, parent->id);
-	}
+	put32bit(&ptr, (parent == nullptr) ? 0 : parent->id);
 	put32bit(&ptr, child->id);
 	put16bit(&ptr, name.length());
 	memcpy(ptr, name.c_str(), name.length());
@@ -272,38 +269,38 @@ void fs_storeedge(FSNodeDirectory *parent, FSNode *child,
 }
 
 /**
- * @brief
- * @param pSrc A pointer to the data storing all edges.
+ * @brief Parse an edge from the metadata file.
+ * @param metadataFile A reference to the memory mapped metadata file.
  * @param sectionOffset A reference to point to the next edge attribute.
- * @param ignoreFlag
- * @param init
- * @return 0 on success, 1 if last edge mark is found, -1 if unknown edge type
- * 			or Error.
+ * @param ignoreFlag A flag to indicate whether to ignore the error.
+ * @param init A flag to indicate whether to initialize the static variable.
+ * @return 0 on success, 1 if last edge mark is found, -1 if unknown node type.
  */
-int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, int ignoreFlag,
-                    bool init = false) {
+int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_t &sectionOffset,
+                 int ignoreFlag, bool init = false) {
+	static const int8_t kError = -1;
+	static const int8_t kSuccess = 0;
+	static const int8_t kLastEdge = 1;
 	static uint32_t currentParentId;
-	uint32_t parentId, childId;
-
 	if (init) {
 		currentParentId = 0;
-		return 0;
+		return kSuccess;
 	}
-	const uint8_t* pSrc = metadataFile.seek(sectionOffset);
-	parentId = get32bit(&pSrc);
-	childId = get32bit(&pSrc);
-	uint16_t edgeNameSize = get16bit(&pSrc);
-	sectionOffset = metadataFile.offset(pSrc);
+	const auto* pSrc = metadataFile->seek(sectionOffset);
+	auto parentId = get32bit(&pSrc);
+	auto childId = get32bit(&pSrc);
+	auto edgeNameSize = get16bit(&pSrc);
+	sectionOffset = metadataFile->offset(pSrc);
 
 	if (!parentId && !childId) {  /// Last edge mark;
-		return 1;
+		return kLastEdge;
 	}
 
 	if (!edgeNameSize) {
 		safs_pretty_syslog(
 		    LOG_ERR, "loading edge: %" PRIu32 "->%" PRIu32 " error: empty name",
 		    parentId, childId);
-		return -1;
+		return kError;
 	}
 
 	std::string name(pSrc, pSrc + edgeNameSize);
@@ -315,9 +312,9 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 		    "loading edge: %" PRIu32 ",%s->%" PRIu32 " error: child not found",
 		    parentId, fsnodes_escape_name(name).c_str(), childId);
 		if (ignoreFlag) {
-			return 0;
+			return kSuccess;
 		}
-		return -1;
+		return kError;
 	}
 	if (!parentId) {
 		if (child->type == FSNode::kTrash) {
@@ -336,7 +333,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 			                   " error: bad child type (%c)\n",
 			                   parentId, fsnodes_escape_name(name).c_str(),
 			                   childId, child->type);
-			return -1;
+			return kError;
 		}
 	} else {
 		FSNodeDirectory *parent = fsnodes_id_to_node<FSNodeDirectory>(parentId);
@@ -355,7 +352,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 					    "loading edge: %" PRIu32 ",%s->%" PRIu32
 					    " root dir not found !!!",
 					    parentId, fsnodes_escape_name(name).c_str(), childId);
-					return -1;
+					return kError;
 				}
 				safs_pretty_syslog(LOG_ERR,
 				                   "loading edge: %" PRIu32 ",%s->%" PRIu32
@@ -368,7 +365,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 				    LOG_ERR,
 				    "use sfsmetarestore (option -i) to attach this "
 				    "node to root dir\n");
-				return -1;
+				return kError;
 			}
 		}
 		if (parent->type != FSNode::kDirectory) {
@@ -386,7 +383,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 					    "loading edge: %" PRIu32 ",%s->%" PRIu32
 					    " root dir not found !!!",
 					    parentId, fsnodes_escape_name(name).c_str(), childId);
-					return -1;
+					return kError;
 				}
 				safs_pretty_syslog(LOG_ERR,
 				                   "loading edge: %" PRIu32 ",%s->%" PRIu32
@@ -399,7 +396,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 				    LOG_ERR,
 				    "use sfsmetarestore (option -i) to attach this "
 				    "node to root dir\n");
-				return -1;
+				return kError;
 			}
 		}
 		if (currentParentId != parentId) {
@@ -409,7 +406,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 				                   " error: parent node sequence error",
 				                   parentId, fsnodes_escape_name(name).c_str(),
 				                   childId);
-				return -1;
+				return kError;
 			}
 			currentParentId = parentId;
 		}
@@ -426,7 +423,7 @@ int fs_parseEdge(const MemoryMappedFile &metadataFile, size_t &sectionOffset, in
 		fsnodes_get_stats(child, &sr);
 		fsnodes_add_stats(parent, &sr);
 	}
-	return 0;
+	return kSuccess;
 }
 
 void fs_storenode(FSNode *f, FILE *fd) {
@@ -452,7 +449,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	put32bit(&ptr, f->ctime);
 	put32bit(&ptr, f->trashtime);
 
-	FSNodeFile *node_file = static_cast<FSNodeFile *>(f);
+	auto *node_file = static_cast<FSNodeFile *>(f);
 
 	switch (f->type) {
 	case FSNode::kDirectory:
@@ -546,16 +543,17 @@ void fs_storenode(FSNode *f, FILE *fd) {
  * @param sectionOffset A reference to point to the next node attribute.
  * @return 0 on success, 1 if last node mark is found, -1 if unknown node type.
  */
-int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset) {
-	static constexpr uint32_t kChunkSize = (1 << 16);
-
+int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size_t &sectionOffset) {
+	static const int8_t kError = -1;
+	static const int8_t kSuccess = 0;
+	static const int8_t kLastNode = 1;
 	uint8_t type;
 	FSNode *node;
-	const uint8_t *pSrc = metadataFile.seek(sectionOffset);
+	const uint8_t *pSrc = metadataFile->seek(sectionOffset);
 	type = get8bit(&pSrc);
-	if (!type) {  // last node
-		sectionOffset = metadataFile.offset(pSrc);
-		return 1;
+	if (!type) {
+		sectionOffset = metadataFile->offset(pSrc);
+		return kLastNode;
 	}
 
 	node = FSNode::create(type);
@@ -569,12 +567,12 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 	node->mtime = get32bit(&pSrc);
 	node->ctime = get32bit(&pSrc);
 	node->trashtime = get32bit(&pSrc);
-	FSNodeFile *nodeFile = static_cast<FSNodeFile *>(node);
+	sectionOffset = metadataFile->offset(pSrc);
+	auto *nodeFile = static_cast<FSNodeFile *>(node);
 
 	uint32_t nodeNameLength;
 	uint32_t chunkAmount;
 	uint16_t sessionIds;
-	uint32_t index;
 
 	switch (type) {
 	case FSNode::kDirectory:
@@ -590,10 +588,8 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 	case FSNode::kSymlink:
 		nodeNameLength = get32bit(&pSrc);
 		static_cast<FSNodeSymlink *>(node)->path_length = nodeNameLength;
-		if (nodeNameLength > 0) {  /// TODO check if pointer is shifted by
-			                       /// memcpy
-			std::memcpy(&(static_cast<FSNodeSymlink *>(node)->path.data()),
-			            pSrc, nodeNameLength);
+		if (nodeNameLength > 0) {
+			static_cast<FSNodeSymlink *>(node)->path = HString(pSrc, pSrc + nodeNameLength);
 			pSrc += nodeNameLength;
 		}
 		break;
@@ -603,25 +599,20 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 		nodeFile->length = get64bit(&pSrc);
 		chunkAmount = get32bit(&pSrc);
 		sessionIds = get16bit(&pSrc);
+
 		nodeFile->chunks.resize(chunkAmount);
-		index = 0;
-		while (chunkAmount > kChunkSize) {
-			for (uint32_t i = 0; i < kChunkSize; i++) {
-				nodeFile->chunks[index++] = get64bit(&pSrc);
-			}
-			chunkAmount -= kChunkSize;
-		}
-		for (uint32_t i = 0; i < chunkAmount; i++) {
-			nodeFile->chunks[index++] = get64bit(&pSrc);
-		}
-		while (sessionIds) {
-			uint32_t sessionId = get32bit(&pSrc);
-			nodeFile->sessionid.push_back(sessionId);
+		memcpy(nodeFile->chunks.data(), pSrc, chunkAmount * sizeof(uint64_t));
+		pSrc += chunkAmount * sizeof(uint64_t);
+
+		nodeFile->sessionid.resize(sessionIds);
+		memcpy(nodeFile->sessionid.data(), pSrc, sessionIds * sizeof(uint32_t));
+		pSrc += sessionIds * sizeof(uint32_t);
 #ifndef METARESTORE
+		for (const auto &sessionId : nodeFile->sessionid) {
 			matoclserv_add_open_file(sessionId, node->id);
-#endif
-			sessionIds--;
 		}
+#endif
+
 		fsnodes_quota_update(node,
 		                     {{QuotaResource::kSize, +fsnodes_get_size(node)}});
 		gMetadata->filenodes++;
@@ -630,8 +621,8 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 		safs_pretty_syslog(LOG_ERR, "loading node: unrecognized node type: %c",
 		                   type);
 		fsnodes_quota_update(node, {{QuotaResource::kInodes, +1}});
-		sectionOffset = metadataFile.offset(pSrc);
-		return -1;
+		sectionOffset = metadataFile->offset(pSrc);
+		return kError;
 	}
 	uint32_t nodeIndex = NODEHASHPOS(node->id);
 	node->next = gMetadata->nodehash[nodeIndex];
@@ -639,8 +630,8 @@ int8_t fs_parseNode(const MemoryMappedFile &metadataFile, size_t &sectionOffset)
 	gMetadata->inode_pool.markAsAcquired(node->id);
 	gMetadata->nodes++;
 	fsnodes_quota_update(node, {{QuotaResource::kInodes, +1}});
-	sectionOffset = metadataFile.offset(pSrc);
-	return 0;
+	sectionOffset = metadataFile->offset(pSrc);
+	return kSuccess;
 }
 
 void fs_storenodes(FILE *fd) {
@@ -759,7 +750,7 @@ bool fs_loadnodes(MetadataLoader::Options options) {
 }
 
 bool fs_loadedges(MetadataLoader::Options options) {
-	int s;
+	int8_t s;
 	fs_parseEdge(options.metadataFile, options.offset, options.ignoreFlag, true);
 	do {
 		s = fs_parseEdge(options.metadataFile, options.offset, options.ignoreFlag);
@@ -842,7 +833,7 @@ bool fs_loadfree(MetadataLoader::Options options) {
 	uint32_t freeNodesToLoad, freeNodesNumber;
 
 	try {
-		ptr = options.metadataFile.seek(options.offset);
+		ptr = options.metadataFile->seek(options.offset);
 	} catch (const std::exception &e) {
 		safs_pretty_errlog(LOG_INFO, "loading free nodes: %s", e.what());
 		return false;
@@ -860,7 +851,7 @@ bool fs_loadfree(MetadataLoader::Options options) {
 	freeNodesToLoad = 0;
 	while (freeNodesNumber > 0) {
 		if (freeNodesToLoad == 0) {
-			freeNodesToLoad = (freeNodesNumber > 1024) ? 1024 : freeNodesNumber;
+			freeNodesToLoad = std::min(freeNodesNumber, uint32_t(1024));
 		}
 		uint32_t id = get32bit(&ptr);
 		uint32_t timestamp = get32bit(&ptr);
@@ -868,7 +859,7 @@ bool fs_loadfree(MetadataLoader::Options options) {
 		freeNodesToLoad--;
 		freeNodesNumber--;
 	}
-	options.offset = options.metadataFile.offset(ptr);
+	options.offset = options.metadataFile->offset(ptr);
 	return true;
 }
 
@@ -998,7 +989,7 @@ static const std::vector<MetadataSection> kMetadataSections = {
     MetadataSection("ACLS 1.2", "Access Control Lists", fs_load_acls),
     MetadataSection("QUOT 1.1", "Quotas", fs_loadquotas),
     MetadataSection("FLCK 1.0", "File Locks", fs_loadlocks),
-    MetadataSection("CHNK 1.0", "Chunks", chunk_load),
+    MetadataSection("CHNK 1.0", "Chunks", chunksLoadFromFile),
     /// Legacy Sections (won't be loaded):
     MetadataSection("QUOT 1.0", "Quotas",
                     [](const MetadataLoader::Options &) { return true; }, true, true),
@@ -1014,23 +1005,23 @@ bool isEndOfMetadata(const uint8_t *sectionPtr) {
 }
 
 
-int fs_load(const MemoryMappedFile &metadataFile, int ignoreflag) {
+int fs_load(const std::shared_ptr<MemoryMappedFile> &metadataFile, int ignoreflag) {
 
 	static constexpr uint8_t kMetadataHeaderOffset = 8;
 
 	/// Skip File Signature
-	const uint8_t *metadataHeaderPtr= metadataFile.seek(kMetadataHeaderOffset);
+	const uint8_t *metadataHeaderPtr= metadataFile->seek(kMetadataHeaderOffset);
 
 	gMetadata->maxnodeid = get32bit(&metadataHeaderPtr);
 	gMetadata->metaversion = get64bit(&metadataHeaderPtr);
 	gMetadata->nextsessionid = get32bit(&metadataHeaderPtr);
 
-	size_t offsetBegin = metadataFile.offset(metadataHeaderPtr);
+	size_t offsetBegin = metadataFile->offset(metadataHeaderPtr);
 
 	/// First secuential pass to gather section offsets and lengths
 	std::unordered_map<std::string_view, std::pair<size_t, uint64_t>>
 	    sectionMarkers;
-	uint8_t *sectionPtr = metadataFile.seek(offsetBegin);
+	uint8_t *sectionPtr = metadataFile->seek(offsetBegin);
 	while (!isEndOfMetadata(sectionPtr)) {
 		const uint8_t *sectionLengthPtr = sectionPtr + kMetadataSectionNameSize;
 		uint64_t sectionLength = get64bit(&sectionLengthPtr);
@@ -1038,11 +1029,11 @@ int fs_load(const MemoryMappedFile &metadataFile, int ignoreflag) {
 		for (const auto &section : kMetadataSections) {
 			if (section.matchesSectionTypeOf(sectionPtr)) {
 				sectionMarkers[section.name] = {
-				    metadataFile.offset(sectionDataPtr), sectionLength};
+				    metadataFile->offset(sectionDataPtr), sectionLength};
 				break;
 			}
 		}
-		sectionPtr = metadataFile.seek(
+		sectionPtr = metadataFile->seek(
 		    offsetBegin += sectionLength + kMetadataSectionHeaderSize);
 	}
 
@@ -1318,15 +1309,15 @@ bool isNewMetadataFile([[maybe_unused]]const uint8_t *headerPtr) {
 	return false;
 }
 
-bool checkMetadataSignature(const MemoryMappedFile &metadataFile) {
+bool checkMetadataSignature(const std::shared_ptr<MemoryMappedFile> &metadataFile) {
 	static constexpr std::string_view kMetadataHeaderV2_9(SFSSIGNATURE "M 2.9");
 	static constexpr uint8_t kMetadataHeaderSize = 8;
 	size_t kMetadataHeaderOffset{0};
 	uint8_t *headerPtr;
 	try {
-		headerPtr = metadataFile.seek(kMetadataHeaderOffset);
+		headerPtr = metadataFile->seek(kMetadataHeaderOffset);
 		safs_pretty_syslog(LOG_INFO, "opened metadata file %s",
-		                   metadataFile.filename().c_str());
+		                   metadataFile->filename().c_str());
 	} catch (const std::exception &e) {
 		throw e;
 	}
@@ -1341,7 +1332,7 @@ bool checkMetadataSignature(const MemoryMappedFile &metadataFile) {
 }
 
 void fs_loadall(const std::string &fname, int ignoreflag) {
-	MemoryMappedFile metadataFile(fname);
+	auto  metadataFile = std::make_shared<MemoryMappedFile>(fname);
 	if (!checkMetadataSignature(metadataFile)) {
 		return;
 	}

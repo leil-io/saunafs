@@ -22,18 +22,16 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
-#include <stdio.h>
+#include <cinttypes>
+#include <cstdio>
 
 #include "common/chunk_part_type.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
-#include "common/memory_file.h"
 #include "master/checksum.h"
 #include "master/filesystem_store.h"
 #include "master/metadata_loader.h"
-#include "protocol/cltoma.h"
 
 struct matocsserventry;
 
@@ -102,7 +100,7 @@ int chunk_invalidate_goal_cache();
 
 #endif
 
-bool chunk_load(MetadataLoader::Options);
+bool chunksLoadFromFile(MetadataLoader::Options);
 void chunk_store(FILE *fd);
 void chunk_unload(void);
 void chunk_newfs(void);

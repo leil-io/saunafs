@@ -23,7 +23,7 @@
 #include "common/platform.h"
 
 #include "common/compact_vector.h"
-#include "common/memory_file.h"
+#include "common/memory_mapped_file.h"
 #include "protocol/lock_info.h"
 
 #include <unordered_map>
@@ -327,12 +327,13 @@ public:
 	void copyPendingToVector(uint32_t inode, int64_t index, int64_t count,
 	                        std::vector<safs_locks::Info> &data);
 
-	 /**
-	  * \brief Load class state from stream.
-	  * @param metadataFile
-	  * @param offsetBegin
-	  */
-	void load(const MemoryMappedFile &metadataFile, size_t& offsetBegin);
+	/**
+	 * \brief Load class state from stream.
+	 * @param metadataFile pointer to MemoryMappedFile structure
+	 * @param offsetBegin	pointer to offsetBegin variable that specifies
+	 * offset
+	 */
+	void load(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_t &offsetBegin);
 
 	/*! \brief Save class state to stream.
 	 * \param file pointer to FILE structure that specifies output stream

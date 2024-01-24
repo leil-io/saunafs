@@ -228,7 +228,7 @@ int fs_loadall(void) {
 	}
 
 	{
-		auto st = util::ScopedTimer("metadata load time:");
+		auto scopedTimer = util::ScopedTimer("metadata load time");
 		fs_loadall(kMetadataFilename, 0);
 	}
 
