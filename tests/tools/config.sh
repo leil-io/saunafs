@@ -15,7 +15,7 @@ fi
 : ${SAUNAFS_DISKS:=}
 : ${SAUNAFS_LOOP_DISKS:=}
 : ${TEMP_DIR:=/tmp/SaunaFS-autotests}
-: ${XAUNAFS_DIR:=/tmp/SaunaFS-autotests-sfs}
+: ${LEGACY_DIR:=/tmp/SaunaFS-autotests-legacy}
 : ${SAUNAFSXX_DIR_BASE:=/tmp/SaunaFS-autotests-old}
 : ${SAUNAFS_ROOT:=$HOME/local}
 : ${FIRST_PORT_TO_USE:=9600}
@@ -35,8 +35,8 @@ chmod 777 "$TEMP_DIR"
 export PATH="$SAUNAFS_ROOT/sbin:$SAUNAFS_ROOT/bin:$PATH"
 
 # Quick checks needed to call test_begin and test_fail
-if (( BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 402 )); then
-	echo  "Error: bash v4.2 or newer required, but $BASH_VERSION found" >&2
+if ((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 402)); then
+	echo "Error: bash v4.2 or newer required, but $BASH_VERSION found" >&2
 	exit 1
 fi
 if ! touch "$TEMP_DIR/check_tmp_dir" || ! rm "$TEMP_DIR/check_tmp_dir"; then
@@ -47,17 +47,16 @@ fi
 # This function shold be called just after test_fail is able to work
 check_configuration() {
 	for prog in \
-			$SAUNAFS_ROOT/sbin/{sfsmaster,sfschunkserver} \
-			$SAUNAFS_ROOT/bin/saunafs \
-			$SAUNAFS_ROOT/bin/file-generate \
-			$SAUNAFS_ROOT/bin/file-validate
-	do
+		$SAUNAFS_ROOT/sbin/{sfsmaster,sfschunkserver} \
+		$SAUNAFS_ROOT/bin/saunafs \
+		$SAUNAFS_ROOT/bin/file-generate \
+		$SAUNAFS_ROOT/bin/file-validate; do
 		if ! [[ -x $prog ]]; then
 			test_fail "Configuration error, executable $prog not found"
 		fi
 	done
 
-	if [[ ! -x $SAUNAFS_ROOT/bin/sfsmount ]] ; then
+	if [[ ! -x $SAUNAFS_ROOT/bin/sfsmount ]]; then
 		test_fail "Configuration error, sfsmount executable not found"
 	fi
 
@@ -86,7 +85,7 @@ parse_true() {
 		return 1
 	fi
 	case "${value,,}" in
-		1|true|t|yes|y|on) return 0 ;;
-		*) return 1 ;;
+	1 | true | t | yes | y | on) return 0 ;;
+	*) return 1 ;;
 	esac
 }

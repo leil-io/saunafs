@@ -3,7 +3,7 @@
 # If out_var provided an associative array with name $out_var
 # is created and it contains information about the filestystem
 setup_local_empty_saunafs() {
-	local use_xaunafs=${USE_XAUNAFS:-}
+	local use_legacy=${USE_LEGACY:-}
 	local use_saunafsXX=${START_WITH_LEGACY_SAUNAFS:-}
 	local use_ramdisk=${USE_RAMDISK:-}
 	local use_zoned_disks=${USE_ZONED_DISKS:-}
@@ -45,10 +45,10 @@ setup_local_empty_saunafs() {
 
 	use_new_goal_config="true"
 	local oldpath="$PATH"
-	if [[ $use_xaunafs ]]; then
+	if [[ $use_legacy ]]; then
 		use_new_goal_config="false"
-		export PATH="$XAUNAFS_DIR/bin:$XAUNAFS_DIR/sbin:$PATH"
-		build_xaunafs
+		export PATH="$LEGACY_DIR/bin:$LEGACY_DIR/sbin:$PATH"
+		build_legacy
 	fi
 
 	if [[ $use_saunafsXX ]]; then
@@ -63,7 +63,7 @@ setup_local_empty_saunafs() {
 	# Prepare configuration for metadata servers
 	use_new_format=$use_new_goal_config prepare_common_metadata_server_files_
 	add_metadata_server_ 0 "master"
-	for ((msid=1 ; msid<number_of_masterservers; ++msid)); do
+	for ((msid = 1; msid < number_of_masterservers; ++msid)); do
 		add_metadata_server_ $msid "shadow"
 	done
 	saunafs_info_[current_master]=0
@@ -86,18 +86,18 @@ setup_local_empty_saunafs() {
 		fi
 		local disks_needed=$((number_of_chunkservers * disks_per_chunkserver))
 		local disks_available=${#disks[@]}
-		if (( disks_available < disks_needed )); then
-			test_fail "Test needs $disks_needed disks"\
-					"but only $disks_available (${disks[@]-}) are available"
+		if ((disks_available < disks_needed)); then
+			test_fail "Test needs $disks_needed disks" \
+				"but only $disks_available (${disks[@]-}) are available"
 		fi
 	fi
 
-	for ((csid=0 ; csid<number_of_chunkservers; ++csid)); do
+	for ((csid = 0; csid < number_of_chunkservers; ++csid)); do
 		add_chunkserver_ $csid
 	done
 
 	# Mount the filesystem
-	for ((mntid=0 ; mntid<number_of_mounts; ++mntid)); do
+	for ((mntid = 0; mntid < number_of_mounts; ++mntid)); do
 		add_mount_ $mntid
 	done
 
@@ -114,8 +114,8 @@ setup_local_empty_saunafs() {
 		add_cgi_server_
 	fi
 
-	# Wait for chunkservers (use saunafs-probe only for SaunaFS -- XaunaFS doesn't support it)
-	if [[ ! $use_xaunafs ]]; then
+	# Wait for chunkservers (use saunafs-probe only for SaunaFS -- MooseFS doesn't support it)
+	if [[ ! $use_legacy ]]; then
 		saunafs_wait_for_all_ready_chunkservers
 	else
 		sleep 3 # A reasonable fallback
@@ -214,7 +214,7 @@ create_sfsexports_cfg_() {
 	echo "${base}${additional}"
 	echo "${meta_base}${meta_additional}"
 	# per-mount entries
-	for ((mntid=0 ; mntid<number_of_mounts; ++mntid)); do
+	for ((mntid = 0; mntid < number_of_mounts; ++mntid)); do
 		local this_mount_exports_variable="MOUNT_${mntid}_EXTRA_EXPORTS"
 		local this_mount_exports=${!this_mount_exports_variable-}
 		if [[ ${this_mount_exports} ]]; then
@@ -231,20 +231,20 @@ create_sfsgoals_cfg_() {
 	done
 	for i in {6..20}; do
 		wildcards=
-		for ((j=0; j<i; j++)); do
+		for ((j = 0; j < i; j++)); do
 			wildcards="$wildcards _"
-		done;
+		done
 		(echo "${MASTER_CUSTOM_GOALS:-}" | tr '|' '\n' | grep "^$i ") || echo "$i $i: $wildcards"
-	done;
+	done
 	if [[ $use_new_format == "true" ]]; then
 		for i in {2..9}; do
 			echo "$((21 + $i)) xor$i: \$xor$i"
-		done;
-		for i in {2..4}; do
-			echo "$((31 + 2*(i - 2) + 0)) ec$i$((i - 1)): \$ec($i,$((i - 1)))"
-			echo "$((31 + 2*(i - 2) + 1)) ec$i$i: \$ec($i,$i)"
 		done
-	fi;
+		for i in {2..4}; do
+			echo "$((31 + 2 * (i - 2) + 0)) ec$i$((i - 1)): \$ec($i,$((i - 1)))"
+			echo "$((31 + 2 * (i - 2) + 1)) ec$i$i: \$ec($i,$i)"
+		done
+	fi
 }
 
 create_sfstopology_cfg_() {
@@ -344,9 +344,9 @@ saunafs_current_master_id() {
 }
 
 prepare_common_metadata_server_files_() {
-	create_sfsexports_cfg_ > "$etcdir/sfsexports.cfg"
-	create_sfstopology_cfg_ > "$etcdir/sfstopology.cfg"
-	create_sfsgoals_cfg_ > "$etcdir/sfsgoals.cfg"
+	create_sfsexports_cfg_ >"$etcdir/sfsexports.cfg"
+	create_sfstopology_cfg_ >"$etcdir/sfstopology.cfg"
+	create_sfsgoals_cfg_ >"$etcdir/sfsgoals.cfg"
 	saunafs_info_[master_exports]="$etcdir/sfsexports.cfg"
 	saunafs_info_[master_topology]="$etcdir/sfstopology.cfg"
 	saunafs_info_[master_custom_goals]="$etcdir/sfsgoals.cfg"
@@ -374,12 +374,12 @@ add_metadata_server_() {
 	get_next_port_number masterserver_matocs_port
 	get_next_port_number masterserver_matots_port
 	mkdir "$masterserver_data_path"
-	create_sfsmaster_master_cfg_ > "$masterserver_master_cfg"
-	create_sfsmaster_shadow_cfg_ > "$masterserver_shadow_cfg"
+	create_sfsmaster_master_cfg_ >"$masterserver_master_cfg"
+	create_sfsmaster_shadow_cfg_ >"$masterserver_shadow_cfg"
 
 	if [[ "$personality" == "master" ]]; then
 		cp "$masterserver_master_cfg" "$masterserver_cfg"
-		echo -n 'SFSM NEW' > "$masterserver_data_path/metadata.sfs"
+		echo -n 'SFSM NEW' >"$masterserver_data_path/metadata.sfs"
 	elif [[ "$personality" == "shadow" ]]; then
 		cp "$masterserver_shadow_cfg" "$masterserver_cfg"
 	else
@@ -407,7 +407,7 @@ create_sfsmetalogger_cfg_() {
 }
 
 prepare_metalogger_() {
-	create_sfsmetalogger_cfg_ > "$etcdir/sfsmetalogger.cfg"
+	create_sfsmetalogger_cfg_ >"$etcdir/sfsmetalogger.cfg"
 	saunafs_info_[metalogger_cfg]="$etcdir/sfsmetalogger.cfg"
 }
 
@@ -424,7 +424,7 @@ create_sfshdd_cfg_() {
 		local firstDisk=$(echo "${chunkserver_id} * ${n}" | bc)
 		local lastDisk=$(echo "${firstDisk} + ${n} - 1" | bc)
 
-		for disk_number in $(seq -w ${firstDisk} ${lastDisk} ); do
+		for disk_number in $(seq -w ${firstDisk} ${lastDisk}); do
 			if mount | grep "sauna_nullb${disk_number}" &>/dev/null; then
 				sudo umount -l "/mnt/zoned/sauna_nullb${disk_number}" &>/dev/null
 			fi
@@ -458,7 +458,7 @@ create_sfshdd_cfg_() {
 		done
 	elif [[ $use_ramdisk ]]; then
 		local disk_number
-		for (( disk_number=0; disk_number<n; disk_number++ )); do
+		for ((disk_number = 0; disk_number < n; disk_number++)); do
 			# Use path provided in env variable, if present generate some pathname otherwise.
 			local this_disk_variable="CHUNKSERVER_${chunkserver_id}_DISK_${disk_number}"
 			if [[ ${!this_disk_variable-} ]]; then
@@ -481,7 +481,7 @@ create_sfshdd_cfg_() {
 # Usage: create_chunkserver_label_entry_ <chunkserver_id>
 create_chunkserver_label_entry_() {
 	local csid=$1
-	tr '|' "\n" <<< "${CHUNKSERVER_LABELS-}" | awk -F: '$1~/(^|,)'$csid'(,|$)/ {print "LABEL = "$2}'
+	tr '|' "\n" <<<"${CHUNKSERVER_LABELS-}" | awk -F: '$1~/(^|,)'$csid'(,|$)/ {print "LABEL = "$2}'
 }
 
 create_sfschunkserver_cfg_() {
@@ -509,8 +509,8 @@ add_chunkserver_() {
 	local chunkserver_cfg=$etcdir/sfschunkserver_$chunkserver_id.cfg
 
 	get_next_port_number csserv_port
-	create_sfshdd_cfg_ > "$hdd_cfg"
-	create_sfschunkserver_cfg_ > "$chunkserver_cfg"
+	create_sfshdd_cfg_ >"$hdd_cfg"
+	create_sfschunkserver_cfg_ >"$chunkserver_cfg"
 	mkdir -p "$chunkserver_data_path"
 	sfschunkserver -c "$chunkserver_cfg" start
 
@@ -556,8 +556,8 @@ configure_mount_() {
 	local fuse_options=""
 	for fuse_option in $(echo ${FUSE_EXTRA_CONFIG-} | tr '|' '\n'); do
 		fuse_option_name=$(echo $fuse_option | cut -f1 -d'=')
-		${mount_cmd} --help |& grep " -o ${fuse_option_name}[ =]" > /dev/null \
-				|| test_fail "Your libfuse doesn't support $fuse_option_name flag"
+		${mount_cmd} --help |& grep " -o ${fuse_option_name}[ =]" >/dev/null ||
+			test_fail "Your libfuse doesn't support $fuse_option_name flag"
 		fuse_options+="-o $fuse_option "
 	done
 	local call="${command_prefix} ${mount_cmd} -c ${mount_cfg} ${mount_dir} ${fuse_options}"
@@ -571,7 +571,7 @@ add_mount_() {
 	local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
 	local sfsmount_available=false
 	if $(which sfsmount &>/dev/null); then sfsmount_available=true; fi
-	create_sfsmount_cfg_ ${mount_id} > "$mount_cfg"
+	create_sfsmount_cfg_ ${mount_id} >"$mount_cfg"
 	mkdir -p "$mount_dir"
 	saunafs_info_[mount${mount_id}]="$mount_dir"
 	saunafs_info_[mount${mount_id}_cfg]="$mount_cfg"
@@ -604,10 +604,10 @@ add_cgi_server_() {
 # Some helper functions for tests to manipulate the existing installation
 
 sfs_dir_info() {
-	if (( $# != 2 )); then
-		echo "Incorrect usage of saunafs dir_info with args $*";
-		exit 2;
-	fi;
+	if (($# != 2)); then
+		echo "Incorrect usage of saunafs dir_info with args $*"
+		exit 2
+	fi
 	field=$1
 	file=$2
 	saunafs dirinfo "$file" | grep -w "$field" | grep -o '[0-9]*'
@@ -617,7 +617,7 @@ find_first_chunkserver_with_chunks_matching() {
 	local pattern=$1
 	local count=${saunafs_info_[chunkserver_count]}
 	local chunkserver
-	for (( chunkserver=0 ; chunkserver < count ; ++chunkserver )); do
+	for ((chunkserver = 0; chunkserver < count; ++chunkserver)); do
 		local hdds=$(get_metadata_path "${saunafs_info_[chunkserver${chunkserver}_hdd]}")
 		if [[ $(find $hdds -type f -name "$pattern") ]]; then
 			echo $chunkserver
@@ -646,7 +646,7 @@ find_chunkserver_chunks() {
 	shift
 	local hdds=$(sed -e 's/*//' -e 's/zonefs://' -e 's/|//' \
 		${saunafs_info_[chunkserver${chunkserver_number}_hdd]})
-	if (( $# > 0 )); then
+	if (($# > 0)); then
 		find $hdds "(" -name "${chunk_data_pattern}" \
 			-o -name "${chunk_metadata_pattern}" ")" -a "(" "$@" ")"
 	else
@@ -665,8 +665,8 @@ find_chunkserver_metadata_chunks() {
 		${saunafs_info_[chunkserver${chunkserver_number}_hdd]})
 
 	local -a extended_args=()
-	if (( $# > 0 )); then
-		extended_args+=( -a "(" "$@" ")" )
+	if (($# > 0)); then
+		extended_args+=(-a "(" "$@" ")")
 	fi
 
 	find $hdds "(" -name "${chunk_metadata_pattern}" ")" "${extended_args[@]}"
@@ -676,7 +676,7 @@ find_chunkserver_metadata_chunks() {
 find_all_chunks() {
 	local count=${saunafs_info_[chunkserver_count]}
 	local chunkserver
-	for (( chunkserver=0 ; chunkserver < count ; ++chunkserver )); do
+	for ((chunkserver = 0; chunkserver < count; ++chunkserver)); do
 		find_chunkserver_chunks $chunkserver "$@"
 	done
 }
@@ -685,7 +685,7 @@ find_all_chunks() {
 find_all_metadata_chunks() {
 	local count=${saunafs_info_[chunkserver_count]}
 	local chunkserver
-	for (( chunkserver=0 ; chunkserver < count ; ++chunkserver )); do
+	for ((chunkserver = 0; chunkserver < count; ++chunkserver)); do
 		find_chunkserver_metadata_chunks $chunkserver "$@"
 	done
 }
@@ -708,7 +708,7 @@ saunafs_admin_master() {
 	local command="$1"
 	shift
 	local port=${saunafs_info_[matocl]}
-	saunafs-admin "$command" localhost "$port" "$@" <<< "${saunafs_info_[admin_password]}"
+	saunafs-admin "$command" localhost "$port" "$@" <<<"${saunafs_info_[admin_password]}"
 }
 
 # A useful shortcut for saunafs-admin commands which require authentication
@@ -720,7 +720,7 @@ saunafs_admin_shadow() {
 	local command="$2"
 	shift 2
 	local port=${saunafs_info_[master${id}_matocl]}
-	saunafs-admin "$command" localhost "$port" "$@" <<< "${saunafs_info_[admin_password]}"
+	saunafs-admin "$command" localhost "$port" "$@" <<<"${saunafs_info_[admin_password]}"
 }
 
 # Stops the active master server without dumping metadata
@@ -738,8 +738,7 @@ saunafs_ready_chunkservers_count() {
 saunafs_wait_for_ready_chunkservers() {
 	local chunkservers=$1
 	local port=${saunafs_info_[matocl]}
-	while [[ "$(saunafs-probe ready-chunkservers-count localhost $port 2>/dev/null | cat)" \
-			!= "$chunkservers" ]]; do
+	while [[ "$(saunafs-probe ready-chunkservers-count localhost $port 2>/dev/null | cat)" != "$chunkservers" ]]; do
 		sleep 0.1
 	done
 }

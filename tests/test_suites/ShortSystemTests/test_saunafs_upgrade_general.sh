@@ -61,7 +61,7 @@ assert_success generate_file file1
 assert_success file-validate file1
 saunafs_chunkserver_daemon 1 start
 assert_eventually \
-		'[[ $(saunafsXX sfscheckfile file1 | grep "chunks with 2 copies" | wc -l) == 1 ]]' "$REPLICATION_TIMEOUT"
+	'[[ $(saunafsXX sfscheckfile file1 | grep "chunks with 2 copies" | wc -l) == 1 ]]' "$REPLICATION_TIMEOUT"
 saunafsXX_chunkserver_daemon 0 stop
 # Check if SaunaFS CS can serve newly replicated chunks to old SaunaFS client:
 assert_success file-validate file1
@@ -79,7 +79,7 @@ many=5
 for i in $(seq $many); do
 	assert_success generate_file file3_$i
 done
-# Check if new files can be read both from Xauna and from Sauna CS:
+# Check if new files can be read both from MooseFS and from SaunaFS CS:
 saunafsXX_chunkserver_daemon 0 stop
 for i in $(seq $many); do
 	assert_success file-validate file3_$i

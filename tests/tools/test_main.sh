@@ -4,7 +4,7 @@ shopt -s expand_aliases extdebug
 
 command_prefix=
 for i in sfsmaster sfschunkserver sfsmount sfsmetarestore sfsmetalogger \
-		saunafs-polonaise-server; do
+	saunafs-polonaise-server; do
 	alias $i="\${command_prefix} $i"
 done
 
@@ -12,7 +12,7 @@ done
 . $(which set_saunafs_constants.sh)
 . tools/stack_trace.sh
 . tools/assert.sh
-. tools/xaunafs.sh
+. tools/legacy.sh
 . tools/string.sh
 . tools/nullblk_zoned.sh
 . tools/saunafs.sh
