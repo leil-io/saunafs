@@ -29,7 +29,6 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 %description
 SaunaFS is an Open Source, easy to deploy and maintain, distributed,
 fault tolerant file system for POSIX compliant OSes.
-SaunaFS is a fork of XaunaFS. For more information please visit
 http://saunafs.com
 
 # Packages
