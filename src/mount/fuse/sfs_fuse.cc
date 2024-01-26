@@ -284,8 +284,14 @@ void sfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *) {
 		auto ctx = get_context(req);
 		auto a = SaunaClient::getattr(ctx, ino);
 		fuse_reply_attr(req, &a.attr, a.attrTimeout);
-	} catch (SaunaClient::RequestException& e) {
-		fuse_reply_err(req, e.system_error_code);
+	} catch (SaunaClient::RequestException &e) {
+		if (e.saunafs_error_code == SAUNAFS_ERROR_ENOENT) {
+			// if the file is not found despite having the inode, it's probably
+			// a stale file handle. For example, from a bind mount.
+			fuse_reply_err(req, ESTALE);
+		} else {
+			fuse_reply_err(req, e.system_error_code);
+		}
 	}
 }
 
