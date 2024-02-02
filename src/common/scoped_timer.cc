@@ -121,7 +121,8 @@ private:
 
 	void init(const std::string &message, TimeUnit timeUnit,
 	          ClockPtr timer = nullptr) {
-		timer_ = (timer == nullptr) ? std::move(timer) : std::make_unique<Clock>();
+		timer_ =
+		    (timer == nullptr) ? std::make_unique<Clock>() : std::move(timer);
 		message_ = message;
 		timeUnit_ = timeUnit;
 
