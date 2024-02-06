@@ -61,12 +61,6 @@ Provides: sfs-chunkserver
 Description: SaunaFS data server
  SaunaFS data server.
 
-#Package: saunafs-chunkserver-zonefs-disk-plugin
-#Architecture: any
-#Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-chunkserver
-#Description: Chunkserver plugin for SMR Host-Managed drives
-# Chunkserver plugin for SMR Host-Managed drives.
-
 Package: saunafs-client
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, bash-completion
