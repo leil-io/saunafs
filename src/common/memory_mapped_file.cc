@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "common/slogger.h"
+#include "cwrap.h"
 
 class MemoryMappedFile::Impl {
 public:
@@ -83,6 +84,11 @@ private:
 MemoryMappedFile::Impl::Impl(const std::string &path) {
 	try {
 		path_ = path;
+		if (path_.front() != '/') { // Add Full path is its missing
+			path_ = fs::getCurrentWorkingDirectory() + "/" + path_;
+			} else {
+			path_ = path;
+		}
 		fd_ = ::open(path.c_str(), O_RDONLY);
 		if (fd_ == -1) {
 			std::string errorMsg =
