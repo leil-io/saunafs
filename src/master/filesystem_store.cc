@@ -592,6 +592,7 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 			static_cast<FSNodeSymlink *>(node)->path = HString(pSrc, pSrc + nodeNameLength);
 			pSrc += nodeNameLength;
 		}
+		gMetadata->linknodes++;
 		break;
 	case FSNode::kFile:
 	case FSNode::kTrash:
@@ -1350,9 +1351,9 @@ void fs_loadall(const std::string &fname, int ignoreflag) {
 	safs_pretty_syslog(
 	    LOG_INFO,
 	    "metadata file %s read (%" PRIu32 " inodes including %" PRIu32
-	    " directory inodes and %" PRIu32 " file inodes, %" PRIu32 " chunks)",
-	    fname.c_str(), gMetadata->nodes, gMetadata->dirnodes,
-	    gMetadata->filenodes, chunk_count());
+	    " directory inodes, %" PRIu32 " file inodes, %" PRIu32 " symlink inodes and %" PRIu32 " chunks)",
+	    metadataFile->filename().c_str(), gMetadata->nodes, gMetadata->dirnodes,
+	    gMetadata->filenodes, gMetadata->linknodes, chunk_count());
 #else
 	safs_pretty_syslog(LOG_INFO, "metadata file %s read", fname.c_str());
 #endif

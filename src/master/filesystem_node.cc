@@ -542,6 +542,9 @@ FSNode *fsnodes_create_node(uint32_t ts, FSNodeDirectory *parent, const HString 
 	if (type == FSNode::kFile) {
 		gMetadata->filenodes++;
 	}
+	if (type == FSNode::kSymlink) {
+		gMetadata->linknodes++;
+	}
 	/* create node */
 	node->id = fsnodes_get_next_id(ts, req_inode);
 
@@ -1249,6 +1252,9 @@ static inline void fsnodes_remove_node(uint32_t ts, FSNode *toremove) {
 				}
 			}
 		}
+	}
+	if (toremove->type == FSNode::kSymlink) {
+		gMetadata->linknodes--;
 	}
 	gMetadata->inode_pool.release(toremove->id, ts, true);
 	xattr_removeinode(toremove->id);

@@ -65,6 +65,7 @@ public:
 	uint32_t reservednodes;
 	uint32_t filenodes;
 	uint32_t dirnodes;
+	uint32_t linknodes;
 
 	QuotaDatabase quota_database;
 
@@ -95,6 +96,7 @@ public:
 	      reservednodes{},
 	      filenodes{},
 	      dirnodes{},
+	      linknodes{},
 	      quota_database{},
 	      fsNodesChecksum{},
 	      xattrChecksum{},
