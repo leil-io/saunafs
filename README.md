@@ -1,4 +1,4 @@
-# SaunaFS [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/saunafs/)
+# [![SaunaFS](https://saunafs.com/favicon.svg) SaunaFS](https://saunafs.com/) [![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://saunafs.slack.com/)
 
 Welcome to SaunaFS, a robust distributed POSIX file system meticulously designed to revolutionize your storage solutions
 by offering unmatched efficiency, security, and redundancy. At its core, SaunaFS is a distributed file system primarily
@@ -18,9 +18,11 @@ Continuity means that SaunaFS installations can easily be refreshed with newer h
 
 SaunaFS is also user-friendly and flexible, and supports various protocols like NFS and S3, provides proprietary WIndows Client, Mac OS client Linux native FUSE client.
 
-### TL;DR:
+### TL;DR
 
-In a nutshell, SaunaFS is software-defined storage platform that was born out of the need to address the shortcomings of traditional data storage solutions. Legacy storage often lacks optimization for specific workloads, resulting in inefficiencies, high energy consumption, and increased costs. We set out to change this by creating a storage solution that leverages cutting-edge technologies, reduces environmental impact, and offers unmatched affordability.
+In a nutshell, SaunaFS is software-defined storage platform that was born out of the need to address the shortcomings of traditional data storage solutions.
+Legacy storage often lacks optimization for specific workloads, resulting in inefficiencies, high energy consumption, and increased costs.
+We set out to change this by creating a storage solution that leverages cutting-edge technologies, reduces environmental impact, and offers unmatched affordability.
 
 ## Feature List & Description
 
@@ -44,21 +46,19 @@ Please refer to the [Installation Guide](INSTALL.md) for detailed instructions o
 
 ## Contact us
 
-Join our Slack community at https://slack.saunafs.com/ to connect with fellow SaunaFS enthusiasts, developers, and users. In our Slack channels, you can:
+Join our Slack community at <https://saunafs.slack.com> to connect with fellow SaunaFS enthusiasts, developers, and users. In our Slack channels, you can:
 
- - **Ask Questions**: Seek guidance, share your experiences, and ask questions related to SaunaFS.
- - **Discuss Ideas**: Engage in discussions about new features, improvements, and best practices.
- - **Receive Updates**: Stay informed about SaunaFS developments, releases, and events.
+- **Ask Questions**: Seek guidance, share your experiences, and ask questions related to SaunaFS.
+- **Discuss Ideas**: Engage in discussions about new features, improvements, and best practices.
+- **Receive Updates**: Stay informed about SaunaFS developments, releases, and events.
 
 Slack is the hub for real-time conversations and knowledge-sharing within our community. Join us and be part of the discussion.
 
 ### Other ways to contact us
-
-- [Email](mailto:contact@saunafs.com)
-- [Official Website](https://saunafs.com/contact)
-
-### Dependencies needed to build deb packages
-sudo apt install asciidoc cmake libfuse3-dev pkg-config zlib1g-dev libspdlog-dev libfmt-dev libboost-system-dev build-essential devscripts debhelper liburcu-dev libboost-program-options-dev
+| Method                     | Link                                                          |
+|----------------------------|---------------------------------------------------------------|
+| :email: Email              | [contact@saunafs.com](mailto:contact@saunafs.com?subject=RFI) |
+| :globe_with_meridians: Web | <https://saunafs.com>                                         |
 
 Thank you for your help.
 

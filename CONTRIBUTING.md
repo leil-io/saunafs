@@ -142,7 +142,7 @@ community to understand your suggestion and find related suggestions.
 #### Before Submitting an Enhancement
 
 - Make sure that you are using the latest version.
-- Read the [documentation]() carefully and find out if the functionality is
+- Read the [documentation](https://docs.saunafs.com) carefully and find out if the functionality is
   already covered, maybe by an individual configuration.
 - Perform a [search](https://github.com/leil-io/saunafs/issues) to see if the
   enhancement has already been suggested. If it has, add a comment to the
@@ -151,8 +151,7 @@ community to understand your suggestion and find related suggestions.
 <!-- omit in toc -->
 #### How Do I Submit a Good Enhancement Suggestion?
 
-Enhancement suggestions are tracked as [GitHub
-issues](https://github.com/leil-io/saunafs/issues).
+Enhancement suggestions are tracked as [GitHub issues](https://github.com/leil-io/saunafs/issues).
 
 - Use a **clear and descriptive title** for the issue to identify the
   suggestion.
@@ -169,22 +168,22 @@ issues](https://github.com/leil-io/saunafs/issues).
 <!-- ### Improving The Documentation TODO Updating, improving and correcting the
 documentation -->
 
-## Styleguides
+## Style guides
 
 ### Commit Messages
 
--	**Title:** Give a descriptive summary, use [conventional commits
-	specification](#conventional-commits-specification).
--	Imperative, start uppercase, no period at the end, no more than 50
-	chars.
--	Remember blank line between title and body.
--	**Body:** Explain why and what (not how), include task ID, wrap at 72
-	chars.
--	**At the end:** Include Co-authored-by for all contributors.
--	Remember at least one blank line before it.
--	Format: Co-authored-by: name <user@users.noreply.github.com>
+- **Title:** Give a descriptive summary, use [conventional commits
+ specification](#conventional-commits-specification).
+- Imperative, start uppercase, no period at the end, no more than 50
+ chars.
+- Remember blank line between title and body.
+- **Body:** Explain why and what (not how), include task ID, wrap at 72
+ chars.
+- **At the end:** Include Co-authored-by for all contributors.
+- Remember at least one blank line before it.
+- Format: Co-authored-by: name <user@users.noreply.github.com>
 
-###  Conventional Commits Specification
+### Conventional Commits Specification
 
 The Conventional Commits specification is a lightweight convention on top of
 commit messages. It provides an easy set of rules for creating an explicit
@@ -225,8 +224,8 @@ the consumers of your library:
   least the basic set of rules like the ones provided by [Google C++ Style
   Guide](https://google.github.io/styleguide/cppguide.html).
 - Here are some examples of using pre-commit tools in SaunaFS development:
-  - [pre-commit-config.yaml](https://diaway-my.sharepoint.com/:u:/g/personal/jk_leil_io/EVk5KPeutHxBm3nB1-OTXRwBlU0gaq1YmZWKbPIqRJQljg?e=f6mxsQ)
-  - [clang-format](https://diaway-my.sharepoint.com/:u:/g/personal/jk_leil_io/EfpVwr7RnZ5Et11TjU9aPfYBqZ_Mb3zpEN23TVL7Ef4UDQ?e=3gdTUx)
+  - [pre-commit-config.yaml](https://diaway-my.sharepoint.com/:u:/g/personal/jk_leil_io/EVk5KPeutHxBm3nB1-OTXRwB0doLo6iKSWGVIOAcLh0i7A?e=SQ9oBk)
+  - [clang-format](https://diaway-my.sharepoint.com/:u:/g/personal/jk_leil_io/EfpVwr7RnZ5Et11TjU9aPfYBoutcJtS8lbhTcQhpLVMq4A?e=9BuQJG)
 
 ### Feature Level Atomicity to Keep the History Clean
 
@@ -242,7 +241,7 @@ The level of commit atomicity differs for existing code and is usually based on
 bug fixes, feature improvements, and similar factors. It is common to have
 commits that amend older ones already present in protected branches.
 
-### Break the Build, Then Fix It!
+### Break the Build, Then Fix It
 
 If the changes you introduce break the pipeline, it is your responsibility, as
 the author of those changes, to fix it. While you can seek assistance from the

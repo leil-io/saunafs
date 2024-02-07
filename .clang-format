@@ -4,8 +4,8 @@
 
 BasedOnStyle: Google
 Standard: Latest
-IndentWidth: '4'
-TabWidth: '4'
+IndentWidth: 4
+TabWidth: 4
 UseTab: ForIndentation
 AccessModifierOffset: -4
 
@@ -21,8 +21,7 @@ AllowShortEnumsOnASingleLine: false
 IncludeBlocks: Preserve
 
 # Clang Format doesn't support adding a semicolon to the end of a single for
-# loop. Instead, we must braces until it does.
+# loop. Instead, we must use braces until it does.
 AllowShortLoopsOnASingleLine: true
-AllowShortBlocksOnASingleLine: true
-
+AllowShortBlocksOnASingleLine: Always
 ...

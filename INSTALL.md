@@ -23,8 +23,7 @@ system.
     ```
 
     It will create a new keyring file `/usr/share/keyrings/saunafs-archive-keyring.gpg` and import the
-    public key used to sign the packages. Please, notice that at the time of writing, the `add-apt-repository` command
-    is deprecated and does not support the `--keyring` option.
+    public key used to sign the packages. Please, notice that at the time of writing, [the use of apt-key deprecated](https://opensource.com/article/22/9/deprecated-linux-apt-key)
 
     You can verify the keyring file by running the following command:
 
@@ -36,13 +35,12 @@ system.
 
 2. Add the SaunaFS repository to your system:
 
-    <!-- TODO(Baldor): provide accessible repository URL -->
-    The repository is available at http://192.168.50.208:8081/repository/saunafs-ubuntu-22.04-dev/. You can
+    The repository is available at <https://repo.saunafs.com/repository/saunafs-ubuntu-22.04-dev/>. You can
     either add it to your system manually or use the following command:
 
     ```shell
     cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
-    deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] http://192.168.50.208:8081/repository/saunafs-ubuntu-22.04-dev/ jammy main
+    deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-22.04-dev/ jammy main
     EOF
     ```
 
@@ -69,6 +67,12 @@ SaunaFS is written in C++ and uses CMake as its build system. There are some uti
 automate the build process. Please, follow the instructions below to build SaunaFS from source.
 
 ### Dependencies
+
+### Dependencies needed to build deb packages
+
+```text
+acl asciidoc attr bc build-essential ca-certificates-java ccache cmake curl debhelper devscripts fuse3 git libblkid-dev libboost-filesystem-dev libboost-iostreams-dev libboost-program-options-dev libboost-system-dev libcrcutil-dev libdb-dev libfmt-dev libfuse3-dev libgoogle-perftools-dev libgtest-dev libisal-dev libjudy-dev libpam0g-dev libspdlog-dev libsystemd-dev liburcu-dev libyaml-cpp-dev lsb-release netcat-openbsd nfs4-acl-tools pkg-config pylint python3 python3-pip rsync socat sudo tidy time uuid-dev valgrind wget zlib1g-dev
+```
 
 The following scripts can be used to install the dependencies on Ubuntu 22.04 (Jammy):
 
@@ -108,7 +112,6 @@ If you want to build SaunaFS without the tests, you can use the following comman
 
 (might require elevated privileges depending on your filesystem permissions)
 ```shell
-```shell
 ./tests/ci_build/run-build.sh release
 ```
 
@@ -116,14 +119,16 @@ If you don't want to use the scripts above, you can use the following commands t
 
 ```shell
 mkdir build
+
 cmake -B ./build \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -G 'Unix Makefiles' \
-	-DENABLE_DOCS=ON \
-	-DENABLE_CLIENT_LIB=ON \
+    -DENABLE_DOCS=ON \
+    -DENABLE_CLIENT_LIB=ON \
     -DENABLE_TESTS=ON \
     -DENABLE_WERROR=ON
-make -C ./build -j$(nproc)
+    
+nice make -C ./build -j$(nproc)
 ```
 
 ### Installing
