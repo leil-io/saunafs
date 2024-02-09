@@ -49,6 +49,9 @@ std::string cfg_yaml_string();
 std::string cfg_yaml_list(std::string service_name,
                           std::map<std::string, std::string> &services);
 
+// Add default values to a YAML string.
+std::string cfg_add_defaults(std::string &config);
+
 int cfg_isdefined(const char *name);
 
 _CONFIG_MAKE_PROTOTYPE(str,char*);

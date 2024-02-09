@@ -17,12 +17,13 @@
  */
 
 #include "common/platform.h"
-#include "admin/dump_config_command.h"
 
 #include <unistd.h>
 #include <iostream>
 
+#include "admin/dump_config_command.h"
 #include "admin/registered_admin_connection.h"
+#include "admin/saunafs_admin_command.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
 
@@ -35,6 +36,10 @@ void DumpConfigurationCommand::usage() const {
 	std::cerr << "    Authentication with the admin password is required\n";
 }
 
+SaunaFsProbeCommand::SupportedOptions DumpConfigurationCommand::supportedOptions() const {
+	return {{defaultsMode, "Return default values as well."}};
+}
+
 void DumpConfigurationCommand::run(const Options &options) const {
 	if (options.arguments().size() != 2) {
 		throw WrongUsageException(
@@ -44,7 +49,7 @@ void DumpConfigurationCommand::run(const Options &options) const {
 	auto connection = RegisteredAdminConnection::create(options.argument(0),
 	                                                    options.argument(1));
 	auto adminResponse = connection->sendAndReceive(
-	    cltoma::adminDumpConfiguration::build(), SAU_MATOCL_ADMIN_DUMP_CONFIG);
+	    cltoma::adminDumpConfiguration::build(options.isSet(defaultsMode)), SAU_MATOCL_ADMIN_DUMP_CONFIG);
 
 	std::string configs;
 	matocl::adminDumpConfiguration::deserialize(adminResponse, configs);

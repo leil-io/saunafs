@@ -4510,7 +4510,7 @@ std::string get_client_configs() {
 	return cfg_yaml_list("clients", client_configs);
 }
 
-void matoclserv_admin_dump_config(matoclserventry *eptr) {
+void matoclserv_admin_dump_config(matoclserventry *eptr, const uint8_t* data, uint32_t length) {
 	if (eptr->registered != ClientState::kAdmin) {
 		safs_pretty_syslog(LOG_NOTICE,
 		                   "SAU_CLTOMA_ADMING_DUMP_CONFIG: available only for "
@@ -4518,6 +4518,8 @@ void matoclserv_admin_dump_config(matoclserventry *eptr) {
 		eptr->mode = KILL;
 		return;
 	}
+	bool defaults = false;
+	cltoma::adminDumpConfiguration::deserialize(data, length, defaults);
 	MessageBuffer reply;
 
 	auto master_config =
@@ -4525,9 +4527,12 @@ void matoclserv_admin_dump_config(matoclserventry *eptr) {
 	auto chunkserver_configs = csdb_chunkserver_configs();
 	auto metalogger_configs = get_metaloggers_config();
 	auto client_configs = get_client_configs();
-	matocl::adminDumpConfiguration::serialize(
-	    reply, master_config + "\n" + chunkserver_configs + "\n" +
-	               metalogger_configs + "\n" + client_configs);
+	auto full_config = master_config + "\n" + chunkserver_configs + "\n" +
+	                   metalogger_configs + "\n" + client_configs;
+	if (defaults) {
+		full_config = cfg_add_defaults(full_config);
+	}
+	matocl::adminDumpConfiguration::serialize(reply, full_config);
 	matoclserv_createpacket(eptr, reply);
 }
 
@@ -4792,7 +4797,7 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					matoclserv_admin_save_metadata(eptr, data, length);
 					break;
 				case SAU_CLTOMA_ADMIN_DUMP_CONFIG:
-					matoclserv_admin_dump_config(eptr);
+					matoclserv_admin_dump_config(eptr, data, length);
 					break;
 				default:
 					safs_pretty_syslog(LOG_NOTICE,"main master server module: got invalid message in shadow state (type:%" PRIu32 ")",type);
@@ -4877,7 +4882,7 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					matoclserv_admin_reload(eptr, data, length);
 					break;
 				case SAU_CLTOMA_ADMIN_DUMP_CONFIG:
-					matoclserv_admin_dump_config(eptr);
+					matoclserv_admin_dump_config(eptr, data, length);
 					break;
 				case SAU_CLTOMA_ADMIN_SAVE_METADATA:
 					matoclserv_admin_save_metadata(eptr, data, length);

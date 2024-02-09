@@ -22,9 +22,13 @@
 #include "common/cfg.h"
 
 #include <map>
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include <yaml-cpp/yaml.h>
 
 #include "common/massert.h"
+#include "common/cfg_options.h"
 
 static char *cfgfname;
 static std::map<std::string, std::string> configParameters;
@@ -119,6 +123,50 @@ int cfg_isdefined(const char *name) {
 void cfg_term(void) {
 	configParameters.clear();
 	free(cfgfname);
+}
+
+std::unordered_map<std::string, std::string> select_defaults(std::string const &service) {
+	if (service == "master") { return gDefaultOptionsMaster; }
+	if (service == "shadow") { return gDefaultOptionsShadow; }
+	if (service == "metaloggers") { return gDefaultOptionsMeta; }
+	if (service == "chunkservers") { return gDefaultOptionsCS; }
+	return {};
+}
+
+std::string cfg_add_defaults(
+    std::string &config) {
+	std::vector<std::string> singleConfigs = {"master", "shadow"};
+	std::vector<std::string> multiConfigs = {"metaloggers", "chunkservers"};
+	YAML::Node fullConfig = YAML::Load(config);
+
+	for (auto const &config_key: singleConfigs) {
+		YAML::Node keyNode = fullConfig[config_key];
+
+		auto defaultValues = select_defaults(config_key);
+		for (auto const &[key, value]: defaultValues) {
+			if (!keyNode[key]) {
+			keyNode[key] = value;
+			}
+		}
+	}
+
+	// For multiconfigs, they contain a list of keys with their own key-value
+	// pairs, so the process is a bit different.
+	for (auto const &config_key: multiConfigs) {
+		YAML::Node keyNode = fullConfig[config_key];
+		auto defaultValues = select_defaults(config_key);
+		for (auto key: keyNode) {
+			for (auto const &[keyDefault, valueDefault]: defaultValues) {
+				if (!key.second[keyDefault]) {
+					key.second[keyDefault] = valueDefault;
+				}
+			}
+		}
+	}
+
+	YAML::Emitter ret;
+	ret << fullConfig;
+	return ret.c_str();
 }
 
 // Helper function to setup an initial YAML map of maps for a particular

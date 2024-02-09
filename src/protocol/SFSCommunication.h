@@ -1736,7 +1736,7 @@ enum class SugidClearMode {
 
 // 0x643
 #define SAU_CLTOMA_ADMIN_DUMP_CONFIG (1000U + 603U)
-/// -
+/// defaults:8
 
 // 0x644
 #define SAU_MATOCL_ADMIN_DUMP_CONFIG (1000U + 604U)
