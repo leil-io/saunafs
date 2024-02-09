@@ -1,7 +1,7 @@
 timeout_set 2 minutes
 assert_program_installed attr
 
-master_cfg="MAGIC_DISABLE_METADATA_DUMPS = 1"
+master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
 master_cfg+="|METADATA_CHECKSUM_RECALCULATION_SPEED = 1"
 master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=DEBUG"
 

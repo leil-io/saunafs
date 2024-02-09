@@ -4,7 +4,7 @@ CHUNKSERVERS=1 \
 	MASTERSERVERS=2 \
 	USE_RAMDISK="YES" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
-	MASTER_EXTRA_CONFIG="MASTER_TIMEOUT = 10|MAGIC_DISABLE_METADATA_DUMPS = 1" \
+	MASTER_EXTRA_CONFIG="MASTER_TIMEOUT = 10|METADATA_DUMP_PERIOD_SECONDS = 0" \
 	setup_local_empty_saunafs info
 
 # Generate any changes, connect shadow master and wait until it's fully synchronized

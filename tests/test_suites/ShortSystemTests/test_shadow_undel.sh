@@ -1,6 +1,6 @@
 timeout_set 1 minutes
 
-master_cfg="MAGIC_DISABLE_METADATA_DUMPS = 1"
+master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
 master_cfg+="|AUTO_RECOVERY = 1"
 
 CHUNKSERVERS=1 \

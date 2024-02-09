@@ -1,6 +1,6 @@
 timeout_set 3 minutes
 
-master_cfg="MAGIC_DISABLE_METADATA_DUMPS = 1"
+master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
 master_cfg+="|AUTO_RECOVERY = 1"
 master_cfg+="|EMPTY_TRASH_PERIOD = 1"
 master_cfg+="|EMPTY_RESERVED_INODES_PERIOD = 1"

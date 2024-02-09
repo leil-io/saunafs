@@ -5,7 +5,7 @@ CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
-	MASTER_EXTRA_CONFIG="MAGIC_DISABLE_METADATA_DUMPS = 1|AUTO_RECOVERY = 1" \
+	MASTER_EXTRA_CONFIG="METADATA_DUMP_PERIOD_SECONDS = 0|AUTO_RECOVERY = 1" \
 	setup_local_empty_saunafs info
 
 # Create subdir and modify mount #1 to use it

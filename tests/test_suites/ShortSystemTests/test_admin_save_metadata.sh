@@ -1,7 +1,7 @@
 master_cfg="SFSMETARESTORE_PATH = $TEMP_DIR/metarestore.sh"
 master_cfg+="|MAGIC_PREFER_BACKGROUND_DUMP = 1"
 master_cfg+="|BACK_META_KEEP_PREVIOUS = 50"
-master_cfg+="|MAGIC_DISABLE_METADATA_DUMPS = 1"
+master_cfg+="|METADATA_DUMP_PERIOD_SECONDS = 0"
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \

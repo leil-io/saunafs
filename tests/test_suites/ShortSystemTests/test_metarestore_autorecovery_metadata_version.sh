@@ -1,6 +1,6 @@
 CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \
-	MASTER_EXTRA_CONFIG="MAGIC_DISABLE_METADATA_DUMPS = 1|BACK_META_KEEP_PREVIOUS = 5" \
+	MASTER_EXTRA_CONFIG="METADATA_DUMP_PERIOD_SECONDS = 0|BACK_META_KEEP_PREVIOUS = 5" \
 	setup_local_empty_saunafs info
 
 changelog_file="${info[master_data_path]}/changelog.sfs"

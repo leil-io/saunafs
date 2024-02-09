@@ -2,7 +2,7 @@ timeout_set 2 minutes
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
-	MASTER_EXTRA_CONFIG="MAGIC_DISABLE_METADATA_DUMPS = 1|AUTO_RECOVERY = 1" \
+	MASTER_EXTRA_CONFIG="METADATA_DUMP_PERIOD_SECONDS = 0|AUTO_RECOVERY = 1" \
 	setup_local_empty_saunafs info
 
 # Remember version of the metadata file. We expect it not to change when generating data.

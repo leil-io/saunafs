@@ -1,6 +1,6 @@
 USE_RAMDISK=YES \
 	MASTERSERVERS=2 \
-	MASTER_EXTRA_CONFIG="MAGIC_DISABLE_METADATA_DUMPS = 1" \
+	MASTER_EXTRA_CONFIG="METADATA_DUMP_PERIOD_SECONDS = 0" \
 	setup_local_empty_saunafs info
 
 # Generate some changes in the changelog

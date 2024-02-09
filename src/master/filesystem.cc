@@ -112,7 +112,10 @@ static void metadataPollServe(const std::vector<pollfd> &pdesc) {
 }
 
 void fs_periodic_storeall() {
-	fs_storeall(MetadataDumper::kBackgroundDump); // ignore error
+	auto result = fs_storeall(MetadataDumper::kBackgroundDump); // ignore error
+
+	safs_silent_syslog(LOG_DEBUG, "periodic metadata dump: %s",
+	                   (SAUNAFS_STATUS_OK == result) ? "success" : "failure");
 }
 
 void fs_term(void) {
@@ -371,9 +374,10 @@ int fs_init(bool doLoad) {
 	}
 	eventloop_reloadregister(fs_reload);
 	metadataserver::registerFunctionCalledOnPromotion(fs_become_master);
-	if (!cfg_isdefined("MAGIC_DISABLE_METADATA_DUMPS")) {
-		// Secret option disabling periodic metadata dumps
-		eventloop_timeregister(TIMEMODE_RUN_LATE,3600,0,fs_periodic_storeall);
+	auto metadataDumpPeriod = cfg_getint32("METADATA_DUMP_PERIOD_SECONDS", 3600);
+	if (metadataDumpPeriod > 0) {  /// 0 means disabled periodic metadata dumps
+		eventloop_timeregister(TIMEMODE_RUN_LATE, metadataDumpPeriod, 0,
+		                       fs_periodic_storeall);
 	}
 	if (metadataserver::isMaster()) {
 		fs_become_master();

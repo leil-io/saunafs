@@ -238,6 +238,11 @@
 ## (Default: 1800)
 # METADATA_SAVE_REQUEST_MIN_PERIOD = 1800
 
+## Metadata periodical dump interval in seconds. If set to 0, metadata periodic dump
+## is disabled (not recommended).
+## (Default: 3600)
+# METADATA_DUMP_PERIOD_SECONDS = 3600
+
 # deprecated:
 # CHUNKS_DEL_LIMIT - use CHUNKS_SOFT_DEL_LIMIT instead
 

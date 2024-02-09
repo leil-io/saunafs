@@ -78,6 +78,7 @@ test_master_noatime=5
 test_master_stop_during_dumping=5
 test_metadata_checksum_recalculation=20
 test_metadata_dump=10
+test_metadata_dump_period_seconds=20
 test_metadata_file_lock=5
 test_metadata_recovery=50
 test_metadata_save_request_min_period=10

@@ -1,6 +1,6 @@
 timeout_set '1 minute'
 
-master_cfg="MAGIC_DISABLE_METADATA_DUMPS = 1"
+master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
 master_cfg+="|MAGIC_DEBUG_LOG = ${TEMP_DIR}/log|LOG_FLUSH_ON=DEBUG"
 master_cfg+="|METADATA_SAVE_REQUEST_MIN_PERIOD = $(timeout_rescale_seconds 10)"
 
