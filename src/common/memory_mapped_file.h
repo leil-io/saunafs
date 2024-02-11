@@ -41,6 +41,14 @@ public:
 	virtual ~MemoryMappedFile();
 
 	/**
+	 * We don't want to allow copying or moving
+	 */
+	MemoryMappedFile(const MemoryMappedFile &) = delete;
+	MemoryMappedFile &operator=(const MemoryMappedFile &) = delete;
+	MemoryMappedFile(MemoryMappedFile &&) noexcept = delete;
+	MemoryMappedFile &operator=(MemoryMappedFile &&) noexcept = delete;
+
+	/**
 	 * Get a pointer to the memory mapped contents of the file
 	 * at the given offset
 	 * @param offset The offset to the memory mapped contents

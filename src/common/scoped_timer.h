@@ -47,6 +47,14 @@ public:
 	ScopedTimer();
 
 	/**
+	 * We don't want to allow copying or moving
+	 */
+	ScopedTimer(const ScopedTimer &) = delete;
+	ScopedTimer &operator=(const ScopedTimer &) = delete;
+	ScopedTimer(ScopedTimer &&) noexcept = delete;
+	ScopedTimer &operator=(ScopedTimer &&) noexcept = delete;
+
+	/**
 	 * Constructor
 	 * @param message The message to log, it is prepended with the elapsed time
 	 */

@@ -79,6 +79,14 @@ public:
 	}
 
 	/**
+	 * We don't want to allow copying or moving
+	 */
+	Impl(const Impl &) = delete;
+	Impl &operator=(const Impl &) = delete;
+	Impl(Impl &&) noexcept = delete;
+	Impl &operator=(Impl &&) noexcept = delete;
+
+	/**
 	 * Set the time unit to use
 	 * @param time_unit The time unit to use for the elapsed time
 	 */

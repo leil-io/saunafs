@@ -31,6 +31,12 @@ public:
 	explicit Impl(const std::string &path);
 	virtual ~Impl();
 
+	/// We don't want to allow copying or moving
+	Impl(const Impl &) = delete;
+	Impl &operator=(const Impl &) = delete;
+	Impl(Impl &&) noexcept = delete;
+	Impl &operator=(Impl &&) noexcept = delete;
+
 	[[nodiscard]] uint8_t *seek(size_t offset) const;
 
 	size_t read(size_t &offset, uint8_t *buf, size_t size,
@@ -68,8 +74,8 @@ private:
 
 private:
 	std::string path_{};      // The path to the file
-	size_t fileSize_{};      // The size of the file
-	size_t mapSize_;         // The size of the memory mapping
+	size_t fileSize_{};       // The size of the file
+	size_t mapSize_;          // The size of the memory mapping
 	uint8_t *map_ = nullptr;  // The memory mapped contents of the file
 	int fd_;                  // The file descriptor of the file
 };
