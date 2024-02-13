@@ -141,6 +141,7 @@ std::string cfg_add_defaults(
 
 	for (auto const &config_key: singleConfigs) {
 		YAML::Node keyNode = fullConfig[config_key];
+		if (keyNode.size() == 0) { continue; };
 
 		auto defaultValues = select_defaults(config_key);
 		for (auto const &[key, value]: defaultValues) {
@@ -154,6 +155,8 @@ std::string cfg_add_defaults(
 	// pairs, so the process is a bit different.
 	for (auto const &config_key: multiConfigs) {
 		YAML::Node keyNode = fullConfig[config_key];
+		if (keyNode.size() == 0) { continue; };
+
 		auto defaultValues = select_defaults(config_key);
 		for (auto key: keyNode) {
 			for (auto const &[keyDefault, valueDefault]: defaultValues) {
