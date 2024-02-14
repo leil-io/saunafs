@@ -55,35 +55,35 @@ void InfoCommand::run(const Options& options) const {
 	SaunaFsStatistics info;
 	deserializeAllLegacyPacketDataNoHeader(response, info);
 	if (options.isSet(kPorcelainMode)) {
-		std::cout << saunafsVersionToString(info.version)
-				<< ' ' << info.memoryUsage
-				<< ' ' << info.totalSpace
-				<< ' ' << info.availableSpace
-				<< ' ' << info.trashSpace
-				<< ' ' << info.trashNodes
-				<< ' ' << info.reservedSpace
-				<< ' ' << info.reservedNodes
-				<< ' ' << info.allNodes
-				<< ' ' << info.dirNodes
-				<< ' ' << info.fileNodes
-				<< ' ' << info.chunks
-				<< ' ' << info.chunkCopies
-				<< ' ' << info.chunkCopies // deprecated 'regular' copies
-				<< std::endl;
+		std::cout << saunafsVersionToString(info.version) << ' '
+		          << info.memoryUsage << ' ' << info.totalSpace << ' '
+		          << info.availableSpace << ' ' << info.trashSpace << ' '
+		          << info.trashNodes << ' ' << info.reservedSpace << ' '
+		          << info.reservedNodes << ' ' << info.allNodes << ' '
+		          << info.dirNodes << ' ' << info.fileNodes << ' '
+		          << info.symlinkNodes << ' ' << info.chunks << ' '
+		          << info.chunkCopies << ' '
+		          << info.chunkCopies  // deprecated 'regular' copies
+		          << std::endl;
 	} else {
 		std::cout << "SaunaFS v" << saunafsVersionToString(info.version) << '\n'
-				<< "Memory usage:\t" << convertToIec(info.memoryUsage) << "B\n"
-				<< "Total space:\t" << convertToIec(info.totalSpace) << "B\n"
-				<< "Available space:\t" << convertToIec(info.availableSpace) << "B\n"
-				<< "Trash space:\t" << convertToIec(info.trashSpace) << "B\n"
-				<< "Trash files:\t" << info.trashNodes << '\n'
-				<< "Reserved space:\t" << convertToIec(info.reservedSpace) << "B\n"
-				<< "Reserved files:\t" << info.reservedNodes << '\n'
-				<< "FS objects:\t" << info.allNodes << '\n'
-				<< "Directories:\t" << info.dirNodes << '\n'
-				<< "Files:\t" << info.fileNodes << '\n'
-				<< "Chunks:\t" << info.chunks << '\n'
-				<< "Chunk copies:\t" << info.chunkCopies << '\n'
-				<< "Regular copies (deprecated):\t" << info.chunkCopies << std::endl;
+		          << "Memory usage:\t" << convertToIec(info.memoryUsage)
+		          << "B\n"
+		          << "Total space:\t" << convertToIec(info.totalSpace) << "B\n"
+		          << "Available space:\t" << convertToIec(info.availableSpace)
+		          << "B\n"
+		          << "Trash space:\t" << convertToIec(info.trashSpace) << "B\n"
+		          << "Trash files:\t" << info.trashNodes << '\n'
+		          << "Reserved space:\t" << convertToIec(info.reservedSpace)
+		          << "B\n"
+		          << "Reserved files:\t" << info.reservedNodes << '\n'
+		          << "FS objects:\t" << info.allNodes << '\n'
+		          << "Directories:\t" << info.dirNodes << '\n'
+		          << "Files:\t" << info.fileNodes << '\n'
+		          << "Symlinks:\t" << info.symlinkNodes << '\n'
+		          << "Chunks:\t" << info.chunks << '\n'
+		          << "Chunk copies:\t" << info.chunkCopies << '\n'
+		          << "Regular copies (deprecated):\t" << info.chunkCopies
+		          << std::endl;
 	}
 }

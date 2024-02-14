@@ -24,6 +24,7 @@
 
 #include <inttypes.h>
 #include <string.h>
+#include <cstdint>
 #include <map>
 
 #include "common/access_control_list.h"
@@ -204,7 +205,10 @@ void fs_disable_checksum_verification(bool value);
 
 // Functions which modify metadata or return some information.
 // To be used by the master server with personality == kMaster
-void fs_info(uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint32_t *trnodes,uint64_t *respace,uint32_t *renodes,uint32_t *inodes,uint32_t *dnodes,uint32_t *fnodes);
+void fs_info(uint64_t *totalspace, uint64_t *availspace, uint64_t *trspace,
+             uint32_t *trnodes, uint64_t *respace, uint32_t *renodes,
+             uint32_t *inodes, uint32_t *dnodes, uint32_t *fnodes,
+             uint32_t *lnodes);
 uint32_t fs_getdirpath_size(uint32_t inode);
 void fs_getdirpath_data(uint32_t inode,uint8_t *buff,uint32_t size);
 uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path);
@@ -231,7 +235,8 @@ uint8_t fs_gettrashpath(uint32_t rootinode,uint8_t sesflags,uint32_t inode,std::
 uint8_t fs_getdetachedattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,Attributes& attr,uint8_t dtype);
 
 // EXTRA
-uint8_t fs_get_dir_stats(const FsContext &context,uint32_t inode,uint32_t *inodes,uint32_t *dirs,uint32_t *files,uint32_t *chunks,uint64_t *length,uint64_t *size,uint64_t *rsize);
+uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode, uint32_t *inodes, uint32_t *dirs, uint32_t *files,
+						 uint32_t *links, uint32_t *chunks, uint64_t *length, uint64_t *size, uint64_t *rsize);
 uint8_t fs_get_chunkid(const FsContext& context,
 		uint32_t inode, uint32_t index, uint64_t *chunkid);
 

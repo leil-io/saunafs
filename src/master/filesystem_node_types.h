@@ -69,6 +69,7 @@ struct statsrecord {
 	uint32_t inodes;
 	uint32_t dirs;
 	uint32_t files;
+	uint32_t links;
 	uint32_t chunks;
 	uint64_t length;
 	uint64_t size;

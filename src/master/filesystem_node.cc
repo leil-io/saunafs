@@ -272,6 +272,7 @@ void fsnodes_get_stats(FSNode *node, statsrecord *sr) {
 		sr->inodes = 1;
 		sr->dirs = 0;
 		sr->files = 1;
+		sr->links = 0;
 		sr->chunks = file_chunks(static_cast<FSNodeFile*>(node));
 		sr->length = static_cast<FSNodeFile*>(node)->length;
 		sr->size = file_size(static_cast<FSNodeFile*>(node), sr->chunks);
@@ -279,6 +280,7 @@ void fsnodes_get_stats(FSNode *node, statsrecord *sr) {
 		break;
 	case FSNode::kSymlink:
 		sr->inodes = 1;
+		sr->links = 1;
 		sr->files = 0;
 		sr->dirs = 0;
 		sr->chunks = 0;
@@ -290,6 +292,7 @@ void fsnodes_get_stats(FSNode *node, statsrecord *sr) {
 		sr->inodes = 1;
 		sr->files = 0;
 		sr->dirs = 0;
+		sr->links = 0;
 		sr->chunks = 0;
 		sr->length = 0;
 		sr->size = 0;
@@ -321,6 +324,7 @@ static inline void fsnodes_sub_stats(FSNodeDirectory *parent, statsrecord *sr) {
 		psr->inodes -= sr->inodes;
 		psr->dirs -= sr->dirs;
 		psr->files -= sr->files;
+		psr->links -= sr->links;
 		psr->chunks -= sr->chunks;
 		psr->length -= sr->length;
 		psr->size -= sr->size;
@@ -341,6 +345,7 @@ void fsnodes_add_stats(FSNodeDirectory *parent, statsrecord *sr) {
 		psr->inodes += sr->inodes;
 		psr->dirs += sr->dirs;
 		psr->files += sr->files;
+		psr->links += sr->links;
 		psr->chunks += sr->chunks;
 		psr->length += sr->length;
 		psr->size += sr->size;
@@ -359,6 +364,7 @@ void fsnodes_add_sub_stats(FSNodeDirectory *parent, statsrecord *newsr, statsrec
 	sr.inodes = newsr->inodes - prevsr->inodes;
 	sr.dirs = newsr->dirs - prevsr->dirs;
 	sr.files = newsr->files - prevsr->files;
+	sr.links = newsr->links - prevsr->links;
 	sr.chunks = newsr->chunks - prevsr->chunks;
 	sr.length = newsr->length - prevsr->length;
 	sr.size = newsr->size - prevsr->size;

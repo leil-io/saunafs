@@ -457,7 +457,7 @@ try:
             masterversion = (1, 4, 0)
         elif length == 60:
             masterversion = (1, 5, 0)
-        elif length == 68 or length == 76:
+        elif length == 68 or length == 80:
             masterversion = struct.unpack(">HBB", data[:4])
 except Exception:
     print("Content-Type: text/html; charset=UTF-8")
@@ -817,10 +817,10 @@ if "IN" in sectionset:
             out.append("""		<td align="right">%u</td>""" % tdcopies)
             out.append("""	</tr>""")
             out.append("""</table>""")
-        elif cmd == MATOCL_INFO and length == 76:
+        elif cmd == MATOCL_INFO and length == 80:
             data = myrecv(s, length)
-            v1, v2, v3, memusage, total, avail, trspace, trfiles, respace, refiles, nodes, dirs, files, chunks, allcopies, tdcopies = struct.unpack(
-                ">HBBQQQQLQLLLLLLL", data)
+            v1, v2, v3, memusage, total, avail, trspace, trfiles, respace, refiles, nodes, dirs, files, symlinks, chunks, allcopies, tdcopies = struct.unpack(
+                ">HBBQQQQLQLLLLLLLL", data)
             out.append(
                 """<table class="FR" cellspacing="0" summary="Info table">""")
             out.append("""	<tr><th colspan="14">Info</th></tr>""")
@@ -836,6 +836,7 @@ if "IN" in sectionset:
             out.append("""		<th>all fs objects</th>""")
             out.append("""		<th>directories</th>""")
             out.append("""		<th>files</th>""")
+            out.append("""		<th>symlinks</th>""")
             out.append("""		<th>chunks</th>""")
             out.append(
                 """		<th><a style="cursor:default" title="chunks from 'regular' hdd space and 'marked for removal' hdd space">all chunk copies</a></th>""")
@@ -863,6 +864,7 @@ if "IN" in sectionset:
             out.append("""		<td align="right">%u</td>""" % nodes)
             out.append("""		<td align="right">%u</td>""" % dirs)
             out.append("""		<td align="right">%u</td>""" % files)
+            out.append("""		<td align="right">%u</td>""" % symlinks)
             out.append("""		<td align="right">%u</td>""" % chunks)
             out.append("""		<td align="right">%u</td>""" % allcopies)
             out.append("""		<td align="right">%u</td>""" % tdcopies)
