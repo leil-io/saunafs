@@ -153,93 +153,15 @@ static int chunks_info(const char *file_name, int fd, uint32_t inode, bool long_
 
 static int file_info(const char *fileName, bool long_wait) {
 	std::vector<uint8_t> buffer;
-	uint32_t inode, messageId = 0;
+	uint32_t inode;
 	int fd;
-	int timeout_ms = long_wait ? kInfiniteTimeout : kDefaultTimeout;
+
 	fd = open_master_conn(fileName, &inode, nullptr, false);
 	if (fd < 0) {
 		return -1;
 	}
 	try {
-		buffer.clear();
-		cltoma::tapeInfo::serialize(buffer, 0, inode);
-		if (tcpwrite(fd, buffer.data(), buffer.size()) != (int)buffer.size()) {
-			printf("%s [tape info]: master: send error\n", fileName);
-			close_master_conn(1);
-			return -1;
-		}
-
-		buffer.resize(PacketHeader::kSize);
-		if (tcptoread(fd, buffer.data(), PacketHeader::kSize, timeout_ms) != (int)PacketHeader::kSize) {
-			printf("%s [tape info]: master query: receive error\n", fileName);
-			close_master_conn(1);
-			return -1;
-		}
-
-		PacketHeader header;
-		deserializePacketHeader(buffer, header);
-
-		if (header.type != SAU_MATOCL_TAPE_INFO) {
-			printf("%s [tape info]: master query: wrong answer (type)\n", fileName);
-			close_master_conn(1);
-			return -1;
-		}
-
-		buffer.resize(header.length);
-
-		if (tcptoread(fd, buffer.data(), header.length, timeout_ms) != (int)header.length) {
-			printf("%s [tape info]: master query: receive error\n", fileName);
-			close_master_conn(1);
-			return -1;
-		}
-
-		PacketVersion version;
-		deserialize(buffer, version, messageId);
-
-		if (messageId != 0) {
-			printf("%s [tape info]: master query: wrong answer (queryid)\n", fileName);
-			close_master_conn(1);
-			return -1;
-		}
-
-		uint8_t status = SAUNAFS_STATUS_OK;
-		if (version == matocl::tapeInfo::kStatusPacketVersion) {
-			matocl::tapeInfo::deserialize(buffer, messageId, status);
-		} else if (version != matocl::tapeInfo::kResponsePacketVersion) {
-			printf("%s [tape info]: master query: wrong answer (packet version)\n", fileName);
-			close_master_conn(1);
-			return -1;
-		}
-		if (status != SAUNAFS_STATUS_OK) {
-			printf("%s [tape info]: %s\n", fileName, saunafs_error_string(status));
-			close_master_conn(1);
-			return -1;
-		}
-
-		std::vector<TapeCopyLocationInfo> tapeCopies;
-		matocl::tapeInfo::deserialize(buffer, messageId, tapeCopies);
-
 		printf("%s:\n", fileName);
-		if (tapeCopies.size() != 0) {
-			for (unsigned i = 0; i < tapeCopies.size(); i++) {
-				std::string copyStatus;
-				switch (tapeCopies[i].state) {
-				case TapeCopyState::kInvalid:
-					copyStatus = "invalid";
-					break;
-				case TapeCopyState::kCreating:
-					copyStatus = "creating";
-					break;
-				case TapeCopyState::kOk:
-					copyStatus = "OK";
-					break;
-				}
-				printf("\ttape replica %u: %s on %s (%s, %s)\n", i + 1, copyStatus.c_str(),
-				       tapeCopies[i].tapeserver.server.c_str(),
-				       tapeCopies[i].tapeserver.address.toString().c_str(),
-				       tapeCopies[i].tapeserver.label.c_str());
-			}
-		}
 
 		if (chunks_info(fileName, fd, inode, long_wait) < 0) {
 			close_master_conn(1);

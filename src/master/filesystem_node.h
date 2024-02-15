@@ -189,7 +189,6 @@ void fsnodes_gettrashtime_recursive(FSNode *node, uint8_t gmode,
 	TrashtimeMap &fileTrashtimes, TrashtimeMap &dirTrashtimes);
 void fsnodes_geteattr_recursive(FSNode *node, uint8_t gmode, uint32_t feattrtab[16],
 	uint32_t deattrtab[16]);
-void fsnodes_enqueue_tape_copies(FSNode *node);
 void fsnodes_setgoal_recursive(FSNode *node, uint32_t ts, uint32_t uid, uint8_t goal, uint8_t smode,
 	uint32_t *sinodes, uint32_t *ncinodes, uint32_t *nsinodes);
 void fsnodes_settrashtime_recursive(FSNode *node, uint32_t ts, uint32_t uid, uint32_t trashtime,

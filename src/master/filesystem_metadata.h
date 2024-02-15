@@ -25,7 +25,6 @@
 #include <map>
 #include <unordered_map>
 
-#include "common/tape_copies.h"
 #include "common/special_inode_defs.h"
 #include "master/acl_storage.h"
 #include "master/chunks.h"
@@ -44,7 +43,6 @@
  */
 struct FilesystemMetadata {
 public:
-	std::unordered_map<uint32_t, TapeCopies> tapeCopies;
 	xattr_inode_entry *xattr_inode_hash[XATTR_INODE_HASH_SIZE];
 	xattr_data_entry *xattr_data_hash[XATTR_DATA_HASH_SIZE];
 	IdPoolDetainer<uint32_t, uint32_t> inode_pool;
@@ -75,8 +73,7 @@ public:
 	uint64_t quota_checksum;
 
 	FilesystemMetadata()
-	    : tapeCopies{},
-	      xattr_inode_hash{},
+	    : xattr_inode_hash{},
 	      xattr_data_hash{},
 	      inode_pool{SFS_INODE_REUSE_DELAY, 12,
 	                 MAX_REGULAR_INODE, MAX_REGULAR_INODE,

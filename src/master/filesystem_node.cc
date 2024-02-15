@@ -1524,46 +1524,6 @@ void fsnodes_geteattr_recursive(FSNode *node, uint8_t gmode, uint32_t feattrtab[
 		}
 	}
 }
-
-void fsnodes_enqueue_tape_copies(FSNode *node) {
-	if (node->type != FSNode::kFile && node->type != FSNode::kTrash && node->type != FSNode::kReserved) {
-		return;
-	}
-
-	FSNodeFile *file_node = static_cast<FSNodeFile*>(node);
-
-	unsigned tapeGoalSize = 0;
-	const Goal &goal(fs_get_goal_definition(file_node->goal));
-	if (goal.find(Goal::Slice::Type(Goal::Slice::Type::kTape)) != goal.end()) {
-		tapeGoalSize = goal[Goal::Slice::Type(Goal::Slice::Type::kTape)].getExpectedCopies();
-	}
-
-	if (tapeGoalSize == 0) {
-		return;
-	}
-
-	auto it = gMetadata->tapeCopies.find(file_node->id);
-	unsigned tapeCopyCount = (it == gMetadata->tapeCopies.end() ? 0 : it->second.size());
-
-	// Create new TapeCopies instance if necessary
-	if (tapeGoalSize > tapeCopyCount && it == gMetadata->tapeCopies.end()) {
-		it = gMetadata->tapeCopies.insert({file_node->id, TapeCopies()}).first;
-	}
-
-	// Enqueue copies for tapeservers
-	TapeKey tapeKey(file_node->id, file_node->mtime, file_node->length);
-	while (tapeGoalSize > tapeCopyCount) {
-		TapeserverId id = matotsserv_enqueue_node(tapeKey);
-		it->second.emplace_back(TapeCopyState::kCreating, id);
-		tapeCopyCount++;
-	}
-}
-
-bool fsnodes_has_tape_goal(FSNode *node) {
-	const Goal &goal(fs_get_goal_definition(node->goal));
-	return goal.find(Goal::Slice::Type(Goal::Slice::Type::kTape)) != goal.end();
-}
-
 #endif
 
 void fsnodes_setgoal_recursive(FSNode *node, uint32_t ts, uint32_t uid, uint8_t goal, uint8_t smode,
@@ -1578,11 +1538,6 @@ void fsnodes_setgoal_recursive(FSNode *node, uint32_t ts, uint32_t uid, uint8_t 
 				if (node->type != FSNode::kDirectory) {
 					fsnodes_changefilegoal(static_cast<FSNodeFile*>(node), goal);
 					(*sinodes)++;
-#ifndef METARESTORE
-					if (matotsserv_can_enqueue_node()) {
-						fsnodes_enqueue_tape_copies(node);
-					}
-#endif
 				} else {
 					node->goal = goal;
 					(*sinodes)++;

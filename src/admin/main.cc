@@ -32,7 +32,6 @@
 #include "admin/list_goals_command.h"
 #include "admin/list_metadataservers_command.h"
 #include "admin/list_mounts_command.h"
-#include "admin/list_tapeservers_command.h"
 #include "admin/list_tasks_command.h"
 #include "admin/magic_recalculate_metadata_checksum_command.h"
 #include "admin/manage_locks_command.h"
@@ -61,7 +60,6 @@ int main(int argc, const char** argv) {
 			new ListGoalsCommand(),
 			new ListMountsCommand(),
 			new ListMetadataserversCommand(),
-			new ListTapeserversCommand(),
 			new ListTasksCommand(),
 			new ManageLocksCommand(),
 			new MetadataserverStatusCommand(),

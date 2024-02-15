@@ -1749,12 +1749,6 @@ uint8_t fs_opencheck(const FsContext &context, uint32_t inode, uint8_t flags, At
 		return status;
 	}
 
-#ifndef METARESTORE
-	if (fsnodes_has_tape_goal(p) && (flags & WANT_WRITE)) {
-		safs_pretty_syslog(LOG_INFO, "Access denied: node %d has tape goal", inode);
-		return SAUNAFS_ERROR_EPERM;
-	}
-#endif
 	if ((flags & AFTER_CREATE) == 0) {
 		uint8_t modemask = 0;
 		if (flags & WANT_READ) {
@@ -2849,60 +2843,6 @@ uint8_t fs_get_chunkid(const FsContext &context, uint32_t inode, uint32_t index,
 		*chunkid = node_file->chunks[index];
 	} else {
 		*chunkid = 0;
-	}
-	return SAUNAFS_STATUS_OK;
-}
-#endif
-
-uint8_t fs_add_tape_copy(const TapeKey &tapeKey, TapeserverId tapeserver) {
-	FSNode *node = fsnodes_id_to_node(tapeKey.inode);
-	if (node == NULL) {
-		return SAUNAFS_ERROR_ENOENT;
-	}
-	if (node->type != FSNode::kTrash && node->type != FSNode::kReserved && node->type != FSNode::kFile) {
-		return SAUNAFS_ERROR_EINVAL;
-	}
-	if (node->mtime != tapeKey.mtime || static_cast<FSNodeFile*>(node)->length != tapeKey.fileLength) {
-		return SAUNAFS_ERROR_MISMATCH;
-	}
-	// Try to reuse an existing copy from this tapeserver
-	auto &tapeCopies = gMetadata->tapeCopies[node->id];
-	for (auto &tapeCopy : tapeCopies) {
-		if (tapeCopy.server == tapeserver) {
-			tapeCopy.state = TapeCopyState::kOk;
-			return SAUNAFS_STATUS_OK;
-		}
-	}
-	tapeCopies.emplace_back(TapeCopyState::kOk, tapeserver);
-	return SAUNAFS_STATUS_OK;
-}
-
-#ifndef METARESTORE
-uint8_t fs_get_tape_copy_locations(uint32_t inode, std::vector<TapeCopyLocationInfo> &locations) {
-	sassert(locations.empty());
-	std::vector<TapeserverId> disconnectedTapeservers;
-	FSNode *node = fsnodes_id_to_node(inode);
-	if (node == NULL) {
-		return SAUNAFS_ERROR_ENOENT;
-	}
-	auto it = gMetadata->tapeCopies.find(node->id);
-	if (it == gMetadata->tapeCopies.end()) {
-		return SAUNAFS_STATUS_OK;
-	}
-	for (auto &tapeCopy : it->second) {
-		TapeserverListEntry tapeserverInfo;
-		if (matotsserv_get_tapeserver_info(tapeCopy.server, tapeserverInfo) == SAUNAFS_STATUS_OK) {
-			locations.emplace_back(tapeserverInfo, tapeCopy.state);
-		} else {
-			disconnectedTapeservers.push_back(tapeCopy.server);
-		}
-	}
-	/* Lazy cleaning up of disconnected tapeservers */
-	for (auto &tapeserverId : disconnectedTapeservers) {
-		std::remove_if(it->second.begin(), it->second.end(),
-		               [tapeserverId](const TapeCopy &copy) {
-			               return copy.server == tapeserverId;
-			       });
 	}
 	return SAUNAFS_STATUS_OK;
 }

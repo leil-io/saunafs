@@ -25,7 +25,6 @@
 #include "master/filesystem_checksum.h"
 #include "master/filesystem_node.h"
 #include "master/filesystem_operations.h"
-#include "master/matotsserv.h"
 
 int SetGoalTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {
 	assert(current_inode_ != inode_list_.end());
@@ -77,11 +76,6 @@ uint8_t SetGoalTask::setGoal(FSNode *node, uint32_t ts) {
 			if ((smode_ & SMODE_TMASK) == SMODE_SET && node->goal != goal_) {
 				if (node->type != FSNode::kDirectory) {
 					fsnodes_changefilegoal(static_cast<FSNodeFile *>(node), goal_);
-#ifndef METARESTORE
-					if (matotsserv_can_enqueue_node()) {
-						fsnodes_enqueue_tape_copies(node);
-					}
-#endif
 				} else {
 					node->goal = goal_;
 				}

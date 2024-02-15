@@ -38,7 +38,6 @@
 #include "common/richacl.h"
 #include "common/serialization_macros.h"
 #include "common/serialized_goal.h"
-#include "common/tape_copy_location_info.h"
 #include "protocol/chunkserver_list_entry.h"
 #include "protocol/directory_entry.h"
 #include "protocol/lock_info.h"
@@ -309,25 +308,6 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		matocl, adminRecalculateMetadataChecksum, SAU_MATOCL_ADMIN_RECALCULATE_METADATA_CHECKSUM, 0,
 		uint8_t, status)
-
-// SAU_MATOCL_TAPE_INFO
-SAUNAFS_DEFINE_PACKET_VERSION(matocl, tapeInfo, kStatusPacketVersion, 0)
-SAUNAFS_DEFINE_PACKET_VERSION(matocl, tapeInfo, kResponsePacketVersion, 1)
-
-SAUNAFS_DEFINE_PACKET_SERIALIZATION(
-		matocl, tapeInfo, SAU_MATOCL_TAPE_INFO, kStatusPacketVersion,
-		uint32_t, messageId,
-		uint8_t, status)
-
-SAUNAFS_DEFINE_PACKET_SERIALIZATION(
-		matocl, tapeInfo, SAU_MATOCL_TAPE_INFO, kResponsePacketVersion,
-		uint32_t, messageId,
-		std::vector<TapeCopyLocationInfo>, chunks)
-
-// SAU_MATOCL_TAPESERVERS_LIST
-SAUNAFS_DEFINE_PACKET_SERIALIZATION(
-		matocl, listTapeservers, SAU_MATOCL_LIST_TAPESERVERS, 0,
-		std::vector<TapeserverListEntry>, tapeservers)
 
 // SAU_MATOCL_FUSE_TRUNCATE
 SAUNAFS_DEFINE_PACKET_VERSION(matocl, fuseTruncate, kStatusPacketVersion, 0)

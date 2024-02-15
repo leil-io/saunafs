@@ -1513,11 +1513,6 @@ void matoclserv_metadataservers_list(matoclserventry* eptr, const uint8_t* data,
 			matomlserv_shadows()));
 }
 
-void matoclserv_list_tapeservers(matoclserventry* eptr, const uint8_t* data, uint32_t length) {
-	cltoma::listTapeservers::deserialize(data, length);
-	matoclserv_createpacket(eptr, matocl::listTapeservers::build(matotsserv_get_tapeservers()));
-}
-
 static void matoclserv_send_iolimits_cfg(matoclserventry *eptr) {
 	MessageBuffer buffer;
 	matocl::iolimitsConfig::serialize(buffer, gIoLimitsConfigId,
@@ -2935,20 +2930,6 @@ void matoclserv_chunks_info(matoclserventry *eptr, const uint8_t *data, uint32_t
 	}
 
 	matoclserv_createpacket(eptr, matocl::chunksInfo::build(message_id, chunks));
-}
-
-void matoclserv_tape_info(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
-	uint32_t messageId;
-	uint32_t inode;
-	cltoma::tapeInfo::deserialize(data, length, messageId, inode);
-
-	std::vector<TapeCopyLocationInfo> tapeLocations;
-	uint8_t status = fs_get_tape_copy_locations(inode, tapeLocations);
-	if (status != SAUNAFS_STATUS_OK) {
-		matoclserv_createpacket(eptr, matocl::tapeInfo::build(messageId, status));
-	} else {
-		matoclserv_createpacket(eptr, matocl::tapeInfo::build(messageId, tapeLocations));
-	}
 }
 
 void matoclserv_fuse_write_chunk(matoclserventry *eptr, PacketHeader header, const uint8_t *data) {
@@ -4904,9 +4885,6 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				case SAU_CLTOMA_ADMIN_RECALCULATE_METADATA_CHECKSUM:
 					matoclserv_admin_recalculate_metadata_checksum(eptr, data, length);
 					break;
-				case SAU_CLTOMA_LIST_TAPESERVERS:
-					matoclserv_list_tapeservers(eptr, data, length);
-					break;
 				case SAU_CLTOMA_LIST_DEFECTIVE_FILES:
 					matoclserv_list_defective_files(eptr, data, length);
 					break;
@@ -4998,9 +4976,6 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					break;
 				case SAU_CLTOMA_CHUNKS_INFO:
 					matoclserv_chunks_info(eptr, data, length);
-					break;
-				case SAU_CLTOMA_TAPE_INFO:
-					matoclserv_tape_info(eptr, data, length);
 					break;
 				case SAU_CLTOMA_FUSE_WRITE_CHUNK:
 				case CLTOMA_FUSE_WRITE_CHUNK:
