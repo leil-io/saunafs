@@ -16,7 +16,8 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
   By default (if no report is specified) all reports will be shown.
   In replication and deletion states, the column means the number of chunks
   with number of copies specified in the label to replicate/delete. +
-  Possible command-line options: +
+  --porcelain +
+    Make the output parsing-friendly. +
   --availability +
     Print report about availability of chunks. +
   --replication +
@@ -25,69 +26,127 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
     Print report about about number of chunks that need deletion. +
 
 *info* __<master ip> <master port>__::
-  Prints statistics concerning the SaunaFS installation.
+  Prints statistics concerning the SaunaFS installation. +
+  --porcelain +
+    Make the output parsing-friendly. +
 
 *iolimits-status* __<master ip> <master port>__::
   Prints current configuration of global I/O limiting
 
 *list-chunkservers* __<master ip> <master port>__::
-  Prints information about all connected chunkservers.
+  Prints information about all connected chunkservers. +
+  --porcelain +
+    Make the output parsing-friendly. +
+
+*list-defective-files* __<master ip> <master port>__::
+  Lists files which currently have defective chunks. +
+  --porcelain +
+    Make the output parsing-friendly. +
+  --unavailable +
+    Print unavailable files +
+  --undergoal +
+    Print files with undergoal chunks +
+  --structure-error +
+    Print files/directories with structure error +
+  --limit= +
+    Limit maximum number of printed files +
 
 *list-disks* __<master ip> <master port>__::
   Prints information about all connected chunkservers. +
-  Possible command-line options: +
+  --porcelain +
+    Make the output parsing-friendly. +
   --verbose +
-    Be a little more verbose and show operations statistics.
+    Be a little more verbose and show operations statistics. +
 
 *list-goals* __<master ip> <master port>__::
   List goal definitions. +
-  Possible command-line options: +
+  --porcelain +
+    Make the output parsing-friendly. +
   --pretty +
-    Print nice table
+    Print nice table +
 
 *list-mounts* __<master ip> <master port>__::
   Prints information about all connected mounts. +
-  Possible command-line options +
+  --porcelain +
+    Make the output parsing-friendly. +
   --verbose +
-    Be a little more verbose and show goal and trash time limits.
-
-*metadataserver-status* __<master ip> <master port>__::
-  Prints status of a master or shadow master server
+    Be a little more verbose and show goal and trash time limits. +
 
 *list-metadataservers* __<master ip> <master port>__::
-  Prints status of active metadata servers.
+  Prints status of active metadata servers. +
+  --porcelain +
+    Make the output parsing-friendly. +
+
+*metadataserver-status* __<master ip> <master port>__::
+  Prints status of a master or shadow master server +
+  --porcelain +
+    Make the output parsing-friendly. +
+
+  *list-tasks* __<master ip> <master port>__::
+  Lists tasks which are currently executed by master
+
+*manage-locks* __<master ip> <master port> [list/unlock] [flock/posix/all]__::
+  Manage locks. +
+  --porcelain +
+    Make the output parsing-friendly. +
+  --active +
+    Print only active locks +
+  --pending +
+    Print only pending locks +
+  --inode= +
+    Specify an inode for operation +
+  --owner= +
+    Specify an owner for operation +
+  --sessionid= +
+    Specify a sessionid for operation +
+  --start= +
+    Specify a range start for operation +
+  --end= +
+    Specify a range end for operation +
 
 *ready-chunkservers-count* __<master ip> <master port>__::
   Prints number of chunkservers ready to be written to.
 
 *promote-shadow* __<shadow ip> <shadow port>__::
-  Promotes metadata server. Works only if personality 'ha-cluster-managed' is used.
-  Authentication with the admin password is required.
+  Promotes metadata server. Works only if personality 'ha-cluster-managed' is used. +
+  Authentication with the admin password is required. +
 
 *stop-master-without-saving-metadata* __<master ip> <master port>__::
   Stop the master server without saving metadata in the metadata.sfs file.
-  Used to quickly migrate a metadata server (works for all personalities).
-  Authentication with the admin password is required.
+  Used to quickly migrate a metadata server (works for all personalities). +
+  Authentication with the admin password is required. +
 
 *reload-config* __<master ip> <master port>__::
   Requests reloading configuration from the config file.
-  This is synchronous (waits for reload to finish).
-  Authentication with the admin password is required.
+  This is synchronous (waits for reload to finish). +
+  Authentication with the admin password is required. +
 
 *save-metadata* __<metadataserver ip> <metadataserver port>__::
-    Requests saving the current state of metadata into the metadata.sfs file.
-    With --async fail if the process cannot be started, e.g. because the process
-    is already in progress. Without --async, fails if either the process cannot be
-    started or if it finishes with an error (i.e., no metadata file is created).
-    Authentication with the admin password is required. +
-    Possible command-line options: +
-    --async +
-      Don't wait for the task to finish.
+  Requests saving the current state of metadata into the metadata.sfs file.
+  With --async fail if the process cannot be started, e.g. because the process
+  is already in progress. Without --async, fails if either the process cannot be
+  started or if it finishes with an error (i.e., no metadata file is created). +
+  Authentication with the admin password is required. +
+  --async +
+    Don't wait for the task to finish. +
 
-== COMMON COMMAND OPTIONS
+*stop-task* __<master ip> <master port> <task id>__::
+    Stop execution of task with the given id
 
-*--porcelain*::
-  Make the output parsing-friendly.
+*list-session* __<master ip> <master port>__::
+  Lists all currently open sessions.
+
+*delete-session* __<master ip> <master port> <session_id>__::
+    Deletes the specified session.
+
+*dump-config* __<master ip> <master port>__::
+    Dumps the configuration files of the master server +
+    Authentication with the admin password is required +
+
+== REPORTING BUGS
+
+Report bugs either to the Github repository <https://github.com/leil/saunafs> as an
+issue or to <contact@saunafs.com>.
 
 == COPYRIGHT
 
