@@ -269,7 +269,7 @@ int fs_load_acl(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_t &o
 		// Deserialize inode & ACL
 		uint32_t inode;
 		RichACL acl;
-		deserialize(ptr, size, inode);
+		deserialize(ptr, size, inode, acl);
 		offsetBegin += size;
 		FSNode *p = fsnodes_id_to_node(inode);
 		if (!p) {

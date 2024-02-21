@@ -1059,11 +1059,16 @@ int fs_load(const std::shared_ptr<MemoryMappedFile> &metadataFile, int ignorefla
 			MetadataLoader::loadSectionAsync(section, options, futures);
 		}
 	}
-	/// Wait for all futures to finish
+	/// Wait for all futures to finish and exit if any of them failed
+	bool success = true;
 	for (auto &future : futures) {
 		future.future.wait();
+		success &= future.future.get();
 	}
 
+	if (!success) {
+		return kOpFailure;
+	}
 	safs_pretty_syslog_attempt(
 	    LOG_INFO, "checking filesystem consistency of the metadata file");
 	fflush(stderr);
