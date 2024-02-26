@@ -574,6 +574,9 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 	uint32_t chunkAmount;
 	uint16_t sessionIds;
 
+	uint32_t index;
+	constexpr uint32_t kChunkSize = (1 << 16);
+
 	switch (type) {
 	case FSNode::kDirectory:
 		gMetadata->dirnodes++;
@@ -602,17 +605,25 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 		sessionIds = get16bit(&pSrc);
 
 		nodeFile->chunks.resize(chunkAmount);
-		memcpy(nodeFile->chunks.data(), pSrc, chunkAmount * sizeof(uint64_t));
-		pSrc += chunkAmount * sizeof(uint64_t);
 
-		nodeFile->sessionid.resize(sessionIds);
-		memcpy(nodeFile->sessionid.data(), pSrc, sessionIds * sizeof(uint32_t));
-		pSrc += sessionIds * sizeof(uint32_t);
-#ifndef METARESTORE
-		for (const auto &sessionId : nodeFile->sessionid) {
-			matoclserv_add_open_file(sessionId, node->id);
+		index = 0;
+		while (chunkAmount > kChunkSize) {
+			for (uint32_t i = 0; i < kChunkSize; i++) {
+				nodeFile->chunks[index++] = get64bit(&pSrc);
+			}
+			chunkAmount -= kChunkSize;
 		}
+		for (uint32_t i = 0; i < chunkAmount; i++) {
+			nodeFile->chunks[index++] = get64bit(&pSrc);
+		}
+		while (sessionIds) {
+			uint32_t sessionId = get32bit(&pSrc);
+			nodeFile->sessionid.push_back(sessionId);
+#ifndef METARESTORE
+			matoclserv_add_open_file(sessionId, node->id);
 #endif
+			sessionIds--;
+		}
 
 		fsnodes_quota_update(node,
 		                     {{QuotaResource::kSize, +fsnodes_get_size(node)}});
