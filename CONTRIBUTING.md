@@ -1,6 +1,10 @@
 <!-- omit in toc -->
 # Contributing to SaunaFS
 
+***PLEASE NOTE: We cannot currently accept contributions from individuals who
+have not signed a copyright assignment agreement. See this
+[issue](https://github.com/leil-io/saunafs/issues/8) for more information***
+
 First off, thanks for taking the time to contribute!
 
 All types of contributions are encouraged and valued. See the [Table of
@@ -25,6 +29,7 @@ contributions.
   - [Reporting Bugs](#reporting-bugs)
   - [Suggesting Enhancements](#suggesting-enhancements) <!-- - [Improving The
     Documentation](#improving-the-documentation) -->
+  - [Grammar/Typos/Nitpicks](#grammar)
 - [Styleguides](#styleguides)
   - [Commit Messages](#commit-messages)
   - [Conventional Commits Specification](#conventional-commits-specification)
@@ -38,7 +43,7 @@ contributions.
 ## I Have a Question
 
 > If you want to ask a question, we assume that you have read the available
-> [Documentation](CONTRIBUTING.md).
+> [Documentation](https://docs.saunafs.com) and the [man files].
 
 Before you ask a question, it is best to search for existing
 [Issues](https://github.com/leil-io/saunafs/issues) that might help you. In case
@@ -56,12 +61,14 @@ recommend the following:
 
 We will then take care of the issue as soon as possible.
 
+You might also consider joining the [Slack channel](https://saunafs.slack.com)
+to ask questions and discuss the project.
+
 ## I Want to Contribute
 
 > ### Legal Notice
 > When contributing to this project, you must agree that you have authored 100%
-> of the content, that you have the necessary rights to the content and that the
-> content you contribute may be provided under the project license.
+> of the content and that you have the necessary rights to the content.
 
 ### Reporting Bugs
 
@@ -76,8 +83,9 @@ steps in advance to help us fix any potential bug as fast as possible.
 - Make sure that you are using the latest version.
 - Determine if your bug is really a bug and not an error on your side e.g. using
   incompatible environment components/versions (Make sure that you have read the
-  [documentation](CONTRIBUTING.md). If you are looking for support, you might
-  want to check [this section](#i-have-a-question)).
+  [documentation](https://docs.saunafs.com) and the [man
+  files](https://github.com/leil-io/saunafs/tree/main/doc). If you are looking
+  for support, you might want to check [this section](#i-have-a-question)).
 - To see if other users have experienced (and potentially already solved) the
   same issue you are having, check if there is not already a bug report existing
   for your bug or error in the [issue
@@ -85,22 +93,16 @@ steps in advance to help us fix any potential bug as fast as possible.
 - Also make sure to search the internet (including Stack Overflow) to see if
   users outside the GitHub community have discussed the issue.
 - Collect information about the bug:
-- Stack trace (Traceback)
-- OS, Platform and Version
-- Version of the interpreter, compiler, SDK, runtime environment, package
-  manager, depending on what seems relevant.
-- Possibly your input and the output
-- Can you reliably reproduce the issue? And can you also reproduce it with older
+  - Stack trace (Traceback)
+  - OS, Platform and Version
+  - Version of the interpreter, compiler, SDK, runtime environment, package
+    manager, depending on what seems relevant.
+  - Possibly your input and the output
+  - Can you reliably reproduce the issue? And can you also reproduce it with older
   versions?
 
 <!-- omit in toc -->
 #### How Do I Submit a Good Bug Report?
-
-> You must never report security related issues, vulnerabilities or bugs
-> including sensitive information to the issue tracker, or elsewhere in public.
-> Instead, sensitive bugs must be sent by email.
-<!-- You may add a PGP key to allow the messages to be sent encrypted as well.
--->
 
 We use GitHub issues to track bugs and errors. If you run into an issue with the
 project:
@@ -122,9 +124,13 @@ Once it's filed:
   there are no reproduction steps or no obvious way to reproduce the issue, the
   team will ask you for those steps and mark the issue as `needs-repro`. Bugs
   with the `needs-repro` tag will not be addressed until they are reproduced.
-- If the team is able to reproduce the issue, it will be marked `needs-fix`, as
-  well as possibly other tags (such as `critical`), and the issue will be left
-  to be implemented by someone.
+  After some time without reproduction, we will probably close the issue.
+- If the team is able to reproduce the issue, it will be marked as a `bug`, as
+  well as possibly other tags (such as `critical`).
+- The team will then work on fixing the issue and will keep you updated on the
+  progress.
+- Alternatively, you can also contribute a fix for the issue. In this case, you
+  should follow the guidelines for [contributing code](#contributing-code).
 
 <!-- You might want to create an issue template for bugs and errors that can be
 used as a guide and that defines the structure of the information to be
@@ -167,6 +173,18 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/leil-i
 
 <!-- ### Improving The Documentation TODO Updating, improving and correcting the
 documentation -->
+
+### Grammar/Typos/Nitpicks
+
+If you notice a typo, grammatical error, or potentially a small improvement to
+make in the code, we encourage you to post it in the mega issue for
+[grammar/typos/nitpicks](https://github.com/leil-io/saunafs/issues/6) instead
+of creating a pull request or another issue.
+
+This is to to keep both the issue tracker and the pull requests clean and
+focused. Each release we will address the issues in this mega issue and include
+the fixes in one commit. We will credit all contributors in the commit message
+as co-authors.
 
 ## Style guides
 
@@ -220,12 +238,11 @@ the consumers of your library:
 
 ### Code Style Guides
 
-- While there are no fixed set of tools to use, there is a requirement to use at
-  least the basic set of rules like the ones provided by [Google C++ Style
-  Guide](https://google.github.io/styleguide/cppguide.html).
-- Here are some examples of using pre-commit tools in SaunaFS development:
-  - [pre-commit-config.yaml](https://diaway-my.sharepoint.com/:u:/g/personal/jk_leil_io/EVk5KPeutHxBm3nB1-OTXRwB0doLo6iKSWGVIOAcLh0i7A?e=SQ9oBk)
-  - [clang-format](https://diaway-my.sharepoint.com/:u:/g/personal/jk_leil_io/EfpVwr7RnZ5Et11TjU9aPfYBoutcJtS8lbhTcQhpLVMq4A?e=9BuQJG)
+You should format your code using clang-format with the included
+`.clang-format` file, which specifies the settings we use (We mostly use the
+Google style with a few modifications). See the
+[clang-format](https://clang.llvm.org/docs/ClangFormat.html) documentation for
+more details.
 
 ### Feature Level Atomicity to Keep the History Clean
 
@@ -265,7 +282,7 @@ change for peer review once they deem the task complete and ready for production
 delivery. To facilitate this, we provide a checklist for a development task that
 must be satisfied before it is considered for peer review:
 
-- The new code must have test coverage meeting the specified metric.
+- The new code should have some test coverage, either unit or integration tests.
 - All automated tests must pass.
 - The build job must be in a healthy state. <!-- omit in toc -->
 
@@ -278,4 +295,3 @@ must be satisfied before it is considered for peer review:
 - [Angular
   Convention](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)
 - [Git Trailer Format](https://git-scm.com/docs/git-interpret-trailers)
-- [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
