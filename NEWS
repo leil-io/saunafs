@@ -18,6 +18,11 @@ This file lists noteworthy changes in SaunaFS.
 - (chunkserver) Add object pool to reuse OutputBuffers in read operations
 - (chunkserver) Add configuration option to disable CRC checking during read
 - (chunkserver) Remove legacy replications
+- (nfs-ganesha) Update nfs-ganesha plugin to support nfs-ganesha v4.3
+- (nfs-ganesha) Enable NFS ACL support at compilation time
+- (nfs-ganesha) Refactor nfs-ganesha plugin
+- (nfs-ganesha) Add Doxygen documentation
+- (nfs-ganesha) Create GaneshaTests suite (fio, performance, copy file)
 
  * Lizardfs (3.13.0-rc1) (2018-06-28)
  - (all) uRaft HA
