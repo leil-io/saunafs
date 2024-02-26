@@ -1,10 +1,14 @@
 This file lists noteworthy changes in SaunaFS.
 
- * SaunaFS (4.0.0-rc1) (2024-02-28)
+ * SaunaFS (4.0.0) (2024-02-28)
 - (all) Rebranding to SaunaFS
 - (all) XOR goal type deprecated (will be removed in a future release)
 - (all) Tape server support deprecated (will be removed next release)
-- (admin) Allow dumping set configuration
+- (all) Add dependency on libyaml-cpp
+- (common) Create example pam.d file on build/install.
+- (all) Remove dependency on fuse2
+- (admin) Allow dumping configuration that is explicitly set.
+- (mount) Remove FUSE2 client (mfsmount3 replaces mfsmount as sfsmount).
 
  * Lizardfs (3.13.0-rc1) (2018-06-28)
  - (all) uRaft HA
