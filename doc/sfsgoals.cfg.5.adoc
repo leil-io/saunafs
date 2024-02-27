@@ -25,12 +25,12 @@ There are 40 replication goals, with 'ids' between 1 and 40, inclusive.
 Each file stored on the filesystem refers to some goal id and is
 replicated according to the goal currently associated with this id.
 
-By default, goal 1 means one copy on any chunkserver, goal 2 means two
-copies on any two chunkservers and so on, until 5 - which is the maximal
-default number of copies. The purpose of sfsgoals.cfg is to override this
-behavior, when desired. The file is a list of goal definitions, each
-consisting of 'id', 'name' and a list of 'labels'. The maximal length
-of this list is 40 labels.
+By default, first five goals are defined: goal 1 means one copy on any
+chunkserver, goal 2 means two copies on any two chunkservers and so on, until 5
+- which is the maximal default number of copies. The purpose of sfsgoals.cfg is
+to override this behavior, when desired. The file is a list of goal
+definitions, each consisting of 'id', 'name' and a list of 'labels'. The
+maximal length of this list is 40 labels.
 
 'id' indicates the goal id to be redefined. If some files are already
 assigned this goal id, their effective goal will change.
@@ -42,20 +42,16 @@ characters: a-z, A-Z, 0-9, _.
 'type' specifies goal type - currently supported types are:
 
 	- *std* - for each file using this goal and for each label, the system
-	         will try to maintain a copy of the file on some chunkserver
-	         with this label.
-	- **xor**N - for each file using this goal, the system will split the file
-	         into N+1 parts (N ordinary + 1 parity). For reading, any N of
-	         the parts are necessary. If labels are specified, parts will
-	         be kept on chunkservers with these labels. Otherwise, default wildcard
-	         labels will be used. N can be in range from 2 to 9.
-	- **ec**(K,M) - for each file using this goal, the system will split the file
-	         into K + M parts (K data parts and M parity). For reading, any K of
-	         the parts are necessary. If labels are specified, parts will
-	         be kept on chunkservers with these labels. Otherwise, default wildcard
-	         labels will be used. K can be in range from 2 to 32 and M from 1 to 32.
+	  will try to maintain a copy of the file on some chunkserver with this
+	  label.
+	- **ec**(K,M) - for each file using this goal, the system will split
+	  the file into K + M parts (K data parts and M parity). For reading,
+	  any K of the parts are necessary. If labels are specified, parts will
+	  be kept on chunkservers with these labels. Otherwise, default
+	  wildcard labels will be used. K can be in range from 2 to 32 and M
+	  from 1 to 32.
 
-	If the type is unspecified is is assumed to be *std*.
+If the type is unspecified, it is assumed to be *std*.
 
 The list of 'labels' is a list of chunkserver labels as defined in
 sfschunkserver.cfg(5). 'label' can consist of up to 32 alphanumeric
@@ -85,17 +81,11 @@ Some example goal definitions:
 
 14 very_important_file : _ _ _ _
 
-15 default_xor3 : $xor3
+15 first_ec : $ec(3,1)
 
-16 fast_read : $xor2 { ssd ssd hdd }
+16 ec32_ssd : $ec(3,2) { ssd ssd ssd ssd ssd } # all parts on ssd
 
-17 xor5 : $xor5 { hdd } # at least one part on hdd
-
-18 first_ec : $ec(3,1)
-
-19 ec32_ssd : $ec(3,2) { ssd ssd ssd ssd ssd } # all parts on ssd
-
-20 ec53_mixed : $ec(5,3) { hdd ssd hdd _ _ _ _ _ } # two parts on hdd and one part on ssd
+17 ec53_mixed : $ec(5,3) { hdd ssd hdd _ _ _ _ _ } # two parts on hdd and one part on ssd
 
 == SNAPSHOT FILES
 
