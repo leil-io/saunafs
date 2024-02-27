@@ -1,0 +1,48 @@
+saunafs-rremove(1)
+===================
+
+== NAME
+
+saunafs-rremove - remove recursively
+
+== SYNOPSIS
+
+[verse]
+*saunafs-rremove* [*-l*] 'OBJECT'...
+
+== DESCRIPTION
+
+*rremove* deletes object(s) recursively. This tool can be used on either file or directory.
+
+== OPTIONS
+
+*-l*::
+This option disables timeout set for this operation. (default timeout is 60 seconds)
+
+== REPORTING BUGS
+
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue.
+
+== COPYRIGHT
+
+Copyright 2008-2009 Gemius SA
+
+Copyright 2013-2019 Skytechnology sp. z o.o.
+
+Copyright 2023-2024 Leil Storage OÜ
+
+SaunaFS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
+
+SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+SaunaFS. If not, see <http://www.gnu.org/licenses/>.
+
+== SEE ALSO
+
+saunafs(1)

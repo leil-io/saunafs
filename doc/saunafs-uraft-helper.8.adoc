@@ -1,0 +1,48 @@
+saunafs-uraft-helper(8)
+========================
+
+== NAME
+
+saunafs-uraft-helper - SaunaFS HA suite helper
+
+== SYNOPSIS
+
+[verse]
+saunafs-uraft-helper
+
+== DESCRIPTION
+
+*saunafs-uraft-helper* is a helper script, used internally by *saunafs-uraft*
+to manage nodes. The script should implement the following operations: isalive
+metadata-version quick-stop promote demote assign-ip drop-ip
+
+Except from *isalive*, this script should not be used on its own. If anyone
+needs special actions to be taken during *saunafs-uraft* management stages
+(such as promotion, demotion), editing this script is sufficient to do so.
+
+== REPORTING BUGS
+
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue.
+
+== COPYRIGHT
+
+Copyright 2008-2009 Gemius SA
+
+Copyright 2013-2019 Skytechnology sp. z o.o.
+
+Copyright 2023-2024 Leil Storage OÜ
+
+SaunaFS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
+
+SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+SaunaFS. If not, see <http://www.gnu.org/licenses/>.
+
+== SEE ALSO
+saunafs-uraft(8), saunafs-uraft.cfg(5)

@@ -47,7 +47,6 @@ set(MANPAGES
     sfsmetadump.8
     sfsrestoremaster.8
     sfs.7                     # not a source
-    sfscgiserv.8
     sfschunkserver.8
     sfsmaster.8
     sfsmetalogger.8
@@ -56,7 +55,7 @@ set(MANPAGES
 
 set(INSTALLED_MANPAGES)
 foreach(MANPAGE ${MANPAGES})
-  get_filename_component(MANPAGE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE}.txt ABSOLUTE)
+  get_filename_component(MANPAGE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE}.adoc ABSOLUTE)
   set(GENERATED_MANPAGE_PATH ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
   if(ENABLE_VERBOSE_ASCIIDOC)
     set(ASCIIDOC_VERBOSE --verbose --keep-artifacts)
