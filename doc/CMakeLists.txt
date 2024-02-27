@@ -47,7 +47,6 @@ set(MANPAGES
     sfsmetadump.8
     sfsrestoremaster.8
     sfs.7                     # not a source
-    sfscgiserv.8
     sfschunkserver.8
     sfsmaster.8
     sfsmetalogger.8
