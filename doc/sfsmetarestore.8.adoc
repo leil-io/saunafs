@@ -42,14 +42,14 @@ Prints 0 if metadata files are corrupted.
 *-v*::
 print version information and exit
 
-*-?*::
-print version information and exit
-
 *-a*::
 autorestore mode (see above)
 
 *-d* 'DATAPATH'::
 master data directory (for autorestore mode)
+
+*-g* 'DIRECTORY'::
+Print latest metadata version that can be restored from disk at the directory. Prints 0 if metadata files are corrupted.
 
 *-m* 'METADATAFILE'::
 specify input metadata image file
