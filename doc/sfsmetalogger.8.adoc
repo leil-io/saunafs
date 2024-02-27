@@ -21,7 +21,7 @@ sfsmetalogger - start, restart or stop Sauna File System metalogger process
 
 == DESCRIPTION
 
-*sfsmetalogger* is the metadata replication server of Sauna File System. Depending on parameters it
+*sfsmetalogger* is the metadata replication server of SaunaFS. Depending on parameters it
 can start, restart or stop SaunaFS metalogger process. Without any options it starts SaunaFS
 metalogger, killing previously run process if lock file exists.
 
@@ -74,23 +74,27 @@ Latest copy of sessions.sfs file from SaunaFS master.
 
 == REPORTING BUGS
 
-Report bugs to <contact@saunafs.com>.
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue.
 
 == COPYRIGHT
 
 Copyright 2008-2009 Gemius SA
+
 Copyright 2013-2019 Skytechnology sp. z o.o.
-Copyright 2023      Leil Storage OÜ
 
-SaunaFS is free software: you can redistribute it and/or modify it under the terms of the GNU
-General Public License as published by the Free Software Foundation, version 3.
+Copyright 2023-2024 Leil Storage OÜ
 
-SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details.
+SaunaFS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
 
-You should have received a copy of the GNU General Public License along with SaunaFS. If not, see
-<http://www.gnu.org/licenses/>.
+SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 
 == SEE ALSO
 

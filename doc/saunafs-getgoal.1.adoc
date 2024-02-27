@@ -3,7 +3,8 @@ saunafs-getgoal(1)
 
 == NAME
 
-saunafs-getgoal, saunafs-setgoal, saunafs-rgetgoal, saunafs-rsetgoal - change or retrieve goal
+saunafs-getgoal, saunafs-setgoal, saunafs-rgetgoal, saunafs-rsetgoal - change
+or retrieve goal
 
 == SYNOPSIS
 
@@ -23,38 +24,45 @@ saunafs-getgoal, saunafs-setgoal, saunafs-rgetgoal, saunafs-rsetgoal - change or
 
 *getgoal* and *setgoal* operate on object's 'goal' value.
 
-*getgoal* prints current 'goal' value of given object(s). These tools can be used on any file,
-directory or deleted ('trash') file.
+*getgoal* prints current 'goal' value of given object(s). These tools can be
+used on any file, directory or deleted ('trash') file.
 
 == OPTIONS
 
-*-r*::
-This option enables recursive mode, which works as usual for every given file, but for every given
-directory additionally prints current value of all contained objects (files and directories).
+*-r*:: This option enables recursive mode, which works as usual for every given
+file, but for every given directory additionally prints current value of all
+contained objects (files and directories).
 
-*-n*, *-h*, *-H*::
-These options are described in saunafs(1).
+*-n*, *-h*, *-H*:: These options are described in saunafs(1).
 
 == NOTE
 
 *rgetgoal* and *rsetgoal* are deprecated aliases for
 *getgoal -r* and *setgoal -r* respectively.
 
+== REPORTING BUGS
+
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue.
+
 == COPYRIGHT
 
 Copyright 2008-2009 Gemius SA
+
 Copyright 2013-2019 Skytechnology sp. z o.o.
-Copyright 2023      Leil Storage OÜ
 
-SaunaFS is free software: you can redistribute it and/or modify it under the terms of the GNU
-General Public License as published by the Free Software Foundation, version 3.
+Copyright 2023-2024 Leil Storage OÜ
 
-SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details.
+SaunaFS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
 
-You should have received a copy of the GNU General Public License along with SaunaFS. If not, see
-<http://www.gnu.org/licenses/>.
+SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 
 == SEE ALSO
 

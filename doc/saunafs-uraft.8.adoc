@@ -15,17 +15,17 @@ saunafs-uraft [*-c 'CFGFILE'*]
 
 == DESCRIPTION
 
-*saunafs-uraft* is a high availability management daemon.
-It can provide master server failover mechanisms based on floating ip.
+*saunafs-uraft* is a high availability management daemon. It can provide master
+server failover mechanisms based on floating ip.
 
 *saunafs-uraft* internal algorithms are based on Raft (raft.github.io).
-Functions used to manage (promote/demote/check/kill/etc) nodes
-are called through *saunafs-uraft-helper*, a script that implements
-uraft API for a specific backend (in this case, SaunaFS).
-See saunafs-uraft-helper(8) man entry for details.
+Functions used to manage (promote/demote/check/kill/etc) nodes are called
+through *saunafs-uraft-helper*, a script that implements uraft API for a
+specific backend (in this case, SaunaFS). See saunafs-uraft-helper(8) man entry
+for details.
 
-For more configuration info and examples, refer to *saunafs-uraft.cfg* file
-and saunafs-uraft.cfg(5) man entry.
+For more configuration info and examples, refer to *saunafs-uraft.cfg* file and
+saunafs-uraft.cfg(5) man entry.
 
 == OPTIONS
 
@@ -35,20 +35,29 @@ print usage information and exit
 *--config 'CFGFILE'*::
 provide an alternative configuration file path.
 
+== REPORTING BUGS
+
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue.
+
 == COPYRIGHT
 
-Copyright 2018-2019 Skytechnology sp. z o.o.
-Copyright 2023      Leil Storage OÜ
+Copyright 2008-2009 Gemius SA
 
-SaunaFS is free software: you can redistribute it and/or modify it under the terms of the GNU
-General Public License as published by the Free Software Foundation, version 3.
+Copyright 2013-2019 Skytechnology sp. z o.o.
 
-SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details.
+Copyright 2023-2024 Leil Storage OÜ
 
-You should have received a copy of the GNU General Public License along with SaunaFS. If not, see
-<http://www.gnu.org/licenses/>.
+SaunaFS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
+
+SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 
 == SEE ALSO
 saunafs-uraft-helper(8), saunafs-uraft.cfg(5)
