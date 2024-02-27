@@ -9,6 +9,8 @@ saunafs (4.0.0) stable; urgency=medium
  * (all) Remove dependency on fuse2
  * (admin) Allow dumping configuration that is explicitly set
  * (mount) Remove FUSE2 client (mfsmount3 replaces mfsmount as sfsmount)
+ * (mount) Add a multi-threaded readahead to improve single-stream reading
+ * (mount) Add readworkers and maxreadaheadrequests command line arguments
  * (chunkserver) Deprecate old chunk formats and add the new SPLIT format
  * (chunkserver) Allow to store metadata and data chunk parts in separate directories
  * (chunkserver) Modify sfshdd.cfg format to allow SPLIT format
