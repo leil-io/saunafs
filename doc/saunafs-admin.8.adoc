@@ -11,11 +11,10 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
 
 == Available COMMANDs
 
-*chunks-health* __<master ip> <master port>__::
-  Returns chunks health reports in the installation.
-  By default (if no report is specified) all reports will be shown.
-  In replication and deletion states, the column means the number of chunks
-  with number of copies specified in the label to replicate/delete. +
+*chunks-health* __<master ip> <master port>__:: Returns chunks health reports
+in the installation. By default (if no report is specified) all reports will be
+shown. In replication and deletion states, the column means the number of
+chunks with number of copies specified in the label to replicate/delete. +
   --porcelain +
     Make the output parsing-friendly. +
   --availability +
@@ -108,12 +107,12 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
   Prints number of chunkservers ready to be written to.
 
 *promote-shadow* __<shadow ip> <shadow port>__::
-  Promotes metadata server. Works only if personality 'ha-cluster-managed' is used. +
-  Authentication with the admin password is required. +
+  Promotes metadata server. Works only if personality 'ha-cluster-managed' is
+  used. + Authentication with the admin password is required. +
 
 *stop-master-without-saving-metadata* __<master ip> <master port>__::
-  Stop the master server without saving metadata in the metadata.sfs file.
-  Used to quickly migrate a metadata server (works for all personalities). +
+  Stop the master server without saving metadata in the metadata.sfs file. Used
+  to quickly migrate a metadata server (works for all personalities). +
   Authentication with the admin password is required. +
 
 *reload-config* __<master ip> <master port>__::
@@ -124,8 +123,9 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
 *save-metadata* __<metadataserver ip> <metadataserver port>__::
   Requests saving the current state of metadata into the metadata.sfs file.
   With --async fail if the process cannot be started, e.g. because the process
-  is already in progress. Without --async, fails if either the process cannot be
-  started or if it finishes with an error (i.e., no metadata file is created). +
+  is already in progress. Without --async, fails if either the process cannot
+  be started or if it finishes with an error (i.e., no metadata file is
+  created). +
   Authentication with the admin password is required. +
   --async +
     Don't wait for the task to finish. +
@@ -145,20 +145,24 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
 
 == REPORTING BUGS
 
-Report bugs either to the Github repository <https://github.com/leil/saunafs> as an
-issue or to <contact@saunafs.com>.
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue
 
 == COPYRIGHT
 
+Copyright 2008-2009 Gemius SA
+
 Copyright 2013-2019 Skytechnology sp. z o.o.
-Copyright 2023      Leil Storage OÜ
 
-SaunaFS is free software: you can redistribute it and/or modify it under the terms of the GNU
-General Public License as published by the Free Software Foundation, version 3.
+Copyright 2023-2024 Leil Storage OÜ
 
-SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
-the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details.
+SaunaFS is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
 
-You should have received a copy of the GNU General Public License along with SaunaFS. If not, see
-<http://www.gnu.org/licenses/>.
+SaunaFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+SaunaFS. If not, see <http://www.gnu.org/licenses/>.

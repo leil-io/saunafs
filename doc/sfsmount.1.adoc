@@ -270,13 +270,16 @@ You can define your `/etc/fstab` SaunaFS share like this:
 
 == REPORTING BUGS
 
-Report bugs to <contact@saunafs.com>.
+Report bugs to the Github repository <https://github.com/leil/saunafs> as an
+issue.
 
 == COPYRIGHT
 
 Copyright 2008-2009 Gemius SA
+
 Copyright 2013-2019 Skytechnology sp. z o.o.
-Copyright 2023      Leil Storage OÜ
+
+Copyright 2023-2024 Leil Storage OÜ
 
 SaunaFS is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
@@ -291,4 +294,4 @@ SaunaFS. If not, see <http://www.gnu.org/licenses/>.
 
 == SEE ALSO
 
-sfsmaster(8), sfstools(1), sfs(7), mount(8)
+sfsmaster(8) sfs(7), mount(8)
