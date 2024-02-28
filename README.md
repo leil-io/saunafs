@@ -3,7 +3,7 @@
 </p>
 <h3 align="center">A Distributed POSIX File System</h3>
 
-[![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://saunafs.slack.com/)
+[![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog)
 
 ## About
 
@@ -76,7 +76,7 @@ There are 2 types of documentation available:
 encourage) pull requests, but without approval they won't be merged at the
 moment. We are currently working on creating a system to allow seamless pull
 requests outside with as little fuss as possible. See this
-[issue](https://github.com/leil-io/saunafs/issues/8) for more details.***
+[issue](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog) for more details.***
 
 See the [Contributing Guide](CONTRIBUTING.md) for detailed information on how
 to contribute to SaunaFS.
@@ -86,7 +86,7 @@ point for how to setup a development environment and run tests.
 
 ## Contact us
 
-Join our [Slack community](https://saunafs.slack.com) to connect with fellow
+Join our [Slack community]() to connect with fellow
 SaunaFS enthusiasts, developers, and users. In our Slack channels, you can:
 
 - **Ask Questions**: Seek guidance, share your experiences, and ask questions
