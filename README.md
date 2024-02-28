@@ -1,4 +1,4 @@
-# [![SaunaFS](https://saunafs.com/favicon.svg) SaunaFS](https://saunafs.com/) [![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://saunafs.slack.com/)
+# [![SaunaFS](https://saunafs.com/favicon.svg) SaunaFS](https://saunafs.com/) [![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog)
 
 Welcome to SaunaFS, a robust distributed POSIX file system meticulously designed to revolutionize your storage solutions
 by offering unmatched efficiency, security, and redundancy. At its core, SaunaFS is a distributed file system primarily
