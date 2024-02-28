@@ -738,7 +738,7 @@ saunafs_ready_chunkservers_count() {
 saunafs_wait_for_ready_chunkservers() {
 	local chunkservers=$1
 	local port=${saunafs_info_[matocl]}
-	while [[ "$(saunafs-probe ready-chunkservers-count localhost $port 2>/dev/null | cat)" != "$chunkservers" ]]; do
+	while [[ "$(saunafs-admin ready-chunkservers-count localhost $port 2>/dev/null | cat)" != "$chunkservers" ]]; do
 		sleep 0.1
 	done
 }
