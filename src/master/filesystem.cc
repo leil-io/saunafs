@@ -216,7 +216,7 @@ int fs_loadall(void) {
 	changelogsMigrateFrom_1_6_29("changelog");
 	if (fs::exists(kMetadataTmpFilename)) {
 		throw MetadataFsConsistencyException(
-				"temporary metadata file exists, metadata directory is in dirty state");
+				"temporary metadata file (" + std::string(kMetadataTmpFilename) + ") exists, metadata directory is in dirty state");
 	}
 	if ((metadataserver::isMaster()) && !fs::exists(kMetadataFilename)) {
 		fs_unlock();

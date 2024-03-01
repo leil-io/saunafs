@@ -1309,11 +1309,12 @@ void fs_load_changelog(const std::string &path) {
 
 bool isNewMetadataFile([[maybe_unused]]const uint8_t *headerPtr) {
 	static constexpr std::string_view kMetadataHeaderNew(SFSSIGNATURE "M NEW");
+	static constexpr std::string_view kMetadataHeaderOld(SAUSIGNATURE "M NEW");
 	[[maybe_unused]]static constexpr uint8_t kMetadataHeaderSize = 8;
 #ifndef METARESTORE
 	if (metadataserver::isMaster()) {  // special case - create new file system
-		if (memcmp(headerPtr, kMetadataHeaderNew.data(), kMetadataHeaderSize) ==
-		    kOpSuccess) {
+		if ((memcmp(headerPtr, kMetadataHeaderNew.data(), kMetadataHeaderSize) == kOpSuccess) ||
+		    (memcmp(headerPtr, kMetadataHeaderOld.data(), kMetadataHeaderSize) == kOpSuccess)){
 			fs_new();
 			safs_pretty_syslog(LOG_NOTICE, "empty filesystem created");
 			// after creating new filesystem always create "back" file for using
@@ -1327,7 +1328,8 @@ bool isNewMetadataFile([[maybe_unused]]const uint8_t *headerPtr) {
 }
 
 bool checkMetadataSignature(const std::shared_ptr<MemoryMappedFile> &metadataFile) {
-	static constexpr std::string_view kMetadataHeaderV2_9(SFSSIGNATURE "M 2.9");
+	static constexpr std::string_view kMetadataHeaderNewV2_9(SFSSIGNATURE "M 2.9");
+	static constexpr std::string_view kMetadataHeaderOldV2_9(SAUSIGNATURE "M 2.9");
 	static constexpr uint8_t kMetadataHeaderSize = 8;
 	size_t kMetadataHeaderOffset{0};
 	uint8_t *headerPtr;
@@ -1341,8 +1343,8 @@ bool checkMetadataSignature(const std::shared_ptr<MemoryMappedFile> &metadataFil
 	if (isNewMetadataFile(headerPtr)) {
 		return false;
 	}
-	if (memcmp(headerPtr, kMetadataHeaderV2_9.data(), kMetadataHeaderSize) !=
-	    kOpSuccess) {
+	if ((memcmp(headerPtr, kMetadataHeaderNewV2_9.data(), kMetadataHeaderSize) != kOpSuccess) &&
+	    (memcmp(headerPtr, kMetadataHeaderOldV2_9.data(), kMetadataHeaderSize) != kOpSuccess)) {
 		throw MetadataConsistencyException("wrong metadata header version");
 	}
 	return true;
