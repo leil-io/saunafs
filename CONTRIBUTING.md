@@ -61,7 +61,7 @@ recommend the following:
 
 We will then take care of the issue as soon as possible.
 
-You might also consider joining the [Slack channel](https://saunafs.slack.com)
+You might also consider joining the [Slack channel](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog)
 to ask questions and discuss the project.
 
 ## I Want to Contribute

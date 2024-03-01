@@ -1,5 +1,8 @@
 This file lists noteworthy changes in SaunaFS.
 
+ * SaunaFS (4.0.1) (2024-02-28)
+ - (docs) Fix README.md and CONTRIBUTING.md links.
+
  * SaunaFS (4.0.0) (2024-02-28)
  - (all) Enable C++23
  - (all) Rebranding to SaunaFS

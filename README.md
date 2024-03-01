@@ -3,11 +3,11 @@
 </p>
 <h3 align="center">A Distributed POSIX File System</h3>
 
-[![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://saunafs.slack.com/)
+[![Slack](https://img.shields.io/badge/slack-join_us-olive?logo=slack&style=flat)](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog)
 
 ## About
 
-[SaunaFS](https://saunafs.com) is a free-and open source, distributed POSIX
+[SaunaFS](https://saunafs.com) is a free and open source, distributed POSIX
 file system inspired by [Google File
 System](https://en.wikipedia.org/wiki/Google_File_System). Designed to run on
 commodity hardware, SaunaFS is a high-performance, scalable, and reliable file
@@ -40,7 +40,7 @@ Check the [Quick Start guide](https://docs.saunafs.com/quick-start) for a
 simple setup of SaunaFS on a single machine.
 
 After the Quick Start Guide, for an advanced setup, please refer to the
-[Administration Guide](https://docs.saunafs.com/advanced-setup) as a starting
+[Administration Guide](https://docs.saunafs.com/administration-guide) as a starting
 place.
 
 ### Building from source
@@ -68,7 +68,7 @@ nice -n 16 make -j$(nproc)
 There are 2 types of documentation available:
 
 * [Online documentation for a general overview](https://docs.saunafs.com/)
-* [Man pages for specific commands and service configuration](docs/)
+* [Man pages for specific commands and service configuration](doc/)
 
 ## Contributing
 
@@ -76,7 +76,7 @@ There are 2 types of documentation available:
 encourage) pull requests, but without approval they won't be merged at the
 moment. We are currently working on creating a system to allow seamless pull
 requests outside with as little fuss as possible. See this
-[issue](https://github.com/leil-io/saunafs/issues/8) for more details.***
+[issue](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog) for more details.***
 
 See the [Contributing Guide](CONTRIBUTING.md) for detailed information on how
 to contribute to SaunaFS.
@@ -86,7 +86,7 @@ point for how to setup a development environment and run tests.
 
 ## Contact us
 
-Join our [Slack community](https://saunafs.slack.com) to connect with fellow
+Join our [Slack community]() to connect with fellow
 SaunaFS enthusiasts, developers, and users. In our Slack channels, you can:
 
 - **Ask Questions**: Seek guidance, share your experiences, and ask questions
