@@ -30,7 +30,6 @@
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
 #include "master/checksum.h"
-#include "master/filesystem_store.h"
 #include "master/metadata_loader.h"
 
 struct matocsserventry;

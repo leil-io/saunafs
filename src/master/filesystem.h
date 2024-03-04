@@ -235,10 +235,12 @@ uint8_t fs_gettrashpath(uint32_t rootinode,uint8_t sesflags,uint32_t inode,std::
 uint8_t fs_getdetachedattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,Attributes& attr,uint8_t dtype);
 
 // EXTRA
-uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode, uint32_t *inodes, uint32_t *dirs, uint32_t *files,
-						 uint32_t *links, uint32_t *chunks, uint64_t *length, uint64_t *size, uint64_t *rsize);
+uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode,
+                         uint32_t *inodes, uint32_t *dirs, uint32_t *files,
+                         uint32_t *links, uint32_t *chunks, uint64_t *length,
+                         uint64_t *size, uint64_t *rsize);
 uint8_t fs_get_chunkid(const FsContext& context,
-		uint32_t inode, uint32_t index, uint64_t *chunkid);
+                       uint32_t inode, uint32_t index, uint64_t *chunkid);
 
 // SPECIAL - LOG EMERGENCY INCREASE VERSION FROM CHUNKS-MODULE
 void fs_incversion(uint64_t chunkid);

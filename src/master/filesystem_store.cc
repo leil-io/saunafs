@@ -19,6 +19,7 @@
 */
 
 #include "common/platform.h"
+#include "master/filesystem_store.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -32,12 +33,10 @@
 #include "common/rotate_files.h"
 #include "common/saunafs_version.h"
 #include "common/setup.h"
-
 #include "common/memory_mapped_file.h"
+
 #include "master/changelog.h"
 #include "master/filesystem.h"
-#include "master/filesystem_checksum.h"
-#include "master/filesystem_freenode.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_node.h"
 #include "master/filesystem_operations.h"
@@ -50,15 +49,14 @@
 #include "master/metadata_loader.h"
 #include "master/restore.h"
 
-#include "master/filesystem_store.h"
 
 // TODO (Baldor): Review the need for these constants below
 constexpr uint8_t kMetadataVersionLegacy = 0x15;
 constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
 constexpr uint8_t kMetadataVersionWithSections = 0x20;
 constexpr uint8_t kMetadataVersionWithLockIds = 0x29;
-static constexpr int8_t kOpSuccess = 0;
-static constexpr int8_t kOpFailure = -1;
+constexpr int8_t kOpSuccess = 0;
+constexpr int8_t kOpFailure = -1;
 char const MetadataStructureReadErrorMsg[] =
     "error reading metadata (structure)";
 
@@ -751,25 +749,25 @@ int fs_checknodes(int ignoreflag) {
 }
 
 bool fs_loadnodes(MetadataLoader::Options options) {
-	int8_t s;
+	int8_t status;
 	do {
-		s = fs_parseNode(options.metadataFile, options.offset);
-		if (s < 0) {
+		status = fs_parseNode(options.metadataFile, options.offset);
+		if (status < 0) {
 			return false;
 		}
-	} while (s == 0);
+	} while (status == 0);
 	return true;
 }
 
 bool fs_loadedges(MetadataLoader::Options options) {
-	int8_t s;
+	int8_t status;
 	fs_parseEdge(options.metadataFile, options.offset, options.ignoreFlag, true);
 	do {
-		s = fs_parseEdge(options.metadataFile, options.offset, options.ignoreFlag);
-		if (s < 0) {
+		status = fs_parseEdge(options.metadataFile, options.offset, options.ignoreFlag);
+		if (status < 0) {
 			return false;
 		}
-	} while (s == 0);
+	} while (status == 0);
 	return true;
 }
 

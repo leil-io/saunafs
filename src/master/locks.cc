@@ -18,15 +18,13 @@
    along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "master/locks.h"
 #include "common/platform.h"
-
-#include <functional>
+#include "master/locks.h"
 
 #include "common/memory_mapped_file.h"
 #include "common/slogger.h"
 
-#include "master/locks.h"
+#include <functional>
 
 bool LockRanges::fits(const LockRange &range) const {
 	return findCollision(range) == nullptr;

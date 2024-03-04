@@ -71,7 +71,7 @@ static int fs_load_posix_acl(const std::shared_ptr<MemoryMappedFile> &metadataFi
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
-        uint32_t sizeofsize = sizeof(size);
+		uint32_t sizeofsize = sizeof(size);
 		uint8_t *ptr;
 		try{
 			ptr = metadataFile->seek(offsetBegin);
@@ -142,11 +142,11 @@ static int fs_load_legacy_acl(const std::shared_ptr<MemoryMappedFile> &metadataF
 	try {
 		// Read size of the entry
 		uint32_t size = 0;
-        uint32_t sizeofsize = sizeof(size);
+		uint32_t sizeofsize = sizeof(size);
 		uint8_t *ptr;
-        try {
+		try {
 			ptr = metadataFile->seek(offsetBegin);
-        } catch (const std::exception &e) {
+		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
 		}
@@ -162,9 +162,9 @@ static int fs_load_legacy_acl(const std::shared_ptr<MemoryMappedFile> &metadataF
 		}
 
 		// Read the entry
-        try {
+		try {
 			ptr = metadataFile->seek(offsetBegin);
-        } catch (const std::exception &e) {
+		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
 		}
@@ -204,32 +204,35 @@ static int fs_load_legacy_acl(const std::shared_ptr<MemoryMappedFile> &metadataF
 }
 
 bool fs_load_legacy_acls(MetadataLoader::Options options) {
-	int s;
+	int status;
 
 	do {
-		s = fs_load_legacy_acl(options.metadataFile, options.offset, options.ignoreFlag);
-		if (s < 0) {
+		status = fs_load_legacy_acl(options.metadataFile, options.offset,
+		                            options.ignoreFlag);
+		if (status < 0) {
 			return false;
 		}
-	} while (s == 0);
+	} while (status == 0);
 	return true;
 }
 
 bool fs_load_posix_acls(MetadataLoader::Options options) {
-	int s;
+	int status;
 	do {
-		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreFlag, false);
-		if (s < 0) {
+		status = fs_load_posix_acl(options.metadataFile, options.offset,
+		                           options.ignoreFlag, false);
+		if (status < 0) {
 			return false;
 		}
-	} while (s == 0);
+	} while (status == 0);
 
 	do {
-		s = fs_load_posix_acl(options.metadataFile, options.offset, options.ignoreFlag, true);
-		if (s < 0) {
+		status = fs_load_posix_acl(options.metadataFile, options.offset,
+		                           options.ignoreFlag, true);
+		if (status < 0) {
 			return false;
 		}
-	} while (s == 0);
+	} while (status == 0);
 
 	return true;
 }
@@ -241,9 +244,9 @@ int fs_load_acl(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_t &o
 		uint32_t size = 0;
 		uint32_t sizeofsize = sizeof(size);
 		uint8_t *ptr;
-        try {
+		try {
 			ptr = metadataFile->seek(offsetBegin);
-        } catch (const std::exception &e) {
+		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "loading acl: %s", e.what());
 			throw e;
 		}
