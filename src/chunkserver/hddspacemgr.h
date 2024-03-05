@@ -30,9 +30,6 @@
 #include "common/chunk_with_version_and_type.h"
 #include "protocol/chunks_with_type.h"
 
-#define ChunkNotFound nullptr
-#define DiskNotFound nullptr
-
 uint32_t hddGetAndResetErrorCounter();
 
 void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks, std::size_t limit);
@@ -77,8 +74,6 @@ int hddChunkWriteBlock(uint64_t chunkId, uint32_t version,
 int hddChunkGetNumberOfBlocks(uint64_t chunkId, ChunkPartType chunkType,
                               uint32_t version, uint16_t *blocks);
 
-bool hddScansInProgress();
-
 /* chunk operations */
 
 /* all chunk operations in one call */
@@ -110,26 +105,6 @@ int hddInit();
 /// Deletes the chunk from the registry and from the disk's testlist in a
 /// thread-safe way.
 void hddDeleteChunkFromRegistry(IChunk *chunk);
-
-/// Remove old chunk and create new one in its place.
-///
-/// \param disk pointer to disk object which will be the owner if new chunk
-/// \param chunk pointer to old object
-/// \param chunkId chunk id that will be reused
-/// \param type type of new chunk object
-/// \return address of the new object or ChunkNotFound
-///
-/// \note ChunkId and threads waiting for this object are preserved.
-IChunk *hddRecreateChunk(IDisk *disk, IChunk *chunk, uint64_t chunkId,
-                         ChunkPartType type);
-
-/// Finds an existing chunk or creates a new one, and locks it anyway.
-///
-/// The function locks the returned chunk (may block if the chunk is already
-/// locked). To unlock it, use \ref hddChunkRelease.
-IChunk *hddChunkFindOrCreatePlusLock(IDisk *disk, uint64_t chunkid,
-                                     ChunkPartType chunkType,
-                                     disk::ChunkGetMode creationMode);
 
 /** \brief Creates a new chunk on disk
  *

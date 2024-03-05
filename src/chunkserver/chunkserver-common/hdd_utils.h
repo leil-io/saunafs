@@ -1,10 +1,15 @@
 #pragma once
 
+#include "common/platform.h"
+
 #include <deque>
 
 #include "chunkserver-common/chunk_interface.h"
 #include "common/chunk_with_version_and_type.h"
 #include "protocol/chunks_with_type.h"
+
+#define ChunkNotFound nullptr
+#define DiskNotFound nullptr
 
 // master reports
 inline std::deque<ChunkWithType> gDamagedChunks;
@@ -43,3 +48,36 @@ void hddRemoveChunkFromContainers(IChunk *chunk);
 /// threads. If the chunk was deleted, and there are no threads waiting, it also
 /// removes it from the registry and from the disk's testlist.
 void hddChunkRelease(IChunk *chunk);
+
+int hddIOEnd(IChunk *chunk);
+
+int hddIOBegin(IChunk *chunk, int newFlag,
+               uint32_t chunkVersion = disk::kMaxUInt32Number);
+
+bool hddScansInProgress();
+
+IChunk *hddChunkFindAndLock(uint64_t chunkId, ChunkPartType chunkType);
+
+int chunkWriteCrc(IChunk *chunk);
+
+/// Finds an existing chunk or creates a new one, and locks it anyway.
+///
+/// The function locks the returned chunk (may block if the chunk is already
+/// locked). To unlock it, use \ref hddChunkRelease.
+IChunk *hddChunkFindOrCreatePlusLock(IDisk *disk, uint64_t chunkid,
+                                     ChunkPartType chunkType,
+                                     disk::ChunkGetMode creationMode);
+
+/// Remove old chunk and create new one in its place.
+///
+/// \param disk pointer to disk object which will be the owner if new chunk
+/// \param chunk pointer to old object
+/// \param chunkId chunk id that will be reused
+/// \param type type of new chunk object
+/// \return address of the new object or ChunkNotFound
+///
+/// \note ChunkId and threads waiting for this object are preserved.
+IChunk *hddRecreateChunk(IDisk *disk, IChunk *chunk, uint64_t chunkId,
+                         ChunkPartType type);
+
+void hddDeleteChunkFromRegistry(IChunk *chunk);

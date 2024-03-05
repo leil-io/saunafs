@@ -1,9 +1,14 @@
+#include "common/platform.h"
+
 #include "hdd_utils.h"
 
 #include <sys/time.h>
 
 #include "chunkserver-common/global_shared_resources.h"
+#include "chunkserver-common/hdd_stats.h"
+#include "common/event_loop.h"
 #include "devtools/TracePrinter.h"
+#include "devtools/request_log.h"
 
 void hddAddErrorAndPreserveErrno(IChunk *chunk) {
 	TRACETHIS();
@@ -101,4 +106,329 @@ void hddRemoveChunkFromContainers(IChunk *chunk) {
 	}
 
 	gChunksMap.erase(chunkIter);
+}
+
+int chunkWriteCrc(IChunk *chunk) {
+	TRACETHIS();
+	assert(chunk);
+
+	chunk->owner()->setNeedRefresh(true);
+
+	uint8_t *crcData = gOpenChunks.getResource(chunk->metaFD()).crcData();
+
+	{
+		DiskWriteStatsUpdater updater(chunk->owner(), chunk->getCrcBlockSize());
+		ssize_t ret = chunk->owner()->writeCrc(chunk, crcData);
+
+		if (ret != static_cast<ssize_t>(chunk->getCrcBlockSize())) {
+			int errmem = errno;
+			safs_silent_errlog(LOG_WARNING,
+			                   "chunk_writecrc: file: %s - write error",
+			                   chunk->metaFilename().c_str());
+			errno = errmem;
+			updater.markWriteAsFailed();
+			return SAUNAFS_ERROR_IO;
+		}
+	}
+
+	HddStats::overheadWrite(chunk->getCrcBlockSize());
+	return SAUNAFS_STATUS_OK;
+}
+
+int hddIOEnd(IChunk *chunk) {
+	assert(chunk);
+	TRACETHIS1(c->chunkid);
+
+	if (chunk->wasChanged()) {
+		int status = chunkWriteCrc(chunk);
+		PRINTTHIS(status);
+
+		if (status != SAUNAFS_STATUS_OK) {
+			// FIXME(hazeman): We are probably leaking fd here.
+			int errmem = errno;
+			safs_silent_errlog(LOG_WARNING, "hddIOEnd: file:%s - write error",
+			                   chunk->metaFilename().c_str());
+			errno = errmem;
+			return status;
+		}
+
+		if (gPerformFsync) {
+			uint64_t startTime = getMicroSecsTime();
+			status = chunk->owner()->fsyncChunk(chunk);
+
+			if (status != SAUNAFS_STATUS_OK) {
+				int errmem = errno;
+				safs_silent_errlog(LOG_WARNING,
+				                   "hddIOEnd: file:%s - fsync error",
+				                   chunk->metaFilename().c_str());
+				errno = errmem;
+				return status;
+			}
+
+			HddStats::dataFSync(chunk->owner(), getMicroSecsTime() - startTime);
+		}
+
+		chunk->setWasChanged(false);
+	}
+
+	if (chunk->refCount() <= 0) {
+		safs_silent_syslog(LOG_WARNING,
+		                   "hddIOEnd: refcount = 0 - "
+		                   "This should never happen!");
+		errno = 0;
+
+		return SAUNAFS_STATUS_OK;
+	}
+
+	chunk->setRefCount(chunk->refCount() - 1);
+
+	if (chunk->refCount() == 0) {
+		gOpenChunks.release(chunk->metaFD(), eventloop_time());
+	}
+
+	errno = 0;
+	chunk->setValidAttr(0);
+
+	return SAUNAFS_STATUS_OK;
+}
+
+int hddIOBegin(IChunk *chunk, int newFlag, uint32_t chunkVersion) {
+	LOG_AVG_TILL_END_OF_SCOPE0("hddIOBegin");
+	TRACETHIS();
+	assert(chunk);
+	int status;
+
+	{  // We can move this chunk as last one to be tested
+		std::lock_guard testsLockGuard(gTestsMutex);
+		chunk->owner()->chunks().markAsTested(chunk);
+	}
+
+	if (chunk->refCount() == 0) {
+		bool add = (chunk->metaFD() < 0);
+
+		assert(!(newFlag && chunk->metaFD() >= 0));
+
+		gOpenChunks.acquire(chunk->metaFD());  // Ignored if c->fd < 0
+
+		if (chunk->metaFD() < 0) {
+			// Try to free some long unused descriptors
+			gOpenChunks.freeUnused(eventloop_time(), gChunksMapMutex);
+			for (int i = 0; i < kOpenRetryCount; ++i) {
+				if (newFlag) {
+					chunk->owner()->creat(chunk);
+				} else {
+					chunk->owner()->open(chunk);
+				}
+				if (chunk->metaFD() < 0 && errno != ENFILE) {
+					safs_silent_errlog(LOG_WARNING,
+					                   "hddIOBegin: file:%s - open error",
+					                   chunk->metaFilename().c_str());
+					return SAUNAFS_ERROR_IO;
+				} else if (chunk->metaFD() >= 0) {
+					gOpenChunks.acquire(chunk->metaFD(), OpenChunk(chunk));
+					break;
+				} else {  // chunk->fd < 0 && errno == ENFILE
+					usleep((kOpenRetry_ms * 1000) << i);
+					// Force free unused descriptors
+					auto freed = gOpenChunks.freeUnused(disk::kMaxUInt32Number,
+					                                    gChunksMapMutex, 4);
+					safs_pretty_syslog(LOG_NOTICE,
+					                   "hddIOBegin: freed unused: %d", freed);
+				}
+			}
+			if (chunk->metaFD() < 0) {
+				safs_silent_errlog(LOG_WARNING,
+				                   "hddIOBegin: file: %s - open error",
+				                   chunk->metaFilename().c_str());
+				return SAUNAFS_ERROR_IO;
+			}
+		}
+
+		if (newFlag) {
+			uint8_t *crcData =
+			    gOpenChunks.getResource(chunk->metaFD()).crcData();
+			memset(crcData, 0, chunk->getCrcBlockSize());
+		} else if (add) {
+			chunk->readaheadHeader();
+			uint8_t *crcData =
+			    gOpenChunks.getResource(chunk->metaFD()).crcData();
+			status = chunk->owner()->readChunkCrc(chunk, chunkVersion, crcData);
+			if (status != SAUNAFS_STATUS_OK) {
+				int errmem = errno;
+				gOpenChunks.release(chunk->metaFD(), eventloop_time());
+				safs_silent_errlog(LOG_WARNING,
+				                   "hddIOBegin: file:%s - read error",
+				                   chunk->metaFilename().c_str());
+				errno = errmem;
+				return status;
+			}
+		}
+	}
+
+	chunk->setRefCount(chunk->refCount() + 1);
+	errno = 0;
+
+	return SAUNAFS_STATUS_OK;
+}
+
+bool hddScansInProgress() { return gScansInProgress != 0; }
+
+IChunk *hddChunkFindAndLock(uint64_t chunkId, ChunkPartType chunkType) {
+	LOG_AVG_TILL_END_OF_SCOPE0("chunk_find");
+
+	return hddChunkFindOrCreatePlusLock(nullptr, chunkId, chunkType,
+	                                    disk::ChunkGetMode::kFindOnly);
+}
+
+IChunk *hddChunkFindOrCreatePlusLock(IDisk *disk, uint64_t chunkid,
+                                     ChunkPartType chunkType,
+                                     disk::ChunkGetMode creationMode) {
+	TRACETHIS2(chunkid, (unsigned)cflag);
+	IChunk *chunk = nullptr;
+	IDisk *effectiveDisk = disk;
+
+	std::unique_lock chunksMapLock(gChunksMapMutex);
+	auto chunkIter = gChunksMap.find(makeChunkKey(chunkid, chunkType));
+
+	if (chunkIter == gChunksMap.end()) {  // The chunk does not exists
+		if (creationMode !=
+		    disk::ChunkGetMode::kFindOnly) {  // Create it if requested
+			chunk =
+			    hddRecreateChunk(effectiveDisk, nullptr, chunkid, chunkType);
+		}
+
+		return chunk;
+	}
+
+	chunk = chunkIter->second.get();
+	effectiveDisk = chunk->owner();
+
+	if (creationMode == disk::ChunkGetMode::kCreateOnly) {
+		if (chunk->state() == ChunkState::Available ||
+		    chunk->state() == ChunkState::Locked) {
+			return nullptr;
+		}
+	}
+
+	while (true) {
+		switch (chunk->state()) {
+		case ChunkState::Available:
+			chunk->setState(ChunkState::Locked);
+			chunksMapLock.unlock();
+			if (chunk->validAttr() == 0) {
+				if (effectiveDisk->updateChunkAttributes(chunk, false) ==
+				    SAUNAFS_ERROR_NOCHUNK) {
+					// The chunk was found as available, but we can not
+					// update its attributes, let's recreate it only if
+					// requested
+					if (creationMode != disk::ChunkGetMode::kFindOnly) {
+						effectiveDisk->unlinkChunk(chunk);
+						chunksMapLock.lock();
+						chunk = hddRecreateChunk(effectiveDisk, chunk, chunkid,
+						                         chunkType);
+						return chunk;
+					}
+
+					// The Chunk is damaged, remove it from disk and from
+					// memory
+					hddReportDamagedChunk(chunk->id(), chunk->type());
+					effectiveDisk->unlinkChunk(chunk);
+					hddDeleteChunkFromRegistry(chunk);
+					return nullptr;
+				}
+			}
+			return chunk;
+		case ChunkState::Deleted:
+			if (creationMode != disk::ChunkGetMode::kFindOnly) {  // Reuse it
+				chunk =
+				    hddRecreateChunk(effectiveDisk, chunk, chunkid, chunkType);
+				return chunk;
+			}
+			if (chunk->condVar() !=
+			    nullptr) {  // waiting threads - wake them up
+				chunk->condVar()->condVar.notify_one();
+			} else {  // no more waiting threads - remove
+				hddRemoveChunkFromContainers(chunk);
+			}
+			return nullptr;
+		case ChunkState::ToBeDeleted:
+		case ChunkState::Locked:
+			if (chunk->condVar() == nullptr) {
+				// Try to reuse one if possible.
+				if (!gFreeCondVars.empty()) {
+					chunk->setCondVar(std::move(gFreeCondVars.back()));
+					gFreeCondVars.pop_back();
+				} else {
+					chunk->setCondVar(std::make_unique<CondVarWithWaitCount>());
+				}
+			}
+			chunk->condVar()->numberOfWaitingThreads++;
+			auto status = chunk->condVar()->condVar.wait_for(
+			    chunksMapLock,
+			    std::chrono::seconds(kSecondsToWaitForLockedChunk_));
+			chunk->condVar()->numberOfWaitingThreads--;
+			if (chunk->condVar()->numberOfWaitingThreads == 0) {
+				// No more waiting threads, store it to be reused
+				gFreeCondVars.emplace_back(std::move(chunk->condVar()));
+			}
+			if (status == std::cv_status::timeout) {
+				safs_pretty_syslog(LOG_WARNING, "Chunk locked for long time");
+				return nullptr;
+			}
+		}
+	}
+}
+
+IChunk *hddRecreateChunk(IDisk *disk, IChunk *chunk, uint64_t chunkId,
+                         ChunkPartType type) {
+	std::unique_ptr<CondVarWithWaitCount> waiting;
+
+	if (chunk != ChunkNotFound) {
+		assert(chunk->id() == chunkId);
+
+		if (chunk->state() != ChunkState::Deleted &&
+		    chunk->owner() != nullptr) {
+			const std::scoped_lock lock(gTestsMutex);
+			disk->chunks().remove(chunk);
+			disk->setNeedRefresh(true);
+		}
+
+		waiting = std::move(chunk->condVar());
+
+		// It's possible to reuse object chunk if the format is the same,
+		// but it doesn't happen often enough to justify adding extra code.
+		hddRemoveChunkFromContainers(chunk);
+	}
+
+	if (disk == DiskNotFound) { return ChunkNotFound; }
+
+	chunk = disk->instantiateNewConcreteChunk(chunkId, type);
+	passert(chunk);
+
+	bool success = gChunksMap
+	                   .insert({makeChunkKey(chunkId, type),
+	                            std::unique_ptr<IChunk>(chunk)})
+	                   .second;
+	massert(success,
+	        "Cannot insert new chunk to the map as a chunk with "
+	        "its chunkId and chunkPartType already exists");
+
+	chunk->setCondVar(std::move(waiting));
+
+	return chunk;
+}
+
+/* chunk operations */
+void hddDeleteChunkFromRegistry(IChunk *chunk) {
+	TRACETHIS();
+	assert(chunk);
+
+	const std::lock_guard chunksMapLockGuard(gChunksMapMutex);
+
+	if (chunk->condVar()) {
+		chunk->setState(ChunkState::Deleted);
+		chunk->condVar()->condVar.notify_one();
+	} else {
+		hddRemoveChunkFromContainers(chunk);
+	}
 }
