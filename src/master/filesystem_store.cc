@@ -963,29 +963,30 @@ void fs_store(FILE *fd, uint8_t fver) {
 			return;
 		}
 	}
+	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata with v2.9 finished");
 }
 
 void fs_store_fd(FILE *fd) {
+	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata header v2.9");
 #if SAUNAFS_VERSHEX >= SAUNAFS_VERSION(2, 9, 0)
-	const char hdr[] = SFSSIGNATURE "M 2.9";
+	constexpr std::string_view kMetadataSignatureV2_9(SFSSIGNATURE "M 2.9");
 	const uint8_t metadataVersion = kMetadataVersionWithLockIds;
-#elif SAUNAFS_VERSHEX >= SAUNAFS_VERSION(1, 6, 29)
-	const char hdr[] = SFSSIGNATURE "M 2.0";
-	const uint8_t metadataVersion = kMetadataVersionWithSections;
 #else
-	const char hdr[] = SFSSIGNATURE "M 1.6";
-	const uint8_t metadataVersion = kMetadataVersionSaunaFS;
+	safs_pretty_errlog(LOG_ERR, "Metadata dumping is not supported in this version");
 #endif
-
-	if (fwrite(&hdr, 1, sizeof(hdr) - 1, fd) != sizeof(hdr) - 1) {
+	if (gMetadata == nullptr) {
+		safs_pretty_syslog(LOG_ERR, "gMetadata is NULL");
+		///TODO Throw exception
+		return;
+	}
+	if (fwrite(kMetadataSignatureV2_9.data(), 1, kMetadataSignatureV2_9.size(), fd) !=
+	    kMetadataSignatureV2_9.size()) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 	} else {
 		fs_store(fd, metadataVersion);
 	}
 }
 
-static constexpr uint8_t kMetadataSectionHeaderSize = 16;
-static constexpr uint8_t kMetadataSectionNameSize = 8;
 
 static const std::vector<MetadataSection> kMetadataSections = {
     /// Synchronously loaded sections (in order)
@@ -1011,7 +1012,7 @@ bool isEndOfMetadata(const uint8_t *sectionPtr) {
 	static constexpr std::string_view kMetadataTrailer("[" SFSSIGNATURE
 	                                                   " EOF MARKER]");
 	return memcmp(sectionPtr, kMetadataTrailer.data(),
-	              ::kMetadataSectionHeaderSize) == kOpSuccess;
+	              MetadataSection::kMetadataSectionHeaderSize) == kOpSuccess;
 }
 
 
@@ -1033,7 +1034,7 @@ int fs_load(const std::shared_ptr<MemoryMappedFile> &metadataFile, int ignorefla
 	    sectionMarkers;
 	uint8_t *sectionPtr = metadataFile->seek(offsetBegin);
 	while (!isEndOfMetadata(sectionPtr)) {
-		const uint8_t *sectionLengthPtr = sectionPtr + kMetadataSectionNameSize;
+		const uint8_t *sectionLengthPtr = sectionPtr + MetadataSection::kMetadataSectionNameSize;
 		uint64_t sectionLength = get64bit(&sectionLengthPtr);
 		const uint8_t *sectionDataPtr = sectionLengthPtr;
 		for (const auto &section : kMetadataSections) {
@@ -1044,7 +1045,8 @@ int fs_load(const std::shared_ptr<MemoryMappedFile> &metadataFile, int ignorefla
 			}
 		}
 		sectionPtr = metadataFile->seek(
-		    offsetBegin += sectionLength + kMetadataSectionHeaderSize);
+		    offsetBegin +=
+		    sectionLength + MetadataSection::kMetadataSectionHeaderSize);
 	}
 
 	MetadataLoader::Futures futures;

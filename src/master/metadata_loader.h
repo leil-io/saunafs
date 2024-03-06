@@ -90,6 +90,12 @@ struct MetadataSection {
 
 	/// Whether the section is legacy and wont be loaded by default (default: false).
 	bool isLegacy;
+
+	/// @brief The size of the section name.
+	static constexpr uint8_t kMetadataSectionNameSize = 8;
+
+	/// @brief The size of the section header.
+	static constexpr uint8_t kMetadataSectionHeaderSize = 16;
 };
 
 /// Helper struct to store information about a section being loaded asynchronously.

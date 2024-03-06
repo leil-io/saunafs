@@ -36,4 +36,5 @@ void fs_broadcast_metadata_saved(uint8_t status);
 void fs_load_changelogs();
 void fs_load_changelog(const std::string &path);
 void fs_loadall(const std::string &fname, int ignoreflag);
+/// Dump current state of file system into metadata file.
 void fs_store_fd(FILE *fd);
