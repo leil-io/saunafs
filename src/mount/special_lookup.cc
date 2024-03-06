@@ -70,6 +70,12 @@ static EntryParam lookup(const Context &ctx, Inode parent, const char *name,
 namespace InodeOplog {
 static EntryParam lookup(const Context &ctx, Inode parent, const char *name,
 	                      char attrstr[256]) {
+#ifdef _WIN32
+	(void) ctx;
+	(void) parent;
+	(void) name;
+#endif
+
 	EntryParam e;
 	e.ino = inode_;
 	e.attr_timeout = 3600.0;
@@ -77,6 +83,7 @@ static EntryParam lookup(const Context &ctx, Inode parent, const char *name,
 	attr_to_stat(inode_, attr, &e.attr);
 	stats_inc(OP_LOOKUP_INTERNAL);
 	makeattrstr(attrstr, 256, &e.attr);
+#ifndef _WIN32
 	oplog_printf(ctx, "lookup (%lu,%s) (internal node: OPLOG): OK (%.1f,%lu,%.1f,%s)",
 	            (unsigned long int)parent,
 	            name,
@@ -84,6 +91,7 @@ static EntryParam lookup(const Context &ctx, Inode parent, const char *name,
 	            (unsigned long int)e.ino,
 	            e.attr_timeout,
 	            attrstr);
+#endif
 	return e;
 }
 } // InodeOplog
