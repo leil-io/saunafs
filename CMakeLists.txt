@@ -335,6 +335,28 @@ if(ZLIB_FOUND)
 endif()
 include_directories(src) # Allow paths relative to src, eg. #include common/crc.h
 link_directories(${LINK_DIRECTORIES} ${FUSE_LIBRARY_DIR})
+
+if(MINGW)
+  if(NOT WINCLIENT_PACKAGE_VERSION)
+    set(WINCLIENT_PACKAGE_VERSION "1.0.0-devel" CACHE STRING "Windows Client version")
+  endif()
+
+  message(STATUS "WINCLIENT_PACKAGE_VERSION: ${WINCLIENT_PACKAGE_VERSION}")
+  message(STATUS "WINFSP_VERSION: ${WINFSP_VERSION}")
+
+  option(ENABLE_WINFSP_WINCLIENT  "Enable winfsp library based windows client build"    ON)
+  option(ENABLE_DOKANY_WINCLIENT  "Enable dokany library based windows client build"    OFF)
+
+  if(ENABLE_WINFSP_WINCLIENT)
+    set(WINFSP_FUSE3_INCLUDE_DIR  "C:/Program Files (x86)/WinFsp/inc/fuse3"             CACHE STRING "winfsp installation /inc directory")
+    set(WINFSP_FUSE_DLL_FOR_ARCH  "C:/Program Files (x86)/WinFsp/bin/winfsp-x64.dll"    CACHE STRING "winfsp-fuse dll for specific arch")
+    set(WINFSP_FUSE_LIBRARY  "C:/Program Files (x86)/WinFsp/lib/winfsp-x64.lib"    CACHE STRING "winfsp-fuse lib for specific arch")
+  endif()
+  if(ENABLE_DOKANY_WINCLIENT)
+    # Something analogous to previous winfsp settings
+  endif()
+endif()
+
 add_subdirectory(external)
 add_subdirectory(src/admin)
 add_subdirectory(src/common)
