@@ -45,7 +45,7 @@ public:
 	double budgetCeil() const;
 
 	// Try to satisfy the request. Return 'cost' or less, but not less than 0. Require cost > 0
-	double attempt(SteadyTimePoint now, double cost);
+	uint64_t attempt(SteadyTimePoint now, double cost);
 
 private:
 	void updateBudget(SteadyTimePoint now);
