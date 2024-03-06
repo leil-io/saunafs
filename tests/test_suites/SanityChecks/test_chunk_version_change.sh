@@ -12,7 +12,7 @@ cd "${info[mount0]}"
 # Create a file
 FILE_SIZE=123456 file-generate file
 
-# Restarft the chunkserver and overwrite the file
+# Restart the chunkserver and overwrite the file
 saunafs_chunkserver_daemon 0 restart
 saunafs_wait_for_all_ready_chunkservers
 FILE_SIZE=234567 file-generate "$TEMP_DIR/newfile"

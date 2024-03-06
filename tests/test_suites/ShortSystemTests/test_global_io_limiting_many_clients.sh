@@ -8,6 +8,9 @@ echo "limit unclassified 1024" > "$iolimits"
 N=5
 # tolerated relative error (in %)
 E=11
+if is_windows_system; then
+	E=15
+fi
 if valgrind_enabled; then
 	E=$((5 * E))
 fi

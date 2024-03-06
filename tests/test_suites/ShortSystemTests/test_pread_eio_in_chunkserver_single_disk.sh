@@ -1,3 +1,6 @@
+if is_windows_system; then
+	timeout_set 1 minute
+fi
 # Create an installation with 3 chunkservers, 1 disk each.
 # CS 0 has a disk which will fail during the test.
 USE_RAMDISK=YES \

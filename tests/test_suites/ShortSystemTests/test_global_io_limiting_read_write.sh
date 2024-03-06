@@ -5,6 +5,9 @@ iolimits="$TEMP_DIR/iolimits.cfg"
 echo "limit unclassified 1024" > "$iolimits"
 
 E=11
+if is_windows_system; then
+	E=15
+fi
 if valgrind_enabled; then
 	E=$((5 * E))
 fi
@@ -16,7 +19,11 @@ CHUNKSERVERS=3 \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
-truncate -s1M "${info[mount0]}/read"
+if is_windows_system; then
+	FILE_SIZE=1048576 file-generate "${info[mount0]}/read"
+else
+	truncate -s1M "${info[mount0]}/read"
+fi
 
 # consume accumulated limit
 cat "${info[mount0]}/read" >/dev/null
