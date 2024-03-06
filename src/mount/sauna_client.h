@@ -22,7 +22,7 @@
 #include "common/platform.h"
 
 #include <string.h>
-#include <sys/stat.h>
+#include "common/stat32.h"
 #include <sys/types.h>
 #include <unistd.h>
 

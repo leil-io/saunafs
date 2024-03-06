@@ -206,7 +206,11 @@ bool ReadPlanExecutor::waitForData(ExecuteParams &params, Timeout &wave_timeout,
 	// Prepare for poll
 	poll_fds.clear();
 	for (const auto &fd_and_executor : executors_) {
+#ifdef _WIN32
+		poll_fds.push_back({static_cast<SOCKET>(fd_and_executor.first), POLLIN, 0});
+#else
 		poll_fds.push_back({fd_and_executor.first, POLLIN, 0});
+#endif
 	}
 
 	if (poll_fds.empty()) {

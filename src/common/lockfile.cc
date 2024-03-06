@@ -24,7 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/file.h>
-#include <sys/stat.h>
+#include "common/stat32.h"
 
 #include "common/cwrap.h"
 #include "common/massert.h"

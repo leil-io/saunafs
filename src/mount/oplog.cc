@@ -29,6 +29,9 @@
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
+#ifdef _WIN32
+#define localtime_r(T, Tm) localtime_s(Tm, T)
+#endif
 
 #define OPBUFFSIZE 0x1000000
 #define LINELENG 1000
