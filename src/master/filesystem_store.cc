@@ -1134,69 +1134,73 @@ void fs_new(void) {
 int fs_emergency_storeall(const std::string &fname) {
 	cstream_t fd(fopen(fname.c_str(), "w"));
 	if (fd == nullptr) {
-		return -1;
+		return kOpFailure;
 	}
 
 	fs_store_fd(fd.get());
 
-	if (ferror(fd.get()) != 0) {
-		return -1;
+	if (ferror(fd.get()) != kOpSuccess) {
+		return kOpFailure;
 	}
 	safs_pretty_syslog(
 	    LOG_WARNING,
 	    "metadata were stored to emergency file: %s - please copy this file to "
 	    "your default location as '%s'",
 	    fname.c_str(), kMetadataFilename);
-	return 0;
+	return kOpSuccess;
 }
 
 int fs_emergency_saves() {
 #if defined(SAUNAFS_HAVE_PWD_H) && defined(SAUNAFS_HAVE_GETPWUID)
 	struct passwd *p;
 #endif
-	if (fs_emergency_storeall(kMetadataEmergencyFilename) == 0) {
-		return 0;
+	if (fs_emergency_storeall(kMetadataEmergencyFilename) == kOpSuccess) {
+		return kOpSuccess;
 	}
 #if defined(SAUNAFS_HAVE_PWD_H) && defined(SAUNAFS_HAVE_GETPWUID)
 	p = getpwuid(getuid());
 	if (p) {
 		std::string fname = p->pw_dir;
 		fname.append("/").append(kMetadataEmergencyFilename);
-		if (fs_emergency_storeall(fname) == 0) {
-			return 0;
+		if (fs_emergency_storeall(fname) == kOpSuccess) {
+			return kOpSuccess;
 		}
 	}
 #endif
 	std::string metadata_emergency_filename = kMetadataEmergencyFilename;
-	if (fs_emergency_storeall("/" + metadata_emergency_filename) == 0) {
-		return 0;
+	if (fs_emergency_storeall("/" + metadata_emergency_filename) ==
+	    kOpSuccess) {
+		return kOpSuccess;
 	}
-	if (fs_emergency_storeall("/tmp/" + metadata_emergency_filename) == 0) {
-		return 0;
+	if (fs_emergency_storeall("/tmp/" + metadata_emergency_filename) ==
+	    kOpSuccess) {
+		return kOpSuccess;
 	}
-	if (fs_emergency_storeall("/var/" + metadata_emergency_filename) == 0) {
-		return 0;
+	if (fs_emergency_storeall("/var/" + metadata_emergency_filename) ==
+	    kOpSuccess) {
+		return kOpSuccess;
 	}
-	if (fs_emergency_storeall("/usr/" + metadata_emergency_filename) == 0) {
-		return 0;
+	if (fs_emergency_storeall("/usr/" + metadata_emergency_filename) ==
+	    kOpSuccess) {
+		return kOpSuccess;
 	}
 	if (fs_emergency_storeall("/usr/share/" + metadata_emergency_filename) ==
-	    0) {
-		return 0;
+	    kOpSuccess) {
+		return kOpSuccess;
 	}
 	if (fs_emergency_storeall("/usr/local/" + metadata_emergency_filename) ==
-	    0) {
-		return 0;
+	    kOpSuccess) {
+		return kOpSuccess;
 	}
 	if (fs_emergency_storeall("/usr/local/var/" +
-	                          metadata_emergency_filename) == 0) {
-		return 0;
+	                          metadata_emergency_filename) == kOpSuccess) {
+		return kOpSuccess;
 	}
 	if (fs_emergency_storeall("/usr/local/share/" +
-	                          metadata_emergency_filename) == 0) {
-		return 0;
+	                          metadata_emergency_filename) == kOpSuccess) {
+		return kOpSuccess;
 	}
-	return -1;
+	return kOpFailure;
 }
 
 #ifndef METARESTORE
