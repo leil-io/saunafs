@@ -41,8 +41,10 @@ static int dir_info(const char *fname) {
 	uint8_t reqbuff[16], *wptr, *buff;
 	const uint8_t *rptr;
 	uint32_t cmd, leng, inode;
-	uint32_t inodes, dirs, files, chunks;
+	uint32_t inodes, dirs, files, links, chunks;
 	uint64_t length, size, realsize;
+	constexpr uint8_t kDirStatsPayload = 44;
+	constexpr uint8_t kDirStatsLegacyPayload = 60;
 	int fd;
 	fd = open_master_conn(fname, &inode, nullptr, false);
 	if (fd < 0) {
@@ -86,13 +88,13 @@ static int dir_info(const char *fname) {
 		close_master_conn(1);
 		return -1;
 	}
-	leng -= 4;
-	if (leng == 1) {
+	leng -= sizeof(uint32_t);
+	if (leng == sizeof(uint8_t)) {
 		printf("%s: %s\n", fname, saunafs_error_string(*rptr));
 		free(buff);
 		close_master_conn(1);
 		return -1;
-	} else if (leng != 56 && leng != 40) {
+	} else if (leng != kDirStatsLegacyPayload && leng != kDirStatsPayload) {
 		printf("%s: master query: wrong answer (leng)\n", fname);
 		free(buff);
 		close_master_conn(1);
@@ -102,12 +104,15 @@ static int dir_info(const char *fname) {
 	inodes = get32bit(&rptr);
 	dirs = get32bit(&rptr);
 	files = get32bit(&rptr);
-	if (leng == 56) {
-		rptr += 8;
+	links = get32bit(&rptr);
+	if (leng == kDirStatsLegacyPayload) {
+		// skip empty data (8 bytes) from legacy format
+		rptr += sizeof(uint32_t ) << 1;
 	}
 	chunks = get32bit(&rptr);
-	if (leng == 56) {
-		rptr += 8;
+	if (leng == kDirStatsLegacyPayload) {
+		// skip empty data (8 bytes) from legacy format
+		rptr += sizeof(uint32_t ) << 1;
 	}
 	length = get64bit(&rptr);
 	size = get64bit(&rptr);
@@ -117,6 +122,7 @@ static int dir_info(const char *fname) {
 	print_number(" inodes:       ", "\n", inodes, 0, 0, 1);
 	print_number("  directories: ", "\n", dirs, 0, 0, 1);
 	print_number("  files:       ", "\n", files, 0, 0, 1);
+	print_number("  links:       ", "\n", links, 0, 0, 1);
 	print_number(" chunks:       ", "\n", chunks, 0, 0, 1);
 	print_number(" length:       ", "\n", length, 0, 1, 1);
 	print_number(" size:         ", "\n", size, 0, 1, 1);

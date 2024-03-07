@@ -26,16 +26,17 @@
 #include "common/lockfile.h"
 #include "common/main.h"
 #include "common/metadata.h"
+#include "common/scoped_timer.h"
 #include "master/changelog.h"
 #include "master/chunks.h"
 #include "master/datacachemgr.h"
-#include "master/goal_config_loader.h"
 #include "master/filesystem_checksum_updater.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_operations.h"
 #include "master/filesystem_periodic.h"
 #include "master/filesystem_snapshot.h"
 #include "master/filesystem_store.h"
+#include "master/goal_config_loader.h"
 #include "master/matoclserv.h"
 #include "master/matomlserv.h"
 #include "master/metadata_dumper.h"
@@ -215,7 +216,7 @@ int fs_loadall(void) {
 	changelogsMigrateFrom_1_6_29("changelog");
 	if (fs::exists(kMetadataTmpFilename)) {
 		throw MetadataFsConsistencyException(
-				"temporary metadata file exists, metadata directory is in dirty state");
+				"temporary metadata file (" + std::string(kMetadataTmpFilename) + ") exists, metadata directory is in dirty state");
 	}
 	if ((metadataserver::isMaster()) && !fs::exists(kMetadataFilename)) {
 		fs_unlock();
@@ -225,7 +226,11 @@ int fs_loadall(void) {
 					+ currentPath + "/" + kMetadataFilename + ".empty to " + currentPath
 					+ "/" + kMetadataFilename);
 	}
-	fs_loadall(kMetadataFilename, 0);
+
+	{
+		auto scopedTimer = util::ScopedTimer("metadata load time");
+		fs_loadall(kMetadataFilename, 0);
+	}
 
 	bool autoRecovery = fs_can_do_auto_recovery();
 	if (autoRecovery || (metadataserver::getPersonality() == metadataserver::Personality::kShadow)) {

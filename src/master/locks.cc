@@ -21,10 +21,10 @@
 #include "common/platform.h"
 #include "master/locks.h"
 
-#include <algorithm>
-#include <functional>
-
+#include "common/memory_mapped_file.h"
 #include "common/slogger.h"
+
+#include <functional>
 
 bool LockRanges::fits(const LockRange &range) const {
 	return findCollision(range) == nullptr;
@@ -364,28 +364,34 @@ void FileLocks::copyPendingToVector(uint32_t inode, int64_t index, int64_t count
 }
 
 template <typename Inserter>
-void load(FILE *file, Inserter insert) {
-	static std::vector<uint8_t> buffer;
-	uint64_t count;
-	uint32_t size;
+void load(const std::shared_ptr<MemoryMappedFile> &metadataFile,
+          size_t& offsetBegin, Inserter insert) {
+	constexpr std::uint8_t kSize = sizeof(std::uint64_t);
 
-	size = sizeof(count);
-	buffer.resize(size);
-	if (fread(buffer.data(), 1, size, file) != size) {
+	uint64_t count;
+	uint8_t *ptr = nullptr;
+	try{
+		ptr = metadataFile->seek(offsetBegin);
+	} catch (const std::exception &e) {
+		safs_pretty_syslog(LOG_ERR, "loading flock: %s", e.what());
 		throw Exception("fread error (size)");
 	}
-	deserialize(buffer, count);
 
-	size = serializedSize(safs_locks::Info());
+	deserialize(ptr, kSize, count);
+	offsetBegin += kSize;
+
+	uint32_t size = serializedSize(safs_locks::Info());
 	for (uint64_t i = 0; i < count; ++i) {
 		safs_locks::Info info;
-
-		buffer.resize(size);
-		if (fread(buffer.data(), 1, size, file) != size) {
+		try{
+			ptr = metadataFile->seek(offsetBegin);
+		} catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "loading flock: %s", e.what());
 			throw Exception("fread error (size)");
 		}
 
-		deserialize(buffer, info);
+		deserialize(ptr, size, info);
+		offsetBegin += size;
 
 		FileLocks::Lock lock{static_cast<FileLocks::Lock::Type>(info.type), info.start, info.end,
 		                     FileLocks::Owner{info.owner, info.sessionid, 0, 0}};
@@ -427,9 +433,14 @@ void store(FILE *file, const Container &data) {
 	}
 }
 
-void FileLocks::load(FILE *file) {
-	::load(file, [this](uint32_t inode, Lock &lock) { active_locks_[inode].insert(lock); });
-	::load(file, [this](uint32_t inode, Lock &lock) { pending_locks_[inode].push_back(lock); });
+void FileLocks::load(const std::shared_ptr<MemoryMappedFile> &metadataFile,
+                     size_t &offsetBegin) {
+	::load(metadataFile, offsetBegin, [this](uint32_t inode, Lock &lock) {
+		active_locks_[inode].insert(lock);
+	});
+	::load(metadataFile, offsetBegin, [this](uint32_t inode, Lock &lock) {
+		pending_locks_[inode].push_back(lock);
+	});
 }
 
 void FileLocks::store(FILE *file) {
