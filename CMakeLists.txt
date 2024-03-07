@@ -42,7 +42,11 @@ option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"  
 option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              OFF)
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
 option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                         ON)
+option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"             ON)
 
+# If enabled (default), the file compile_commands.json is generated in the build
+# directory. Tools like clangd and vscode use this file for proper analysis.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ${ENABLE_COMPILE_COMMANDS})
 
 find_program(CCACHE_FOUND ccache)
 message(STATUS "ENABLE_CCACHE: ${ENABLE_CCACHE}")
@@ -124,6 +128,7 @@ message(STATUS "ENABLE_CRC: ${ENABLE_CRC}")
 message(STATUS "ENABLE_REQUEST_LOG: ${ENABLE_REQUEST_LOG}")
 message(STATUS "USE_LEGACY_READ_MESSAGES: ${USE_LEGACY_READ_MESSAGES}")
 message(STATUS "ENABLE_NFS_GANESHA: ${ENABLE_NFS_GANESHA}")
+message(STATUS "ENABLE_COMPILE_COMMANDS: ${CMAKE_EXPORT_COMPILE_COMMANDS}")
 
 execute_process(COMMAND "git" "rev-parse" "HEAD"
   OUTPUT_VARIABLE GIT_SHA1 RESULT_VARIABLE GIT_SHA1_RETURN_VALUE
