@@ -976,8 +976,7 @@ void fs_store_fd(FILE *fd) {
 #endif
 	if (gMetadata == nullptr) {
 		safs_pretty_syslog(LOG_ERR, "gMetadata is NULL");
-		///TODO Throw exception
-		return;
+		throw NoMetadataException();
 	}
 	if (fwrite(kMetadataSignatureV2_9.data(), 1, kMetadataSignatureV2_9.size(), fd) !=
 	    kMetadataSignatureV2_9.size()) {
@@ -1137,7 +1136,12 @@ int fs_emergency_storeall(const std::string &fname) {
 		return kOpFailure;
 	}
 
-	fs_store_fd(fd.get());
+	try {
+		fs_store_fd(fd.get());
+	} catch (const std::exception &e) {
+		safs_pretty_syslog(LOG_ERR, "error storing metadata: %s", e.what());
+		return kOpFailure;
+	}
 
 	if (ferror(fd.get()) != kOpSuccess) {
 		return kOpFailure;

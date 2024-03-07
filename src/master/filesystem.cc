@@ -169,7 +169,13 @@ void fs_storeall(const char *fname) {
 		safs_pretty_syslog(LOG_ERR, "can't open metadata file");
 		return;
 	}
-	fs_store_fd(fd);
+	try {
+		fs_store_fd(fd);
+	} catch (const Exception& ex) {
+		safs_pretty_syslog(LOG_ERR, "fs_storeall: can't write metadata: %s", ex.what());
+		fclose(fd); // close the file before throwing
+		return;
+	}
 
 	if (ferror(fd)!=0) {
 		safs_pretty_syslog(LOG_ERR, "can't write metadata");
