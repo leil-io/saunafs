@@ -335,6 +335,17 @@ if(ZLIB_FOUND)
 endif()
 include_directories(src) # Allow paths relative to src, eg. #include common/crc.h
 link_directories(${LINK_DIRECTORIES} ${FUSE_LIBRARY_DIR})
+
+if(MINGW)
+  option(ENABLE_WINFSP_WINCLIENT  "Enable winfsp library based windows client build"    ON)
+
+  if(ENABLE_WINFSP_WINCLIENT)
+    set(WINFSP_FUSE3_INCLUDE_DIR  "C:/Program Files (x86)/WinFsp/inc/fuse3"             CACHE STRING "winfsp installation /inc directory")
+    set(WINFSP_FUSE_DLL_FOR_ARCH  "C:/Program Files (x86)/WinFsp/bin/winfsp-x64.dll"    CACHE STRING "winfsp-fuse dll for specific arch")
+    set(WINFSP_FUSE_LIBRARY  "C:/Program Files (x86)/WinFsp/lib/winfsp-x64.lib"    CACHE STRING "winfsp-fuse lib for specific arch")
+  endif()
+endif()
+
 add_subdirectory(external)
 add_subdirectory(src/admin)
 add_subdirectory(src/common)
