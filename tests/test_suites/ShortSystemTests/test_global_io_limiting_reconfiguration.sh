@@ -5,6 +5,9 @@ iolimits="$TEMP_DIR/iolimits.cfg"
 echo "limit unclassified 1024" > "$iolimits"
 
 E=11
+if is_windows_system; then
+	E=15
+fi
 if valgrind_enabled; then
 	E=$((5 * E))
 fi

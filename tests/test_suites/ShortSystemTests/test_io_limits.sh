@@ -12,7 +12,7 @@ CHUNKSERVERS=3 \
 cd "${info[mount0]}"
 
 rescale_value() {
-	if valgrind_enabled; then
+	if valgrind_enabled || is_windows_system ; then
 		echo $((4 * $1))
 	else
 		echo "$1"

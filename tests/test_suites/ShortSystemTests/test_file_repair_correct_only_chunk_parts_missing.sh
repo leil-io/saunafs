@@ -30,7 +30,11 @@ cd ..
 # Unmount old SaunaFS client 0:
 assert_success saunafs_mount_unmount 0
 # Mount SaunaFS client 0:
-assert_success saunafs_mount_start 0
+if is_windows_system; then
+	saunafs_mount_start 0
+else
+	assert_success saunafs_mount_start 0
+fi
 
 cd ${info[mount0]}
 
@@ -55,7 +59,11 @@ cd ..
 # Unmount old SaunaFS client 0:
 assert_success saunafs_mount_unmount 0
 # Mount SaunaFS client 0:
-assert_success saunafs_mount_start 0
+if is_windows_system; then
+	saunafs_mount_start 0
+else
+	assert_success saunafs_mount_start 0
+fi
 
 cd ${info[mount0]}
 

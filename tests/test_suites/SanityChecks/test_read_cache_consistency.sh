@@ -38,7 +38,7 @@ if file-validate test/file; then
 fi
 
 # Ensure that file is broken on the other mount as well
-if file-validate test/file; then
+if file-validate ${info[mount1]}/test/file; then
 	test_add_failure "Data read is not up to date"
 fi
 
