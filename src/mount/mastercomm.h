@@ -119,7 +119,11 @@ uint8_t fs_getchunksinfo(uint32_t uid, uint32_t gid, uint32_t inode, uint32_t ch
 uint8_t fs_getchunkservers(std::vector<ChunkserverListEntry> &chunkservers);
 
 // called after fork
-int fs_init_master_connection(SaunaClient::FsInitParams &params);
+int fs_init_master_connection(SaunaClient::FsInitParams &params
+#ifdef _WIN32
+, uint8_t &session_flags, int &mounting_uid, int &mounting_gid
+#endif
+);
 void fs_init_threads(uint32_t retries);
 void fs_term(void);
 

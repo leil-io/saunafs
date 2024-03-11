@@ -95,6 +95,11 @@ static bool disconnect;
 static time_t lastwrite;
 static int sessionlost;
 
+#ifdef _WIN32
+uint8_t *session_flags_ = NULL;
+int *mounting_uid_ = NULL, *mounting_gid_ = NULL;
+#endif
+
 static uint32_t maxretries;
 
 static pthread_t rpthid,npthid;
@@ -719,6 +724,9 @@ int fs_connect(bool verbose) {
 	}
 	sessionid = get32bit(&rptr);
 	sesflags = get8bit(&rptr);
+#ifdef _WIN32
+	*session_flags_ = sesflags;
+#endif
 	if (!gInitParams.meta) {
 		rootuid = get32bit(&rptr);
 		rootgid = get32bit(&rptr);
@@ -806,7 +814,19 @@ int fs_connect(bool verbose) {
 			}
 #else
 			fprintf(stderr, " ; root mapped to %" PRIu32 ":%" PRIu32, rootuid, rootgid);
-			fprintf(stderr, " ; users mapped to %" PRIu32 ":%" PRIu32, mapalluid, mapallgid);
+			if (mapalluid != 999 || mapallgid != 999) {
+				if (*mounting_uid_ != USE_LOCAL_ID && *mounting_gid_ != USE_LOCAL_ID) {
+					fprintf(stderr, " ; master server overwrote users mapping");
+				}
+				*mounting_uid_ = mapalluid;
+				*mounting_gid_ = mapallgid;
+			}
+			if (*mounting_uid_ == USE_LOCAL_ID && *mounting_gid_ == USE_LOCAL_ID) {
+				fprintf(stderr, " ; users mapped to local IDs");
+			} else {
+				fprintf(stderr, " ; users mapped to %" PRIu32 ":%" PRIu32,
+				        *mounting_uid_, *mounting_gid_);
+			}
 #endif
 		} else {
 			// meta
@@ -1246,7 +1266,11 @@ void* fs_receive_thread(void *) {
 }
 
 // called before fork
-int fs_init_master_connection(SaunaClient::FsInitParams &params) {
+int fs_init_master_connection(SaunaClient::FsInitParams &params
+#ifdef _WIN32
+, uint8_t &session_flags, int &mounting_uid, int &mounting_gid
+#endif
+) {
 	master_statsptr_init();
 
 	gInitParams = params;
@@ -1260,6 +1284,11 @@ int fs_init_master_connection(SaunaClient::FsInitParams &params) {
 	if (params.delayed_init) {
 		return 1;
 	}
+#ifdef _WIN32
+	session_flags_ = &session_flags; 
+	mounting_uid_ = &mounting_uid;
+	mounting_gid_ = &mounting_gid;
+#endif
 	return fs_connect(params.verbose);
 }
 
