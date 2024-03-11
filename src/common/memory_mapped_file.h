@@ -68,6 +68,16 @@ public:
 	size_t read(size_t &offset, uint8_t *buf, size_t size,
 	            bool = false) const;
 
+	/**
+	 * Write the given number of bytes to the memory mapped file
+	 * @param offset
+	 * @param buf
+	 * @param size
+	 * @return
+	 */
+	[[nodiscard]] size_t write(size_t offset, const uint8_t *buf,
+	                           size_t size) const;
+
 	/** Get the offset of the given pointer into the memory mapped file
 	 * relative to the start of the file
 	 * @param ptr The pointer to get the offset of

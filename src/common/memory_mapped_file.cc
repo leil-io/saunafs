@@ -43,6 +43,9 @@ public:
 	size_t read(size_t &offset, uint8_t *buf, size_t size,
 	            bool moveOffset = false) const;
 
+	[[nodiscard]] size_t write(size_t offset, const uint8_t *buf,
+	                           size_t size) const;
+
 	[[nodiscard]] size_t offset(const uint8_t *ptr) const;
 
 	[[nodiscard]] const std::string &filename() const;
@@ -168,6 +171,16 @@ size_t MemoryMappedFile::Impl::offset(const uint8_t *ptr) const {
 
 size_t MemoryMappedFile::offset(const uint8_t *ptr) const {
 	return pimpl->offset(ptr);
+}
+
+size_t MemoryMappedFile::write([[maybe_unused]] size_t offset, [[maybe_unused]]  const uint8_t *buf,
+									 [[maybe_unused]] size_t size) const {
+	return pimpl->write(offset, buf, size);
+}
+
+size_t MemoryMappedFile::Impl::write([[maybe_unused]] size_t offset, [[maybe_unused]]  const uint8_t *buf,
+                               [[maybe_unused]] size_t size) const {
+	return 0;
 }
 
 const std::string &MemoryMappedFile::Impl::filename() const { return path_; }
