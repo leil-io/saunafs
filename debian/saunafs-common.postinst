@@ -12,8 +12,8 @@ case "${1}" in
 			adduser --quiet --system --group --no-create-home --home /var/lib/saunafs saunafs
 		fi
 		if [ ! -f $sau_limits_conf ]; then
-			echo "saunafs soft nofile 10000" > $sau_limits_conf
-			echo "saunafs hard nofile 10000" >> $sau_limits_conf
+			echo "saunafs soft nofile 131072" > $sau_limits_conf
+			echo "saunafs hard nofile 131072" >> $sau_limits_conf
 			chmod 0644 $sau_limits_conf
 		fi
 		if [ ! -f $sau_pam_d ]; then

@@ -138,8 +138,8 @@ if ! getent passwd %{sau_user} > /dev/null 2>&1 ; then
 	adduser --system -g %{sau_group} --no-create-home --home-dir %{sau_datadir} %{sau_user}
 fi
 if [ ! -f %{sau_limits_conf} ]; then
-	echo "%{sau_user} soft nofile 10000" > %{sau_limits_conf}
-	echo "%{sau_user} hard nofile 10000" >> %{sau_limits_conf}
+	echo "%{sau_user} soft nofile 131072" > %{sau_limits_conf}
+	echo "%{sau_user} hard nofile 131072" >> %{sau_limits_conf}
 	chmod 0644 %{sau_limits_conf}
 fi
 if [ ! -f %{sau_pam_d} ]; then
@@ -188,8 +188,8 @@ if ! getent passwd %{sau_user} > /dev/null 2>&1 ; then
 	adduser --system -g %{sau_group} --no-create-home --home-dir %{sau_datadir} %{sau_user}
 fi
 if [ ! -f %{sau_limits_conf} ]; then
-	echo "%{sau_user} soft nofile 10000" > %{sau_limits_conf}
-	echo "%{sau_user} hard nofile 10000" >> %{sau_limits_conf}
+	echo "%{sau_user} soft nofile 131072" > %{sau_limits_conf}
+	echo "%{sau_user} hard nofile 131072" >> %{sau_limits_conf}
 	chmod 0644 %{sau_limits_conf}
 fi
 if [ ! -f %{sau_pam_d} ]; then
