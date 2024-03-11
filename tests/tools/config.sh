@@ -1,3 +1,17 @@
+is_windows_system() {
+	grep /proc/version -e [Mm]icrosoft > /dev/null
+}
+
+get_windows_homepath() {
+	local win_home_directory=$(/mnt/c/Windows/System32/cmd.exe /C "echo %homepath%" | tr -d "\r\n")
+	echo -n "/mnt/c${win_home_directory//\\//}"
+}
+
+get_windows_domain() {
+	local win_domain=$(/mnt/c/Windows/System32/cmd.exe /C "echo %USERDOMAIN%" | tr -d "\r\n")
+	echo -n "$win_domain"
+}
+
 # Load config file with machine-specific configuration
 if [[ ! -z "${SAUNAFS_TESTS_CONF:-}" && -f "${SAUNAFS_TESTS_CONF}" ]]; then
 	echo "Using \"${SAUNAFS_TESTS_CONF}\" tests configuration file"
@@ -17,7 +31,11 @@ fi
 : ${TEMP_DIR:=/tmp/SaunaFS-autotests}
 : ${LEGACY_DIR:=/tmp/SaunaFS-autotests-legacy}
 : ${SAUNAFSXX_DIR_BASE:=/tmp/SaunaFS-autotests-old}
-: ${SAUNAFS_ROOT:=$HOME/local}
+if is_windows_system; then
+	: ${SAUNAFS_ROOT:=/usr/local}
+else
+	: ${SAUNAFS_ROOT:=$HOME/local}
+fi
 : ${FIRST_PORT_TO_USE:=9600}
 : ${ERROR_FILE:=}
 : ${RAMDISK_DIR:=/mnt/ramdisk}
@@ -33,6 +51,9 @@ chmod 777 "$TEMP_DIR"
 
 # Prepare important environment variables
 export PATH="$SAUNAFS_ROOT/sbin:$SAUNAFS_ROOT/bin:$PATH"
+if is_windows_system; then
+	export PATH="$(get_windows_homepath)/SaunaFS:/mnt/c/Windows/System32:$PATH"
+fi
 
 # Quick checks needed to call test_begin and test_fail
 if ((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 402)); then

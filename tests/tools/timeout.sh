@@ -19,6 +19,11 @@ timeout_killer_thread() {
 		local value=$(($(date +%s -d "$value_string") - $(date +%s)))
 		local now_ts=$(date +%s)
 
+		# Triples test time in Windows environment
+		if is_windows_system; then
+			multiplier=$(python3 -c "print(int(5 * $multiplier))")
+		fi
+
 		if [[ -z $begin_ts || -z $value_string || -z $multiplier ]]; then
 			# A race with timeout_set occurred (it truncates the endTS file and then writes it)
 			# or a race with test_cleanup (test_timeout_end_ts_file has just been removed)

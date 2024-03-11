@@ -110,7 +110,9 @@ function parametrize_command() {
 # Do not run directly in test cases
 # This should be called at the very beginning of a test
 test_begin() {
-	( tail -n0 -f /var/log/syslog | stdbuf -oL tee "$ERROR_DIR/syslog.log" & )
+	if ! is_windows_system; then
+		( tail -n0 -f /var/log/syslog | stdbuf -oL tee "$ERROR_DIR/syslog.log" & )
+	fi
 	test_result_file="$TEMP_DIR/$(unique_file)_results.txt"
 	test_end_file=$test_result_file.end
 	check_configuration
@@ -144,18 +146,30 @@ mass_chmod_777() {
 # This removes all temporary files and unmounts filesystems
 test_cleanup() {
 	# Unmount all sfsmounts
-	local retries=0
-	pkill -KILL -u saunafstest sfsmount || true
-	pkill -KILL -u saunafstest memcheck || true
-	# Search for all fuse filesystems mounted by user saunafstest and umount them
-	local uid=$(id -u saunafstest)
-	while list_of_mounts=$(cat /proc/mounts | awk '$3 ~ /^fuse/' | grep "user_id=$uid[^0-9]"); do
-		echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 fusermount -u || sleep 1
-		if ((++retries == 30)); then
-			echo "Can't unmount: $list_of_mounts" >&2
-			break
-		fi
-	done
+	if is_windows_system; then
+		local retries=0
+		while list_of_mounts=$(cat /proc/mounts | awk '$1 ~ /^[F-O]:/' | grep drvfs); do
+			echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 sudo umount -l || sleep 1
+			if ((++retries == 30)); then
+				echo "Can't unmount: $list_of_mounts" >&2
+				break
+			fi
+		done
+		taskkill.exe /IM sfsmount3.exe /F &> /dev/null || true
+	else
+		local retries=0
+		pkill -KILL -u saunafstest sfsmount || true
+		pkill -KILL -u saunafstest memcheck || true
+		# Search for all fuse filesystems mounted by user saunafstest and umount them
+		local uid=$(id -u saunafstest)
+		while list_of_mounts=$(cat /proc/mounts | awk '$3 ~ /^fuse/' | grep "user_id=$uid[^0-9]"); do
+			echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 fusermount -u || sleep 1
+			if ((++retries == 30)); then
+				echo "Can't unmount: $list_of_mounts" >&2
+				break
+			fi
+		done
+	fi
 	# Remove temporary files
 	if ! [[ $TEMP_DIR ]]; then
 		echo "TEMP_DIR variable empty, cowardly refusing to rm -rf /*"
