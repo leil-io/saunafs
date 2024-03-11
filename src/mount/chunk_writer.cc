@@ -229,7 +229,11 @@ void ChunkWriter::processOperations(uint32_t msTimeout) {
 	}
 
 	for (pollfd& pollFd : pollFds) {
+#ifdef _WIN32
+		if (pollFd.fd == static_cast<SOCKET>(dataChainFd_)) {
+#else
 		if (pollFd.fd == dataChainFd_) {
+#endif
 			if (pollFd.revents & POLLIN) {
 				const uint32_t dataFdBufferSize = 1024;
 				uint8_t dataFdBuffer[dataFdBufferSize];
