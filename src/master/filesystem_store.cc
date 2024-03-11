@@ -424,7 +424,7 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 	return kSuccess;
 }
 
-void fs_storenode(FSNode *f, FILE *fd) {
+void fs_storenode(FSNode *f, FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	uint8_t unodebuff[1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 +
 	                  8 * 65536 + 4 * 65536 + 4];
 	uint8_t *ptr, *chptr;
@@ -644,7 +644,7 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 	return kSuccess;
 }
 
-void fs_storenodes(FILE *fd) {
+void fs_storenodes(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	uint32_t i;
 	FSNode *p;
 	for (i = 0; i < NODEHASHSIZE; i++) {
