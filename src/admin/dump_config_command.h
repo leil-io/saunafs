@@ -21,10 +21,16 @@
 #include "common/platform.h"
 
 #include "admin/saunafs_admin_command.h"
+#include <string>
+#include <unordered_map>
 
 class DumpConfigurationCommand : public SaunaFsProbeCommand {
 public:
+	std::string defaultsMode = "--defaults";
+
 	std::string name() const override;
 	void usage() const override;
+	SupportedOptions supportedOptions() const override;
 	void run(const Options &options) const override;
 };
+
