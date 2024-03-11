@@ -30,7 +30,7 @@ namespace {
 struct TestCase {
 	double time;
 	double request;
-	double result;
+	uint64_t result;
 };
 
 SteadyTimePoint timepointInc(SteadyTimePoint tp, double seconds) {
@@ -79,8 +79,9 @@ TEST(TokenBucketTests, ManyAttemptsAccumulateProperly) {
 	tester(10, 5, {
 			{.1, 1, 1},
 			{.2, 1, 1},
-			{.25, 1, .5},
-			{.25, 1, 0}
+			{.25, 1, 0}, // result should be integer though it accumulated 0.5
+			{.3, 1, 1},
+			{.6, 2, 2},
 		});
 }
 
@@ -88,9 +89,12 @@ TEST(TokenBucketTests, ReconfigurationChangingRate) {
 	SteadyTimePoint t0;
 	TokenBucket tb(t0);
 	tb.reconfigure(t0, 1, 10);
-	doTests(tb, t0, {{.5, 10, .5}});
-	tb.reconfigure(timepointInc(t0, 1), 2, 10);
-	doTests(tb, t0, {{2, 10, 2.5}});
+	doTests(tb, t0, {
+			{.5, 10, 0}, 
+			{2, 10, 2}
+		});
+	tb.reconfigure(timepointInc(t0, 3), 2, 10);
+	doTests(tb, t0, {{4.5, 10, 4}});
 }
 
 TEST(TokenBucketTests, ReconfigurationReducingCeil) {

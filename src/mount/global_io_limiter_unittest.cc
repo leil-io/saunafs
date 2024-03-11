@@ -283,7 +283,7 @@ TEST(LimiterProxyTests, EndTimeAfterManyParallelReads) {
 
 				// Moreover, check if we can compute the exact read time:
 				auto bytes_to_read = N * M * 1024;
-				auto bytes_per_delta_us = int64_t((1024 * delta_us) / 1000);
+				auto bytes_per_delta_us = double(double(1024.0 * delta_us) / 1000.0);
 				auto periods_needed_to_read_all = ceil(double(bytes_to_read) / bytes_per_delta_us);
 				int64_t expected_read_time_us = delta_us * periods_needed_to_read_all;
 				ASSERT_EQ(expected_read_time_us, time_passed_us);
