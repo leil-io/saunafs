@@ -20,38 +20,29 @@
 
 #include "common/platform.h"
 
-#include <stdio.h>
+#include <vector>
 
 #include "chunkserver/chartsdata.h"
 #include "chunkserver/hddspacemgr.h"
 #include "chunkserver/masterconn.h"
 #include "chunkserver/network_main_thread.h"
 #include "common/random.h"
+#include "common/run_tab.h"
 
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
+/// Functions to call before normal startup
+inline const std::vector<RunTab> earlyRunTabs = {};
 
-/* Run Tab */
-typedef int (*runfn)(void);
-struct run_tab {
-	runfn fn;
-	const char *name;
-};
+/// Functions to call during normal startup
+inline const std::vector<RunTab> runTabs = {
+    RunTab{rnd_init, "random generator"}, RunTab{loadPlugins, "plugin manager"},
+    RunTab{hddInit, "hdd space manager"},
+    // Has to be before "masterconn"
+    RunTab{mainNetworkThreadInit, "main server module"},
+    RunTab{masterconn_init, "master connection module"},
+    RunTab{chartsdata_init, "charts module"}};
 
-run_tab RunTab[] = {
-    {rnd_init, "random generator"},
-    {loadPlugins, "plugin manager"},
-    {hddInit, "hdd space manager"},
-    {mainNetworkThreadInit,
-     "main server module"}, /* it has to be before "masterconn" */
-    {masterconn_init, "master connection module"},
-    {chartsdata_init, "charts module"},
-    {(runfn)0, "****"}};
-
-run_tab LateRunTab[] = {
-    {masterconn_init_threads, "master connection module - threads"},
-    {hddLateInit, "hdd space manager - threads"},
-    {mainNetworkThreadInitThreads, "main server module - threads"},
-    {(runfn)0, "****"}};
-
-run_tab EarlyRunTab[] = {{(runfn)0, "****"}};
+/// Functions to call delayed after the initialization is correct
+inline const std::vector<RunTab> lateRunTabs = {
+    RunTab{masterconn_init_threads, "master connection module - threads"},
+    RunTab{hddLateInit, "hdd space manager - threads"},
+    RunTab{mainNetworkThreadInitThreads, "main server module - threads"}};

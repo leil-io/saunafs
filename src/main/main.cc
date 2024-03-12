@@ -136,37 +136,41 @@ static void signal_pipe_serv(const std::vector<pollfd> &pdesc) {
 	}
 }
 
+bool initialize(const std::vector<RunTab> &tabs) {
+	bool isOk = true;
 
-int initialize(run_tab* tab) {
-	uint32_t i;
-	int ok;
-	ok = 1;
-	for (i=0 ; (long int)(tab[i].fn)!=0 && ok ; i++) {
+	for (const auto &tab : tabs) {
 		eventloop_updatetime();
+
 		try {
-			if (tab[i].fn()<0) {
-				safs_pretty_syslog(LOG_ERR,"init: %s failed",tab[i].name);
-				ok=0;
+			if (tab.function() < 0) {
+				safs_pretty_syslog(LOG_ERR, "init: %s failed",
+				                   tab.name.c_str());
+				isOk = false;
+				break;
 			}
-		} catch (const std::exception& e) {
+		} catch (const std::exception &e) {
 			safs_pretty_syslog(LOG_ERR, "%s", e.what());
-			ok = 0;
+			isOk = false;
+			break;
 		}
 	}
+
 	eventloop_updatetime();
-	return ok;
+
+	return isOk;
 }
 
-int initialize_early(void) {
-	return initialize(EarlyRunTab);
+bool initialize_early() {
+	return initialize(earlyRunTabs);
 }
 
-int initialize(void) {
-	return initialize(RunTab);
+bool initialize() {
+	return initialize(runTabs);
 }
 
-int initialize_late(void) {
-	return initialize(LateRunTab);
+bool initialize_late() {
+	return initialize(lateRunTabs);
 }
 
 const std::string& set_syslog_ident() {
