@@ -37,6 +37,7 @@
 
 #include <list>
 
+#include "chunkserver-common/hdd_utils.h"
 #include "chunkserver/bgjobs.h"
 #include "chunkserver/hddspacemgr.h"
 #include "chunkserver/network_main_thread.h"

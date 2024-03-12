@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable symbol export for loadable modules, ensuring same shared resource
+# references. Needed for the plugins, as they are shared libraries.
+set(CMAKE_ENABLE_EXPORTS ON)
+
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
