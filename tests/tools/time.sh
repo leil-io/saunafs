@@ -22,6 +22,10 @@ wait_for() {
 	return 1
 }
 
+wait_chunkservers() {
+	sleep 5
+}
+
 execution_time() {
 	/usr/bin/time --quiet -f %e "${@}" 2>&1 > /dev/null || true
 }

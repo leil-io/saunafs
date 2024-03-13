@@ -31,11 +31,7 @@ fi
 : ${TEMP_DIR:=/tmp/SaunaFS-autotests}
 : ${LEGACY_DIR:=/tmp/SaunaFS-autotests-legacy}
 : ${SAUNAFSXX_DIR_BASE:=/tmp/SaunaFS-autotests-old}
-if is_windows_system; then
-	: ${SAUNAFS_ROOT:=/usr/local}
-else
-	: ${SAUNAFS_ROOT:=$HOME/local}
-fi
+: ${SAUNAFS_ROOT:=/usr/local}
 : ${FIRST_PORT_TO_USE:=9600}
 : ${ERROR_FILE:=}
 : ${RAMDISK_DIR:=/mnt/ramdisk}

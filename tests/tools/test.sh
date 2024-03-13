@@ -142,33 +142,41 @@ mass_chmod_777() {
 		'user=$(stat -c "%U" "{}"); sudo -nu $user setfacl -b "{}" ; sudo -nu $user chmod 777 "{}"' \;
 }
 
+windows_unmount_fs() {
+	local retries=0
+	while list_of_mounts=$(cat /proc/mounts | awk '$1 ~ /^[F-O]:/' | grep drvfs); do
+		echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 sudo umount -l || sleep 1
+		if ((++retries == 30)); then
+			echo "Can't unmount: $list_of_mounts" >&2
+			break
+		fi
+	done
+	taskkill.exe /IM sfsmount3.exe /F &> /dev/null || true
+}
+
+unix_unmount_fs() {
+	local retries=0
+	pkill -KILL -u saunafstest sfsmount || true
+	pkill -KILL -u saunafstest memcheck || true
+	# Search for all fuse filesystems mounted by user saunafstest and umount them
+	local uid=$(id -u saunafstest)
+	while list_of_mounts=$(cat /proc/mounts | awk '$3 ~ /^fuse/' | grep "user_id=$uid[^0-9]"); do
+		echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 fusermount -u || sleep 1
+		if ((++retries == 30)); then
+			echo "Can't unmount: $list_of_mounts" >&2
+			break
+		fi
+	done
+}
+
 # Do not use directly
 # This removes all temporary files and unmounts filesystems
 test_cleanup() {
 	# Unmount all sfsmounts
 	if is_windows_system; then
-		local retries=0
-		while list_of_mounts=$(cat /proc/mounts | awk '$1 ~ /^[F-O]:/' | grep drvfs); do
-			echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 sudo umount -l || sleep 1
-			if ((++retries == 30)); then
-				echo "Can't unmount: $list_of_mounts" >&2
-				break
-			fi
-		done
-		taskkill.exe /IM sfsmount3.exe /F &> /dev/null || true
+		windows_unmount_fs
 	else
-		local retries=0
-		pkill -KILL -u saunafstest sfsmount || true
-		pkill -KILL -u saunafstest memcheck || true
-		# Search for all fuse filesystems mounted by user saunafstest and umount them
-		local uid=$(id -u saunafstest)
-		while list_of_mounts=$(cat /proc/mounts | awk '$3 ~ /^fuse/' | grep "user_id=$uid[^0-9]"); do
-			echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 fusermount -u || sleep 1
-			if ((++retries == 30)); then
-				echo "Can't unmount: $list_of_mounts" >&2
-				break
-			fi
-		done
+		unix_unmount_fs
 	fi
 	# Remove temporary files
 	if ! [[ $TEMP_DIR ]]; then

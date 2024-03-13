@@ -341,7 +341,7 @@ if(MINGW)
 
   if(ENABLE_WINFSP_WINCLIENT)
     set(WINFSP_FUSE3_INCLUDE_DIR  "C:/Program Files (x86)/WinFsp/inc/fuse3"             CACHE STRING "winfsp installation /inc directory")
-    set(WINFSP_FUSE_DLL_FOR_ARCH  "C:/Program Files (x86)/WinFsp/bin/winfsp-x64.dll"    CACHE STRING "winfsp-fuse dll for specific arch")
+    set(WINFSP_FUSE_DLL  "C:/Program Files (x86)/WinFsp/bin/winfsp-x64.dll"    CACHE STRING "winfsp-fuse dll for specific arch")
     set(WINFSP_FUSE_LIBRARY  "C:/Program Files (x86)/WinFsp/lib/winfsp-x64.lib"    CACHE STRING "winfsp-fuse lib for specific arch")
   endif()
 endif()

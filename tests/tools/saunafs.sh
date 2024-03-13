@@ -630,51 +630,61 @@ configure_mount_() {
 	saunafs_info_[mnt${mount_id}_command]=${mount_cmd}
 }
 
+windows_prepare_mount_() {
+	local mount_id=$1
+	local mount_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[f-o]')
+	local mount_big_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[F-O]')
+	local mount_dir="/mnt/$mount_dir_letter"
+	local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
+	create_sfsmount_cfg_ ${mount_id} > "$mount_cfg"
+
+	local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir}"
+	local umount_call="windows_do_umount_ ${mount_big_dir_letter} ${mount_dir}"
+
+	if [ ! -d "$mount_dir" ]; then
+		sudo mkdir "$mount_dir"
+	fi
+
+	saunafs_info_[mount${mount_id}]=$mount_dir
+	saunafs_info_[mount${mount_id}_cfg]=$mount_cfg
+	saunafs_info_[mntcall${mount_id}]=$mount_call
+	saunafs_info_[mnt${mount_id}_command]="sfsmount3.exe"
+	saunafs_info_[umountcall${mount_id}]=$umount_call
+	saunafs_info_[mount_win_path${mount_id}]=${mount_big_dir_letter}:
+}
+
+unix_prepare_mount_() {
+	local mount_id=$1
+	local mount_dir=$mntdir/sfs${mount_id}
+	local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
+	local sfsmount_available=false
+	if $(which sfsmount &>/dev/null); then sfsmount_available=true; fi
+	create_sfsmount_cfg_ ${mount_id} >"$mount_cfg"
+	mkdir -p "$mount_dir"
+	saunafs_info_[mount${mount_id}]="$mount_dir"
+	saunafs_info_[mount${mount_id}_cfg]="$mount_cfg"
+	max_tries=30
+
+	if [ -z ${SAFS_MOUNT_COMMAND+x} ]; then
+		if [ "$sfsmount_available" = true ]; then
+			SAFS_MOUNT_COMMAND=sfsmount
+			echo "Using libfuse3 for mounting filesystem."
+		else
+			echo "No sfsmount executable available, exiting"
+			exit 2
+		fi
+	fi
+
+	configure_mount_ ${mount_id} ${SAFS_MOUNT_COMMAND}
+}
+
 add_mount_() {
 	local mount_id=$1
 
 	if is_windows_system; then
-		local mount_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[f-o]')
-		local mount_big_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[F-O]')
-		local mount_dir="/mnt/$mount_dir_letter"
-		local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
-		create_sfsmount_cfg_ ${mount_id} > "$mount_cfg"
-
-		local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir}"
-		local umount_call="windows_do_umount_ ${mount_big_dir_letter} ${mount_dir}"
-
-		if [ ! -d "$mount_dir" ]; then
-			sudo mkdir "$mount_dir"
-		fi
-
-		saunafs_info_[mount${mount_id}]=$mount_dir
-		saunafs_info_[mount${mount_id}_cfg]=$mount_cfg
-		saunafs_info_[mntcall${mount_id}]=$mount_call
-		saunafs_info_[mnt${mount_id}_command]="sfsmount3.exe"
-		saunafs_info_[umountcall${mount_id}]=$umount_call
-		saunafs_info_[mount_win_path${mount_id}]=${mount_big_dir_letter}:
+		windows_prepare_mount_ $mount_id
 	else
-		local mount_dir=$mntdir/sfs${mount_id}
-		local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
-		local sfsmount_available=false
-		if $(which sfsmount &>/dev/null); then sfsmount_available=true; fi
-		create_sfsmount_cfg_ ${mount_id} >"$mount_cfg"
-		mkdir -p "$mount_dir"
-		saunafs_info_[mount${mount_id}]="$mount_dir"
-		saunafs_info_[mount${mount_id}_cfg]="$mount_cfg"
-		max_tries=30
-
-		if [ -z ${SAFS_MOUNT_COMMAND+x} ]; then
-			if [ "$sfsmount_available" = true ]; then
-				SAFS_MOUNT_COMMAND=sfsmount
-				echo "Using libfuse3 for mounting filesystem."
-			else
-				echo "No sfsmount executable available, exiting"
-				exit 2
-			fi
-		fi
-
-		configure_mount_ ${mount_id} ${SAFS_MOUNT_COMMAND}
+		unix_prepare_mount_ $mount_id
 	fi
 
 	max_tries=30

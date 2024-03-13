@@ -25,7 +25,7 @@ saunafs setgoal xor2 dir
 FILE_SIZE=$(( 4 * SAUNAFS_CHUNK_SIZE )) file-generate dir/file
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 for cs in {0..2}; do
@@ -38,7 +38,7 @@ saunafs makesnapshot dir/file backup/snapshot
 saunafs setgoal backup backup/snapshot
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 assert_eventually_prints 4 'find_chunkserver_metadata_chunks 3 -name "chunk_0*" | wc -l'
@@ -56,7 +56,7 @@ assert_success rm "$chunk"
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 # dir/file will have the following chunks:
@@ -86,7 +86,7 @@ cp "$saved_chunk" "$TEMP_DIR"
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=10
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 # Chunk id was incremented by number of chunks.

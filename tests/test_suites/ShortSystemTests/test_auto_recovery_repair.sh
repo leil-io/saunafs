@@ -14,7 +14,7 @@ saunafs setgoal 3 dir
 FILE_SIZE=$(( 4 * SAUNAFS_CHUNK_SIZE )) file-generate dir/file
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 assert_equals 4 $(find_chunkserver_metadata_chunks 0 | wc -l)
@@ -30,7 +30,7 @@ assert_success rm "$chunk"
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 for chunk in 1 2; do
@@ -48,7 +48,7 @@ assert_success rm "$chunk"
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 
 if is_windows_system; then
-	sleep 5
+	wait_chunkservers
 fi
 
 for chunk in 1 2; do
