@@ -49,7 +49,7 @@ static void fs_store_acl(uint32_t id, const RichACL &acl, FILE *fd) {
 	}
 }
 
-void fs_store_acls(FILE *fd) {
+void fs_store_acls(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile) {
 	for (uint32_t i = 0; i < NODEHASHSIZE; ++i) {
 		for (FSNode *p = gMetadata->nodehash[i]; p; p = p->next) {
 			const RichACL *node_acl = gMetadata->acl_storage.get(p->id);

@@ -60,7 +60,7 @@ constexpr int8_t kOpFailure = -1;
 char const MetadataStructureReadErrorMsg[] =
     "error reading metadata (structure)";
 
-void xattr_store(FILE *fd) {
+void xattr_store(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	uint8_t hdrbuff[4 + 1 + 4];
 	uint8_t *ptr;
 	uint32_t i;
@@ -684,20 +684,20 @@ void fs_storeedges_rec(FSNodeDirectory *f, FILE *fd) {
 	}
 }
 
-void fs_storeedges(FILE *fd) {
+void fs_storeedges(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	fs_storeedges_rec(gMetadata->root, fd);
 	fs_storeedgelist(gMetadata->trash, fd);
 	fs_storeedgelist(gMetadata->reserved, fd);
 	fs_storeedge(nullptr, nullptr, std::string(), fd);  // end marker
 }
 
-static void fs_storequotas(FILE *fd) {
+static void fs_storequotas(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	const std::vector<QuotaEntry> &entries =
 	    gMetadata->quota_database.getEntries();
 	fs_store_generic(fd, entries);
 }
 
-static void fs_storelocks(FILE *fd) {
+static void fs_storelocks(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	gMetadata->flock_locks.store(fd);
 	gMetadata->posix_locks.store(fd);
 }
@@ -803,7 +803,7 @@ static bool fs_loadlocks(MetadataLoader::Options options) {
 	return true;
 }
 
-void fs_storefree(FILE *fd) {
+void fs_storefree(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	uint8_t wbuff[8 * 1024], *ptr;
 
 	uint32_t l = gMetadata->inode_pool.detainedCount();

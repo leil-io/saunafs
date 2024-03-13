@@ -2675,7 +2675,7 @@ bool chunksLoadFromFile(MetadataLoader::Options options) {
 	}
 }
 
-void chunk_store(FILE *fd) {
+void chunk_store(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile) {
 	passert(gChunksMetadata);
 	uint8_t hdr[8];
 	uint8_t storebuff[kSerializedChunkSizeWithLockId * CHUNKCNT];

@@ -32,4 +32,4 @@ bool fs_load_posix_acls(MetadataLoader::Options);
 
 bool fs_load_acls(MetadataLoader::Options);
 
-void fs_store_acls(FILE *fd);
+void fs_store_acls(FILE *fd, const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr);

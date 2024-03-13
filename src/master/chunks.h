@@ -100,7 +100,7 @@ int chunk_invalidate_goal_cache();
 #endif
 
 bool chunksLoadFromFile(MetadataLoader::Options);
-void chunk_store(FILE *fd);
+void chunk_store(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr);
 void chunk_unload(void);
 void chunk_newfs(void);
 int chunk_strinit(void);
