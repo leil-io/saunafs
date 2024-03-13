@@ -424,60 +424,62 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 	return kSuccess;
 }
 
-void fs_storenode(FSNode *f, FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
-	uint8_t unodebuff[1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 +
-	                  8 * 65536 + 4 * 65536 + 4];
+void fs_storenode(FSNode *node, FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
+	constexpr size_t kNodeSize = 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 + 8 * 65536 + 4 * 65536 + 4;
+	constexpr uint8_t kDirNodeSize      = 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4;
+	constexpr uint8_t kBlockDevNodeSize = 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4;
+	constexpr uint8_t kSymlinkNodeSize  = 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4;
+	constexpr uint8_t kFileNodeSize = 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2;
+	constexpr uint32_t kChunkSize = (1 << 16);
+	std::array<uint8_t, kNodeSize> buffer;
 	uint8_t *ptr, *chptr;
 	uint32_t i, indx, ch, sessionids;
 	std::string name;
 
-	if (f == NULL) {  // last node
+	if (node == nullptr) {  // last node
 		fputc(0, fd);
 		return;
 	}
-	ptr = unodebuff;
-	put8bit(&ptr, f->type);
-	put32bit(&ptr, f->id);
-	put8bit(&ptr, f->goal);
-	put16bit(&ptr, f->mode);
-	put32bit(&ptr, f->uid);
-	put32bit(&ptr, f->gid);
-	put32bit(&ptr, f->atime);
-	put32bit(&ptr, f->mtime);
-	put32bit(&ptr, f->ctime);
-	put32bit(&ptr, f->trashtime);
+	ptr = buffer.data();
+	put8bit(&ptr, node->type);
+	put32bit(&ptr, node->id);
+	put8bit(&ptr, node->goal);
+	put16bit(&ptr, node->mode);
+	put32bit(&ptr, node->uid);
+	put32bit(&ptr, node->gid);
+	put32bit(&ptr, node->atime);
+	put32bit(&ptr, node->mtime);
+	put32bit(&ptr, node->ctime);
+	put32bit(&ptr, node->trashtime);
 
-	auto *node_file = static_cast<FSNodeFile *>(f);
+	auto *nodeFile = static_cast<FSNodeFile *>(node);
 
-	switch (f->type) {
+	switch (node->type) {
 	case FSNode::kDirectory:
 	case FSNode::kSocket:
 	case FSNode::kFifo:
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
-		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		if (fwrite(buffer.data(), 1, kDirNodeSize, fd) != kDirNodeSize) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		break;
 	case FSNode::kBlockDev:
 	case FSNode::kCharDev:
-		put32bit(&ptr, static_cast<FSNodeDevice *>(f)->rdev);
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
-		           fd) != (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		put32bit(&ptr, static_cast<FSNodeDevice *>(node)->rdev);
+		if (fwrite(buffer.data(), 1, kBlockDevNodeSize, fd) != kBlockDevNodeSize) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		break;
 	case FSNode::kSymlink:
-		name = (std::string) static_cast<FSNodeSymlink *>(f)->path;
+		name = (std::string) static_cast<FSNodeSymlink *>(node)->path;
 		put32bit(&ptr, name.length());
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
-		           fd) != (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		if (fwrite(buffer.data(), 1, kSymlinkNodeSize, fd) != kSymlinkNodeSize) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		if (fwrite(name.c_str(), 1, name.length(), fd) !=
-		    (size_t)(static_cast<FSNodeSymlink *>(f)->path_length)) {
+		    (size_t)(static_cast<FSNodeSymlink *>(node)->path_length)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
@@ -485,41 +487,39 @@ void fs_storenode(FSNode *f, FILE *fd, [[maybe_unused]] const std::shared_ptr<Me
 	case FSNode::kFile:
 	case FSNode::kTrash:
 	case FSNode::kReserved:
-		put64bit(&ptr, node_file->length);
-		ch = node_file->chunkCount();
+		put64bit(&ptr, nodeFile->length);
+		ch = nodeFile->chunkCount();
 		put32bit(&ptr, ch);
-		sessionids = std::min<int>(node_file->sessionid.size(), 65535);
+		sessionids = std::min<int>(nodeFile->sessionid.size(), 65535);
 		put16bit(&ptr, sessionids);
 
-		if (fwrite(unodebuff, 1,
-		           1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
-		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2)) {
+		if (fwrite(buffer.data(), 1, kFileNodeSize, fd) != kFileNodeSize) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 
 		indx = 0;
-		while (ch > 65536) {
+		while (ch > kChunkSize) {
 			chptr = ptr;
-			for (i = 0; i < 65536; i++) {
-				put64bit(&chptr, node_file->chunks[indx]);
+			for (i = 0; i < kChunkSize; i++) {
+				put64bit(&chptr, nodeFile->chunks[indx]);
 				indx++;
 			}
-			if (fwrite(ptr, 1, 8 * 65536, fd) != (size_t)(8 * 65536)) {
+			if (fwrite(ptr, 1, 8 * kChunkSize, fd) != (size_t)(8 * kChunkSize)) {
 				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
-			ch -= 65536;
+			ch -= kChunkSize;
 		}
 
 		chptr = ptr;
 		for (i = 0; i < ch; i++) {
-			put64bit(&chptr, node_file->chunks[indx]);
+			put64bit(&chptr, nodeFile->chunks[indx]);
 			indx++;
 		}
 
 		sessionids = 0;
-		for (const auto &sid : node_file->sessionid) {
+		for (const auto &sid : nodeFile->sessionid) {
 			if (sessionids >= 65535) {
 				break;
 			}
@@ -533,6 +533,17 @@ void fs_storenode(FSNode *f, FILE *fd, [[maybe_unused]] const std::shared_ptr<Me
 			return;
 		}
 	}
+}
+
+void fs_storenodes(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
+	uint32_t i;
+	FSNode *p;
+	for (i = 0; i < NODEHASHSIZE; i++) {
+		for (p = gMetadata->nodehash[i]; p; p = p->next) {
+			fs_storenode(p, fd, metadataFile);
+		}
+	}
+	fs_storenode(NULL, fd, metadataFile);  // end marker
 }
 
 /**
@@ -642,17 +653,6 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 	fsnodes_quota_update(node, {{QuotaResource::kInodes, +1}});
 	sectionOffset = metadataFile->offset(pSrc);
 	return kSuccess;
-}
-
-void fs_storenodes(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
-	uint32_t i;
-	FSNode *p;
-	for (i = 0; i < NODEHASHSIZE; i++) {
-		for (p = gMetadata->nodehash[i]; p; p = p->next) {
-			fs_storenode(p, fd);
-		}
-	}
-	fs_storenode(NULL, fd);  // end marker
 }
 
 void fs_storeedgelist(FSNodeDirectory *parent, FILE *fd) {
