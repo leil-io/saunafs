@@ -20,15 +20,3 @@ setup_machine_script="${script_dir}/../setup_machine.sh"
 
 extract_paragraphs 'echo Install necessary programs' "${setup_machine_script}" | \
 	bash -x /dev/stdin
-
-# Extras
-apt-get install \
-  libdb-dev \
-  libjudy-dev
-
-GTEST_ROOT="${GTEST_ROOT:-"/usr/local"}"
-readonly gtest_temp_build_dir="$(mktemp -d)"
-apt-get install cmake libgtest-dev
-cmake -S /usr/src/googletest -B "${gtest_temp_build_dir}" -DCMAKE_INSTALL_PREFIX="${GTEST_ROOT}"
-make -C "${gtest_temp_build_dir}" install
-rm -rf "${gtest_temp_build_dir:?}"
