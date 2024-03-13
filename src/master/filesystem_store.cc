@@ -969,7 +969,7 @@ void fs_store(FILE *fd, uint8_t fver) {
 void fs_store_fd(FILE *fd) {
 	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata header v2.9");
 #if SAUNAFS_VERSHEX >= SAUNAFS_VERSION(2, 9, 0)
-	constexpr std::string_view kMetadataSignatureV2_9(SFSSIGNATURE "M 2.9");
+	constexpr std::string_view kMetadataSignatureV2_9(SAUSIGNATURE "M 2.9");
 	const uint8_t metadataVersion = kMetadataVersionWithLockIds;
 #else
 	safs_pretty_errlog(LOG_ERR, "Metadata dumping is not supported in this version");
