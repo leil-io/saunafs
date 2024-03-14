@@ -873,7 +873,7 @@ bool fs_loadfree(MetadataLoader::Options options) {
 	return true;
 }
 
-static int process_section(const char *label, uint8_t (&hdr)[16], uint8_t *&ptr,
+static int process_section(const char *label, uint8_t* hdr, uint8_t *&ptr,
                            off_t &offbegin, off_t &offend, FILE *&fd) {
 	offend = ftello(fd);
 	memcpy(hdr, label, 8);
@@ -890,15 +890,16 @@ static int process_section(const char *label, uint8_t (&hdr)[16], uint8_t *&ptr,
 }
 
 void fs_store(FILE *fd, uint8_t fver) {
-	uint8_t hdr[16];
+	std::array<uint8_t, MetadataSection::kMetadataSectionHeaderSize> header;
 	uint8_t *ptr;
 	off_t offbegin, offend;
 
-	ptr = hdr;
+	ptr = header.data();
 	put32bit(&ptr, gMetadata->maxnodeid);
 	put64bit(&ptr, gMetadata->metaversion);
 	put32bit(&ptr, gMetadata->nextsessionid);
-	if (fwrite(hdr, 1, 16, fd) != (size_t)16) {
+	if (fwrite(header.data(), 1, MetadataSection::kMetadataSectionHeaderSize,
+	           fd) != MetadataSection::kMetadataSectionHeaderSize) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
@@ -910,55 +911,57 @@ void fs_store(FILE *fd, uint8_t fver) {
 	}
 	fs_storenodes(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("NODE 1.0", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("NODE 1.0", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	fs_storeedges(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("EDGE 1.0", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("EDGE 1.0", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	fs_storefree(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("FREE 1.0", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("FREE 1.0", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		xattr_store(fd);
-		if (process_section("XATR 1.0", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("XATR 1.0", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_store_acls(fd);
-		if (process_section("ACLS 1.2", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("ACLS 1.2", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_storequotas(fd);
-		if (process_section("QUOT 1.1", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("QUOT 1.1", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 		fs_storelocks(fd);
-		if (process_section("FLCK 1.0", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("FLCK 1.0", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 	}
 	chunk_store(fd);
 	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("CHNK 1.0", hdr, ptr, offbegin, offend, fd) !=
+		if (process_section("CHNK 1.0", header.data(), ptr, offbegin, offend, fd) !=
 		    SAUNAFS_STATUS_OK) {
 			return;
 		}
 
 		fseeko(fd, offend, SEEK_SET);
-		memcpy(hdr, "[SFS EOF MARKER]", 16);
-		if (fwrite(hdr, 1, 16, fd) != (size_t)16) {
+		memcpy(header.data(), "[SFS EOF MARKER]", MetadataSection::kMetadataSectionTrailerSize);
+		if (fwrite(header.data(), 1,
+		           MetadataSection::kMetadataSectionTrailerSize,
+		           fd) != MetadataSection::kMetadataSectionTrailerSize) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}

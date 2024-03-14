@@ -96,6 +96,9 @@ struct MetadataSection {
 
 	/// @brief The size of the section header.
 	static constexpr uint8_t kMetadataSectionHeaderSize = 16;
+
+	/// @brief The size of the Metadata trailer EOF.
+	static constexpr uint8_t kMetadataSectionTrailerSize = 16;
 };
 
 /// Helper struct to store information about a section being loaded asynchronously.
