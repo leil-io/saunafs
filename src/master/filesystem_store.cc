@@ -889,7 +889,8 @@ static int process_section(const char *label, uint8_t* hdr, uint8_t *&ptr,
 	return SAUNAFS_STATUS_OK;
 }
 
-void fs_store(FILE *fd, uint8_t fver) {
+
+void fs_store(FILE *fd) {
 	std::array<uint8_t, MetadataSection::kMetadataSectionHeaderSize> header;
 	uint8_t *ptr;
 	off_t offbegin, offend;
@@ -903,68 +904,56 @@ void fs_store(FILE *fd, uint8_t fver) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
-	if (fver >= kMetadataVersionWithSections) {
-		offbegin = ftello(fd);
+	offbegin = ftello(fd);
 		fseeko(fd, offbegin + 16, SEEK_SET);
-	} else {
-		offbegin = 0;  // makes some old compilers happy
-	}
 	fs_storenodes(fd);
-	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("NODE 1.0", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
+	if (process_section("NODE 1.0", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
 	}
 	fs_storeedges(fd);
-	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("EDGE 1.0", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
+	if (process_section("EDGE 1.0", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
 	}
 	fs_storefree(fd);
-	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("FREE 1.0", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
-		xattr_store(fd);
-		if (process_section("XATR 1.0", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
-		fs_store_acls(fd);
-		if (process_section("ACLS 1.2", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
-		fs_storequotas(fd);
-		if (process_section("QUOT 1.1", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
-		fs_storelocks(fd);
-		if (process_section("FLCK 1.0", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
+	if (process_section("FREE 1.0", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
+	}
+	xattr_store(fd);
+	if (process_section("XATR 1.0", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
+	}
+	fs_store_acls(fd);
+	if (process_section("ACLS 1.2", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
+	}
+	fs_storequotas(fd);
+	if (process_section("QUOT 1.1", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
+	}
+	fs_storelocks(fd);
+	if (process_section("FLCK 1.0", header.data(), ptr, offbegin, offend, fd) !=
+	    SAUNAFS_STATUS_OK) {
+		return;
 	}
 	chunk_store(fd);
-	if (fver >= kMetadataVersionWithSections) {
-		if (process_section("CHNK 1.0", header.data(), ptr, offbegin, offend, fd) !=
-		    SAUNAFS_STATUS_OK) {
-			return;
-		}
+	if (process_section("CHNK 1.0", header.data(), ptr, offbegin, offend,
+	                    fd) != SAUNAFS_STATUS_OK) {
+		return;
+	}
 
-		fseeko(fd, offend, SEEK_SET);
-		memcpy(header.data(), "[SFS EOF MARKER]", MetadataSection::kMetadataSectionTrailerSize);
-		if (fwrite(header.data(), 1,
-		           MetadataSection::kMetadataSectionTrailerSize,
-		           fd) != MetadataSection::kMetadataSectionTrailerSize) {
-			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
-			return;
-		}
+	fseeko(fd, offend, SEEK_SET);
+	memcpy(header.data(), "[SFS EOF MARKER]",
+	       MetadataSection::kMetadataSectionTrailerSize);
+	if (fwrite(header.data(), 1, MetadataSection::kMetadataSectionTrailerSize,
+	           fd) != MetadataSection::kMetadataSectionTrailerSize) {
+		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		return;
 	}
 	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata with v2.9 finished");
 }
@@ -973,7 +962,6 @@ void fs_store_fd(FILE *fd) {
 	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata header v2.9");
 #if SAUNAFS_VERSHEX >= SAUNAFS_VERSION(2, 9, 0)
 	constexpr std::string_view kMetadataSignatureV2_9(SAUSIGNATURE "M 2.9");
-	const uint8_t metadataVersion = kMetadataVersionWithLockIds;
 #else
 	safs_pretty_errlog(LOG_ERR, "Metadata dumping is not supported in this version");
 #endif
@@ -985,7 +973,7 @@ void fs_store_fd(FILE *fd) {
 	    kMetadataSignatureV2_9.size()) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 	} else {
-		fs_store(fd, metadataVersion);
+		fs_store(fd);
 	}
 }
 
