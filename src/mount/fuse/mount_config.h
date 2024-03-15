@@ -113,6 +113,7 @@ struct sfsopts_ {
 	double bandwidthoveruse;
 	int nonemptymount;
 	bool directio;
+	int ignoreflush;
 
 	sfsopts_()
 		: masterhost(NULL),
@@ -167,7 +168,8 @@ struct sfsopts_ {
 		symlinkcachetimeout(SaunaClient::FsInitParams::kDefaultSymlinkCacheTimeout),
 		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
 		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
-		directio(SaunaClient::FsInitParams::kDirectIO)
+		directio(SaunaClient::FsInitParams::kDirectIO),
+		ignoreflush(0)
 	{ }
 };
 

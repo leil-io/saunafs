@@ -145,7 +145,7 @@ struct FsInitParams {
 #ifdef _WIN32
 				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
 #endif
-	             verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             verbose(kDefaultVerbose), direct_io(kDirectIO), ignoreflush(0) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -177,7 +177,7 @@ struct FsInitParams {
 #ifdef _WIN32
 				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
 #endif
-	             verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             verbose(kDefaultVerbose), direct_io(kDirectIO), ignoreflush(0) {
 	}
 
 	std::string bind_host;
@@ -229,6 +229,7 @@ struct FsInitParams {
 
 	bool verbose;
 	bool direct_io;
+	bool ignoreflush;
 
 	std::string io_limits_config_file;
 };
