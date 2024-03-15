@@ -112,6 +112,7 @@ struct sfsopts_ {
 	unsigned symlinkcachetimeout;
 	double bandwidthoveruse;
 	int nonemptymount;
+	int ignoreflush;
 
 	sfsopts_()
 		: masterhost(NULL),
@@ -165,7 +166,8 @@ struct sfsopts_ {
 		prefetchxorstripes(SaunaClient::FsInitParams::kDefaultPrefetchXorStripes),
 		symlinkcachetimeout(SaunaClient::FsInitParams::kDefaultSymlinkCacheTimeout),
 		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
-		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts)
+		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
+		ignoreflush(0)
 	{ }
 };
 
