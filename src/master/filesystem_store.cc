@@ -890,7 +890,7 @@ static int process_section(const char *label, uint8_t* hdr, uint8_t *&ptr,
 }
 
 
-void fs_store(FILE *fd) {
+void fs_store(FILE *fd, [[maybe_unused]] const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr) {
 	std::array<uint8_t, MetadataSection::kMetadataSectionHeaderSize> header;
 	uint8_t *ptr;
 	off_t offbegin, offend;
@@ -899,13 +899,17 @@ void fs_store(FILE *fd) {
 	put32bit(&ptr, gMetadata->maxnodeid);
 	put64bit(&ptr, gMetadata->metaversion);
 	put32bit(&ptr, gMetadata->nextsessionid);
+	if (!fd || !metadataFile) {
+		safs_pretty_syslog(LOG_ERR, "fd or metadataFile is NULL");
+		throw NoMetadataException();
+	}
 	if (fwrite(header.data(), 1, MetadataSection::kMetadataSectionHeaderSize,
 	           fd) != MetadataSection::kMetadataSectionHeaderSize) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
 	offbegin = ftello(fd);
-		fseeko(fd, offbegin + 16, SEEK_SET);
+	fseeko(fd, offbegin + 16, SEEK_SET);
 	fs_storenodes(fd);
 	if (process_section("NODE 1.0", header.data(), ptr, offbegin, offend, fd) !=
 	    SAUNAFS_STATUS_OK) {
@@ -958,12 +962,13 @@ void fs_store(FILE *fd) {
 	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata with v2.9 finished");
 }
 
-void fs_store_fd(FILE *fd) {
+bool fs_store_fd(FILE *fd, const std::shared_ptr<MemoryMappedFile> &metadataFile) {
 	safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Dumping metadata header v2.9");
 #if SAUNAFS_VERSHEX >= SAUNAFS_VERSION(2, 9, 0)
 	constexpr std::string_view kMetadataSignatureV2_9(SAUSIGNATURE "M 2.9");
 #else
 	safs_pretty_errlog(LOG_ERR, "Metadata dumping is not supported in this version");
+	return false;
 #endif
 	if (gMetadata == nullptr) {
 		safs_pretty_syslog(LOG_ERR, "gMetadata is NULL");
@@ -972,9 +977,16 @@ void fs_store_fd(FILE *fd) {
 	if (fwrite(kMetadataSignatureV2_9.data(), 1, kMetadataSignatureV2_9.size(), fd) !=
 	    kMetadataSignatureV2_9.size()) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
+		return false;
 	} else {
-		fs_store(fd);
+		try {
+			fs_store(fd, metadataFile);
+		} catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "fs_store_fd: %s", e.what());
+			throw e;
+		}
 	}
+	return true;
 }
 
 
@@ -1123,12 +1135,13 @@ void fs_new(void) {
 
 int fs_emergency_storeall(const std::string &fname) {
 	cstream_t fd(fopen(fname.c_str(), "w"));
-	if (fd == nullptr) {
+	auto metadataFile = std::make_shared<MemoryMappedFile>(fname, MemoryMappedFile::Mode::kWriteOnly);
+	if (fd == nullptr || metadataFile == nullptr) {
 		return kOpFailure;
 	}
 
 	try {
-		fs_store_fd(fd.get());
+		fs_store_fd(fd.get(), metadataFile);
 	} catch (const std::exception &e) {
 		safs_pretty_syslog(LOG_ERR, "error storing metadata: %s", e.what());
 		return kOpFailure;
@@ -1350,7 +1363,7 @@ bool checkMetadataSignature(const std::shared_ptr<MemoryMappedFile> &metadataFil
 }
 
 void fs_loadall(const std::string &fname, int ignoreflag) {
-	auto  metadataFile = std::make_shared<MemoryMappedFile>(fname);
+	auto  metadataFile = std::make_shared<MemoryMappedFile>(fname, MemoryMappedFile::Mode::kReadOnly);
 	if (!checkMetadataSignature(metadataFile)) {
 		return;
 	}
@@ -1449,6 +1462,8 @@ uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 
 	if (dumpType == MetadataDumper::kForegroundDump) {
 		cstream_t fd(fopen(kMetadataTmpFilename, "w"));
+		auto metadataFile = std::make_shared<MemoryMappedFile>(
+		    kMetadataTmpFilename, MemoryMappedFile::Mode::kWriteOnly);
 		if (fd == nullptr) {
 			safs_pretty_syslog(LOG_ERR, "can't open metadata file");
 			// try to save in alternative location - just in case
@@ -1460,7 +1475,12 @@ uint8_t fs_storeall(MetadataDumper::DumpType dumpType) {
 			return SAUNAFS_ERROR_IO;
 		}
 
-		fs_store_fd(fd.get());
+		try {
+			fs_store_fd(fd.get(), metadataFile);
+		} catch (const std::exception &e) {
+			safs_pretty_syslog(LOG_ERR, "error storing metadata: %s", e.what());
+			status = SAUNAFS_ERROR_IO;
+		}
 
 		if (ferror(fd.get()) != 0) {
 			safs_pretty_syslog(LOG_ERR, "can't write metadata");

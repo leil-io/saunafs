@@ -29,7 +29,7 @@
 
 class MemoryMappedFile::Impl {
 public:
-	explicit Impl(const std::string &path);
+	explicit Impl(const std::string &path, Mode mode = Mode::kReadOnly);
 	virtual ~Impl();
 
 	/// We don't want to allow copying or moving
@@ -44,7 +44,7 @@ public:
 	            bool moveOffset = false) const;
 
 	[[nodiscard]] size_t write(size_t offset, const uint8_t *buf,
-	                           size_t size) const;
+	                           size_t size);
 
 	[[nodiscard]] size_t offset(const uint8_t *ptr) const;
 
@@ -84,7 +84,7 @@ private:
 	int fd_;                  // The file descriptor of the file
 };
 
-MemoryMappedFile::Impl::Impl(const std::string &path) {
+MemoryMappedFile::Impl::Impl(const std::string &path, Mode mode) {
 	try {
 		path_ = path;
 		if (path_.front() != '/') { // Add Full path is its missing
@@ -92,20 +92,37 @@ MemoryMappedFile::Impl::Impl(const std::string &path) {
 			} else {
 			path_ = path;
 		}
-		fd_ = ::open(path.c_str(), O_RDONLY);
+		fd_ = ::open(path.c_str(),
+		             (mode == MemoryMappedFile::Mode::kReadOnly)
+		                 ? O_RDONLY
+		                 : O_RDWR | O_CREAT | O_TRUNC,
+		             S_IRUSR | S_IWUSR | S_IRGRP);
 		if (fd_ == -1) {
 			std::string errorMsg =
 			    "Failed to open file '" + path +
 			    "' for reading: " + std::string(strerror(errno));
 			throw std::runtime_error(errorMsg);
 		}
-		fileSize_ = getFileSizeFromFd(fd_);
-		mapSize_ = calculateMapSizeFromFilesize(fileSize_);
+		if (mode == MemoryMappedFile::Mode::kReadOnly) {
+			// Get the size of the file
+			fileSize_ = getFileSizeFromFd(fd_);
+			mapSize_ = calculateMapSizeFromFilesize(fileSize_);
 
-		map_ = static_cast<uint8_t *>(
-		    ::mmap(nullptr, mapSize_, PROT_READ, MAP_SHARED, fd_, 0));
-		if (map_ == MAP_FAILED) {
-			throw std::runtime_error("Failed to mmap file '" + path + "'");
+			map_ = static_cast<uint8_t *>(
+			    ::mmap(nullptr, mapSize_, PROT_READ, MAP_SHARED, fd_, 0));
+			if (map_ == MAP_FAILED) {
+				throw std::runtime_error("Failed to mmap file '" + path + "'");
+			}
+		} else {
+			// the file is empty when dumping process starts
+			fileSize_ = 0;
+			mapSize_ = calculateMapSizeFromFilesize(fileSize_);
+
+			map_ = static_cast<uint8_t *>(
+			    ::mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, 0));
+			if (map_ == MAP_FAILED) {
+				throw std::runtime_error("Failed to mmap file '" + path + "'");
+			}
 		}
 	} catch (std::exception &e) {
 		safs_pretty_syslog(LOG_ERR, "Failed to map file '%s': %s", path.c_str(),
@@ -117,8 +134,8 @@ MemoryMappedFile::Impl::Impl(const std::string &path) {
 MemoryMappedFile::MemoryMappedFile() = default;
 MemoryMappedFile::~MemoryMappedFile() = default;
 
-MemoryMappedFile::MemoryMappedFile(const std::string &path)
-    : pimpl(std::make_unique<Impl>(path)) {}
+MemoryMappedFile::MemoryMappedFile(const std::string &path, Mode mode)
+    : pimpl(std::make_unique<Impl>(path, mode)) {}
 
 MemoryMappedFile::Impl::~Impl() {
 	try {
@@ -143,6 +160,11 @@ uint8_t *MemoryMappedFile::seek(size_t offset) const {
 	return pimpl->seek(offset);
 }
 
+size_t MemoryMappedFile::read(size_t &offset, uint8_t *buf, size_t size,
+                              bool walk) const {
+	return pimpl->read(offset, buf, size, walk);
+}
+
 size_t MemoryMappedFile::Impl::read(size_t &offset, uint8_t *buf, size_t size,
                                     bool moveOffset) const {
 	if (map_ == nullptr) {
@@ -155,9 +177,25 @@ size_t MemoryMappedFile::Impl::read(size_t &offset, uint8_t *buf, size_t size,
 	return read_size;
 }
 
-size_t MemoryMappedFile::read(size_t &offset, uint8_t *buf, size_t size,
-                              bool walk) const {
-	return pimpl->read(offset, buf, size, walk);
+size_t MemoryMappedFile::Impl::write([[maybe_unused]] size_t offset, const uint8_t *buf,
+                                     size_t size) {
+	if (map_ == nullptr) {
+		throw std::runtime_error("File is not mapped");
+	}
+
+	auto ptr = map_ + offset;
+	memcpy(ptr, buf, size);
+	fileSize_ = MemoryMappedFile::Impl::getFileSizeFromFd(fd_);
+	mapSize_ = calculateMapSizeFromFilesize(fileSize_);
+	if (offset + size > fileSize_) {
+		throw std::out_of_range("Offset is out of bounds");
+	}
+	return size;
+}
+
+size_t MemoryMappedFile::write(size_t offset, const uint8_t *buf,
+                               size_t size) const {
+	return pimpl->write(offset, buf, size);
 }
 
 size_t MemoryMappedFile::Impl::offset(const uint8_t *ptr) const {
@@ -171,16 +209,6 @@ size_t MemoryMappedFile::Impl::offset(const uint8_t *ptr) const {
 
 size_t MemoryMappedFile::offset(const uint8_t *ptr) const {
 	return pimpl->offset(ptr);
-}
-
-size_t MemoryMappedFile::write([[maybe_unused]] size_t offset, [[maybe_unused]]  const uint8_t *buf,
-									 [[maybe_unused]] size_t size) const {
-	return pimpl->write(offset, buf, size);
-}
-
-size_t MemoryMappedFile::Impl::write([[maybe_unused]] size_t offset, [[maybe_unused]]  const uint8_t *buf,
-                               [[maybe_unused]] size_t size) const {
-	return 0;
 }
 
 const std::string &MemoryMappedFile::Impl::filename() const { return path_; }

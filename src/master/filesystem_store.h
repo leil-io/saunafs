@@ -22,6 +22,7 @@
 
 #include "common/platform.h"
 #include "common/exceptions.h"
+#include "common/memory_mapped_file.h"
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataException, Exception);
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataFsConsistencyException,
@@ -37,4 +38,4 @@ void fs_load_changelogs();
 void fs_load_changelog(const std::string &path);
 void fs_loadall(const std::string &fname, int ignoreflag);
 /// Dump current state of file system into metadata file.
-void fs_store_fd(FILE *fd);
+bool fs_store_fd(FILE *fd, const std::shared_ptr<MemoryMappedFile> &metadataFile = nullptr);

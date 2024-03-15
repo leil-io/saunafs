@@ -28,6 +28,11 @@
  */
 class MemoryMappedFile {
 public:
+	enum class Mode {
+		kReadOnly,
+		kWriteOnly
+	};
+
 	/// Default constructor
 	MemoryMappedFile();
 
@@ -35,7 +40,7 @@ public:
 	 * Constructor
 	 * @param path The path to the file
 	 */
-	explicit MemoryMappedFile(const std::string &path);
+	explicit MemoryMappedFile(const std::string &path, Mode mode = Mode::kReadOnly);
 
 	/// Destructor
 	virtual ~MemoryMappedFile();
