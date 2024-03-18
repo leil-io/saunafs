@@ -24,9 +24,7 @@ mkdir dir
 saunafs setgoal xor2 dir
 FILE_SIZE=$(( 4 * SAUNAFS_CHUNK_SIZE )) file-generate dir/file
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 for cs in {0..2}; do
 	assert_equals 4 $(find_chunkserver_metadata_chunks $cs -name "chunk_xor*" | wc -l)
@@ -37,9 +35,7 @@ mkdir backup
 saunafs makesnapshot dir/file backup/snapshot
 saunafs setgoal backup backup/snapshot
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 assert_eventually_prints 4 'find_chunkserver_metadata_chunks 3 -name "chunk_0*" | wc -l'
 
@@ -55,9 +51,7 @@ assert_success rm "$chunk"
 # Update first and second chunk of the file, this will change ids on CS 0, 1 and 2 because of snapshot.
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 # dir/file will have the following chunks:
 #   +-----------------+-----------------+-----------------+-----------------+
@@ -85,9 +79,7 @@ cp "$saved_chunk" "$TEMP_DIR"
 # Update first chunk of the file, this will change it's version to 2 on CS 1 and 2.
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=10
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 # Chunk id was incremented by number of chunks.
 assert_equals 1 $(find_chunkserver_metadata_chunks 0 -name "chunk_xor*0000000000000005_00000001.???" | wc -l)

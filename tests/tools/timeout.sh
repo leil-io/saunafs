@@ -21,7 +21,7 @@ timeout_killer_thread() {
 
 		# Triples test time in Windows environment
 		if is_windows_system; then
-			multiplier=$(python3 -c "print(int(5 * $multiplier))")
+			multiplier=$((5 * $multiplier))
 		fi
 
 		if [[ -z $begin_ts || -z $value_string || -z $multiplier ]]; then
@@ -30,7 +30,7 @@ timeout_killer_thread() {
 			continue
 		fi
 
-		local total_timeout=$(python3 -c "print(int($value * $multiplier * $machine_environment_multiplier))")
+		local total_timeout=$(($value * $multiplier * $machine_environment_multiplier))
 		local end_ts=$(($begin_ts + $total_timeout))
 
 		if (( now_ts >= end_ts )); then

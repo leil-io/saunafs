@@ -95,6 +95,9 @@ static bool disconnect;
 static time_t lastwrite;
 static int sessionlost;
 
+// This constant means no master side mapping of uid/gid coming from client
+#define DEFAULT_UID_GID_MAPPING 999
+
 #ifdef _WIN32
 uint8_t *sessionFlags = nullptr;
 int *mountingUid  = nullptr;
@@ -815,18 +818,24 @@ int fs_connect(bool verbose) {
 			}
 #else
 			fprintf(stderr, " ; root mapped to %" PRIu32 ":%" PRIu32, rootuid, rootgid);
-			if (mapalluid != 999 || mapallgid != 999) {
-				if (*mountingUid  != USE_LOCAL_ID && *mountingGid != USE_LOCAL_ID) {
+			// The Windows specific code makes consistent the use of client side
+			// uid/gid mappings and master side uid/gid mappings.
+			if (mapalluid != DEFAULT_UID_GID_MAPPING ||
+			    mapallgid != DEFAULT_UID_GID_MAPPING) {
+				if (*mountingUid != USE_LOCAL_ID &&
+				    *mountingGid != USE_LOCAL_ID) {
 					fprintf(stderr, " ; master server overwrote users mapping");
 				}
-				*mountingUid  = mapalluid;
+				*mountingUid = mapalluid;
 				*mountingGid = mapallgid;
 			}
-			if (*mountingUid  == USE_LOCAL_ID && *mountingGid == USE_LOCAL_ID) {
+			// At last, the final mapping is shown in the connection parameters
+			// line.
+			if (*mountingUid == USE_LOCAL_ID && *mountingGid == USE_LOCAL_ID) {
 				fprintf(stderr, " ; users mapped to local IDs");
 			} else {
 				fprintf(stderr, " ; users mapped to %" PRIu32 ":%" PRIu32,
-				        *mountingUid , *mountingGid);
+				        *mountingUid, *mountingGid);
 			}
 #endif
 		} else {

@@ -142,8 +142,10 @@ mass_chmod_777() {
 		'user=$(stat -c "%U" "{}"); sudo -nu $user setfacl -b "{}" ; sudo -nu $user chmod 777 "{}"' \;
 }
 
+# Unmounts all SaunaFS mountpoints created in Windows
 windows_unmount_fs() {
 	local retries=0
+	# Search for all drvfs filesystems mounted and umount them
 	while list_of_mounts=$(cat /proc/mounts | awk '$1 ~ /^[F-O]:/' | grep drvfs); do
 		echo "$list_of_mounts" | awk '{print $2}' | xargs -r -d'\n' -n1 sudo umount -l || sleep 1
 		if ((++retries == 30)); then
@@ -154,6 +156,7 @@ windows_unmount_fs() {
 	taskkill.exe /IM sfsmount3.exe /F &> /dev/null || true
 }
 
+# Unmounts all SaunaFS testing mountpoints created in Unix-like OS's
 unix_unmount_fs() {
 	local retries=0
 	pkill -KILL -u saunafstest sfsmount || true

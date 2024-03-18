@@ -32,25 +32,25 @@ cd ${info[mount0]}
 # Produce first version chunks
 dd if=/dev/zero of=file bs=1k count=5k
 saunafs setgoal xor2 file
-if is_windows_system; then
-	wait_chunkservers
-fi
+
+wait_if_windows
+
 while (( $(saunafs fileinfo file | grep -c copy) < 4 )); do # 1 [goal1] + 3 [xor2]
 	sleep 1
 done
 saunafs setgoal xor3 file
-if is_windows_system; then
-	wait_chunkservers
-fi
+
+wait_if_windows
+
 while (( $(saunafs fileinfo file | grep -c copy) < 8 )); do # 1 [goal1] + 3 [xor2] + 4 [xor3]
 	sleep 1
 done
 sleep 2
 # Overwrite the file
 file-overwrite file
-if is_windows_system; then
-	wait_chunkservers
-fi
+
+wait_if_windows
+
 # Stop all chunkservers
 for_chunkservers stop {0..7}
 

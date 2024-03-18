@@ -19,11 +19,7 @@ CHUNKSERVERS=3 \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
-if is_windows_system; then
-	FILE_SIZE=1048576 file-generate "${info[mount0]}/read"
-else
-	truncate -s1M "${info[mount0]}/read"
-fi
+truncate -s1M "${info[mount0]}/read"
 
 # consume accumulated limit
 cat "${info[mount0]}/read" >/dev/null

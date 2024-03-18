@@ -13,9 +13,7 @@ mkdir dir
 saunafs setgoal 3 dir
 FILE_SIZE=$(( 4 * SAUNAFS_CHUNK_SIZE )) file-generate dir/file
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 assert_equals 4 $(find_chunkserver_metadata_chunks 0 | wc -l)
 assert_equals 4 $(find_chunkserver_metadata_chunks 1 | wc -l)
@@ -29,9 +27,7 @@ assert_success rm "$chunk"
 # Update first and second chunk of the file, this will change it's version to 2 on CS 1 and 2.
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 for chunk in 1 2; do
 	assert_equals 1 $(find_chunkserver_metadata_chunks 0 -name "chunk_000000000000000${chunk}_00000001.???" | wc -l)
@@ -47,9 +43,7 @@ assert_success rm "$chunk"
 # Update first and second chunk of the file, this will change it's version to 3 on CS 2.
 dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 
-if is_windows_system; then
-	wait_chunkservers
-fi
+wait_if_windows
 
 for chunk in 1 2; do
 	assert_equals 1 $(find_chunkserver_metadata_chunks 0 -name "chunk_000000000000000${chunk}_00000001.???" | wc -l)

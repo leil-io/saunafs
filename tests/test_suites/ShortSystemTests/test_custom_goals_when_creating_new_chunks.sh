@@ -1,5 +1,5 @@
 if is_windows_system; then
-	timeout_set "2 minute"
+	timeout_set "2 minutes"
 else
 	timeout_set "1 minute"
 fi
