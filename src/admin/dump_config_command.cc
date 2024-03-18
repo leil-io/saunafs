@@ -38,7 +38,7 @@ void DumpConfigurationCommand::usage() const {
 	std::cerr << "    Authentication with the admin password is required\n";
 }
 
-SaunaFsProbeCommand::SupportedOptions DumpConfigurationCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions DumpConfigurationCommand::supportedOptions() const {
 	return {
 		{
 			defaultsMode,

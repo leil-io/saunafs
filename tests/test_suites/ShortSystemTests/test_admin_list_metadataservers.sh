@@ -3,7 +3,7 @@ MASTERSERVERS=2 \
 	setup_local_empty_saunafs info
 
 list_metadata_servers() {
-	saunafs_probe_master list-metadataservers --porcelain
+	saunafs_admin_master_no_password list-metadataservers --porcelain
 }
 
 nr="[0-9]+"

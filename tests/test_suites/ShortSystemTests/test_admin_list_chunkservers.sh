@@ -14,10 +14,10 @@ for goal in $goals; do
 done
 
 list_chunkservers() {
-	saunafs-probe list-chunkservers --porcelain localhost "${info[matocl]}"
+	saunafs-admin list-chunkservers --porcelain localhost "${info[matocl]}"
 }
 
-# Wait for all chunkservers to report chunk creation and see what saunafs-probe prints then
+# Wait for all chunkservers to report chunk creation and see what saunafs-admin prints then
 export MESSAGE="Veryfing chunkservers list with all the chunkservers up"
 expect_eventually_prints 7 'list_chunkservers | awk "{chunks += \$3} END {print chunks}"'
 cslist=$(list_chunkservers)
@@ -28,7 +28,7 @@ expect_equals 4 $(wc -l <<< "$cslist")
 expect_equals 4 $(awk -v version="$SAUNAFS_VERSION" '$2 == version' <<< "$cslist" | wc -l)
 expect_equals "cs0 cs1 cs2 cs3" "$(awk '{print $10}' <<< "$cslist" | sort | xargs echo)"
 
-# Turn off one chunkserver and see what saunafs-probe prints now
+# Turn off one chunkserver and see what saunafs-admin prints now
 export MESSAGE="Veryfing chunkservers list with one chunkserver down"
 saunafs_chunkserver_daemon 0 stop
 saunafs_wait_for_ready_chunkservers 3

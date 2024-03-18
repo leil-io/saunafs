@@ -9,7 +9,8 @@ assert_failure saunafs-admin stop-master-without-saving-metadata \
 saunafs_master_n 1 start
 
 # Remember version of metadata before stopping the master server
-last_metadata_version=$(saunafs_probe_master metadataserver-status | cut -f3)
+last_metadata_version=$(saunafs_admin_master_no_password \
+		metadataserver-status | cut -f3)
 
 # Make sure admin stop will succeed with connected shadow server
 assert_success saunafs-admin stop-master-without-saving-metadata \

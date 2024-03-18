@@ -3,7 +3,7 @@ saunafs-admin(8)
 
 == NAME
 
-saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
+saunafs-admin - SaunaFS monitoring and administration tool
 
 == SYNOPSIS
 

@@ -29,9 +29,9 @@ FILE_SIZE=300K file-generate goal{1..2}/medium_{1..10}
 FILE_SIZE=5M   file-generate goal{1..2}/big_{1..10}
 
 # Count chunks in the system. Expect that each chunk has one copy on CS0 and one copy on CS1.
-chunks=$(saunafs_probe_master info | awk '{print $12}')
+chunks=$(saunafs_admin_master_no_password info | awk '{print $12}')
 assert_equals 60 $chunks
-assert_equals 90 $(saunafs_probe_master info | awk '{print $13}')
+assert_equals 90 $(saunafs_admin_master_no_password info | awk '{print $13}')
 assert_less_than 30 "$(find_chunkserver_metadata_chunks 0 | wc -l)"
 assert_less_than 30 "$(find_chunkserver_metadata_chunks 1 | wc -l)"
 
@@ -51,7 +51,7 @@ done
 
 # Assert that exactly disks marked "pread_EIO" are marked as damaged.
 sleep 1
-list=$(saunafs_probe_master list-disks)
+list=$(saunafs_admin_master_no_password list-disks)
 assert_equals 6 "$(wc -l <<< "$list")"
 assert_awk_finds_no '(/EIO/ && $4 != "yes") || (!/EIO/ && $4 == "yes")' "$list"
 

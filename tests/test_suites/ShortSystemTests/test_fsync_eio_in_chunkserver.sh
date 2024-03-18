@@ -26,10 +26,10 @@ FILE_SIZE=1234 assert_success file-generate test/small_{1..10}
 FILE_SIZE=1M   assert_success file-generate test/big_{1..10}
 
 # Wait for the failure to be detected
-assert_eventually_prints yes "saunafs_probe_master list-disks | awk '/EIO/ {print \$4}'"
+assert_eventually_prints yes "saunafs_admin_master_no_password list-disks | awk '/EIO/ {print \$4}'"
 
 # Verify that exactly disks marked "fsync_EIO" are marked as damaged
-list=$(saunafs_probe_master list-disks)
+list=$(saunafs_admin_master_no_password list-disks)
 assert_equals 3 "$(wc -l <<< "$list")"
 assert_awk_finds_no '(/EIO/ && $4 != "yes") || (!/EIO/ && $4 != "no")' "$list"
 

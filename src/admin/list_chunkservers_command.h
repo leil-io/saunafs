@@ -28,7 +28,7 @@
 #include "protocol/chunkserver_list_entry.h"
 
 
-class ListChunkserversCommand : public SaunaFsProbeCommand {
+class ListChunkserversCommand : public SaunaFsAdminCommand {
 public:
 	virtual std::string name() const;
 	virtual SupportedOptions supportedOptions() const;

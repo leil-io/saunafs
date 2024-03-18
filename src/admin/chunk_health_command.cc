@@ -38,7 +38,7 @@ std::string ChunksHealthCommand::name() const {
 	return "chunks-health";
 }
 
-SaunaFsProbeCommand::SupportedOptions ChunksHealthCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ChunksHealthCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode,      kPorcelainModeDescription},
 		{kOptionAvailability, "Print report about availability of chunks."},

@@ -116,14 +116,14 @@ saunafs_metadata_version() {
 	else
 		load_config
 	fi
-	local probe_result=$(saunafs_admin metadataserver-status --porcelain "${matocl_host}" "$matocl_port")
+	local admin_result=$(saunafs_admin metadataserver-status --porcelain "${matocl_host}" "$matocl_port")
 	if [[ $? != 0 ]] ; then
 		log "failed to query SaunaFS master status"
 		return $SAUNAFS_URAFT_ERROR
 	fi
-	local personality=$(echo "$probe_result" | cut -f1)
-	local connection=$(echo "$probe_result" | cut -f2)
-	local metadata_version_in_ram=$(echo "$probe_result" | cut -f3)
+	local personality=$(echo "$admin_result" | cut -f1)
+	local connection=$(echo "$admin_result" | cut -f2)
+	local metadata_version_in_ram=$(echo "$admin_result" | cut -f3)
 	case "$personality/$connection" in
 		master/running)
 			metadata_location="ram"
@@ -145,7 +145,7 @@ saunafs_metadata_version() {
 			fi
 		;;
 		*)
-			log "unexpected output from saunafs-admin: $probe_result"
+			log "unexpected output from saunafs-admin: $admin_result"
 			return $SAUNAFS_URAFT_OK
 		;;
 	esac

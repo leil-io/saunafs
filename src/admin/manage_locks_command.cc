@@ -41,7 +41,7 @@ void ManageLocksCommand::usage() const {
 	std::cerr << "    Manages file locks" << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions ManageLocksCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ManageLocksCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{"--active", "Print only active locks"},
@@ -131,7 +131,7 @@ static void processListType(uint32_t inode, RegisteredAdminConnection &conn, con
 		}
 
 		for (auto &lock : locks) {
-			if (options.isSet(SaunaFsProbeCommand::kPorcelainMode)) {
+			if (options.isSet(SaunaFsAdminCommand::kPorcelainMode)) {
 				std::cout << lock.inode
 				<< " " << lock.owner
 				<< " " << lock.sessionid

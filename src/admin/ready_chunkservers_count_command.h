@@ -24,7 +24,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class ReadyChunkserversCountCommand : public SaunaFsProbeCommand {
+class ReadyChunkserversCountCommand : public SaunaFsAdminCommand {
 public:
 	virtual std::string name() const;
 	virtual void usage() const;

@@ -34,7 +34,7 @@ std::string ListChunkserversCommand::name() const {
 	return "list-chunkservers";
 }
 
-SaunaFsProbeCommand::SupportedOptions ListChunkserversCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListChunkserversCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 	};

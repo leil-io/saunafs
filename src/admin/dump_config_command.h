@@ -24,7 +24,7 @@
 #include <string>
 #include <unordered_map>
 
-class DumpConfigurationCommand : public SaunaFsProbeCommand {
+class DumpConfigurationCommand : public SaunaFsAdminCommand {
 public:
 	std::string defaultsMode = "--defaults";
 

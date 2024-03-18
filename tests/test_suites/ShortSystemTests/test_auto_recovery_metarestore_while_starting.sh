@@ -19,4 +19,4 @@ sleep 1
 expect_failure sfsmetarestore -a -d "${info[master_data_path]}"
 
 # Expect that the master server still applies the changelog.
-expect_failure saunafs-probe info localhost "${info[matocl]}"
+expect_failure saunafs-admin info localhost "${info[matocl]}"

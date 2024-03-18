@@ -24,7 +24,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class ReloadConfigCommand : public SaunaFsProbeCommand {
+class ReloadConfigCommand : public SaunaFsAdminCommand {
 public:
 	virtual std::string name() const override;
 	virtual void usage() const override;

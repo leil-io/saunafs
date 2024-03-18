@@ -402,8 +402,6 @@ rm -rf $RPM_BUILD_ROOT
 %doc NEWS README.md UPGRADE
 %attr(755,root,root) %{_bindir}/saunafs-admin
 %{_mandir}/man8/saunafs-admin.8*
-%{_bindir}/saunafs-probe
-%{_mandir}/man8/saunafs-probe.8*
 
 %files uraft
 %define sau_uraft_examples %{_docdir}/saunafs-uraft/examples

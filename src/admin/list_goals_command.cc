@@ -37,7 +37,7 @@ std::string ListGoalsCommand::name() const {
 	return "list-goals";
 }
 
-SaunaFsProbeCommand::SupportedOptions ListGoalsCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListGoalsCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{"--pretty", "Print nice table"}

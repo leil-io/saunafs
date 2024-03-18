@@ -2,7 +2,7 @@ iolimits="$TEMP_DIR/iolimits.cfg"
 printf "subsystem blkio\nlimit /aaa 203\nlimit unclassified 301\n" > "$iolimits"
 
 status() {
-	saunafs-probe iolimits-status --porcelain localhost "${info[matocl]}"
+	saunafs-admin iolimits-status --porcelain localhost "${info[matocl]}"
 }
 
 CHUNKSERVERS=1 \

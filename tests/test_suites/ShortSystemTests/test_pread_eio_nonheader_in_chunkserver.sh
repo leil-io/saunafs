@@ -32,7 +32,7 @@ for i in {1..10}; do
 	assert_success file-validate goal2/small_*
 done
 sleep 1
-list=$(saunafs_probe_master list-disks)
+list=$(saunafs_admin_master_no_password list-disks)
 assert_equals 3 "$(wc -l <<< "$list")"
 assert_awk_finds_no '$4 != "no"' "$list"
 
@@ -46,7 +46,7 @@ done
 
 # Assert that exactly disks marked "pread_far_EIO" are marked as damaged
 sleep 1
-list=$(saunafs_probe_master list-disks)
+list=$(saunafs_admin_master_no_password list-disks)
 assert_equals 3 "$(wc -l <<< "$list")"
 assert_awk_finds_no '(/EIO/ && $4 != "yes") || (!/EIO/ && $4 != "no")' "$list"
 

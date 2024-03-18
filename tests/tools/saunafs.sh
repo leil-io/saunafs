@@ -114,7 +114,7 @@ setup_local_empty_saunafs() {
 		add_cgi_server_
 	fi
 
-	# Wait for chunkservers (use saunafs-probe only for SaunaFS -- MooseFS doesn't support it)
+	# Wait for chunkservers (use saunafs-admin only for SaunaFS -- MooseFS doesn't support it)
 	if [[ ! $use_legacy ]]; then
 		saunafs_wait_for_all_ready_chunkservers
 	else
@@ -690,14 +690,14 @@ find_all_metadata_chunks() {
 	done
 }
 
-# A useful shortcut for saunafs-probe
-# Usage: saunafs_probe_master <command> [option...]
-# Calls saunafs-probe with the given command and and automatically adds address
+# A useful shortcut for saunafs-admin
+# Usage: saunafs_admin_master_no_password <command> [option...]
+# Calls saunafs-admin with the given command and and automatically adds address
 # of the master server
-saunafs_probe_master() {
+saunafs_admin_master_no_password() {
 	local command="$1"
 	shift
-	saunafs-probe "$command" localhost "${saunafs_info_[matocl]}" --porcelain "$@"
+	saunafs-admin "$command" localhost "${saunafs_info_[matocl]}" --porcelain "$@"
 }
 
 # A useful shortcut for saunafs-admin commands which require authentication
@@ -731,7 +731,7 @@ saunafs_stop_master_without_saving_metadata() {
 
 # print the number of fully operational chunkservers
 saunafs_ready_chunkservers_count() {
-	saunafs-probe ready-chunkservers-count localhost ${saunafs_info_[matocl]}
+	saunafs-admin ready-chunkservers-count localhost ${saunafs_info_[matocl]}
 }
 
 # saunafs_wait_for_ready_chunkservers <num> -- waits until <num> chunkservers are fully operational
@@ -752,9 +752,9 @@ saunafs_shadow_synchronized() {
 	local num=$1
 	local port1=${saunafs_info_[matocl]}
 	local port2=${saunafs_info_[master${num}_matocl]}
-	local probe1="saunafs-probe metadataserver-status --porcelain localhost $port1"
-	local probe2="saunafs-probe metadataserver-status --porcelain localhost $port2"
-	if [[ "$($probe1 | cut -f3)" == "$($probe2 | cut -f3)" ]]; then
+	local admin1="saunafs-admin metadataserver-status --porcelain localhost $port1"
+	local admin2="saunafs-admin metadataserver-status --porcelain localhost $port2"
+	if [[ "$($admin1 | cut -f3)" == "$($admin2 | cut -f3)" ]]; then
 		return 0
 	else
 		return 1
@@ -766,7 +766,8 @@ saunafs_shadow_synchronized() {
 # <ip2>:<port2>:<label> <chunks2>
 # ...
 saunafs_rebalancing_status() {
-	saunafs_probe_master list-chunkservers | sort | awk '$2 == "'$SAUNAFS_VERSION'" {print $1":"$10,$3}'
+	saunafs_admin_master_no_password \
+		list-chunkservers | sort | awk '$2 == "'$SAUNAFS_VERSION'" {print $1":"$10,$3}'
 }
 
 # Tells if the hdd configuration line is for a zoned disk

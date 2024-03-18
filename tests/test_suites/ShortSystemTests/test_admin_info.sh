@@ -15,4 +15,4 @@ done
 rm dir_3/file
 rm dir_xor2/file
 expect_equals "$SAUNAFS_VERSION 2 0 0 9 5 4 4 7 7" \
-	"$(saunafs-probe info --porcelain localhost "${info[matocl]}" | cut -d' ' -f 1,6-)"
+	"$(saunafs-admin info --porcelain localhost "${info[matocl]}" | cut -d' ' -f 1,6-)"

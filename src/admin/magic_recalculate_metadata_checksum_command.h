@@ -24,7 +24,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class MagicRecalculateMetadataChecksumCommand : public SaunaFsProbeCommand {
+class MagicRecalculateMetadataChecksumCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

@@ -8,7 +8,6 @@ set(MANPAGES
     saunafs.7
     saunafs-admin.8
     saunafs-cgiserver.8
-    saunafs-probe.8          # not a source
     saunafs-uraft.8
     saunafs-uraft-helper.8
     saunafs-uraft.cfg.5

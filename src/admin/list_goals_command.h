@@ -24,7 +24,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class ListGoalsCommand : public SaunaFsProbeCommand {
+class ListGoalsCommand : public SaunaFsAdminCommand {
 public:
 	virtual std::string name() const;
 	virtual SupportedOptions supportedOptions() const;

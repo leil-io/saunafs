@@ -28,7 +28,7 @@
 #include "common/server_connection.h"
 #include "admin/saunafs_admin_command.h"
 
-class ChunksHealthCommand : public SaunaFsProbeCommand {
+class ChunksHealthCommand : public SaunaFsAdminCommand {
 public:
 	virtual std::string name() const;
 	virtual SupportedOptions supportedOptions() const;

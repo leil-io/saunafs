@@ -40,7 +40,7 @@ void SaveMetadataCommand::usage() const {
 			"    Authentication with the admin password is required." << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions SaveMetadataCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions SaveMetadataCommand::supportedOptions() const {
 	return { {"--async", "Don't wait for the task to finish."} };
 }
 

@@ -25,7 +25,7 @@
 #include "common/server_connection.h"
 #include "admin/saunafs_admin_command.h"
 
-class PromoteShadowCommand : public SaunaFsProbeCommand {
+class PromoteShadowCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

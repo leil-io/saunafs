@@ -2,7 +2,7 @@ MOUNTS=4 \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 
-mounts=$(saunafs-probe list-mounts --porcelain --verbose localhost "${info[matocl]}")
+mounts=$(saunafs-admin list-mounts --porcelain --verbose localhost "${info[matocl]}")
 expect_equals "4" $(wc -l <<< "$mounts")
 for i in {1..4}; do
 	expect_equals \

@@ -28,7 +28,7 @@
 /**
  * A command for saunafs-admin that checks the global I/O limiting status
  */
-class IoLimitsStatusCommand : public SaunaFsProbeCommand {
+class IoLimitsStatusCommand : public SaunaFsAdminCommand {
 public:
 	/**
 	 * Return name of a command

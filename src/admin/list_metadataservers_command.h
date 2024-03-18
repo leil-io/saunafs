@@ -24,7 +24,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class ListMetadataserversCommand : public SaunaFsProbeCommand {
+class ListMetadataserversCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

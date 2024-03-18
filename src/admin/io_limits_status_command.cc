@@ -36,7 +36,7 @@ void IoLimitsStatusCommand::usage() const {
 	std::cerr << "    Prints current configuration of global I/O limiting" << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions IoLimitsStatusCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions IoLimitsStatusCommand::supportedOptions() const {
 	return { {kPorcelainMode, kPorcelainModeDescription} };
 }
 

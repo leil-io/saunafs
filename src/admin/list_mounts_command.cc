@@ -62,7 +62,7 @@ std::string ListMountsCommand::name() const {
 	return "list-mounts";
 }
 
-SaunaFsProbeCommand::SupportedOptions ListMountsCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListMountsCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{kVerboseMode,   "Be a little more verbose and show goal and trash time limits."},
