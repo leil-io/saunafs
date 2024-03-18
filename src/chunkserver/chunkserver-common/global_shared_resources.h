@@ -36,6 +36,6 @@ inline std::vector<std::unique_ptr<CondVarWithWaitCount>> gFreeCondVars;
 /// Active Disks scans in progress.
 /// Note: theoretically it would return a false positive if scans haven't
 /// started yet, but it's a _very_ unlikely situation.
-static std::atomic_int gScansInProgress(0);
+inline std::atomic_int gScansInProgress(0);
 
-static std::atomic_bool gPerformFsync;
+inline std::atomic_bool gPerformFsync(true);
