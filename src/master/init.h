@@ -20,10 +20,10 @@
 
 #include "common/platform.h"
 
-#include <stdio.h>
+#include <vector>
 
 #include "common/random.h"
-#include "master/changelog.h"
+#include "common/run_tab.h"
 #include "master/chartsdata.h"
 #include "master/datacachemgr.h"
 #include "master/exports.h"
@@ -36,35 +36,30 @@
 #include "master/personality.h"
 #include "master/topology.h"
 
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
-const char id[]="@(#) version: " STR(VERSMAJ) "." STR(VERSMID) "." STR(VERSMIN) ", written by Jakub Kruszona-Zawadzki";
+/// Functions to call before normal startup
+inline const std::vector<RunTab> earlyRunTabs = {
+    RunTab{metadataserver::personality_validate, "validate personality"}};
 
-/* Run Tab */
-typedef int (*runfn)(void);
-struct run_tab {
-	runfn fn;
-	const char *name;
-};
+/// Functions to call during normal startup
+inline const std::vector<RunTab> runTabs = {
+    // has to be first
+    RunTab{hstorage_init, "name storage"},
+    // has to be second
+    RunTab{metadataserver::personality_init, "personality"},
+    RunTab{rnd_init, "random generator"},
+    // has to be before 'fs_init' and 'matoclserv_networkinit'
+    RunTab{dcm_init, "data cache manager"},
+    // has to be before 'fs_init'
+    RunTab{matoclserv_sessionsinit, "load stored sessions"},
+    RunTab{exports_init, "exports manager"},
+    RunTab{topology_init, "net topology module"},
+    // the lambda is used to select the correct fs_init overload
+    RunTab{[]() { return fs_init(); }, "file system manager"},
+    RunTab{chartsdata_init, "charts module"},
+    RunTab{masterconn_init, "communication with master server"},
+    RunTab{matomlserv_init, "communication with metalogger"},
+    RunTab{matocsserv_init, "communication with chunkserver"},
+    RunTab{matoclserv_networkinit, "communication with clients"}};
 
-run_tab RunTab[]={
-	{hstorage_init, "name storage"}, // has to be first
-	{metadataserver::personality_init, "personality"}, // has to be second
-	{rnd_init,"random generator"},
-	{dcm_init,"data cache manager"}, // has to be before 'fs_init' and 'matoclserv_networkinit'
-	{matoclserv_sessionsinit,"load stored sessions"}, // has to be before 'fs_init'
-	{exports_init,"exports manager"},
-	{topology_init,"net topology module"},
-	{fs_init,"file system manager"},
-	{chartsdata_init,"charts module"},
-	{masterconn_init,"communication with master server"},
-	{matomlserv_init,"communication with metalogger"},
-	{matocsserv_init,"communication with chunkserver"},
-	{matoclserv_networkinit,"communication with clients"},
-	{(runfn)0,"****"}
-},LateRunTab[]={
-	{(runfn)0,"****"}
-},EarlyRunTab[]={
-	{metadataserver::personality_validate, "validate personality"},
-	{(runfn)0,"****"}
-};
+/// Functions to call delayed after the initialization is correct
+inline const std::vector<RunTab> lateRunTabs = {};
