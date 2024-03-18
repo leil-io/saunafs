@@ -82,3 +82,8 @@ compile_commands.json
 src/chunkserver/plugins/zonefs_disk
 tests/ci_build/run-smr-tests.sh
 tests/test_suites/SMRTests
+
+# Windows
+##########
+src/mount/windows
+create-win-release.bat

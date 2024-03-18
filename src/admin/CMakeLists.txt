@@ -9,8 +9,10 @@ add_executable(saunafs-admin ${SAUNAFS_ADMIN_MAIN})
 target_link_libraries(saunafs-admin saunafs-admin-lib)
 install(TARGETS saunafs-admin RUNTIME DESTINATION ${BIN_SUBDIR})
 
-add_custom_target(saunafs-probe ALL
+if(NOT MINGW)
+  add_custom_target(saunafs-probe ALL
     COMMAND ln -sf saunafs-admin saunafs-probe
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS saunafs-admin)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/saunafs-probe DESTINATION ${BIN_SUBDIR})
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/saunafs-probe DESTINATION ${BIN_SUBDIR})
+endif()

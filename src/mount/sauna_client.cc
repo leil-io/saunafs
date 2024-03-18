@@ -224,6 +224,59 @@ static std::atomic<bool> gDirectIo(false);
 static uint32_t lock_request_counter = 0;
 static std::mutex lock_request_mutex;
 
+#ifdef _WIN32
+uint8_t session_flags;
+
+uint8_t get_session_flags() { return session_flags; }
+
+#define LOCAL_USERS_THRESHOLD 0x30000
+static int32_t mounting_uid = USE_LOCAL_ID;
+static int32_t mounting_gid = USE_LOCAL_ID;
+uint32_t winfsp_uid = 0;
+uint32_t winfsp_gid = 0;
+std::mutex winfsp_context_mutex;
+
+void update_last_winfsp_context(const uint32_t uid, const uint32_t gid) {
+	std::lock_guard<std::mutex> winfsp_context_lock(winfsp_context_mutex);
+
+	if (uid > LOCAL_USERS_THRESHOLD) {
+		if (debug_mode && winfsp_uid != uid) {
+			safs::log_debug("set WinFSP user id to {}", uid);
+		}
+		winfsp_uid = uid;
+	}
+	if (gid > LOCAL_USERS_THRESHOLD) {
+		if (debug_mode && winfsp_gid != gid) {
+			safs::log_debug("set WinFSP group id to {}", uid);
+		}
+		winfsp_gid = gid;
+	}
+}
+
+void convert_winfsp_context_to_master_context(uint32_t &uid, uint32_t &gid) {
+	// set values as the ones provided in the options
+	if (uid != 0 && mounting_uid != USE_LOCAL_ID) {
+		uid = mounting_uid;
+	}
+	if (gid != 0 && mounting_gid != USE_LOCAL_ID) {
+		gid = mounting_gid;
+	}
+}
+
+void patch_uid_gid_fields(stat32 &st) {
+	if (((st.st_uid ==
+	      (mounting_uid == USE_LOCAL_ID ? winfsp_uid : mounting_uid)) ||
+	     (st.st_mode & S_IWOTH) ||
+	     (st.st_gid ==
+	          (mounting_gid == USE_LOCAL_ID ? winfsp_gid : mounting_gid) &&
+	      (st.st_mode & S_IWGRP)))) {
+		st.st_uid = winfsp_uid;
+		st.st_gid = winfsp_gid;
+	}
+}
+
+void patch_uid_gid_fields(AttrReply &e) { patch_uid_gid_fields(e.attr); }
+#endif
 
 static std::unique_ptr<AclCache> acl_cache;
 
@@ -692,7 +745,15 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 	int status;
 
 	if (debug_mode) {
+#ifdef _WIN32
+		if (parent != SPECIAL_INODE_ROOT ||
+		    strcmp(name, SPECIAL_FILE_NAME_OPLOG) != 0) {
+			oplog_printf(ctx, "lookup (%lu,%s) ...", (unsigned long int)parent,
+			             name);
+		}
+#else
 		oplog_printf(ctx, "lookup (%lu,%s) ...", (unsigned long int)parent, name);
+#endif
 	}
 	nleng = strlen(name);
 	if (nleng > SFS_NAME_MAX) {
@@ -781,7 +842,13 @@ AttrReply getattr(Context &ctx, Inode ino) {
 	}
 
 	if (IS_SPECIAL_INODE(ino)) {
+#ifndef _WIN32
 		return special_getattr(ino, ctx, attrstr);
+#else
+		AttrReply e = special_getattr(ino, ctx, attrstr);
+		patch_uid_gid_fields(e);
+		return e;
+#endif
 	}
 
 	maxfleng = write_data_getmaxfleng(ino);
@@ -808,6 +875,9 @@ AttrReply getattr(Context &ctx, Inode ino) {
 		o_stbuf.st_size=maxfleng;
 	}
 	attr_timeout = (attr_get_mattr(attr)&MATTR_NOACACHE)?0.0:attr_cache_timeout;
+#ifdef _WIN32
+	patch_uid_gid_fields(o_stbuf);
+#endif
 	makeattrstr(attrstr,256,&o_stbuf);
 	oplog_printf(ctx, "getattr (%lu): OK (%.1f,%s)",
 			(unsigned long int)ino,
@@ -3239,7 +3309,15 @@ std::vector<ChunkserverListEntry> getchunkservers() {
 void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsigned direntry_cache_size_,
 		double entry_cache_timeout_, double attr_cache_timeout_, int mkdir_copy_sgid_,
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
-		double acl_cache_timeout_, unsigned acl_cache_size_) {
+		double acl_cache_timeout_, unsigned acl_cache_size_
+#ifdef _WIN32
+		, int mounting_uid_, int mounting_gid_
+#endif
+		) {
+#ifdef _WIN32
+	mounting_uid = mounting_uid_;
+	mounting_gid = mounting_gid_;
+#endif
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
 	direntry_cache_timeout = direntry_cache_timeout_;
@@ -3279,7 +3357,11 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 void fs_init(FsInitParams &params) {
 	socketinit();
 	mycrc32_init();
-	int connection_ret = fs_init_master_connection(params);
+	int connection_ret = fs_init_master_connection(params
+#ifdef _WIN32
+	, session_flags, params.mounting_uid, params.mounting_gid
+#endif
+	);
 	if (!params.delayed_init && connection_ret < 0) {
 		safs_pretty_syslog(LOG_ERR, "Can't initialize connection with master server");
 		socketrelease();
@@ -3319,11 +3401,18 @@ void fs_init(FsInitParams &params) {
 			std::max(params.bandwidth_overuse, 1.));
 	write_data_init(params.write_cache_size, params.io_retries, params.write_workers,
 			params.write_window_size, params.chunkserver_write_timeout_ms, params.cache_per_inode_percentage);
+#ifdef _WIN32
+	set_debug_mode(params.debug_mode);
+#endif
 
 	init(params.debug_mode, params.keep_cache, params.direntry_cache_timeout, params.direntry_cache_size,
 		params.entry_cache_timeout, params.attr_cache_timeout, params.mkdir_copy_sgid,
 		params.sugid_clear_mode, params.use_rw_lock,
-		params.acl_cache_timeout, params.acl_cache_size);
+		params.acl_cache_timeout, params.acl_cache_size
+#ifdef _WIN32
+		, params.mounting_uid, params.mounting_gid
+#endif
+		);
 }
 
 void fs_term() {

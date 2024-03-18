@@ -44,10 +44,10 @@ double TokenBucket::budgetCeil() const {
 	return budgetCeil_;
 }
 
-double TokenBucket::attempt(SteadyTimePoint now, double cost) {
+uint64_t TokenBucket::attempt(SteadyTimePoint now, double cost) {
 	sassert(cost > 0);
 	updateBudget(now);
-	const double result = std::min(cost, budget_);
+	const uint64_t result = std::min(cost, budget_);
 	budget_ -= result;
 	return result;
 }

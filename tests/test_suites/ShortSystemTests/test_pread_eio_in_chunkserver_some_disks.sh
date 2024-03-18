@@ -1,4 +1,8 @@
-timeout_set '45 seconds'
+if is_windows_system; then
+	timeout_set '2 minutes'
+else
+	timeout_set '45 seconds'
+fi
 
 # Create an installation with 2 chunkservers, 3 disks each.
 # Two out of three disks in CS 0 will fail during the test.

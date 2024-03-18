@@ -41,9 +41,14 @@ const Attributes InodeStats::attr =
 	  {{'f', 0x01,0xA4, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0}};
 const Inode InodeStats::inode_ = SPECIAL_INODE_STATS;
 
-// 0x0100 == 0b100000000 == 0400
+// Win: 0x0124 == 0b100100100 == 0444
+// Other OSs: 0x0100 == 0b100000000 == 0400
 const Attributes InodeOplog::attr =
+#ifdef _WIN32
+	  {{'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0}};
+#else
 	  {{'f', 0x01,0x00, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0}};
+#endif
 const Inode InodeOplog::inode_ = SPECIAL_INODE_OPLOG;
 
 // 0x0100 == 0b100000000 == 0400

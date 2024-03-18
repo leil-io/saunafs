@@ -1,4 +1,9 @@
-timeout_set 3 minutes
+if is_windows_system; then
+	timeout_set 5 minutes
+else
+	timeout_set 3 minutes
+fi
+
 
 CHUNKSERVERS=4 \
 	MOUNTS=10 \

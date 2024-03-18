@@ -22,7 +22,7 @@
 #include "common/platform.h"
 
 #include <string.h>
-#include <sys/stat.h>
+#include "common/stat32.h"
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -40,6 +40,10 @@
 #include "protocol/lock_info.h"
 #include "protocol/named_inode_entry.h"
 
+#ifdef _WIN32
+#define USE_LOCAL_ID -1
+#endif
+
 namespace SaunaClient {
 
 typedef uint32_t Inode;
@@ -55,6 +59,8 @@ struct FsInitParams {
 	static constexpr bool     kDefaultDelayedInit = false;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultReportReservedPeriod = 60;
+	static constexpr const char *kDefaultUmaskDir = "002"; // means rwxrwxr-x permissions mask, 775 default permissions
+	static constexpr const char *kDefaultUmaskFile = "002"; // means rwxrwxr-x permissions mask, 775 default permissions
 #else
 	static constexpr unsigned kDefaultReportReservedPeriod = 30;
 #endif
@@ -135,6 +141,9 @@ struct FsInitParams {
 	             mkdir_copy_sgid(kDefaultMkdirCopySgid), sugid_clear_mode(kDefaultSugidClearMode),
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
+#ifdef _WIN32
+				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
+#endif
 	             verbose(kDefaultVerbose) {
 	}
 
@@ -164,6 +173,9 @@ struct FsInitParams {
 	             mkdir_copy_sgid(kDefaultMkdirCopySgid), sugid_clear_mode(kDefaultSugidClearMode),
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
+#ifdef _WIN32
+				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
+#endif
 	             verbose(kDefaultVerbose) {
 	}
 
@@ -209,6 +221,10 @@ struct FsInitParams {
 	bool use_rw_lock;
 	double acl_cache_timeout;
 	unsigned acl_cache_size;
+#ifdef _WIN32
+	int mounting_uid;
+	int mounting_gid;
+#endif
 
 	bool verbose;
 
@@ -310,6 +326,14 @@ struct RequestException : public std::exception {
 	int saunafs_error_code;
 };
 
+#ifdef _WIN32
+
+uint8_t get_session_flags();
+
+void update_last_winfsp_context(const unsigned int uid, const unsigned int gid);
+
+void convert_winfsp_context_to_master_context(unsigned int& uid, unsigned int& gid);
+#endif
 void updateGroups(Context &ctx);
 
 void masterDisconnectedCallback();

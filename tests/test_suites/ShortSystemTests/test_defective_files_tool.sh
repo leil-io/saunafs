@@ -14,7 +14,11 @@ FILE_SIZE=$((3*64*1024)) BLOCK_SIZE=1024 file-generate dir_ec/file
 
 saunafs_chunkserver_daemon 0 stop
 
-assert_eventually_prints 1 "saunafs_admin_master list-defective-files --undergoal --porcelain | wc -l"
+if is_windows_system; then
+	assert_eventually_prints 1 "saunafs_admin_master list-defective-files --undergoal --porcelain | wc -l" '75 seconds'
+else
+	assert_eventually_prints 1 "saunafs_admin_master list-defective-files --undergoal --porcelain | wc -l"
+fi
 assert_equals 0 $(saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l)
 assert_equals 0 $(saunafs_admin_master list-defective-files --structure-error --porcelain | wc -l)
 
@@ -22,7 +26,11 @@ for CS in {1..2}; do
 	saunafs_chunkserver_daemon $CS stop
 done
 
-assert_eventually_prints 1 "saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l"
+if is_windows_system; then
+	assert_eventually_prints 1 "saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l" '75 seconds'
+else
+	assert_eventually_prints 1 "saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l"
+fi
 assert_equals 0 $(saunafs_admin_master list-defective-files --undergoal --porcelain | wc -l)
 assert_equals 0 $(saunafs_admin_master list-defective-files --structure-error --porcelain | wc -l)
 
@@ -30,5 +38,9 @@ for CS in {0..2}; do
 	saunafs_chunkserver_daemon $CS start
 done
 
-assert_eventually_prints 0 "saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l"
+if is_windows_system; then
+	assert_eventually_prints 0 "saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l" '75 seconds'
+else
+	assert_eventually_prints 0 "saunafs_admin_master list-defective-files --unavailable --porcelain | wc -l"
+fi
 assert_equals 0 $(saunafs_admin_master list-defective-files --structure-error --porcelain | wc -l)

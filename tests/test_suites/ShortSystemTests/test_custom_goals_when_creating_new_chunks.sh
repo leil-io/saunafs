@@ -1,4 +1,8 @@
-timeout_set "1 minute"
+if is_windows_system; then
+	timeout_set "2 minutes"
+else
+	timeout_set "1 minute"
+fi
 
 # Start an installation with 2 servers labeled 'de', 2 labeled 'us' and one labeled 'cn'
 USE_RAMDISK=YES \

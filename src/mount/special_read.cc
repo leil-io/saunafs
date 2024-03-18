@@ -123,8 +123,14 @@ static std::vector<uint8_t> read(const Context &ctx,
 namespace InodeOplog {
 static std::vector<uint8_t> read(const Context &ctx,
 		size_t size, off_t off, FileInfo *fi, int debug_mode) {
+#ifdef _WIN32
+	(void) ctx;
+	(void) off;
+#endif
 	if (debug_mode) {
+#ifndef _WIN32
 		printDebugReadInfo(ctx, SPECIAL_INODE_OPLOG, size, off);
+#endif
 	}
 	uint32_t ssize;
 	uint8_t *buff;

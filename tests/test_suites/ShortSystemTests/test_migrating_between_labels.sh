@@ -38,11 +38,22 @@ wait
 
 # Change goal of all files, verify
 saunafs setgoal two_hdds dir/file*
-expect_eventually_prints 20 'count_chunks_on_chunkservers {3..5}'
-assert_eventually_prints 20 'find_all_metadata_chunks | wc -l'
+if is_windows_system; then
+	expect_eventually_prints 20 'count_chunks_on_chunkservers {3..5}' '75 seconds'
+	assert_eventually_prints 20 'find_all_metadata_chunks | wc -l' '75 seconds'
+else
+	expect_eventually_prints 20 'count_chunks_on_chunkservers {3..5}'
+	assert_eventually_prints 20 'find_all_metadata_chunks | wc -l'
+fi
 
 # Change goal of some files, verify
 saunafs setgoal two_flops dir/file{1..4}
-expect_eventually_prints 8 'count_chunks_on_chunkservers {6..8}'
-expect_eventually_prints 12 'count_chunks_on_chunkservers {3..5}'
-assert_eventually_prints 20 'find_all_metadata_chunks | wc -l'
+if is_windows_system; then
+	expect_eventually_prints 8 'count_chunks_on_chunkservers {6..8}' '75 seconds'
+	expect_eventually_prints 12 'count_chunks_on_chunkservers {3..5}' '75 seconds'
+	assert_eventually_prints 20 'find_all_metadata_chunks | wc -l' '75 seconds'
+else
+	expect_eventually_prints 8 'count_chunks_on_chunkservers {6..8}'
+	expect_eventually_prints 12 'count_chunks_on_chunkservers {3..5}'
+	assert_eventually_prints 20 'find_all_metadata_chunks | wc -l'
+fi

@@ -30,7 +30,7 @@ USE_RAMDISK=YES \
 			`|CHUNKS_SOFT_DEL_LIMIT = 10`
 			`|CHUNKS_WRITE_REP_LIMIT = 10`
 			`|REPLICATIONS_DELAY_INIT = 0`
-			`|CHUNKS_REBALANCING_BETWEEN_LABELS=1`
+			`|CHUNKS_REBALANCING_BETWEEN_LABELS = 1`
 			`|REPLICATIONS_DELAY_DISCONNECT = 0"\
 	setup_local_empty_saunafs info
 
@@ -44,18 +44,30 @@ assert_equals 3 "$(count_chunks_on_chunkservers {6..8})"
 assert_equals 3 "$(count_chunks_on_chunkservers {0..11})"
 
 saunafs setgoal ec33_hdd dir/file
-assert_eventually_prints '6 ec3_3' 'chunks_state' '2 minutes'
+if is_windows_system; then
+	assert_eventually_prints '6 ec3_3' 'chunks_state' '4 minutes'
+else
+	assert_eventually_prints '6 ec3_3' 'chunks_state' '2 minutes'
+fi
 assert_equals 3 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 6 "$(count_chunks_on_chunkservers {0..11})"
 
 saunafs setgoal ec22_mix dir/file
-assert_eventually_prints '4 ec2_2' 'chunks_state' '2 minutes'
+if is_windows_system; then
+	assert_eventually_prints '4 ec2_2' 'chunks_state' '4 minutes'
+else
+	assert_eventually_prints '4 ec2_2' 'chunks_state' '2 minutes'
+fi
 assert_equals 2 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 2 "$(count_chunks_on_chunkservers {6..8})"
 
 saunafs setgoal ec36_mix dir/file
 saunafs fileinfo dir/*
-assert_eventually_prints '9 ec3_6' 'chunks_state' '2 minutes'
+if is_windows_system; then
+	assert_eventually_prints '9 ec3_6' 'chunks_state' '4 minutes'
+else
+	assert_eventually_prints '9 ec3_6' 'chunks_state' '2 minutes'
+fi
 saunafs fileinfo dir/*
 assert_equals 3 "$(count_chunks_on_chunkservers {3..5})"
 assert_equals 3 "$(count_chunks_on_chunkservers {6..8})"

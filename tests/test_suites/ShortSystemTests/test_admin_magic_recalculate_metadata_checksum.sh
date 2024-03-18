@@ -25,7 +25,7 @@ assert_failure saunafs-admin magic-recalculate-metadata-checksum localhost "$por
 assert_equals 0 $(grep updater_end "$TEMP_DIR/log" | wc -l)
 assert_equals 0 $(grep updater_start "$TEMP_DIR/log" | wc -l)
 
-# Verify if the command without --async blocks us until checkum is recalculated
+# Verify if the command without --async blocks us until checksum is recalculated
 time assert_success saunafs-admin magic-recalculate-metadata-checksum localhost "$port" <<< "pass"
 log_data=$(tail -n 100 "$TEMP_DIR/log")
 assert_equals 1 $(echo "$log_data" | grep updater_end | wc -l)

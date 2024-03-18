@@ -29,10 +29,14 @@
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
+#ifdef _WIN32
+#define localtime_r(T, Tm) localtime_s(Tm, T)
+#endif
 
 #define OPBUFFSIZE 0x1000000
 #define LINELENG 1000
 #define MAXHISTORYSIZE 0xF00000
+#define TIMEDATAPREFFIXSIZE 34
 
 typedef struct _fhentry {
 	unsigned long fh;
@@ -53,8 +57,23 @@ static pthread_cond_t nodata = PTHREAD_COND_INITIALIZER;
 static time_t gConvTmHour = std::numeric_limits<time_t>::max(); // enforce update on first read
 static struct tm gConvTm;
 static pthread_mutex_t timelock = PTHREAD_MUTEX_INITIALIZER;
+#ifdef _WIN32
+static int debug_mode_;
+
+void set_debug_mode(int debug_mode) { debug_mode_ = debug_mode; }
+#endif
 
 static inline void oplog_put(uint8_t *buff,uint32_t leng) {
+#ifdef _WIN32
+	if (debug_mode_) {
+		char str_buff[LINELENG];
+		for (uint32_t i = TIMEDATAPREFFIXSIZE; i < leng - 1; i++) {
+			str_buff[i - TIMEDATAPREFFIXSIZE] = buff[i];
+		}
+		str_buff[leng - TIMEDATAPREFFIXSIZE - 1] = '\0';
+		safs::log_debug("{}", str_buff);
+	}
+#endif
 	uint32_t bpos;
 	if (leng>OPBUFFSIZE) {  // just in case
 		buff+=leng-OPBUFFSIZE;
@@ -107,6 +126,7 @@ void oplog_printf(const struct SaunaClient::Context &ctx,const char *format,...)
 	char buff[LINELENG];
 
 	get_time(tv, ltime);
+	// Update TIMEDATAPREFFIXSIZE constant if changing the time format
 	r  = snprintf(buff, LINELENG, "%llu %02u.%02u %02u:%02u:%02u.%06u: uid:%u gid:%u pid:%u cmd:",
 		(unsigned long long)tv.tv_sec, ltime.tm_mon + 1, ltime.tm_mday, ltime.tm_hour, ltime.tm_min, ltime.tm_sec, (unsigned)tv.tv_usec,
 		(unsigned)ctx.uid, (unsigned)ctx.gid, (unsigned)ctx.pid);
@@ -136,6 +156,7 @@ void oplog_printf(const char *format, ...) {
 	char buff[LINELENG];
 
 	get_time(tv, ltime);
+	// Update TIMEDATAPREFFIXSIZE constant if changing the time format
 	r = snprintf(buff, LINELENG, "%llu %02u.%02u %02u:%02u:%02u.%06u: cmd:",
 		(unsigned long long)tv.tv_sec, ltime.tm_mon + 1, ltime.tm_mday, ltime.tm_hour, ltime.tm_min, ltime.tm_sec, (unsigned)tv.tv_usec);
 	if (r < 0) {

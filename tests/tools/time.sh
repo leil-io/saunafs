@@ -22,6 +22,16 @@ wait_for() {
 	return 1
 }
 
+# Current Windows testing relies on masters and chunkservers running under 
+# WSL1. This makes them much slower than expected, making some tests to fail
+# due to failing almost-inmediate checks. Therefore, solution was to wait some
+# small, though enough time (5s) to make those checks pass.
+wait_if_windows() {
+    if is_windows_system; then
+        sleep 5
+    fi
+}
+
 execution_time() {
 	/usr/bin/time --quiet -f %e "${@}" 2>&1 > /dev/null || true
 }
