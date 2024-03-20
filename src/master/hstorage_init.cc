@@ -32,12 +32,13 @@ static std::string gBDBStoragePath;
 static uint64_t gBDBStorageCacheSize;
 
 void hstorage_reload() {
-	int use_bdb = cfg_getuint8("USE_BDB_NAME_STORAGE", 0);
+	int use_bdb = cfg_getuint8("USE_BDB_FOR_NAME_STORAGE", 0);
 	std::string bdb_path = cfg_getstring("DATA_PATH", DATA_PATH);
 	uint64_t cache_size = cfg_getuint32("BDB_NAME_STORAGE_CACHE_SIZE", 10);
 
 	if (use_bdb != gUseBDBStorage) {
-		safs_pretty_syslog(LOG_ERR, "Changing USE_BDB_NAME_STORAGE requires restart.");
+		safs_pretty_syslog(
+		    LOG_ERR, "Changing USE_BDB_FOR_NAME_STORAGE requires restart.");
 	}
 
 	if (gUseBDBStorage && bdb_path != gBDBStoragePath) {
