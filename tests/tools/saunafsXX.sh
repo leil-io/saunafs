@@ -46,6 +46,36 @@ END
 		cp -Rp usr/ ${SAUNAFSXX_DIR_BASE}/install
 		cd -
 		;;
+#  We don't support testing CentOS and Fedora anymore, but the code is left
+#  here for reference.
+#
+# 	CentOS | Fedora)
+# 		local destdir="${TEMP_DIR}/saunafsxx_packages"
+# 		mkdir ${destdir}
+# 		local url=""
+# 		if [ "$distro" == CentOS ]; then
+# 			url="http://dev.saunafs.com/packages/centos.saunafs.repo"
+# 		else
+# 			url="http://dev.saunafs.com/packages/fedora.saunafs.repo"
+# 		fi
+# 		mkdir -p ${TEMP_DIR}/dnf/etc/yum.repos.d
+# 		cat >${TEMP_DIR}/dnf/dnf.conf <<END
+# [main]
+# logdir=${TEMP_DIR}/dnf/var/log
+# cachedir=${TEMP_DIR}/dnf/var/cache
+# persistdir=${TEMP_DIR}/dnf/var/lib/dnf
+# reposdir=${TEMP_DIR}/dnf/etc/yum.repos.d
+# END
+# 		wget "$url" -O ${TEMP_DIR}/dnf/etc/yum.repos.d/saunafs.repo
+# 		for pkg in {saunafs-master,saunafs-chunkserver,saunafs-client}-${SAUNAFSXX_TAG}; do
+# 			fakeroot dnf -y --config=${TEMP_DIR}/dnf/dnf.conf --destdir=${destdir} download ${pkg}
+# 		done
+# 		# unpack binaries
+# 		cd ${destdir}
+# 		find . -name "*master*.rpm" | xargs rpm2cpio | cpio -idm ./usr/sbin/sfsmaster
+# 		find . -name "*chunkserver*.rpm" | xargs rpm2cpio | cpio -idm ./usr/sbin/sfschunkserver
+# 		find . -name "*client*.rpm" | xargs rpm2cpio | cpio -idm ./usr/bin/*
+#
 	*)
 		test_fail "Your distribution ($distro) is not supported."
 		;;
