@@ -225,6 +225,7 @@ static uint32_t lock_request_counter = 0;
 static std::mutex lock_request_mutex;
 
 #ifdef _WIN32
+bool ignore_read = false;
 uint8_t session_flags;
 
 uint8_t get_session_flags() { return session_flags; }
@@ -2189,6 +2190,15 @@ ReadCache::Result read(Context &ctx,
 		safs::log_debug("read from inode {} up to {} bytes from position {}",
 		                ino, size, off);
 	}
+#ifdef _WIN32
+	if (ignore_read) {
+		ReadCache::Entry *entry = new ReadCache::Entry(off, size);
+		entry->buffer = std::vector<uint8_t>(size);
+		ReadCache::Result ret;
+		ret.entries.push_back(entry);
+		return ret;
+	}
+#endif
 	if (fileinfo==NULL) {
 		oplog_printf(ctx, "read (%lu,%" PRIu64 ",%" PRIu64 "): %s",
 				(unsigned long int)ino,
@@ -3378,12 +3388,13 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
 		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io
 #ifdef _WIN32
-		, int mounting_uid_, int mounting_gid_
+		, int mounting_uid_, int mounting_gid_, bool special_copy_mode
 #endif
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
+	ignore_read = special_copy_mode;
 #endif
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
@@ -3470,7 +3481,13 @@ void fs_init(FsInitParams &params) {
 	write_data_init(params.write_cache_size, params.io_retries,
 	                params.write_workers, params.write_window_size,
 	                params.chunkserver_write_timeout_ms,
-	                params.cache_per_inode_percentage, params.ignoreflush);
+	                params.cache_per_inode_percentage,
+#ifdef _WIN32
+	                params.special_copy_mode
+#else
+	                params.ignore_flush
+#endif
+	                );
 #ifdef _WIN32
 	set_debug_mode(params.debug_mode);
 #endif
@@ -3480,7 +3497,7 @@ void fs_init(FsInitParams &params) {
 		params.sugid_clear_mode, params.use_rw_lock,
 		params.acl_cache_timeout, params.acl_cache_size, params.direct_io
 #ifdef _WIN32
-		, params.mounting_uid, params.mounting_gid
+		, params.mounting_uid, params.mounting_gid, params.special_copy_mode
 #endif
 		);
 }
