@@ -3,7 +3,11 @@ timeout_set 90 seconds
 # A long scenario of SaunaFS upgrade from legacy to current version,
 # checking if multiple mini-things work properly, in one test.
 #
-# TODO: Rethink this test, we shouldn't do partial upgrades like this.
+# TODO: Rethink this test, we shouldn't do partial upgrades like this. However,
+# there may be reasons why we need do it (for example, because of the hardware
+# it can be impossible to upgrade everything at once, or where it's useful to
+# test a newer client against an existing cluster, perhaps for compatibility
+# reasons).
 
 export SAFS_MOUNT_COMMAND="sfsmount"
 
@@ -47,7 +51,6 @@ saunafs_master_daemon restart
 saunafs_master_n 1 restart
 
 # Ensure that versions are switched
-echo $(saunafs_admin_master info)
 assert_equals 0 $(saunafs_admin_master info | grep $SAUNAFSXX_TAG | wc -l)
 saunafs_wait_for_all_ready_chunkservers
 # Check if files can still be read:

@@ -3,7 +3,6 @@
 # If out_var provided an associative array with name $out_var
 # is created and it contains information about the filestystem
 setup_local_empty_saunafs() {
-	MASTER_START_PARAM=${MASTER_START_PARAM:-}
 	local use_legacy=${USE_LEGACY:-}
 	local use_saunafsXX=${START_WITH_LEGACY_SAUNAFS:-}
 	local use_ramdisk=${USE_RAMDISK:-}
@@ -22,6 +21,7 @@ setup_local_empty_saunafs() {
 	local etcdir=$TEMP_DIR/saunafs/etc
 	local vardir=$TEMP_DIR/saunafs/var
 	local mntdir=$TEMP_DIR/mnt
+	local master_start_param=${MASTER_START_PARAM:-}
 	local shadow_start_param=${SHADOW_START_PARAM:-}
 	declare -gA saunafs_info_
 	saunafs_info_[chunkserver_count]=$number_of_chunkservers
@@ -69,7 +69,7 @@ setup_local_empty_saunafs() {
 	saunafs_info_[masterserver_count]=$number_of_masterservers
 
 	# Start one masterserver with personality master
-	saunafs_master_daemon start ${MASTER_START_PARAM}
+	saunafs_master_daemon start ${master_start_param}
 
 	# Prepare the metalogger, so that any test can start it
 	prepare_metalogger_
