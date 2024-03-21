@@ -79,11 +79,12 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 #ifdef _WIN32
+	static constexpr bool     kDefaultSpecialCopyMode = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 #else
+	static constexpr bool     kDefaultIgnoreFlush = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
-	static constexpr bool     kDefaultIgnoreFlush = false;
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
 	static constexpr unsigned kDefaultWriteWorkers = 10;
 	static constexpr unsigned kDefaultWriteWindowSize = 15;
@@ -143,9 +144,11 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_copy_mode(kDefaultSpecialCopyMode),
+#else
+	             ignore_flush(kDefaultIgnoreFlush),
 #endif
-	             verbose(kDefaultVerbose), ignoreflush(kDefaultIgnoreFlush) {
+	             verbose(kDefaultVerbose) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -175,9 +178,11 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_copy_mode(kDefaultSpecialCopyMode),
+#else
+	             ignore_flush(kDefaultIgnoreFlush),
 #endif
-	             verbose(kDefaultVerbose), ignoreflush(kDefaultIgnoreFlush) {
+	             verbose(kDefaultVerbose) {
 	}
 
 	std::string bind_host;
@@ -227,8 +232,12 @@ struct FsInitParams {
 	int mounting_gid;
 #endif
 
+#ifdef _WIN32
+	bool special_copy_mode;
+#else
+	bool ignore_flush;
+#endif
 	bool verbose;
-	bool ignoreflush;
 
 	std::string io_limits_config_file;
 };
