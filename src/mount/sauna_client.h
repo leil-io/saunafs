@@ -83,6 +83,7 @@ struct FsInitParams {
 #else
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
+	static constexpr bool     kDefaultIgnoreFlush = false;
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
 	static constexpr unsigned kDefaultWriteWorkers = 10;
 	static constexpr unsigned kDefaultWriteWindowSize = 15;
@@ -145,7 +146,7 @@ struct FsInitParams {
 #ifdef _WIN32
 				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
 #endif
-	             verbose(kDefaultVerbose), direct_io(kDirectIO), ignoreflush(0) {
+	             verbose(kDefaultVerbose), direct_io(kDirectIO), ignoreflush(kDefaultIgnoreFlush) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -177,7 +178,7 @@ struct FsInitParams {
 #ifdef _WIN32
 				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
 #endif
-	             verbose(kDefaultVerbose), direct_io(kDirectIO), ignoreflush(0) {
+	             verbose(kDefaultVerbose), direct_io(kDirectIO), ignoreflush(kDefaultIgnoreFlush) {
 	}
 
 	std::string bind_host;

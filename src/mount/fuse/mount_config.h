@@ -169,7 +169,7 @@ struct sfsopts_ {
 		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
 		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
 		directio(SaunaClient::FsInitParams::kDirectIO),
-		ignoreflush(0)
+		ignoreflush(SaunaClient::FsInitParams::kDefaultIgnoreFlush)
 	{ }
 };
 
