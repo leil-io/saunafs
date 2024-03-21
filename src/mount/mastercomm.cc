@@ -758,7 +758,6 @@ int fs_connect(bool verbose) {
 		mintrashtime = 0;
 		maxtrashtime = 0;
 	}
-	fs_register_config();
 	free(regbuff);
 	lastwrite=time(NULL);
 	if (!verbose) {
@@ -1170,6 +1169,9 @@ void* fs_receive_thread(void *) {
 			if (sessionlost) {      // if previous session is lost then try to register as a new session
 				if (fs_connect(false)==0) {
 					sessionlost=0;
+					fdLock.unlock();
+					fs_register_config();
+					fdLock.lock();
 				}
 			} else {        // if other problem occurred then try to resolve hostname and portname then try to reconnect using the same session id
 				if (fs_resolve(false, gInitParams.bind_host, gInitParams.host, gInitParams.port) == 0) {
@@ -1295,11 +1297,15 @@ int fs_init_master_connection(SaunaClient::FsInitParams &params
 		return 1;
 	}
 #ifdef _WIN32
-	sessionFlags = &session_flags; 
+	sessionFlags = &session_flags;
 	mountingUid  = &mounting_uid;
 	mountingGid = &mounting_gid;
 #endif
-	return fs_connect(params.verbose);
+	int connectResult = fs_connect(params.verbose);
+	if (connectResult == 0) {
+		fs_register_config();
+	}
+	return connectResult;
 }
 
 // called after fork

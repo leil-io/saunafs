@@ -1239,7 +1239,7 @@ enum class SugidClearMode {
 /// msgid:32 status:8
 
 //0x01E6
-#define SAU_CLTOMA_REGISTER_CONFIG (1000U + 485U)
+#define SAU_CLTOMA_REGISTER_CONFIG (1000U + 486U)
 /// config:STDSTRING
 
 /// version==0 msgid:32 status:8
