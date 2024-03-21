@@ -167,7 +167,7 @@ struct sfsopts_ {
 		symlinkcachetimeout(SaunaClient::FsInitParams::kDefaultSymlinkCacheTimeout),
 		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
 		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
-		ignoreflush(0)
+		ignoreflush(SaunaClient::FsInitParams::kDefaultIgnoreFlush)
 	{ }
 };
 
