@@ -327,6 +327,47 @@ public:
 		addEntry(ctx, parent_inode, inode, index, next_index, name, attr, timestamp);
 	}
 
+	/*! \brief Add directory entry information to cache.
+	 *
+	 * \param ctx Process credentials.
+	 * \param parent_inode Parent node index (inode).
+	 * \param inode Inode of directory entry.
+	 * \param name Name of directory entry.
+	 * \param attr attributes of found directory entry.
+	 * \param timestamp Time when data has been obtained (used for entry timeout).
+	 */
+	void insert(const SaunaClient::Context &ctx, uint32_t parent_inode,
+	            uint32_t inode, const std::string name, const Attributes &attr,
+	            uint64_t timestamp) {
+		// Avoid inserting stale data
+		if (timestamp + timeout_ <= current_time_) {
+			return;
+		}
+		removeExpired(1, timestamp);
+		auto lookup_it = find(ctx, parent_inode, name);
+		if (lookup_it != lookup_set_.end()) {
+			erase(std::addressof(*lookup_it));
+		}
+		addEntry(ctx, parent_inode, inode, INVALID_INDEX, INVALID_INDEX, name, attr, timestamp);
+	}
+
+	/*! \brief Add directory entry information to cache.
+	 *
+	 * \param ctx Process credentials.
+	 * \param inode Inode of directory entry.
+	 * \param attr attributes of found directory entry.
+	 * \param timestamp Time when data has been obtained (used for entry timeout).
+	 */
+	void insert(const SaunaClient::Context &ctx, uint32_t inode,
+	            const Attributes &attr, uint64_t timestamp) {
+		// Avoid inserting stale data
+		if (timestamp + timeout_ <= current_time_) {
+			return;
+		}
+		removeExpired(1, timestamp);
+		addEntry(ctx, INVALID_PARENT, inode, INVALID_INDEX, INVALID_INDEX, EMPTY_NAME, attr, timestamp);
+	}
+
 	/*! \brief Add data to cache from container.
 	 *
 	 * \param ctx Process credentials.
