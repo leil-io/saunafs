@@ -52,9 +52,6 @@ setup_local_empty_saunafs() {
 	fi
 
 	if [[ $use_saunafsXX ]]; then
-		# In old suite, when legacy version was >= 3.11, we set `use_new_goal_config`=true
-		# Maybe that's not what we want? (look at if above)
-		use_new_goal_config="true"
 		SAUNAFSXX_DIR=${SAUNAFSXX_DIR_BASE}/install/usr
 		export PATH="${SAUNAFSXX_DIR}/bin:${SAUNAFSXX_DIR}/sbin:$PATH"
 		install_saunafsXX
@@ -809,6 +806,19 @@ saunafs_admin_master() {
 	shift
 	local port=${saunafs_info_[matocl]}
 	saunafs-admin "$command" localhost "$port" "$@" <<<"${saunafs_info_[admin_password]}"
+}
+
+# A generic function to run old SaunaFS admin commands.
+#
+# Usage examples:
+# saunafs_old_admin_master info
+# saunafs_old_admin_master list-chunkservers
+# saunafs_old_admin_master list-mounts
+saunafs_old_admin_master() {
+	local command="$1"
+	shift
+	local port=${saunafs_info_[matocl]}
+	"$SAUNAFSXX_DIR/bin/saunafs-admin" "$command" localhost "$port" "$@"
 }
 
 # A useful shortcut for saunafs-admin commands which require authentication
