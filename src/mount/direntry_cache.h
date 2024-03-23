@@ -607,6 +607,7 @@ protected:
 		fifo_list_.push_back(entry);
 		entry.timestamp = timestamp;
 		entry.attr = de.attributes;
+		entry.next_index = de.next_index;
 	}
 
 	void addEntry(const SaunaClient::Context &ctx, uint32_t parent_inode,
