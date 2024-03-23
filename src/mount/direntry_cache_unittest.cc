@@ -49,7 +49,38 @@ public:
 	InodeMultiset::const_iterator inode_end() const {
 		return inode_multiset_.end();
 	}
+
+	size_t index_size() const {
+		return index_set_.size();
+	}
+
+	size_t lookup_size() const {
+		return lookup_set_.size();
+	}
 };
+
+void check_expected_content(
+    DirEntryCacheIntrospect &cache,
+    std::vector<std::tuple<int, int, int, std::string>> index_output,
+    std::vector<std::tuple<int, int, int, std::string>> lookup_output) {
+	auto index_it = cache.index_begin();
+	auto index_output_it = index_output.begin();
+	while (index_it != cache.index_end()) {
+		ASSERT_EQ(*index_output_it, std::make_tuple(index_it->inode, index_it->parent_inode, index_it->index, index_it->name));
+		index_it++;
+		index_output_it++;
+	}
+	ASSERT_TRUE(index_output_it == index_output.end());
+
+	auto lookup_it = cache.lookup_begin();
+	auto lookup_output_it = lookup_output.begin();
+	while (lookup_it != cache.lookup_end()) {
+		ASSERT_EQ(*lookup_output_it, std::make_tuple(lookup_it->inode, lookup_it->parent_inode, lookup_it->index, lookup_it->name));
+		lookup_it++;
+		lookup_output_it++;
+	}
+	ASSERT_TRUE(lookup_output_it == lookup_output.end());
+}
 
 TEST(DirEntryCache, Basic) {
 	DirEntryCacheIntrospect cache(5000000);
@@ -85,46 +116,61 @@ TEST(DirEntryCache, Basic) {
 			{3, 4, 12, "a2", attributes_with_6}
 		}, current_time
 	);
+	size_t initial_size = cache.size();
+
+	// Overwrite old lookup entry, but do not insert in the index set
+	cache.insert(SaunaClient::Context(1, 2, 0, 0), 11, 15, "a1",
+	             dummy_attributes, current_time);
+
+	ASSERT_EQ(cache.size(), initial_size);
+	ASSERT_EQ(cache.size(), cache.lookup_size());
+	ASSERT_EQ(cache.size(), cache.index_size() + 1);
+
+	// Insert to the lookup set (different ctx) and do not insert in the index
+	// set
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 11, 15, "a1",
+	             dummy_attributes, current_time);
+
+	ASSERT_EQ(cache.size(), initial_size + 1);
+	ASSERT_EQ(cache.size(), cache.lookup_size());
+	ASSERT_EQ(cache.size(), cache.index_size() + 2);
+
+	// Add plain inode entry
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 6, dummy_attributes,
+	             current_time);
+
+	ASSERT_EQ(cache.size(), initial_size + 2);
+	ASSERT_EQ(cache.size(), cache.lookup_size() + 1);
+	ASSERT_EQ(cache.size(), cache.index_size() + 3);
+
+	// Overwrite plain inode entry, should remove old entries in index and
+	// lookup sets
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 12, attributes_with_6,
+	             current_time);
+
+	ASSERT_EQ(cache.size(), initial_size + 2);
+	ASSERT_EQ(cache.size(), cache.lookup_size() + 2);
+	ASSERT_EQ(cache.size(), cache.index_size() + 4);
 
 	std::vector<std::tuple<int, int, int, std::string>> index_output {
 		std::make_tuple(7, 9, 0, "a1"),
 		std::make_tuple(11, 9, 1, "a4"),
 		std::make_tuple(13, 9, 2, "a3"),
-		std::make_tuple(12, 9, 3, "a2"),
-		std::make_tuple(5, 11, 7, "a1"),
 		std::make_tuple(4, 11, 8, "a2"),
 		std::make_tuple(3, 11, 9, "a3")
 	};
 
 	std::vector<std::tuple<int, int, int, std::string>> lookup_output {
 		std::make_tuple(7, 9, 0, "a1"),
-		std::make_tuple(12, 9, 3, "a2"),
 		std::make_tuple(13, 9, 2, "a3"),
 		std::make_tuple(11, 9, 1, "a4"),
-		std::make_tuple(5, 11, 7, "a1"),
+		std::make_tuple(15, 11, INVALID_INDEX, "a1"),
+		std::make_tuple(15, 11, INVALID_INDEX, "a1"),
 		std::make_tuple(4, 11, 8, "a2"),
 		std::make_tuple(3, 11, 9, "a3")
 	};
 
-	auto index_it = cache.index_begin();
-	auto index_output_it = index_output.begin();
-	ASSERT_EQ(cache.size(), index_output.size());
-	while (index_it != cache.index_end()) {
-		ASSERT_EQ(*index_output_it, std::make_tuple(index_it->inode, index_it->parent_inode, index_it->index, index_it->name));
-		index_it++;
-		index_output_it++;
-	}
-	ASSERT_TRUE(index_output_it == index_output.end());
-
-	auto lookup_it = cache.lookup_begin();
-	auto lookup_output_it = lookup_output.begin();
-	ASSERT_EQ(cache.size(), lookup_output.size());
-	while (lookup_it != cache.lookup_end()) {
-		ASSERT_EQ(*lookup_output_it, std::make_tuple(lookup_it->inode, lookup_it->parent_inode, lookup_it->index, lookup_it->name));
-		lookup_it++;
-		lookup_output_it++;
-	}
-	ASSERT_TRUE(lookup_output_it == lookup_output.end());
+	check_expected_content(cache, index_output, lookup_output);
 
 	auto by_inode_it = cache.find(SaunaClient::Context(0, 0, 0, 0), 12);
 	ASSERT_NE(by_inode_it, cache.inode_end());
@@ -132,6 +178,12 @@ TEST(DirEntryCache, Basic) {
 	by_inode_it++;
 	ASSERT_NE(by_inode_it, cache.inode_end());
 	ASSERT_EQ(by_inode_it->attr[0], 9);
+	by_inode_it++;
+	ASSERT_NE(by_inode_it, cache.inode_end());
+	ASSERT_EQ(by_inode_it->inode, 15);
+	by_inode_it++;
+	ASSERT_NE(by_inode_it, cache.inode_end());
+	ASSERT_EQ(by_inode_it->inode, 15);
 	by_inode_it++;
 	ASSERT_EQ(by_inode_it, cache.inode_end());
 }
@@ -143,9 +195,29 @@ TEST(DirEntryCache, Repetitions) {
 	dummy_attributes.fill(0);
 	auto current_time = cache.updateTime();
 
-	cache.insertSequence(SaunaClient::Context(0, 0, 0, 0), 9, std::vector<DirectoryEntry>{{0, 1, 7, "a1", dummy_attributes}}, current_time);
-	cache.insertSequence(SaunaClient::Context(0, 0, 0, 0), 9, std::vector<DirectoryEntry>{{1, 2, 7, "a1", dummy_attributes}}, current_time);
+	cache.insertSequence(
+	    SaunaClient::Context(0, 0, 0, 0), 9,
+	    std::vector<DirectoryEntry>{{0, 1, 7, "a1", dummy_attributes},
+	                                {1, 2, 8, "a2", dummy_attributes},
+	                                {2, 3, 9, "a3", dummy_attributes},
+	                                {3, 4, 10, "a4", dummy_attributes},
+	                                {4, 5, 11, "a5", dummy_attributes},
+	                                {5, 6, 12, "a6", dummy_attributes}},
+	    current_time);
+	// Lookup set finds the entries and should overwrite them
+	cache.insertSequence(
+	    SaunaClient::Context(0, 0, 0, 0), 9,
+	    std::vector<DirectoryEntry>{{1, 2, 8, "a1", dummy_attributes},
+	                                {2, 3, 9, "a2", dummy_attributes},
+	                                {3, 4, 10, "a3", dummy_attributes},
+	                                {4, 5, 11, "a4", dummy_attributes},
+	                                {5, 6, 12, "a5", dummy_attributes},
+									{6, 7, 13, "a6", dummy_attributes}},
+	    current_time);
+
+	ASSERT_EQ(cache.size(), 6);
 	cache.removeOldest(5);
+	ASSERT_EQ(cache.size(), 1);
 }
 
 TEST(DirEntryCache, RandomOrder) {
@@ -153,10 +225,6 @@ TEST(DirEntryCache, RandomOrder) {
 
 	Attributes dummy_attributes;
 	dummy_attributes.fill(0);
-	Attributes attributes_with_6 = dummy_attributes;
-	Attributes attributes_with_9 = dummy_attributes;
-	attributes_with_6[0] = 6;
-	attributes_with_9[0] = 9;
 	auto current_time = cache.updateTime();
 	cache.insertSequence(
 		SaunaClient::Context(0, 0, 0, 0), 9,
@@ -197,24 +265,28 @@ TEST(DirEntryCache, RandomOrder) {
 		std::make_tuple(4, 9, 8, "a5"),
 		std::make_tuple(3, 9, 9, "a6")
 	};
+	
+	check_expected_content(cache, index_output, lookup_output);
 
-	auto index_it = cache.index_begin();
-	auto index_output_it = index_output.begin();
-	ASSERT_EQ(cache.size(), index_output.size());
-	while (index_it != cache.index_end()) {
-		ASSERT_EQ(*index_output_it, std::make_tuple(index_it->inode, index_it->parent_inode, index_it->index, index_it->name));
-		index_it++;
-		index_output_it++;
-	}
-	ASSERT_TRUE(index_output_it == index_output.end());
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 9, 10, 3, 100, "a7",
+	             dummy_attributes, current_time);
+	// Check last entry was actually inserted
+	auto lookup_it = cache.lookup_end();
+	lookup_it--;
+	ASSERT_EQ(lookup_it->inode, 10);
+	// Should remove the sequence of entries starting from index 0, including the last one inserted
+	cache.invalidate(SaunaClient::Context(0, 0, 0, 0), 9, 0);
 
-	auto lookup_it = cache.lookup_begin();
-	auto lookup_output_it = lookup_output.begin();
-	ASSERT_EQ(cache.size(), lookup_output.size());
-	while (lookup_it != cache.lookup_end()) {
-		ASSERT_EQ(*lookup_output_it, std::make_tuple(lookup_it->inode, lookup_it->parent_inode, lookup_it->index, lookup_it->name));
-		lookup_it++;
-		lookup_output_it++;
-	}
-	ASSERT_TRUE(lookup_output_it == lookup_output.end());
+	index_output = {
+		std::make_tuple(5, 9, 7, "a4"),
+		std::make_tuple(4, 9, 8, "a5"),
+		std::make_tuple(3, 9, 9, "a6")
+	};
+
+	lookup_output = {
+		std::make_tuple(5, 9, 7, "a4"),
+		std::make_tuple(4, 9, 8, "a5"),
+		std::make_tuple(3, 9, 9, "a6")
+	};
+	check_expected_content(cache, index_output, lookup_output);
 }
