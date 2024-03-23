@@ -23,6 +23,8 @@ setup_local_empty_saunafs() {
 	local mntdir=$TEMP_DIR/mnt
 	local master_start_param=${MASTER_START_PARAM:-}
 	local shadow_start_param=${SHADOW_START_PARAM:-}
+	local user_id=${USER_ID:=$(id -u)}
+	local group_id=${GROUP_ID:=$(id -g)}
 	declare -gA saunafs_info_
 	saunafs_info_[chunkserver_count]=$number_of_chunkservers
 	saunafs_info_[admin_password]=${ADMIN_PASSWORD:-password}
@@ -98,7 +100,7 @@ setup_local_empty_saunafs() {
 
 	# Mount the filesystem
 	for ((mntid = 0; mntid < number_of_mounts; ++mntid)); do
-		add_mount_ $mntid
+		add_mount_ $mntid $user_id $group_id
 	done
 
 	export PATH="$oldpath"
@@ -572,11 +574,11 @@ create_sfsmount_cfg_() {
 }
 
 windows_do_mount_() {
-	local user_id=$(id -u)
-	local group_id=$(id -g)
 	local mount_cfg=$1
 	local drive=$2
 	local mount_dir=$3
+	local user_id=$4
+	local group_id=$5
 	sfsmount3.exe -c ${mount_cfg} -D ${drive}: --uid $user_id --gid $group_id &
 	disown $!
 
@@ -636,9 +638,11 @@ windows_prepare_mount_() {
 	local mount_big_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[F-O]')
 	local mount_dir="/mnt/$mount_dir_letter"
 	local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
+	local user_id=$2
+	local group_id=$3
 	create_sfsmount_cfg_ ${mount_id} > "$mount_cfg"
 
-	local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir}"
+	local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir} $user_id $group_id"
 	local umount_call="windows_do_umount_ ${mount_big_dir_letter} ${mount_dir}"
 
 	if [ ! -d "$mount_dir" ]; then
@@ -680,9 +684,11 @@ unix_prepare_mount_() {
 
 add_mount_() {
 	local mount_id=$1
+	local user_id=$2
+	local group_id=$3
 
 	if is_windows_system; then
-		windows_prepare_mount_ $mount_id
+		windows_prepare_mount_ $mount_id $user_id $group_id
 	else
 		unix_prepare_mount_ $mount_id
 	fi
