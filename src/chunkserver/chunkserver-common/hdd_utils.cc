@@ -65,7 +65,6 @@ void hddChunkRelease(IChunk *chunk) {
 	if (chunk->state() == ChunkState::Locked) {
 		chunk->setState(ChunkState::Available);
 		if (chunk->condVar()) {
-			chunksMapUniqueLock.unlock();
 			chunk->condVar()->condVar.notify_one();
 		}
 	} else if (chunk->state() == ChunkState::ToBeDeleted) {
