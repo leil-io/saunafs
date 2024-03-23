@@ -622,6 +622,22 @@ protected:
 		}
 		inode_multiset_.insert(*entry);
 		fifo_list_.push_back(*entry);
+		if (lookup_set_.size() < index_set_.size()) {
+			auto size1 = index_set_.size();
+			auto size2 = lookup_set_.size();
+			safs::log_err(
+			    "Inconsistent DirEntryCache: lookup set should have at least "
+			    "as many entries as index set, index:%lu > lookup:%lu",
+			    size1, size2);
+		}
+		if (inode_multiset_.size() < lookup_set_.size()) {
+			auto size1 = lookup_set_.size();
+			auto size2 = inode_multiset_.size();
+			safs::log_err(
+			    "Inconsistent DirEntryCache: inode multiset should have at "
+			    "least as many entries as lookup set, lookup:%lu > inode:%lu",
+			    size1, size2);
+		}
 	}
 
 	Timer timer_;
