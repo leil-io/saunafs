@@ -162,6 +162,30 @@ static std::vector<uint8_t> read(const Context &ctx,
 	}
 	MagicFile *file = reinterpret_cast<MagicFile*>(fi->fh);
 	std::unique_lock<std::mutex> lock(file->mutex);
+
+#ifdef _WIN32
+	if (file->wasWritten) {
+		if (isWStringFromWindows(file->value)) {
+			file->value = convertWStringFromWindowsToString(file->value);
+		}
+
+		auto separatorPos = file->value.find('=');
+		if (separatorPos == file->value.npos) {
+			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Wrong value '%s'",
+			                   file->value.c_str());
+		} else {
+			std::string name = file->value.substr(0, separatorPos);
+			std::string value = file->value.substr(separatorPos + 1);
+			if (!value.empty() && value.back() == '\n') {
+				value.resize(value.size() - 1);
+			}
+			gTweaks.setValue(name, value);
+			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Setting '%s' to '%s'",
+			                   name.c_str(), value.c_str());
+		}
+	}
+#endif
+
 	if (!file->wasRead) {
 		file->value = gTweaks.getAllValues();
 		file->wasRead = true;
