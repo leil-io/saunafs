@@ -324,6 +324,10 @@ public:
 		if (index_it != index_set_.end()) {
 			erase(std::addressof(*index_it));
 		}
+		auto inode_it = find(ctx, inode);
+		if (inode_it != inode_multiset_.end()) {
+			erase(std::addressof(*inode_it));
+		}
 		addEntry(ctx, parent_inode, inode, index, next_index, name, attr, timestamp);
 	}
 
@@ -348,6 +352,10 @@ public:
 		if (lookup_it != lookup_set_.end()) {
 			erase(std::addressof(*lookup_it));
 		}
+		auto inode_it = find(ctx, inode);
+		if (inode_it != inode_multiset_.end()) {
+			erase(std::addressof(*inode_it));
+		}
 		addEntry(ctx, parent_inode, inode, INVALID_INDEX, INVALID_INDEX, name, attr, timestamp);
 	}
 
@@ -365,6 +373,10 @@ public:
 			return;
 		}
 		removeExpired(1, timestamp);
+		auto inode_it = find(ctx, inode);
+		if (inode_it != inode_multiset_.end()) {
+			erase(std::addressof(*inode_it));
+		}
 		addEntry(ctx, INVALID_PARENT, inode, INVALID_INDEX, INVALID_INDEX, EMPTY_NAME, attr, timestamp);
 	}
 
