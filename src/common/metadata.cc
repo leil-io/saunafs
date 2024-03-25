@@ -90,12 +90,17 @@ uint64_t metadataGetVersion(const std::string& file) {
 		throw MetadataCheckException("Can't read the metadata file");
 	}
 
-	if (memcmp(chkbuff, SFSSIGNATURE "M 2.9", strlen(SFSSIGNATURE "M 2.9")) == 0) {
+	std::string signature = std::string(chkbuff, 8);
+	std::string sfsSignature = std::string(SFSSIGNATURE "M 2.9");
+	std::string sauSignature = std::string(SAUSIGNATURE "M 2.9");
+
+	if (signature == sfsSignature || signature == sauSignature) {
 		memcpy(eofmark,"[SFS EOF MARKER]",16);
 	} else {
 		close(fd);
-		throw MetadataCheckException("Bad format of the metadata file");
+		throw MetadataCheckException("Bad EOF MARKER in the metadata file.");
 	}
+
 	const uint8_t* ptr = reinterpret_cast<const uint8_t*>(chkbuff + 8 + 4);
 	uint64_t version;
 	version = get64bit(&ptr);
