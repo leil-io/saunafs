@@ -339,6 +339,7 @@ struct RequestException : public std::exception {
 
 #ifdef _WIN32
 
+bool get_ignore_read();
 uint8_t get_session_flags();
 
 void update_last_winfsp_context(const unsigned int uid, const unsigned int gid);
