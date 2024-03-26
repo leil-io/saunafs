@@ -19,13 +19,13 @@ REPLICATION_TIMEOUT='30 seconds'
 
 # Start test with master, 5 chunkservers and mount running old SaunaFS code
 # Ensure that we work on legacy version
-assert_equals 1 $(saunafs_admin_master info | grep $SAUNAFSXX_TAG | wc -l)
-assert_equals 5 $(saunafs_admin_master list-chunkservers | grep $SAUNAFSXX_TAG | wc -l)
-assert_equals 1 $(saunafs_admin_master list-mounts | grep $SAUNAFSXX_TAG | wc -l)
+assert_equals 1 $(saunafs_old_admin_master info | grep $SAUNAFSXX_TAG | wc -l)
+assert_equals 5 $(saunafs_old_admin_master list-chunkservers | grep $SAUNAFSXX_TAG | wc -l)
+assert_equals 1 $(saunafs_old_admin_master list-mounts | grep $SAUNAFSXX_TAG | wc -l)
 
 cd "${info[mount0]}"
 mkdir dir
-assert_success saunafsXX sfssetgoal ec32 dir
+assert_success saunafsXX saunafs setgoal ec32 dir
 cd dir
 
 function generate_file {

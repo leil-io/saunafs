@@ -27,7 +27,7 @@ Dir::Cache "${TEMP_DIR}/apt/var/cache/apt";
 Dir::Etc::Parts "${TEMP_DIR}/apt/apt.conf.d";
 END
 		local destdir="${TEMP_DIR}/apt/var/cache/apt/archives"
-		echo "deb [arch=amd64] https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/ ${codename} main" >${TEMP_DIR}/apt/saunafs.list
+		echo "deb [arch=amd64 trusted=yes] https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/ ${codename} main" >${TEMP_DIR}/apt/saunafs.list
 		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get update
 		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get -y --allow-downgrades install -d \
 			saunafs-master=${SAUNAFSXX_TAG_APT} \
