@@ -226,6 +226,9 @@ static std::mutex lock_request_mutex;
 
 #ifdef _WIN32
 bool ignore_read = false;
+
+bool get_ignore_read() { return ignore_read; }
+
 uint8_t session_flags;
 
 uint8_t get_session_flags() { return session_flags; }
@@ -2190,15 +2193,6 @@ ReadCache::Result read(Context &ctx,
 		safs::log_debug("read from inode {} up to {} bytes from position {}",
 		                ino, size, off);
 	}
-#ifdef _WIN32
-	if (ignore_read) {
-		ReadCache::Entry *entry = new ReadCache::Entry(off, size);
-		entry->buffer = std::vector<uint8_t>(size);
-		ReadCache::Result ret;
-		ret.entries.push_back(entry);
-		return ret;
-	}
-#endif
 	if (fileinfo==NULL) {
 		oplog_printf(ctx, "read (%lu,%" PRIu64 ",%" PRIu64 "): %s",
 				(unsigned long int)ino,
