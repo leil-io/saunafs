@@ -817,6 +817,22 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 	if (maxfleng>(uint64_t)(e.attr.st_size)) {
 		e.attr.st_size=maxfleng;
 	}
+
+	// If lookup succeeded and data did not come from cache, then cache it 
+	if (!icacheflag) {
+		auto data_acquire_time = gDirEntryCache.updateTime();
+
+		std::unique_lock<shared_mutex> write_guard(gDirEntryCache.rwlock());
+		gDirEntryCache.updateTime();
+
+		gDirEntryCache.insert(ctx, parent, e.ino, std::string(name), attr,
+		                      data_acquire_time);
+		if (gDirEntryCache.size() > gDirEntryCacheMaxSize) {
+			gDirEntryCache.removeOldest(gDirEntryCache.size() -
+			                            gDirEntryCacheMaxSize);
+		}
+	}
+
 	makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(ctx, "lookup (%lu,%s)%s: OK (%.1f,%lu,%.1f,%s)",
 			(unsigned long int)parent,
@@ -836,6 +852,7 @@ AttrReply getattr(Context &ctx, Inode ino) {
 	Attributes attr;
 	char attrstr[256];
 	int status;
+	bool fromCache;
 
 	if (debug_mode) {
 		oplog_printf(ctx, "getattr (%lu) ...", (unsigned long int)ino);
@@ -858,10 +875,12 @@ AttrReply getattr(Context &ctx, Inode ino) {
 		}
 		stats_inc(OP_DIRCACHE_GETATTR);
 		status = SAUNAFS_STATUS_OK;
+		fromCache = true;
 	} else {
 		stats_inc(OP_GETATTR);
 		RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, ctx,
 		fs_getattr(ino,ctx.uid,ctx.gid,attr));
+		fromCache = false;
 	}
 	if (status != SAUNAFS_STATUS_OK) {
 		oplog_printf(ctx, "getattr (%lu): %s",
@@ -878,9 +897,25 @@ AttrReply getattr(Context &ctx, Inode ino) {
 #ifdef _WIN32
 	patch_uid_gid_fields(o_stbuf);
 #endif
+
+	// If getattr succeeded and data did not come from cache, then cache it
+	if (!fromCache) {
+		auto data_acquire_time = gDirEntryCache.updateTime();
+
+		std::unique_lock<shared_mutex> write_guard(gDirEntryCache.rwlock());
+		gDirEntryCache.updateTime();
+
+		gDirEntryCache.insert(ctx, ino, attr, data_acquire_time);
+		if (gDirEntryCache.size() > gDirEntryCacheMaxSize) {
+			gDirEntryCache.removeOldest(gDirEntryCache.size() -
+			                            gDirEntryCacheMaxSize);
+		}
+	}
+
 	makeattrstr(attrstr,256,&o_stbuf);
-	oplog_printf(ctx, "getattr (%lu): OK (%.1f,%s)",
+	oplog_printf(ctx, "getattr (%lu)%s: OK (%.1f,%s)",
 			(unsigned long int)ino,
+			fromCache ? " (using open dir cache)" : "",
 			attr_timeout,
 			attrstr);
 	return AttrReply{o_stbuf, attr_timeout};

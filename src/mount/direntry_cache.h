@@ -21,6 +21,7 @@
 #include "common/platform.h"
 
 #include <atomic>
+#include <limits>
 
 #include "common/attributes.h"
 #include "common/shared_mutex.h"
@@ -30,6 +31,10 @@
 
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/set.hpp>
+
+constexpr uint64_t kInvalidIndex = std::numeric_limits<uint64_t>::max();
+constexpr uint32_t kInvalidParent = std::numeric_limits<uint32_t>::max();
+constexpr char kEmptyName[] = "";
 
 /*! \brief Cache for directory entries
  *
@@ -320,7 +325,60 @@ public:
 		if (index_it != index_set_.end()) {
 			erase(std::addressof(*index_it));
 		}
+		auto inode_it = find(ctx, inode);
+		if (inode_it != inode_multiset_.end()) {
+			erase(std::addressof(*inode_it));
+		}
 		addEntry(ctx, parent_inode, inode, index, next_index, name, attr, timestamp);
+	}
+
+	/*! \brief Add directory entry information to cache.
+	 *
+	 * \param ctx Process credentials.
+	 * \param parent_inode Parent node index (inode).
+	 * \param inode Inode of directory entry.
+	 * \param name Name of directory entry.
+	 * \param attr attributes of found directory entry.
+	 * \param timestamp Time when data has been obtained (used for entry timeout).
+	 */
+	void insert(const SaunaClient::Context &ctx, uint32_t parent_inode,
+	            uint32_t inode, const std::string name, const Attributes &attr,
+	            uint64_t timestamp) {
+		// Avoid inserting stale data
+		if (timestamp + timeout_ <= current_time_) {
+			return;
+		}
+		removeExpired(1, timestamp);
+		auto lookup_it = find(ctx, parent_inode, name);
+		if (lookup_it != lookup_set_.end()) {
+			erase(std::addressof(*lookup_it));
+		}
+		auto inode_it = find(ctx, inode);
+		if (inode_it != inode_multiset_.end()) {
+			erase(std::addressof(*inode_it));
+		}
+		addEntry(ctx, parent_inode, inode, kInvalidIndex, kInvalidIndex, name, attr, timestamp);
+	}
+
+	/*! \brief Add directory entry information to cache.
+	 *
+	 * \param ctx Process credentials.
+	 * \param inode Inode of directory entry.
+	 * \param attr attributes of found directory entry.
+	 * \param timestamp Time when data has been obtained (used for entry timeout).
+	 */
+	void insert(const SaunaClient::Context &ctx, uint32_t inode,
+	            const Attributes &attr, uint64_t timestamp) {
+		// Avoid inserting stale data
+		if (timestamp + timeout_ <= current_time_) {
+			return;
+		}
+		removeExpired(1, timestamp);
+		auto inode_it = find(ctx, inode);
+		if (inode_it != inode_multiset_.end()) {
+			erase(std::addressof(*inode_it));
+		}
+		addEntry(ctx, kInvalidParent, inode, kInvalidIndex, kInvalidIndex, kEmptyName, attr, timestamp);
 	}
 
 	/*! \brief Add data to cache from container.
@@ -408,9 +466,10 @@ public:
 	 */
 	void lockAndInvalidateParent(uint32_t parent_inode) {
 		std::unique_lock<SharedMutex> guard(rwlock_);
-		auto it = index_set_.lower_bound(std::make_tuple(parent_inode, 0, 0, 0),
-		                                 IndexCompare());
-		while (it != index_set_.end() && it->parent_inode == parent_inode) {
+		// lookup_set_ should contain all the elements inside index_set
+		auto it = lookup_set_.lower_bound(
+		    std::make_tuple(parent_inode, 0, 0, ""), LookupCompare());
+		while (it != lookup_set_.end() && it->parent_inode == parent_inode) {
 			DirEntry *entry = std::addressof(*it);
 			++it;
 			erase(entry);
@@ -426,10 +485,10 @@ public:
 	 */
 	void lockAndInvalidateParent(const SaunaClient::Context &ctx, uint32_t parent_inode) {
 		std::unique_lock<SharedMutex> guard(rwlock_);
-
-		auto it = index_set_.lower_bound(std::make_tuple(parent_inode, ctx.uid, ctx.gid, 0),
-		                                 IndexCompare());
-		while (it != index_set_.end() &&
+		// lookup_set_ should contain all the elements inside index_set
+		auto it = lookup_set_.lower_bound(
+		    std::make_tuple(parent_inode, 0, 0, ""), LookupCompare());
+		while (it != lookup_set_.end() &&
 		       std::make_tuple(parent_inode, ctx.uid, ctx.gid) ==
 		               std::make_tuple(it->parent_inode, it->uid, it->gid)) {
 			DirEntry *entry = std::addressof(*it);
@@ -444,7 +503,7 @@ public:
 
 	/*! \brief Get number of elements in cache. */
 	size_t size() const {
-		return lookup_set_.size();
+		return inode_multiset_.size();
 	}
 
 	/*! \brief Get reference to reader-writer (shared) mutex. */
@@ -516,8 +575,13 @@ public:
 
 protected:
 	void erase(DirEntry *entry) {
-		lookup_set_.erase(lookup_set_.iterator_to(*entry));
-		index_set_.erase(index_set_.iterator_to(*entry));
+		if (entry->parent_inode != kInvalidParent && !entry->name.empty()) {
+			lookup_set_.erase(lookup_set_.iterator_to(*entry));
+		}
+		if (entry->parent_inode != kInvalidParent &&
+		    entry->index != kInvalidIndex) {
+			index_set_.erase(index_set_.iterator_to(*entry));
+		}
 		inode_multiset_.erase(inode_multiset_.iterator_to(*entry));
 		fifo_list_.erase(fifo_list_.iterator_to(*entry));
 		delete entry;
@@ -544,23 +608,40 @@ protected:
 		fifo_list_.push_back(entry);
 		entry.timestamp = timestamp;
 		entry.attr = de.attributes;
+		entry.next_index = de.next_index;
 	}
 
-	IndexSet::iterator addEntry(const SaunaClient::Context &ctx, uint32_t parent_inode,
-	                            uint32_t inode, uint64_t index, uint64_t next_index,
-								std::string name, Attributes attr, uint64_t timestamp) {
-		DirEntry *entry =
-		        new DirEntry(ctx, parent_inode, inode, index, next_index, name, attr, timestamp);
-		lookup_set_.insert(*entry);
-		auto result = index_set_.insert(*entry);
+	void addEntry(const SaunaClient::Context &ctx, uint32_t parent_inode,
+	              uint32_t inode, uint64_t index, uint64_t next_index,
+	              std::string name, Attributes attr, uint64_t timestamp) {
+		DirEntry *entry = new DirEntry(ctx, parent_inode, inode, index,
+		                               next_index, name, attr, timestamp);
+		assert(entry);
+
+		if (parent_inode != kInvalidParent && !name.empty()) {
+			lookup_set_.insert(*entry);
+		}
+		if (parent_inode != kInvalidParent && index != kInvalidIndex) {
+			index_set_.insert(*entry);
+		}
 		inode_multiset_.insert(*entry);
 		fifo_list_.push_back(*entry);
-		if (lookup_set_.size() != index_set_.size()) {
+		if (lookup_set_.size() < index_set_.size()) {
 			auto size1 = index_set_.size();
 			auto size2 = lookup_set_.size();
-			safs::log_err("Inconsistent DirEntryCache index-lookup views, index:%lu != lookup:%lu", size1, size2);
+			safs::log_err(
+			    "Inconsistent DirEntryCache: lookup set should have at least "
+			    "as many entries as index set, index:%lu > lookup:%lu",
+			    size1, size2);
 		}
-		return result.first;
+		if (inode_multiset_.size() < lookup_set_.size()) {
+			auto size1 = lookup_set_.size();
+			auto size2 = inode_multiset_.size();
+			safs::log_err(
+			    "Inconsistent DirEntryCache: inode multiset should have at "
+			    "least as many entries as lookup set, lookup:%lu > inode:%lu",
+			    size1, size2);
+		}
 	}
 
 	Timer timer_;
