@@ -164,8 +164,8 @@ TEST(DirEntryCache, Basic) {
 		std::make_tuple(7, 9, 0, "a1"),
 		std::make_tuple(13, 9, 2, "a3"),
 		std::make_tuple(11, 9, 1, "a4"),
-		std::make_tuple(15, 11, INVALID_INDEX, "a1"),
-		std::make_tuple(15, 11, INVALID_INDEX, "a1"),
+		std::make_tuple(15, 11, kInvalidParent, "a1"),
+		std::make_tuple(15, 11, kInvalidParent, "a1"),
 		std::make_tuple(4, 11, 8, "a2"),
 		std::make_tuple(3, 11, 9, "a3")
 	};
@@ -212,7 +212,7 @@ TEST(DirEntryCache, Repetitions) {
 	                                {3, 4, 10, "a3", dummy_attributes},
 	                                {4, 5, 11, "a4", dummy_attributes},
 	                                {5, 6, 12, "a5", dummy_attributes},
-									{6, 7, 13, "a6", dummy_attributes}},
+	                                {6, 7, 13, "a6", dummy_attributes}},
 	    current_time);
 
 	ASSERT_EQ(cache.size(), 6);

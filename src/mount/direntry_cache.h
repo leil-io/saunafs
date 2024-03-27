@@ -21,6 +21,7 @@
 #include "common/platform.h"
 
 #include <atomic>
+#include <limits>
 
 #include "common/attributes.h"
 #include "common/shared_mutex.h"
@@ -31,9 +32,9 @@
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/set.hpp>
 
-#define INVALID_INDEX 0xffff
-#define INVALID_PARENT 0xffffffff
-#define EMPTY_NAME ""
+constexpr uint64_t kInvalidIndex = std::numeric_limits<uint64_t>::max();
+constexpr uint32_t kInvalidParent = std::numeric_limits<uint32_t>::max();
+constexpr char kEmptyName[] = "";
 
 /*! \brief Cache for directory entries
  *
@@ -356,7 +357,7 @@ public:
 		if (inode_it != inode_multiset_.end()) {
 			erase(std::addressof(*inode_it));
 		}
-		addEntry(ctx, parent_inode, inode, INVALID_INDEX, INVALID_INDEX, name, attr, timestamp);
+		addEntry(ctx, parent_inode, inode, kInvalidIndex, kInvalidIndex, name, attr, timestamp);
 	}
 
 	/*! \brief Add directory entry information to cache.
@@ -377,7 +378,7 @@ public:
 		if (inode_it != inode_multiset_.end()) {
 			erase(std::addressof(*inode_it));
 		}
-		addEntry(ctx, INVALID_PARENT, inode, INVALID_INDEX, INVALID_INDEX, EMPTY_NAME, attr, timestamp);
+		addEntry(ctx, kInvalidParent, inode, kInvalidIndex, kInvalidIndex, kEmptyName, attr, timestamp);
 	}
 
 	/*! \brief Add data to cache from container.
@@ -574,11 +575,11 @@ public:
 
 protected:
 	void erase(DirEntry *entry) {
-		if (entry->parent_inode != INVALID_PARENT && !entry->name.empty()) {
+		if (entry->parent_inode != kInvalidParent && !entry->name.empty()) {
 			lookup_set_.erase(lookup_set_.iterator_to(*entry));
 		}
-		if (entry->parent_inode != INVALID_PARENT &&
-		    entry->index != INVALID_INDEX) {
+		if (entry->parent_inode != kInvalidParent &&
+		    entry->index != kInvalidIndex) {
 			index_set_.erase(index_set_.iterator_to(*entry));
 		}
 		inode_multiset_.erase(inode_multiset_.iterator_to(*entry));
@@ -615,10 +616,12 @@ protected:
 	              std::string name, Attributes attr, uint64_t timestamp) {
 		DirEntry *entry = new DirEntry(ctx, parent_inode, inode, index,
 		                               next_index, name, attr, timestamp);
-		if (parent_inode != INVALID_PARENT && !name.empty()) {
+		assert(entry);
+
+		if (parent_inode != kInvalidParent && !name.empty()) {
 			lookup_set_.insert(*entry);
 		}
-		if (parent_inode != INVALID_PARENT && index != INVALID_INDEX) {
+		if (parent_inode != kInvalidParent && index != kInvalidIndex) {
 			index_set_.insert(*entry);
 		}
 		inode_multiset_.insert(*entry);

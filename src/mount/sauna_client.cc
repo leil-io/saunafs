@@ -831,8 +831,6 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 			gDirEntryCache.removeOldest(gDirEntryCache.size() -
 			                            gDirEntryCacheMaxSize);
 		}
-
-		write_guard.unlock();
 	}
 
 	makeattrstr(attrstr,256,&e.attr);
@@ -854,7 +852,7 @@ AttrReply getattr(Context &ctx, Inode ino) {
 	Attributes attr;
 	char attrstr[256];
 	int status;
-	bool fromcache;
+	bool fromCache;
 
 	if (debug_mode) {
 		oplog_printf(ctx, "getattr (%lu) ...", (unsigned long int)ino);
@@ -877,12 +875,12 @@ AttrReply getattr(Context &ctx, Inode ino) {
 		}
 		stats_inc(OP_DIRCACHE_GETATTR);
 		status = SAUNAFS_STATUS_OK;
-		fromcache = 1;
+		fromCache = true;
 	} else {
 		stats_inc(OP_GETATTR);
 		RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, ctx,
 		fs_getattr(ino,ctx.uid,ctx.gid,attr));
-		fromcache = 0;
+		fromCache = false;
 	}
 	if (status != SAUNAFS_STATUS_OK) {
 		oplog_printf(ctx, "getattr (%lu): %s",
@@ -901,7 +899,7 @@ AttrReply getattr(Context &ctx, Inode ino) {
 #endif
 
 	// If getattr succeeded and data did not come from cache, then cache it
-	if (!fromcache) {
+	if (!fromCache) {
 		auto data_acquire_time = gDirEntryCache.updateTime();
 
 		std::unique_lock<shared_mutex> write_guard(gDirEntryCache.rwlock());
@@ -912,14 +910,12 @@ AttrReply getattr(Context &ctx, Inode ino) {
 			gDirEntryCache.removeOldest(gDirEntryCache.size() -
 			                            gDirEntryCacheMaxSize);
 		}
-
-		write_guard.unlock();
 	}
 
 	makeattrstr(attrstr,256,&o_stbuf);
 	oplog_printf(ctx, "getattr (%lu)%s: OK (%.1f,%s)",
 			(unsigned long int)ino,
-			fromcache?" (using open dir cache)":"",
+			fromCache ? " (using open dir cache)" : "",
 			attr_timeout,
 			attrstr);
 	return AttrReply{o_stbuf, attr_timeout};
