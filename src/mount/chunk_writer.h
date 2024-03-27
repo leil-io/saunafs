@@ -62,7 +62,7 @@ public:
 	 *        that we initialize; it represents the maximum time that can elapse when we are
 	 *        waiting for each chunkserver to accept connection or send a status message
 	 */
-	void init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms);
+	void init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms, uint32_t chunkSize);
 
 	/*!
 	 * \return minimum number of blocks which will be written to chunkservers by
@@ -175,6 +175,7 @@ private:
 	bool acceptsNewOperations_;
 	int combinedStripeSize_;
 	int dataChainFd_;
+	int chunkSizeInBlocks_;
 
 	std::map<int, std::unique_ptr<WriteExecutor>> executors_;
 	std::list<WriteCacheBlock> journal_;
@@ -186,6 +187,8 @@ private:
 	void startOperation(Operation operation);
 	void fillOperation(Operation &operation, int first_block, int first_index, int size,
 			std::vector<uint8_t *> &stripe_element);
+	void fillNotExisting(Operation &operation, int first_block, int first_index, int size,
+	                     std::vector<uint8_t *> &stripe_element);
 	void fillStripe(Operation &operation, int first_block, std::vector<uint8_t *> &stripe_element);
 	void readBlocks(int block_index, int size, int block_from, int block_to,
 			std::vector<WriteCacheBlock> &blocks);

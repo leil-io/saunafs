@@ -443,7 +443,10 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 			// Optimization -- talk with chunkservers only if we have to write any data.
 			// Don't do this if we just have to release some previously unlocked lock.
 			if (haveDataToWrite) {
-				writer.init(locator.get(), gChunkserverTimeout_ms);
+				writer.init(
+				    locator.get(), gChunkserverTimeout_ms,
+				    std::min(inodeData_->maxfleng - chunkIndex_ * SFSCHUNKSIZE,
+				             (uint64_t)SFSCHUNKSIZE));
 				processDataChain(writer);
 				writer.finish(kTimeToFinishOperations * 1000);
 
@@ -796,10 +799,12 @@ int write_blocks(inodedata *id, uint64_t offset, uint32_t size, const uint8_t* d
 	return 0;
 }
 
-int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t* data) {
+int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t *data,
+               size_t currentSize) {
 	LOG_AVG_TILL_END_OF_SCOPE0("write_data");
 	int status;
 	inodedata *id = (inodedata*) vid;
+	id->maxfleng = std::max(id->maxfleng, currentSize);
 	if (id == NULL) {
 		return SAUNAFS_ERROR_IO;
 	}

@@ -126,7 +126,7 @@ ChunkWriter::~ChunkWriter() {
 	}
 }
 
-void ChunkWriter::init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms) {
+void ChunkWriter::init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms, uint32_t chunkSize) {
 	LOG_AVG_TILL_END_OF_SCOPE0("ChunkWriter::init");
 	sassert(pendingOperations_.empty());
 	sassert(executors_.empty());
@@ -134,6 +134,8 @@ void ChunkWriter::init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_m
 	Timeout connectTimeout{std::chrono::milliseconds(chunkserverTimeout_ms)};
 	combinedStripeSize_ = 0;
 	locator_ = locator;
+	chunkSizeInBlocks_ =
+	    (chunkSize == 0 ? 0 : (chunkSize - 1) / SFSBLOCKSIZE + 1);
 
 	for (const ChunkTypeWithAddress& location : locator_->locationInfo().locations) {
 		// If we have an executor writing the same chunkType, use it
@@ -437,6 +439,43 @@ void ChunkWriter::fillOperation(Operation &operation, int first_block, int first
 }
 
 /*!
+ * Fills given operation with a range of blocks beyond file size required to be read.
+ * \param operation operation to be filled
+ * \param first_index index of the first block required to be read
+ * \param size number of required blocks
+ * \param stripe_element map of blocks in a stripe
+ */
+void ChunkWriter::fillNotExisting(Operation &operation, int first_block, int first_index, int size,
+		std::vector<uint8_t *> &stripe_element) {
+	assert(size >= 0);
+	if (size == 0) {
+		return;
+	}
+	int block_from = operation.journalPositions.front()->from;
+	int block_to = operation.journalPositions.front()->to;
+
+	std::vector<WriteCacheBlock> blocks;
+	blocks.reserve(size);
+	// Fills not existing blocks with zeroes
+	for (int index = first_block; index < first_block + size; ++index) {
+		WriteCacheBlock block(locator_->chunkIndex(), index, WriteCacheBlock::kReadBlock);
+		memset(block.data(), 0, SFSBLOCKSIZE);
+		block.from = block_from;
+		block.to = block_to;
+		blocks.push_back(std::move(block));
+	}
+	assert(blocks.size() == (size_t)size);
+
+	for (int index = 0; index < size; ++index) {
+		// Insert the new block into the journal just after the last block of the operation
+		auto position = journal_.insert(operation.journalPositions.back(), std::move(blocks[index]));
+		operation.journalPositions.push_back(position);
+
+		stripe_element[first_index + index] = position->data();
+	}
+}
+
+/*!
  * Fills given operation with blocks required to be read.
  * \param operation operation to be filled
  * \param first_block first block of the operation
@@ -455,6 +494,14 @@ void ChunkWriter::fillStripe(Operation &operation, int first_block, std::vector<
 	int hole_size = 0;
 	int range_end = std::min(combinedStripeSize_, SFSBLOCKSINCHUNK - first_block);
 	for (int i = 0; i < range_end; ++i) {
+		if (first_block + i == chunkSizeInBlocks_) {
+			if (hole_size > 0) {
+				fillOperation(operation, first_block, hole_start, hole_size,
+				              stripe_element);
+			}
+			fillNotExisting(operation, first_block, i, range_end - i, stripe_element);
+			return;
+		}
 		if (stripe_element[i] == nullptr) {
 			if (hole_size == 0) {
 				hole_start = i;
