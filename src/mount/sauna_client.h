@@ -79,8 +79,10 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 #ifdef _WIN32
+	static constexpr bool     kDefaultSpecialCopyMode = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 #else
+	static constexpr bool     kDefaultIgnoreFlush = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
@@ -142,7 +144,9 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_copy_mode(kDefaultSpecialCopyMode),
+#else
+	             ignore_flush(kDefaultIgnoreFlush),
 #endif
 	             verbose(kDefaultVerbose) {
 	}
@@ -174,7 +178,9 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_copy_mode(kDefaultSpecialCopyMode),
+#else
+	             ignore_flush(kDefaultIgnoreFlush),
 #endif
 	             verbose(kDefaultVerbose) {
 	}
@@ -226,6 +232,11 @@ struct FsInitParams {
 	int mounting_gid;
 #endif
 
+#ifdef _WIN32
+	bool special_copy_mode;
+#else
+	bool ignore_flush;
+#endif
 	bool verbose;
 
 	std::string io_limits_config_file;
@@ -328,6 +339,7 @@ struct RequestException : public std::exception {
 
 #ifdef _WIN32
 
+bool get_ignore_read();
 uint8_t get_session_flags();
 
 void update_last_winfsp_context(const unsigned int uid, const unsigned int gid);

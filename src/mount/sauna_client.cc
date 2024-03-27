@@ -225,6 +225,10 @@ static uint32_t lock_request_counter = 0;
 static std::mutex lock_request_mutex;
 
 #ifdef _WIN32
+bool ignore_read = false;
+
+bool get_ignore_read() { return ignore_read; }
+
 uint8_t session_flags;
 
 uint8_t get_session_flags() { return session_flags; }
@@ -3346,12 +3350,13 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
 		double acl_cache_timeout_, unsigned acl_cache_size_
 #ifdef _WIN32
-		, int mounting_uid_, int mounting_gid_
+		, int mounting_uid_, int mounting_gid_, bool special_copy_mode
 #endif
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
+	ignore_read = special_copy_mode;
 #endif
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
@@ -3434,8 +3439,16 @@ void fs_init(FsInitParams &params) {
 			params.max_readahead_requests,
 			params.prefetch_xor_stripes,
 			std::max(params.bandwidth_overuse, 1.));
-	write_data_init(params.write_cache_size, params.io_retries, params.write_workers,
-			params.write_window_size, params.chunkserver_write_timeout_ms, params.cache_per_inode_percentage);
+	write_data_init(params.write_cache_size, params.io_retries,
+	                params.write_workers, params.write_window_size,
+	                params.chunkserver_write_timeout_ms,
+	                params.cache_per_inode_percentage,
+#ifdef _WIN32
+	                params.special_copy_mode
+#else
+	                params.ignore_flush
+#endif
+	                );
 #ifdef _WIN32
 	set_debug_mode(params.debug_mode);
 #endif
@@ -3445,7 +3458,7 @@ void fs_init(FsInitParams &params) {
 		params.sugid_clear_mode, params.use_rw_lock,
 		params.acl_cache_timeout, params.acl_cache_size
 #ifdef _WIN32
-		, params.mounting_uid, params.mounting_gid
+		, params.mounting_uid, params.mounting_gid, params.special_copy_mode
 #endif
 		);
 }
