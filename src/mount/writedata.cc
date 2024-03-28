@@ -443,10 +443,7 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 			// Optimization -- talk with chunkservers only if we have to write any data.
 			// Don't do this if we just have to release some previously unlocked lock.
 			if (haveDataToWrite) {
-				writer.init(
-				    locator.get(), gChunkserverTimeout_ms,
-				    std::min(inodeData_->maxfleng - chunkIndex_ * SFSCHUNKSIZE,
-				             (uint64_t)SFSCHUNKSIZE));
+				writer.init(locator.get(), gChunkserverTimeout_ms);
 				processDataChain(writer);
 				writer.finish(kTimeToFinishOperations * 1000);
 
@@ -524,6 +521,9 @@ void InodeChunkWriter::processDataChain(ChunkWriter& writer) {
 	uint32_t maximumTime = kMaximumTime;
 	bool otherJobsAreWaiting = false;
 	while (true) {
+		writer.setChunkSizeInBlocks(
+		    std::min(inodeData_->maxfleng - chunkIndex_ * SFSCHUNKSIZE,
+		             (uint64_t)SFSCHUNKSIZE));
 		bool newOtherJobsAreWaiting = !queue_isempty(jqueue);
 		if (!otherJobsAreWaiting && newOtherJobsAreWaiting) {
 			// Some new jobs have just arrived in the queue -- we should finish faster.
@@ -804,13 +804,13 @@ int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t *data,
 	LOG_AVG_TILL_END_OF_SCOPE0("write_data");
 	int status;
 	inodedata *id = (inodedata*) vid;
-	id->maxfleng = std::max(id->maxfleng, currentSize);
 	if (id == NULL) {
 		return SAUNAFS_ERROR_IO;
 	}
 
 	Glock lock(gMutex);
 	status = id->status;
+	id->maxfleng = std::max(id->maxfleng, currentSize);
 	if (status == SAUNAFS_STATUS_OK) {
 		if (offset + size > id->maxfleng) {     // move fleng
 			id->maxfleng = offset + size;

@@ -126,7 +126,7 @@ ChunkWriter::~ChunkWriter() {
 	}
 }
 
-void ChunkWriter::init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms, uint32_t chunkSize) {
+void ChunkWriter::init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms) {
 	LOG_AVG_TILL_END_OF_SCOPE0("ChunkWriter::init");
 	sassert(pendingOperations_.empty());
 	sassert(executors_.empty());
@@ -134,8 +134,6 @@ void ChunkWriter::init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_m
 	Timeout connectTimeout{std::chrono::milliseconds(chunkserverTimeout_ms)};
 	combinedStripeSize_ = 0;
 	locator_ = locator;
-	chunkSizeInBlocks_ =
-	    (chunkSize == 0 ? 0 : (chunkSize - 1) / SFSBLOCKSIZE + 1);
 
 	for (const ChunkTypeWithAddress& location : locator_->locationInfo().locations) {
 		// If we have an executor writing the same chunkType, use it
@@ -330,6 +328,11 @@ std::list<WriteCacheBlock> ChunkWriter::releaseJournal() {
 	return std::move(journal_);
 }
 
+void ChunkWriter::setChunkSizeInBlocks(uint32_t chunkSize) {
+	chunkSizeInBlocks_ =
+	    (chunkSize == 0 ? 0 : (chunkSize - 1) / SFSBLOCKSIZE + 1);
+}
+
 void ChunkWriter::addOperation(WriteCacheBlock&& block) {
 	sassert(block.type != WriteCacheBlock::kParityBlock);
 	sassert(acceptsNewOperations_);
@@ -441,6 +444,7 @@ void ChunkWriter::fillOperation(Operation &operation, int first_block, int first
 /*!
  * Fills given operation with a range of blocks beyond file size required to be read.
  * \param operation operation to be filled
+ * \param first_block first block of the operation
  * \param first_index index of the first block required to be read
  * \param size number of required blocks
  * \param stripe_element map of blocks in a stripe
@@ -453,12 +457,14 @@ void ChunkWriter::fillNotExisting(Operation &operation, int first_block, int fir
 	}
 	int block_from = operation.journalPositions.front()->from;
 	int block_to = operation.journalPositions.front()->to;
+	int beyond_start = first_block + first_index;
 
 	std::vector<WriteCacheBlock> blocks;
 	blocks.reserve(size);
 	// Fills not existing blocks with zeroes
-	for (int index = first_block; index < first_block + size; ++index) {
-		WriteCacheBlock block(locator_->chunkIndex(), index, WriteCacheBlock::kReadBlock);
+	for (int index = beyond_start; index < beyond_start + size; ++index) {
+		WriteCacheBlock block(locator_->chunkIndex(), index,
+		                      WriteCacheBlock::kReadBlock);
 		memset(block.data(), 0, SFSBLOCKSIZE);
 		block.from = block_from;
 		block.to = block_to;
