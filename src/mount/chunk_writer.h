@@ -62,7 +62,7 @@ public:
 	 *        that we initialize; it represents the maximum time that can elapse when we are
 	 *        waiting for each chunkserver to accept connection or send a status message
 	 */
-	void init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms, uint32_t chunkSize);
+	void init(WriteChunkLocator* locator, uint32_t chunkserverTimeout_ms);
 
 	/*!
 	 * \return minimum number of blocks which will be written to chunkservers by
@@ -126,6 +126,8 @@ public:
 	std::list<WriteCacheBlock> releaseJournal();
 
 	bool acceptsNewOperations() { return acceptsNewOperations_; }
+
+	void setChunkSizeInBlocks(uint32_t chunkSize);
 
 private:
 	typedef uint32_t WriteId;
