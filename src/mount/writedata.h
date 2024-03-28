@@ -22,6 +22,7 @@
 
 #include "common/platform.h"
 
+#include <cstddef>
 #include <inttypes.h>
 
 #include "common/attributes.h"
