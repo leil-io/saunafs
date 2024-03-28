@@ -26,7 +26,7 @@ master_kill_loop() {
 ( master_kill_loop & )
 
 cd "${info[mount0]}"
-assert_success git clone https://github.com/saunafs/saunafs.git
+assert_success git clone https://github.com/leil-io/saunafs.git
 saunafs setgoal -r 2 saunafs
 mkdir saunafs/build
 cd saunafs/build
