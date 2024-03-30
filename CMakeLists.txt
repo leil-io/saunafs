@@ -40,6 +40,7 @@ option(ENABLE_POLONAISE         "Enable polonaise"                              
 option(ENABLE_CLIENT_LIB        "Enable dynamic client library (libsaunafs-client)"     OFF)
 # end of SaunaFS options
 option(ENABLE_TRACES            "Enable traces"                                          OFF)
+option(ENABLE_SYSLOG_FOR_TRACES "Enable usage of syslog instead of stdout for traces"    OFF)
 option(ENABLE_CRC               "Enable checksums"                                       ON)
 option(ENABLE_REQUEST_LOG       "Enable logging request times"                           OFF)
 option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"           OFF)
@@ -128,6 +129,7 @@ message(STATUS "ENABLE_CLIENT_LIB: ${ENABLE_CLIENT_LIB}")
 message(STATUS "ENABLE_URAFT: ${ENABLE_URAFT}")
 # end of SaunaFS options values
 message(STATUS "ENABLE_TRACES: ${ENABLE_TRACES}")
+message(STATUS "ENABLE_SYSLOG_FOR_TRACES: ${ENABLE_SYSLOG_FOR_TRACES}")
 message(STATUS "ENABLE_CRC: ${ENABLE_CRC}")
 message(STATUS "ENABLE_REQUEST_LOG: ${ENABLE_REQUEST_LOG}")
 message(STATUS "USE_LEGACY_READ_MESSAGES: ${USE_LEGACY_READ_MESSAGES}")
@@ -291,6 +293,10 @@ endif()
 
 if(ENABLE_TRACES)
   add_definitions(-DENABLE_TRACES)
+
+  if (ENABLE_SYSLOG_FOR_TRACES)
+    add_definitions(-DENABLE_SYSLOG_FOR_TRACES)
+  endif()
 endif()
 
 if(ENABLE_REQUEST_LOG)

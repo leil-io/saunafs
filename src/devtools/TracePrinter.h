@@ -33,10 +33,13 @@
 #include <sys/time.h>
 #include <cstdio>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <boost/format.hpp>
+
+#ifdef ENABLE_SYSLOG_FOR_TRACES
+#include "common/slogger.h"
+#endif
 
 class ThreadPrinter {
 private:
@@ -95,7 +98,16 @@ public:
 
 		struct timeval tv;
 		gettimeofday(&tv, NULL);
-		fprintf(stdout, "%s%lu.%06lu Thread %9lx %s%s\033[0m\n", colourStr.c_str(), tv.tv_sec, tv.tv_usec, myId, indentStr.c_str(), message.c_str());
+
+#ifdef ENABLE_SYSLOG_FOR_TRACES
+		safs_pretty_syslog(LOG_NOTICE, "%lu.%06lu Thread %9lx %s%s", tv.tv_sec,
+		                   tv.tv_usec, myId, indentStr.c_str(),
+		                   message.c_str());
+#else
+		fprintf(stdout, "%s%lu.%06lu Thread %9lx %s%s\033[0m\n",
+		        colourStr.c_str(), tv.tv_sec, tv.tv_usec, myId,
+		        indentStr.c_str(), message.c_str());
+#endif
 	}
 
 protected:
