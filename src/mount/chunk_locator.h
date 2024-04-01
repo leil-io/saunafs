@@ -97,6 +97,10 @@ public:
 	virtual void locateAndLockChunk(uint32_t inode, uint32_t index);
 	virtual void unlockChunk();
 
+	uint64_t fileLength() const { 
+		return locationInfo_.fileLength; 
+	}
+
 	uint32_t chunkIndex() {
 		return index_;
 	}

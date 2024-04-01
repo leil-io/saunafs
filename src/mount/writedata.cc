@@ -441,6 +441,10 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 	try {
 		try {
 			locator->locateAndLockChunk(inodeData_->inode, chunkIndex_);
+			Glock lock(gMutex);
+			inodeData_->maxfleng =
+			    std::max(inodeData_->maxfleng, locator->fileLength());
+			lock.unlock();
 
 			// Optimization -- talk with chunkservers only if we have to write any data.
 			// Don't do this if we just have to release some previously unlocked lock.
@@ -449,13 +453,14 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 				processDataChain(writer);
 				writer.finish(kTimeToFinishOperations * 1000);
 
-				Glock lock(gMutex);
+				lock.lock();
 				returnJournalToDataChain(writer.releaseJournal(), lock);
+				lock.unlock();
 			}
 			locator->unlockChunk();
 			read_inode_ops(inodeData_->inode);
 
-			Glock lock(gMutex);
+			lock.lock();
 			inodeData_->minimumBlocksToWrite = writer.getMinimumBlockCountWorthWriting();
 			bool canWait = !inodeData_->requiresFlushing();
 			if (!haveAnyBlockInCurrentChunk(lock)) {
