@@ -500,13 +500,16 @@ void ChunkWriter::fillStripe(Operation &operation, int first_block, std::vector<
 	int hole_size = 0;
 	int range_end = std::min(combinedStripeSize_, SFSBLOCKSINCHUNK - first_block);
 	for (int i = 0; i < range_end; ++i) {
-		if (first_block + i == chunkSizeInBlocks_) {
+		if (first_block + i >= chunkSizeInBlocks_) {
 			if (hole_size > 0) {
 				fillOperation(operation, first_block, hole_start, hole_size,
 				              stripe_element);
+				hole_size = 0;
 			}
-			fillNotExisting(operation, first_block, i, range_end - i, stripe_element);
-			return;
+			if (stripe_element[i] == nullptr) {
+				fillNotExisting(operation, first_block, i, 1, stripe_element);
+			}
+			continue;
 		}
 		if (stripe_element[i] == nullptr) {
 			if (hole_size == 0) {
