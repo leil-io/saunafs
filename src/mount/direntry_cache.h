@@ -487,7 +487,7 @@ public:
 		std::unique_lock<SharedMutex> guard(rwlock_);
 		// lookup_set_ should contain all the elements inside index_set
 		auto it = lookup_set_.lower_bound(
-		    std::make_tuple(parent_inode, 0, 0, ""), LookupCompare());
+		    std::make_tuple(parent_inode, ctx.uid, ctx.gid, ""), LookupCompare());
 		while (it != lookup_set_.end() &&
 		       std::make_tuple(parent_inode, ctx.uid, ctx.gid) ==
 		               std::make_tuple(it->parent_inode, it->uid, it->gid)) {
