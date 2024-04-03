@@ -575,7 +575,8 @@ public:
 
 protected:
 	void erase(DirEntry *entry) {
-		if (entry->parent_inode != kInvalidParent && !entry->name.empty()) {
+		// The 'no more entries' marker has empty name and should be erased
+		if (entry->parent_inode != kInvalidParent || !entry->name.empty()) {
 			lookup_set_.erase(lookup_set_.iterator_to(*entry));
 		}
 		if (entry->parent_inode != kInvalidParent &&
@@ -618,7 +619,7 @@ protected:
 		                               next_index, name, attr, timestamp);
 		assert(entry);
 
-		if (parent_inode != kInvalidParent && !name.empty()) {
+		if (parent_inode != kInvalidParent || !name.empty()) {
 			lookup_set_.insert(*entry);
 		}
 		if (parent_inode != kInvalidParent && index != kInvalidIndex) {
