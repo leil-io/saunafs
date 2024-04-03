@@ -272,7 +272,7 @@ public:
 		auto it = find(ctx, inode);
 		bool ret = false;
 		uint64_t newest_timestamp = 0;
-		while (it == inode_multiset_.end() && it->inode == inode) {
+		while (it != inode_multiset_.end() && it->inode == inode) {
 			if (!expired(*it, current_time_) &&
 			    it->timestamp > newest_timestamp && it->uid == ctx.uid &&
 			    it->gid == ctx.gid) {
