@@ -263,14 +263,26 @@ public:
 	 * \return True if inode has been found in cache, false otherwise.
 	 */
 	bool lookup(const SaunaClient::Context &ctx, uint32_t inode, Attributes &attr) {
+		// 'no more entries' marker
+		if (inode == 0) {
+			return false;
+		}
 		shared_lock<SharedMutex> guard(rwlock_);
 		updateTime();
 		auto it = find(ctx, inode);
-		if (it == inode_multiset_.end() || expired(*it, current_time_) || it->inode == 0) {
-			return false;
+		bool ret = false;
+		uint64_t newest_timestamp = 0;
+		while (it == inode_multiset_.end() && it->inode == inode) {
+			if (!expired(*it, current_time_) &&
+			    it->timestamp > newest_timestamp && it->uid == ctx.uid &&
+			    it->gid == ctx.gid) {
+				attr = it->attr;
+				newest_timestamp = it->timestamp;
+				ret = true;
+			}
+			it++;
 		}
-		attr = it->attr;
-		return true;
+		return ret;
 	}
 
 	/*! \brief Get attributes of directory entry.
