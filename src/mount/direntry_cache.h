@@ -629,17 +629,17 @@ protected:
 		if (lookup_set_.size() < index_set_.size()) {
 			auto size1 = index_set_.size();
 			auto size2 = lookup_set_.size();
-			safs::log_err(
+			safs_pretty_syslog(LOG_ERR,
 			    "Inconsistent DirEntryCache: lookup set should have at least "
-			    "as many entries as index set, index:%lu > lookup:%lu",
+			    "as many entries as index set, index size:%lu > lookup size:%lu",
 			    size1, size2);
 		}
 		if (inode_multiset_.size() < lookup_set_.size()) {
 			auto size1 = lookup_set_.size();
 			auto size2 = inode_multiset_.size();
-			safs::log_err(
+			safs_pretty_syslog(LOG_ERR,
 			    "Inconsistent DirEntryCache: inode multiset should have at "
-			    "least as many entries as lookup set, lookup:%lu > inode:%lu",
+			    "least as many entries as lookup set, lookup size:%lu > inode size:%lu",
 			    size1, size2);
 		}
 	}
