@@ -66,6 +66,7 @@ case "$release" in
 		apt-get -y install libgtest-dev libspdlog-dev libjudy-dev time bc
 		apt-get -y install libsystemd-dev liburcu-dev uuid-dev libblkid-dev
 		apt-get -y install libyaml-cpp-dev
+		apt-get -y install fio
 		pip3 install mypy black flask requests types-requests
 		;;
 	CentOS/7*)
@@ -73,7 +74,8 @@ case "$release" in
 		yum -y install acl attr dbench nc pylint rsync socat tidy wget gperftools-libs
 		yum -y install boost-program-options boost-system libboost-filesystem libboost-iostreams
 		yum -y install pam-devel libdb-devel nfs4-acl-tools time bc
-		dnf -y install yaml-cpp-devel
+		yum -y install yaml-cpp-devel
+		yum -y install fio
 		;;
 	CentOS/8*)
 		dnf -y install asciidoc cmake fuse-devel git gcc gcc-c++ make pkgconfig rpm-build zlib-devel
@@ -83,6 +85,7 @@ case "$release" in
 		dnf -y install fmt-devel spdlog-devel boost-devel libtirpc-devel time bc
 		dnf -y install --enablerepo=PowerTools gtest-devel
 		dnf -y install yaml-cpp-devel
+		dnf -y install fio
 		# install openbsd version of netcat
 		dnf -y install epel-release
 		dnf -y update
@@ -95,6 +98,7 @@ case "$release" in
 		dnf -y install Judy-devel pam-devel libdb-devel thrift-devel valgrind pylint nfs4-acl-tools
 		dnf -y install libtirpc-devel time dbench bc tidy wget fuse3 fuse fakeroot asciidoc dnf-utils
 		dnf -y install yaml-cpp-devel
+		dnf -y install fio
 		# install openbsd version of netcat
 		dnf -y install netcat
 		update-alternatives --remove-all nc
