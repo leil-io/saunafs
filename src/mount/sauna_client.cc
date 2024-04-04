@@ -3365,7 +3365,7 @@ std::vector<ChunkserverListEntry> getchunkservers() {
 void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsigned direntry_cache_size_,
 		double entry_cache_timeout_, double attr_cache_timeout_, int mkdir_copy_sgid_,
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
-		double acl_cache_timeout_, unsigned acl_cache_size_
+		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io
 #ifdef _WIN32
 		, int mounting_uid_, int mounting_gid_
 #endif
@@ -3385,6 +3385,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 	uint64_t timeout = (uint64_t)(direntry_cache_timeout * 1000000);
 	gDirEntryCache.setTimeout(timeout);
 	gDirEntryCacheMaxSize = direntry_cache_size_;
+	gDirectIo = direct_io;
 	if (debug_mode) {
 		safs::log_debug("cache parameters: file_keep_cache={} direntry_cache_timeout={:.2f}"
 		                " entry_cache_timeout={:.2f} attr_cache_timeout={:.2f}",
@@ -3464,7 +3465,7 @@ void fs_init(FsInitParams &params) {
 	init(params.debug_mode, params.keep_cache, params.direntry_cache_timeout, params.direntry_cache_size,
 		params.entry_cache_timeout, params.attr_cache_timeout, params.mkdir_copy_sgid,
 		params.sugid_clear_mode, params.use_rw_lock,
-		params.acl_cache_timeout, params.acl_cache_size
+		params.acl_cache_timeout, params.acl_cache_size, params.direct_io
 #ifdef _WIN32
 		, params.mounting_uid, params.mounting_gid
 #endif
