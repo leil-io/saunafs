@@ -786,7 +786,7 @@ void usage(const char *appname) {
 	printf(
 "usage: %s [-vdu] [-t locktimeout] [-c cfgfile] [start|stop|restart|reload|test|isalive]\n"
 "\n"
-"-v : print version number and exit\n"
+"-v[|V] : print version number and exit\n"
 "-d : run in foreground\n"
 "-u : log undefined config variables\n"
 "-t locktimeout : how long wait for lockfile\n"
@@ -833,9 +833,10 @@ int main(int argc,char **argv) {
 	lockmemory = 0;
 	appname = argv[0];
 
-	while ((ch = getopt(argc, argv, "o:c:p:dht:uvx?")) != -1) {
+	while ((ch = getopt(argc, argv, "o:c:p:dht:uvVx?")) != -1) {
 		switch(ch) {
 			case 'v':
+			case 'V':
 				printf("version: %s\n",SAUNAFS_PACKAGE_VERSION);
 				return 0;
 			case 'd':
