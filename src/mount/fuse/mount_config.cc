@@ -115,11 +115,6 @@ void usage(const char *progname) {
 
 	printf("general options:\n");
 	fuse_cmdline_help();
-printf(
-"    -o opt,[opt...]         mount options\n"
-"    -h   --help             print help\n"
-"    -V   --version          print version\n"
-"\n");
 
 	printf(
 "SFS options:\n"
