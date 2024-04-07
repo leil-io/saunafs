@@ -565,6 +565,24 @@ void attr_to_stat(uint32_t inode, const Attributes &attr, struct stat *stbuf) {
 	stbuf->st_nlink = attrnlink;
 }
 
+void update_attr_size(Attributes &attr, const uint64_t size) {
+	uint8_t attrtype = attr[0];
+	if (attrtype == TYPE_DIRECTORY || attrtype == TYPE_SYMLINK ||
+	    attrtype == TYPE_FILE) {
+		int kSizeOffsetInAttr = 27;
+		uint8_t *sz_ptr = attr.data() + kSizeOffsetInAttr;
+		sz_ptr[0] = ((size) >> 56) & 0xFF;
+		sz_ptr[1] = ((size) >> 48) & 0xFF;
+		sz_ptr[2] = ((size) >> 40) & 0xFF;
+		sz_ptr[3] = ((size) >> 32) & 0xFF;
+		sz_ptr[4] = ((size) >> 24) & 0xFF;
+		sz_ptr[5] = ((size) >> 16) & 0xFF;
+		sz_ptr[6] = ((size) >> 8) & 0xFF;
+		sz_ptr[7] = (size) & 0xFF;
+	}
+	// for the other types of inode the size should be 0
+}
+
 void makemodestr(char modestr[11],uint16_t mode) {
 	uint32_t i;
 	strcpy(modestr,"?rwxrwxrwx");
@@ -815,6 +833,7 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((attr[0]==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
 	attr_to_stat(inode,attr,&e.attr);
 	if (maxfleng>(uint64_t)(e.attr.st_size)) {
+		update_attr_size(attr, maxfleng);
 		e.attr.st_size=maxfleng;
 	}
 
@@ -891,6 +910,7 @@ AttrReply getattr(Context &ctx, Inode ino) {
 	memset(&o_stbuf, 0, sizeof(struct stat));
 	attr_to_stat(ino,attr,&o_stbuf);
 	if (attr[0]==TYPE_FILE && maxfleng>(uint64_t)(o_stbuf.st_size)) {
+		update_attr_size(attr, maxfleng);
 		o_stbuf.st_size=maxfleng;
 	}
 	attr_timeout = (attr_get_mattr(attr)&MATTR_NOACACHE)?0.0:attr_cache_timeout;
