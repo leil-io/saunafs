@@ -837,7 +837,7 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 		e.attr.st_size=maxfleng;
 	}
 
-	// If lookup succeeded and data did not come from cache, then cache it 
+	// If lookup succeeded and data did not come from cache, then cache it
 	if (!icacheflag) {
 		auto data_acquire_time = gDirEntryCache.updateTime();
 
@@ -1641,6 +1641,7 @@ EntryParam link(Context &ctx, Inode ino, Inode newparent, const char *newname) {
 				saunafs_error_string(status));
 		throw RequestException(status);
 	} else {
+		gDirEntryCache.lockAndInvalidateInode(inode);
 		gDirEntryCache.lockAndInvalidateParent(newparent);
 		e.ino = inode;
 		mattr = attr_get_mattr(attr);
