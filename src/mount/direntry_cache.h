@@ -35,6 +35,7 @@
 
 constexpr uint64_t kInvalidIndex = std::numeric_limits<uint64_t>::max();
 constexpr uint32_t kInvalidParent = std::numeric_limits<uint32_t>::max();
+constexpr uint32_t kNoMoreEntriesMarker = 0;
 constexpr char kEmptyName[] = "";
 
 /*! \brief Cache for directory entries
@@ -264,8 +265,7 @@ public:
 	 * \return True if inode has been found in cache, false otherwise.
 	 */
 	bool lookup(const SaunaClient::Context &ctx, uint32_t inode, Attributes &attr) {
-		// 'no more entries' marker
-		if (inode == 0) {
+		if (inode == kNoMoreEntriesMarker) {
 			return false;
 		}
 		shared_lock<SharedMutex> guard(rwlock_);
