@@ -22,6 +22,7 @@
 
 #include <atomic>
 #include <limits>
+#include <sstream>
 
 #include "common/attributes.h"
 #include "common/shared_mutex.h"
@@ -486,6 +487,19 @@ public:
 			++it;
 			erase(entry);
 		}
+
+		// Make sure inode_multiset_ is also clean of outdated entries.
+		// There are scenarios where we can not determine yet the inodes from
+		// the parent, like in unlink
+		auto iter = inode_multiset_.lower_bound(parent_inode, InodeCompare());
+
+		while (iter != inode_multiset_.end() &&
+		       (iter->inode == parent_inode ||
+		        iter->parent_inode == kInvalidParent)) {
+			DirEntry *entry = std::addressof(*iter);
+			++iter;
+			erase(entry);
+		}
 	}
 
 	/*! \brief Remove data from cache matching specified criteria.
@@ -505,6 +519,19 @@ public:
 		               std::make_tuple(it->parent_inode, it->uid, it->gid)) {
 			DirEntry *entry = std::addressof(*it);
 			++it;
+			erase(entry);
+		}
+
+		// Make sure inode_multiset_ is also clean of outdated entries.
+		// There are scenarios where we can not determine yet the inodes from
+		// the parent, like in unlink
+		auto iter = inode_multiset_.lower_bound(parent_inode, InodeCompare());
+
+		while (iter != inode_multiset_.end() &&
+		       (iter->inode == parent_inode ||
+		        iter->parent_inode == kInvalidParent)) {
+			DirEntry *entry = std::addressof(*iter);
+			++iter;
 			erase(entry);
 		}
 	}
@@ -583,6 +610,30 @@ public:
 	uint64_t updateTime() {
 		current_time_ = timer_.elapsed_us();
 		return current_time_;
+	}
+
+	/// String representation of the complete cache. Useful for debugging.
+	std::string toString() {
+		std::unique_lock<SharedMutex> guard(rwlock_);
+
+		std::stringstream result;
+
+		result << "lookup_set:\n";
+		for (const auto &iter : lookup_set_) {
+			result << iter.toString() << "\n";
+		}
+
+		result << "index_set:\n";
+		for (const auto &iter : index_set_) {
+			result << iter.toString() << "\n";
+		}
+
+		result << "inode_multiset:\n";
+		for (const auto &iter : inode_multiset_) {
+			result << iter.toString() << "\n";
+		}
+
+		return result.str();
 	}
 
 protected:
