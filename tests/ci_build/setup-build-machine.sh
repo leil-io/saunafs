@@ -18,5 +18,5 @@ extract_paragraphs() {
 setup_machine_script="${script_dir}/../setup_machine.sh"
 [ -f "${setup_machine_script}" ] || die "Script not found: ${setup_machine_script}"
 
-extract_paragraphs 'echo Install necessary programs' "${setup_machine_script}" | \
+extract_paragraphs 'echo '\''Install necessary programs' "${setup_machine_script}" | \
 	bash -x /dev/stdin

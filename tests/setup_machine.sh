@@ -37,8 +37,8 @@ fi
 
 if grep -q 'saunafstest_loop' /etc/fstab; then
 	if [[ "${1}" != "setup-force" ]]; then
-		echo The machine is at least partialy configured
-		echo Run revert-setup-machine.sh to revert the current configuration
+		echo 'The machine is at least partialy configured'
+		echo 'Run revert-setup-machine.sh to revert the current configuration'
 		exit 1
 	fi
 fi
@@ -46,7 +46,7 @@ fi
 shift
 umask 0022
 
-echo ; echo Install necessary programs
+echo ; echo 'Install necessary programs'
 # lsb_release is required by both build scripts and this script -- install it first
 if ! command -v  lsb_release >/dev/null; then
 	if command -v dnf >/dev/null; then
@@ -262,10 +262,10 @@ sed '\@PATH="'"${VIRTUAL_ENV}"'/bin@!s@$@\nPATH="'"${VIRTUAL_ENV}"'/bin:${PATH}"
 python3 -m venv "${VIRTUAL_ENV}"
 "${VIRTUAL_ENV}/bin/python3" -m pip install install "${python_packages[@]}"
 
-echo ; echo Add group fuse
+echo ; echo 'Add group fuse'
 groupadd -f fuse
 
-echo ; echo Add user saunafstest
+echo ; echo 'Add user saunafstest'
 if ! getent passwd saunafstest > /dev/null; then
 	useradd --system --user-group --home /var/lib/saunafstest --create-home saunafstest
 	chmod 755 /var/lib/saunafstest
@@ -278,7 +278,7 @@ if ! groups saunafstest | grep -w adm > /dev/null; then
 	usermod -a -G adm saunafstest # allow this user to read files from /var/log
 fi
 
-echo ; echo Prepare sudo configuration
+echo ; echo 'Prepare sudo configuration'
 if ! [[ -d /etc/sudoers.d ]]; then
 	# Sudo is not installed by default on Debian machines
 	echo "sudo not installed!" >&2
@@ -314,7 +314,7 @@ fi
 
 case "${release}" in
 	LinuxMint/*|Ubuntu/*|Debian/*)
-		echo ; echo Configure SaunaFS repository
+		echo ; echo 'Configure SaunaFS repository'
 		gpg --no-default-keyring \
 			--keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
 			--keyserver hkps://keyserver.ubuntu.com \
@@ -398,17 +398,17 @@ for name in saunafstest saunafstest_{0..9}; do
 	fi
 done
 
-echo ; echo Prepare /etc/fuse.conf
+echo ; echo 'Prepare /etc/fuse.conf'
 if ! grep '^[[:blank:]]*user_allow_other' /etc/fuse.conf >/dev/null; then
 	echo "user_allow_other" >> /etc/fuse.conf
 fi
 
-echo; echo Configure local port range for outbond connections
+echo ; echo 'Configure local port range for outbond connections'
 if [ ! -f  /etc/sysctl.d/60-ip_port_range.conf ]; then
 	echo "net.ipv4.ip_local_port_range=10000 64000" > /etc/sysctl.d/60-ip_port_range.conf
 fi
 
-echo ; echo Prepare empty /etc/saunafs_tests.conf
+echo ; echo 'Prepare empty /etc/saunafs_tests.conf'
 if ! [[ -f /etc/saunafs_tests.conf ]]; then
 	cat >/etc/saunafs_tests.conf <<-END
 		: \${SAUNAFS_DISKS:="$*"}
@@ -418,7 +418,7 @@ if ! [[ -f /etc/saunafs_tests.conf ]]; then
 	END
 fi
 
-echo ; echo Prepare ramdisk
+echo ; echo 'Prepare ramdisk'
 if ! grep /mnt/ramdisk /etc/fstab >/dev/null; then
 	echo "# Ramdisk used in SaunaFS tests" >> /etc/fstab
 	echo "ramdisk  /mnt/ramdisk  tmpfs  mode=1777,size=2g" >> /etc/fstab
@@ -428,7 +428,7 @@ if ! grep /mnt/ramdisk /etc/fstab >/dev/null; then
 	echo ': ${RAMDISK_DIR:=/mnt/ramdisk}' >> /etc/saunafs_tests.conf
 fi
 
-echo ; echo Prepare loop devices
+echo ; echo 'Prepare loop devices'
 #creating loop devices more or less evenly distributed between available disks
 i=0
 devices=6
@@ -461,4 +461,4 @@ done
 echo ': ${SAUNAFS_LOOP_DISKS:="'"${loops[*]}"'"}' >> /etc/saunafs_tests.conf
 
 set +x
-echo Machine configured successfully
+echo 'Machine configured successfully'
