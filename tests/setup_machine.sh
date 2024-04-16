@@ -172,7 +172,7 @@ for username in saunafstest_{0..9}; do
 	fi
 done
 
-if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep '# SMR' /etc/sudoers.d/saunafstest >/dev/null; then
+if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep -q '# SMR' /etc/sudoers.d/saunafstest >/dev/null; then
 	cat <<-'END' >>/etc/sudoers.d/saunafstest
 		# SMR
 		saunafstest ALL = NOPASSWD: /usr/sbin/modprobe null_blk nr_devices=0
@@ -191,7 +191,7 @@ if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep '# SMR' /etc/sudoers.d/saunafst
 	END
 fi
 
-if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep '# Ganesha' /etc/sudoers.d/saunafstest >/dev/null; then
+if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep -q '# Ganesha' /etc/sudoers.d/saunafstest >/dev/null; then
 	cat <<-'END' >>/etc/sudoers.d/saunafstest
 		# Ganesha automated tests
 		saunafstest ALL = NOPASSWD: /tmp/SaunaFS-autotests/mnt/sfs0/bin/ganesha.nfsd
@@ -200,6 +200,13 @@ if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep '# Ganesha' /etc/sudoers.d/saun
 		saunafstest ALL = NOPASSWD: /usr/bin/mkdir -p /var/run/ganesha
 		saunafstest ALL = NOPASSWD: /usr/bin/touch /var/run/ganesha/ganesha.pid
 		saunafstest ALL = NOPASSWD: /usr/bin/mount, /usr/bin/umount
+	END
+fi
+
+if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep -q '# Client' /etc/sudoers.d/saunafstest >/dev/null; then
+	cat <<-'END' >>/etc/sudoers.d/saunafstest
+		# Client
+		saunafstest ALL = NOPASSWD: /usr/bin/tee /tmp/SaunaFS-autotests/mnt/sfs*
 	END
 fi
 

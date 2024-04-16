@@ -113,6 +113,7 @@ struct FsInitParams {
 	static constexpr double   kDefaultAclCacheTimeout = 1.0;
 	static constexpr unsigned kDefaultAclCacheSize = 1000;
 	static constexpr bool     kDefaultVerbose = false;
+	static constexpr bool     kDirectIO = false;
 
 	// Thank you, GCC 4.6, for no delegating constructors
 	FsInitParams()
@@ -144,7 +145,7 @@ struct FsInitParams {
 #ifdef _WIN32
 				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
 #endif
-	             verbose(kDefaultVerbose) {
+	             verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -176,7 +177,7 @@ struct FsInitParams {
 #ifdef _WIN32
 				 mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), 
 #endif
-	             verbose(kDefaultVerbose) {
+	             verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
 	std::string bind_host;
@@ -227,6 +228,7 @@ struct FsInitParams {
 #endif
 
 	bool verbose;
+	bool direct_io;
 
 	std::string io_limits_config_file;
 };

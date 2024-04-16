@@ -80,13 +80,13 @@ public:
 		return networking_failures_;
 	}
 
-	/// Counter for the .saunafds_tweaks file.
+	/// Counter for the .saunafs_tweaks file.
 	static std::atomic<uint64_t> executions_total_;
 
-	/// Counter for the .saunafds_tweaks file.
+	/// Counter for the .saunafs_tweaks file.
 	static std::atomic<uint64_t> executions_with_additional_operations_;
 
-	/// Counter for the .saunafds_tweaks file.
+	/// Counter for the .saunafs_tweaks file.
 	static std::atomic<uint64_t> executions_finished_by_additional_operations_;
 
 protected:
