@@ -582,7 +582,7 @@ int hddGetLoadFactor() {
 int hddOpen(IChunk *chunk) {
 	assert(chunk);
 	LOG_AVG_TILL_END_OF_SCOPE0("hddOpen");
-	TRACETHIS1(chunk->chunkid);
+	TRACETHIS1(chunk->id());
 
 	int status = hddIOBegin(chunk, 0);
 	PRINTTHIS(status);
@@ -608,7 +608,7 @@ int hddOpen(uint64_t chunkId, ChunkPartType chunkType) {
 
 int hddClose(IChunk *chunk) {
 	assert(chunk);
-	TRACETHIS1(chunk->chunkid);
+	TRACETHIS1(chunk->id());
 	int status = hddIOEnd(chunk);
 	PRINTTHIS(status);
 	if (status != SAUNAFS_STATUS_OK) {
@@ -632,7 +632,7 @@ int hddReadCrcAndBlock(IChunk *chunk, uint16_t blockNumber,
                        OutputBuffer *outputBuffer) {
 	LOG_AVG_TILL_END_OF_SCOPE0("hddReadCrcAndBlock");
 	assert(chunk);
-	TRACETHIS2(c->chunkid, blocknum);
+	TRACETHIS2(chunk->id(), blockNumber);
 
 	int bytesRead = 0;
 

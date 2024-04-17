@@ -45,7 +45,7 @@ void hddReportDamagedChunk(uint64_t chunkId, ChunkPartType chunkType) {
 bool hddChunkTryLock(IChunk *chunk) {
 	assert(gChunksMapMutex.try_lock() == false);
 	assert(chunk);
-	TRACETHIS1(chunk->chunkid);
+	TRACETHIS1(chunk->id());
 	bool ret = false;
 
 	if (chunk != nullptr && chunk->state() == ChunkState::Available) {
@@ -136,7 +136,7 @@ int chunkWriteCrc(IChunk *chunk) {
 
 int hddIOEnd(IChunk *chunk) {
 	assert(chunk);
-	TRACETHIS1(c->chunkid);
+	TRACETHIS1(chunk->id());
 
 	if (chunk->wasChanged()) {
 		int status = chunkWriteCrc(chunk);
@@ -282,7 +282,7 @@ IChunk *hddChunkFindAndLock(uint64_t chunkId, ChunkPartType chunkType) {
 IChunk *hddChunkFindOrCreatePlusLock(IDisk *disk, uint64_t chunkid,
                                      ChunkPartType chunkType,
                                      disk::ChunkGetMode creationMode) {
-	TRACETHIS2(chunkid, (unsigned)cflag);
+	TRACETHIS2(chunkid, (unsigned)creationMode);
 	IChunk *chunk = nullptr;
 	IDisk *effectiveDisk = disk;
 
