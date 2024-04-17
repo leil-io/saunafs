@@ -823,7 +823,7 @@ if "IN" in sectionset:
                 ">HBBQQQQLQLLLLLLLL", data)
             out.append(
                 """<table class="FR" cellspacing="0" summary="Info table">""")
-            out.append("""	<tr><th colspan="14">Info</th></tr>""")
+            out.append("""	<tr><th colspan="15">Info</th></tr>""")
             out.append("""	<tr>""")
             out.append("""		<th>version</th>""")
             out.append("""		<th>RAM used</th>""")
