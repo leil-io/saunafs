@@ -1,0 +1,59 @@
+ARG BASE_IMAGE=ubuntu:22.04
+FROM ${BASE_IMAGE}
+ARG DEBIAN_FRONTEND=noninteractive
+ENV LC_ALL="C.UTF-8"
+ENV TZ=Europe/Tallinn
+RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
+
+ARG GROUP_ID=1000
+ARG USER_ID=1000
+ARG USER_NAME=jenkins
+ARG USER_HOME=/home/${USER_NAME}
+ENV GROUP_ID=${GROUP_ID}
+ENV USER_ID=${USER_ID}
+ENV USERNAME=${USER_NAME}
+ENV HOME=${USER_HOME}
+
+COPY ./tests/setup_machine.sh /tmp/
+COPY ./tests/ci_build/setup-test-machine.sh \
+	./tests/ci_build/zonefs-tools-setup.sh \
+	/tmp/ci_build/
+
+## Create user and permissions
+RUN set -e ; \
+	apt-get update ; apt-get install --yes sudo ; \
+	rm -rf /var/lib/apt/lists/*; \
+	userdel -r $(getent passwd ${USER_ID} | cut -d: -f1)> /dev/null 2>&1 || true; \
+	groupdel $(getent group ${GROUP_ID} | cut -d: -f1)> /dev/null 2>&1 || true; \
+	groupadd -g ${GROUP_ID} ${USERNAME}; \
+	useradd -r -m -u ${USER_ID} -g ${GROUP_ID} -d ${USER_HOME} ${USERNAME}; \
+	mkdir -p ${USER_HOME}/.cache/ccache; \
+	chmod -R ugo+rwX ${USER_HOME}; \
+	echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers ; \
+	chmod 0440 /etc/sudoers
+
+WORKDIR ${USER_HOME}
+
+## Run the setup-test-machine.sh script
+RUN set -e ; \
+	apt-get update ; \
+	chmod +x /tmp/ci_build/setup-test-machine.sh ; \
+	/tmp/ci_build/setup-test-machine.sh ; \
+	rm -rf /var/lib/apt/lists/*
+
+## Enable additional basic tools
+RUN set -e ; \
+	apt-get update ; \
+	apt-get install --yes \
+		procps \
+		systemd \
+		tini ; \
+	rm -rf /var/lib/apt/lists/* ; \
+	sed -i '/imklog/s/^/#/' /etc/rsyslog.conf ; \
+	touch /var/log/syslog ; \
+	chmod -R a+rwX-t /tmp /var/log /mnt/ramdisk; \
+	chown -R ${USERNAME}:${USERNAME} /tmp /var/log; \
+	true
+COPY ./tests/ci_build/docker_entrypoint.test /docker_entrypoint.sh
+RUN chmod +x /docker_entrypoint.sh
+ENTRYPOINT ["tini", "--", "/docker_entrypoint.sh" ]

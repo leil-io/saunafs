@@ -1,14 +1,12 @@
 def imageTags = [:]
 pipeline {
-    agent {
-        label 'docker'
-    }
+    agent { label 'docker' }
     environment{
         PROJECT_NAME = 'saunafs'
         DOCKER_INTERNAL_REGISTRY = "registry.ci.leil.io"
-        DOCKER_ENABLE_PUSH_IMAGE = 'true'
-        DOCKER_ENABLE_PULL_CACHE_IMAGE = 'true'
         DOCKER_INTERNAL_REGISTRY_URL= "https://${DOCKER_INTERNAL_REGISTRY}"
+        dockerImageSaunafs = 'registry.ci.leil.io/saunafs-test:dev-ubuntu-22.04-latest'
+        dockerImageSaunafsGanesha = 'registry.ci.leil.io/saunafs-test:dev-ganesha-ubuntu-22.04-latest'
         dockerRegistrySecretId = 'private-docker-registry-credentials'
         nexusUrl = "http://192.168.50.208:8081"
     }
@@ -20,29 +18,13 @@ pipeline {
         preserveStashes(buildCount: 2)
     }
     stages {
-        stage('Preparation') {
-            parallel {
-                stage('Image_Build') {
-                    agent { label 'docker' }
-                    steps {
-                        cleanAndClone()
-                        script {
-                            docker.withRegistry(env.DOCKER_INTERNAL_REGISTRY_URL, env.dockerRegistrySecretId) {
-                                sh "tests/ci_build/docker-build.sh ubuntu22.04-test"
-                            }
-                            imageTags['ubuntu22.04-test'] = getPartialTag(env.BRANCH_NAME, 'ubuntu22.04-test', getCommitId())
-                        }
-                    }
-                }
-            }
-        }
         stage('Build') {
             parallel {
                 stage ('BuildProject') {
                     agent {
                         docker {
                             label 'docker'
-                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                            image env.dockerImageSaunafs
                             registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
@@ -53,23 +35,6 @@ pipeline {
                         sh 'tests/ci_build/run-build.sh test'
                         stash allowEmpty: true, name: 'test-binaries', includes: "install/saunafs/**/*"
                         stash allowEmpty: true, name: 'built-binaries', includes: "build/saunafs/**/*"
-                    }
-                }
-                stage('GaneshaImage') {
-                    when {
-                        beforeAgent true
-                        expression { env.BRANCH_NAME ==~ /(main|dev)/ }
-                    }
-                    agent { label 'docker' }
-                    steps {
-                        cleanAndClone()
-                        script {
-                            docker.withRegistry(env.DOCKER_INTERNAL_REGISTRY_URL, env.dockerRegistrySecretId) {
-                                DOCKER_BASE_IMAGE="${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
-                                sh "tests/ci_build/docker-build.sh ganesha"
-                            }
-                            imageTags['ganesha'] = getPartialTag(env.BRANCH_NAME, 'ganesha', 'latest')
-                        }
                     }
                 }
             }
@@ -112,7 +77,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                            image env.dockerImageSaunafs
                             registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
@@ -128,7 +93,7 @@ pipeline {
                     agent {
                         docker {
                             label 'docker'
-                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                            image env.dockerImageSaunafs
                             registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
@@ -144,12 +109,12 @@ pipeline {
                 stage('Ganesha') {
                     when {
                         beforeAgent true
-                        expression { env.BRANCH_NAME ==~ /(main|dev)/ }
+                        expression { env.BRANCH_NAME ==~ /(main|dev|PR-.*)/ }
                     }
                     agent {
                         docker {
                             label 'docker'
-                            image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ganesha']
+                            image env.dockerImageSaunafsGanesha
                             registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                             registryCredentialsId env.dockerRegistrySecretId
                             args  '--security-opt seccomp=unconfined --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1 --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --cap-add SETPCAP'
@@ -166,12 +131,12 @@ pipeline {
         stage('Package') {
             when {
                 beforeAgent true
-                expression { env.BRANCH_NAME ==~ /(main|dev)/ }
+                expression { env.BRANCH_NAME ==~ /(main|dev|PR-.*)/ }
             }
             agent {
                 docker {
                     label 'docker'
-                    image "${DOCKER_INTERNAL_REGISTRY}/${PROJECT_NAME}:" + imageTags['ubuntu22.04-test']
+                    image env.dockerImageSaunafs
                     registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
                     registryCredentialsId env.dockerRegistrySecretId
                     args  '--security-opt seccomp=unconfined'
