@@ -86,8 +86,8 @@ debug_command() {
 	fi
 	if (( depth <= DEBUG_LEVEL )); then
 		local indent=">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-		echo "${indent:0:$depth} $(basename "${BASH_SOURCE[1]}"):${BASH_LINENO[0]}:`
-				`${FUNCNAME[1]}(): ${BASH_COMMAND}" >&2 | true
+		echo "${indent:0:$depth} $(basename "${BASH_SOURCE[1]}"):${BASH_LINENO[0]}:
+				${FUNCNAME[1]}(): ${BASH_COMMAND}" >&2 | true
 	fi
 }
 
