@@ -97,10 +97,8 @@ void ChunkCopiesCalculator::optimize() {
 		                                       target_slice.size());
 
 		Goal::Slice result(target_slice.getType());
-		i = 0;
-		for (auto result_part : result) {
-			result_part = target_slice[assignment[i]];
-			++i;
+		for (int k = 0, m = target_slice.size(); k < m; ++k) {
+			result[k] = target_slice[assignment[k]];
 		}
 		target_slice = std::move(result);
 	}
