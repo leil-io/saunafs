@@ -90,13 +90,13 @@ done
 
 ## Define ACLs for the files
 file1_acl='user::rw- user:saunafstest:rwx group::rw- group:saunafstest:rwx mask::rwx other::r--'
-file2_acl='user::rw- user:saunafstest:r-- group::rw- group:saunafstest:r-- mask::rw- other::r--'
-file3_acl='user::rw- user:saunafstest:-w- group::rw- group:saunafstest:-w- mask::rw- other::r--'
+file2_acl='user::rw- user:saunafstest:r-- group::rw- group:saunafstest:r-- mask::rw- other::---'
+file3_acl='user::rw- user:saunafstest:-w- group::rw- group:saunafstest:-w- mask::rw- other::---'
 
 ## Create different ACL types for different files
-setfacl -m u:saunafstest:rwx -m g:saunafstest:rwx o::r-- "${info[mount0]}/dir1/file1" 2> /dev/null
-setfacl -m u:saunafstest:r-- -m g:saunafstest:r-- o::--- "${info[mount0]}/symlink2" 2> /dev/null
-setfacl -m u:saunafstest:-w- -m g:saunafstest:-w- o::--- "${info[mount0]}/dir3/file3" 2> /dev/null
+setfacl -m u:saunafstest:rwx -m g:saunafstest:rwx -m o::r-- "${info[mount0]}/dir1/file1" 2> /dev/null
+setfacl -m u:saunafstest:r-- -m g:saunafstest:r-- -m o::--- "${info[mount0]}/symlink2" 2> /dev/null
+setfacl -m u:saunafstest:-w- -m g:saunafstest:-w- -m o::--- "${info[mount0]}/dir3/file3" 2> /dev/null
 
 saunafs-admin save-metadata localhost "${saunafs_info_[matocl]}" <<< "password"
 
