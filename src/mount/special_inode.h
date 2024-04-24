@@ -58,6 +58,26 @@ namespace InodeOphistory {
 }
 
 namespace InodeTweaks {
+#ifdef _WIN32
+	static inline bool isWStringFromWindows(const std::string &value) {
+		// Detecting Windows API wide string format
+		return !value.empty() && value[0] == -1;
+	}
+
+	static inline std::string convertWStringFromWindowsToString(
+		const std::string &value) {
+		// This conversion is necessary due to the special encoding format
+		// of Windows API strings, which may include a Byte Order Mark (BOM)
+		// and use UTF-16 encoding. The conversion ensures compatibility
+		// with UTF-8 encoded strings, which are more universally supported.
+		std::string result;
+		for (int i = 2; i < (int)value.size(); i += 2) {
+			result.push_back(value[i]);
+		}
+		return result;
+	}
+#endif
+
 	extern const Attributes attr;
 	extern const SaunaClient::Inode inode_;
 }

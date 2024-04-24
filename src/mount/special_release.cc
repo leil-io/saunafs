@@ -73,6 +73,12 @@ namespace InodeTweaks {
 static void release(FileInfo *fi) {
 	MagicFile *file = reinterpret_cast<MagicFile*>(fi->fh);
 	if (file->wasWritten) {
+#ifdef _WIN32
+		if (isWStringFromWindows(file->value)) {
+			file->value = convertWStringFromWindowsToString(file->value);
+		}
+#endif
+
 		auto separatorPos = file->value.find('=');
 		if (separatorPos == file->value.npos) {
 			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Wrong value '%s'",
@@ -80,21 +86,6 @@ static void release(FileInfo *fi) {
 		} else {
 			std::string name = file->value.substr(0, separatorPos);
 			std::string value = file->value.substr(separatorPos + 1);
-#ifdef _WIN32
-			if (!name.empty() && name[0] == -1) { // Powershell command
-				// Given the special format of the Powershell input, this patch
-				// must be applied
-				std::string real_name, real_value;
-				for (int i = 2; i < (int)name.size(); i += 2) {
-					real_name.push_back(name[i]);
-				}
-				for (int i = 1; i < (int)value.size(); i += 2) {
-					real_value.push_back(value[i]);
-				}
-				name = real_name;
-				value = real_value;
-			}
-#endif
 			if (!value.empty() && value.back() == '\n') {
 				value.resize(value.size() - 1);
 			}
