@@ -38,8 +38,13 @@ setup_local_empty_saunafs() {
 	export ZONED_DISKS
 
 	# Try to enable core dumps if possible
-	if [[ $(ulimit -c) == 0 ]]; then
-		ulimit -c unlimited || ulimit -c 100000000 || ulimit -c 1000000 || ulimit -c 10000 || :
+	ulimit -c unlimited || ulimit -c 100000000 || ulimit -c 1000000 || ulimit -c 10000 || :
+	# Try to enable coredump analysis
+	if [[ ! -z ${COREDUMP_WATCH:-} ]]; then
+		coredump_setup
+		if coredump_is_enabled; then
+			( coredump_watcher & )
+		fi
 	fi
 
 	# Prepare directories for SaunaFS

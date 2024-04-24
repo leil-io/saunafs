@@ -113,3 +113,15 @@ implemented in the following directory:
     <SOURCE_DIRECTORY>/tests/tools
 
 Merry testing!
+
+
+Experimental features
+=====================
+
+These features can be enabled by setting the required ENV variable.
+
+- COREDUMP_WATCH - Watch for any coredumps and terminate the test if found.
+  Also print out useful information from GDB. Note that this requires setting
+  `/proc/sys/kernel/core_pattern`. While it try restores the pattern after the
+  test has ended each time (including failure), you may want to keep an eye on
+  this and restore it manually to the original (and please file a bug).

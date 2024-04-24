@@ -156,6 +156,8 @@ apt_packages=(
 	libnfsidmap-dev
 	libnsl-dev
 	libsqlite3-dev
+	xfslibs-dev
+	inotify-tools
 )
 dnf_packages=(
 	boost-filesystem
@@ -359,6 +361,13 @@ if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep -q '# Client' /etc/sudoers.d/sa
 	cat <<-'END' >>/etc/sudoers.d/saunafstest
 		# Client
 		saunafstest ALL = NOPASSWD: /usr/bin/tee /tmp/SaunaFS-autotests/mnt/sfs*
+	END
+fi
+
+if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep -q '# Core dumps' /etc/sudoers.d/saunafstest >/dev/null; then
+	cat <<-'END' >>/etc/sudoers.d/saunafstest
+		# Core dumps
+		saunafstest ALL = NOPASSWD: /usr/bin/tee /proc/sys/kernel/core_pattern
 	END
 fi
 
