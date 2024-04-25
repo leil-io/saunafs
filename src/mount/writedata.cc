@@ -213,7 +213,6 @@ static std::condition_variable fcbcond;
 static uint32_t fcbwaiting = 0;
 static int64_t freecacheblocks;
 static inodedata **idhash;
-static bool ignoreflush = 0;
 
 static uint32_t gWriteWindowSize;
 static uint32_t gChunkserverTimeout_ms;
@@ -677,8 +676,7 @@ void* write_worker(void*) {
 
 /* API | glock: INITIALIZED,UNLOCKED */
 void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
-                     uint32_t writewindowsize, uint32_t chunkserverTimeout_ms,
-                     uint32_t cachePerInodePercentage, bool ignoreFlush) {
+		uint32_t writewindowsize, uint32_t chunkserverTimeout_ms, uint32_t cachePerInodePercentage) {
 	uint64_t cachebytecount = uint64_t(cachesize) * 1024 * 1024;
 	uint64_t cacheblockcount = (cachebytecount / SFSBLOCKSIZE);
 	uint32_t i;
@@ -692,7 +690,6 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 		cacheblockcount = 10;
 	}
 
-	ignoreflush = ignoreFlush;
 	freecacheblocks = cacheblockcount;
 	gCachePerInodePercentage = cachePerInodePercentage;
 
@@ -893,9 +890,6 @@ static int write_data_flush(void* vid, Glock& lock) {
 }
 
 int write_data_flush(void* vid) {
-	if (ignoreflush) {
-		return SAUNAFS_STATUS_OK;
-	}
 	Glock lock(gMutex);
 	return write_data_flush(vid, lock);
 }

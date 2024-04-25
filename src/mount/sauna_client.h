@@ -79,7 +79,7 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 #ifdef _WIN32
-	static constexpr bool     kDefaultSpecialCopyMode = false;
+	static constexpr bool     kDefaultSpecialWriteMode = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 #else
 	static constexpr bool     kDefaultIgnoreFlush = false;
@@ -145,7 +145,7 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_copy_mode(kDefaultSpecialCopyMode),
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_write_mode(kDefaultSpecialWriteMode),
 #else
 	             ignore_flush(kDefaultIgnoreFlush),
 #endif
@@ -179,7 +179,7 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_copy_mode(kDefaultSpecialCopyMode),
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_write_mode(kDefaultSpecialWriteMode),
 #else
 	             ignore_flush(kDefaultIgnoreFlush),
 #endif
@@ -234,7 +234,7 @@ struct FsInitParams {
 #endif
 
 #ifdef _WIN32
-	bool special_copy_mode;
+	bool special_write_mode;
 #else
 	bool ignore_flush;
 #endif

@@ -205,7 +205,7 @@ Equivalent to *--nostdopts* (*-n*) option for use in fstab.
 Equivalent to *--nonempty* option for use in fstab.
 
 *-o sfsignoreflush*::
-DANGEROUS. Ignore flush/fsync usual behavior by replying SUCCESS to it 
+DANGEROUS. Ignore flush usual behavior by replying SUCCESS to it 
 inmediately. Targets fast creation of small files, but may cause data loss 
 during crashes when allegedly flushed data is still being processed.
 

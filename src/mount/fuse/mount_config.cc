@@ -222,7 +222,7 @@ void usage(const char *progname) {
 "    -o enablefilelocks=0|1      enables/disables global file locking "
 				"(disabled by default)\n"
 "    -o nonempty                 allow mounts over non-empty file/dir\n"
-"    -o sfsignoreflush           DANGEROUS. Ignore flush/fsync usual behavior by "
+"    -o sfsignoreflush           DANGEROUS. Ignore flush usual behavior by "
 				"replying SUCCESS to it inmediately. Targets fast creation of "
 				"small files, but may cause data loss during crashes.\n"
 "\n",

@@ -211,6 +211,7 @@ static unsigned gDirEntryCacheMaxSize = 100000;
 
 static int debug_mode = 0;
 static int usedircache = 1;
+static bool ignore_flush = false;
 static int keep_cache = 0;
 static double direntry_cache_timeout = 0.1;
 static double entry_cache_timeout = 0.0;
@@ -2394,6 +2395,12 @@ BytesWritten write(Context &ctx, Inode ino, const char *buf, size_t size, off_t 
 }
 
 void flush(Context &ctx, Inode ino, FileInfo* fi) {
+	if (ignore_flush) {
+		oplog_printf(ctx, "flush (%lu): OK",
+				(unsigned long int)ino);
+		return;
+	}
+
 	finfo *fileinfo = reinterpret_cast<finfo*>(fi->fh);
 	int err;
 
@@ -3382,13 +3389,18 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
 		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io
 #ifdef _WIN32
-		, int mounting_uid_, int mounting_gid_, bool special_copy_mode
+		, int mounting_uid_, int mounting_gid_, bool special_write_mode
+#else
+		, bool ignore_flush_
 #endif
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
-	ignore_read = special_copy_mode;
+	ignore_read = special_write_mode;
+	ignore_flush = special_write_mode;
+#else
+	ignore_flush = ignore_flush_;
 #endif
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
@@ -3475,13 +3487,7 @@ void fs_init(FsInitParams &params) {
 	write_data_init(params.write_cache_size, params.io_retries,
 	                params.write_workers, params.write_window_size,
 	                params.chunkserver_write_timeout_ms,
-	                params.cache_per_inode_percentage,
-#ifdef _WIN32
-	                params.special_copy_mode
-#else
-	                params.ignore_flush
-#endif
-	                );
+	                params.cache_per_inode_percentage);
 #ifdef _WIN32
 	set_debug_mode(params.debug_mode);
 #endif
@@ -3491,7 +3497,9 @@ void fs_init(FsInitParams &params) {
 		params.sugid_clear_mode, params.use_rw_lock,
 		params.acl_cache_timeout, params.acl_cache_size, params.direct_io
 #ifdef _WIN32
-		, params.mounting_uid, params.mounting_gid, params.special_copy_mode
+		, params.mounting_uid, params.mounting_gid, params.special_write_mode
+#else
+		, params.ignore_flush
 #endif
 		);
 }
