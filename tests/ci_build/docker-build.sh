@@ -142,7 +142,14 @@ case "${option,,}" in
 		;;
 	ganesha)
 		docker_context_dir="${PROJECT_DIR}/tests/ci_build/ganesha"
-		dockerfile="${docker_context_dir}/Dockerfile"
+		case ${DOCKER_BASE_IMAGE,,} in
+			*ubuntu-24.04* | *debian-trixie*)
+				dockerfile="${docker_context_dir}/Dockerfile.ubuntu-24.04"
+				;;
+			*)
+				dockerfile="${docker_context_dir}/Dockerfile"
+				;;
+		esac
 		;;
 	*)
 		docker_context_dir="${PROJECT_DIR}"
