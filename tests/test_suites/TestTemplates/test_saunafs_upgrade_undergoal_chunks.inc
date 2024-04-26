@@ -35,7 +35,7 @@ assert_saunafsXX_services_count_equals 1 $CHUNKSERVERS_MINIMUM 1
 
 cd "${info[mount0]}"
 mkdir dir
-assert_success saunafsXX sfssetgoal $GOAL dir
+assert_success saunafsXX saunafs setgoal $GOAL dir
 cd dir
 
 # map filesize -> cnt, e.g. 20M -> 5 (5 files of filesize 20M)
