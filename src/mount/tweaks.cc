@@ -96,5 +96,3 @@ std::string Tweaks::getAllValues() const {
 	}
 	return ss.str();
 }
-
-Tweaks gTweaks;
