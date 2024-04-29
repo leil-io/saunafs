@@ -13,7 +13,8 @@ Build-Depends: asciidoc (>= 8.6.6),
                libboost-system-dev,
                libboost-program-options-dev,
                python3,
-	       libyaml-cpp-dev
+               libyaml-cpp-dev,
+
 Rules-Requires-Root: no
 Standards-Version: 3.9.3
 Homepage: https://saunafs.org/
