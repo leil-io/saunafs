@@ -53,4 +53,4 @@ private:
 	std::unique_ptr<Impl> impl_;
 };
 
-extern Tweaks gTweaks;
+inline Tweaks gTweaks;

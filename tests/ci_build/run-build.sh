@@ -54,7 +54,7 @@ case "${build_type,,}" in
 		;;
 	test)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
-			-DCMAKE_BUILD_TYPE=RelWithDbInfo
+			-DCMAKE_BUILD_TYPE=RelWithDebInfo
 			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=OFF
