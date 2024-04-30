@@ -30,7 +30,13 @@
 
 #ifndef SAUNAFS_HAVE_STD_TO_STRING
 
+// A fix for https://stackoverflow.com/q/77034039/10788155
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <sstream>
+#pragma GCC diagnostic pop
+
 #include <string>
 
 namespace std {
