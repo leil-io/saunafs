@@ -1,4 +1,9 @@
+// A fix for https://stackoverflow.com/q/77034039/10788155
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <gtest/gtest.h>
+#pragma GCC diagnostic pop
 
 #include "chunkserver/cmr_disk.h"
 
