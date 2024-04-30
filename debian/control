@@ -13,6 +13,7 @@ Build-Depends: asciidoc (>= 8.6.6),
                libboost-system-dev,
                libboost-program-options-dev,
                python3,
+               libyaml-cpp-dev,
 Rules-Requires-Root: no
 Standards-Version: 3.9.3
 Homepage: https://saunafs.org/
@@ -28,45 +29,30 @@ Package: saunafs-common
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
          adduser
-Conflicts: sfs-common
-Replaces: sfs-common
-Provides: sfs-common
 Description: SaunaFS common files
  Files and services common for all SaunaFS daemons.
 
 Package: saunafs-master
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-common
-Conflicts: sfs-master
-Replaces: sfs-master
-Provides: sfs-master
 Description: SaunaFS master server
  SaunaFS master (metadata) server.
 
 Package: saunafs-metalogger
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-common
-Conflicts: sfs-metalogger
-Replaces: sfs-metalogger
-Provides: sfs-metalogger
 Description: SaunaFS metalogger server
  SaunaFS metalogger (metadata replication) server.
 
 Package: saunafs-chunkserver
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-common
-Conflicts: sfs-chunkserver
-Replaces: sfs-chunkserver
-Provides: sfs-chunkserver
 Description: SaunaFS data server
  SaunaFS data server.
 
 Package: saunafs-client
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, bash-completion
-Conflicts: sfs-client
-Replaces: sfs-client
-Provides: sfs-client
 Description: SaunaFS client
  SaunaFS clients: sfsmount and sfstools.
 
@@ -92,9 +78,6 @@ Package: saunafs-cgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
          python3
-Conflicts: sfs-cgi
-Replaces: sfs-cgi
-Provides: sfs-cgi
 Description: SaunaFS CGI Monitor
  SaunaFS CGI Monitor.
 
@@ -102,9 +85,6 @@ Package: saunafs-cgiserv
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, saunafs-cgi,
          python3
-Conflicts: sfs-cgiserv
-Replaces: sfs-cgiserv
-Provides: sfs-cgiserv
 Description: Simple CGI-capable HTTP server to run SaunaFS CGI Monitor
  Simple CGI-capable HTTP server to run SaunaFS CGI Monitor.
 
