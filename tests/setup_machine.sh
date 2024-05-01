@@ -245,9 +245,10 @@ rm -rf "${gtest_temp_build_dir:?}"
 # Setup python3 with a global virtual env (new recommended way)
 VIRTUAL_ENV=/var/lib/saunafs_setup_machine_venv
 export VIRTUAL_ENV
+if ! grep -Eq 'PATH=.*'"${VIRTUAL_ENV}/bin\b"'' /etc/environment ; then
+	sed -E 's@(PATH=)([:"'\'']?)(.*)\2@\1\2\3:'"${VIRTUAL_ENV}/bin"'\2@' -i /etc/environment;
+fi
 sed '\@VIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@!s@$@\nVIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@' -zi /etc/environment
-# shellcheck disable=SC2016
-sed '\@PATH="'"${VIRTUAL_ENV}"'/bin@!s@$@\nPATH="'"${VIRTUAL_ENV}"'/bin:${PATH}"@' -zi /etc/environment
 python3 -m venv "${VIRTUAL_ENV}"
 "${VIRTUAL_ENV}/bin/python3" -m pip install install "${python_packages[@]}"
 
