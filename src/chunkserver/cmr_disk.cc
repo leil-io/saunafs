@@ -369,8 +369,9 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 	    (offsetInBlock + size > SFSBLOCKSIZE)) {
 		return SAUNAFS_ERROR_WRONGOFFSET;
 	}
-	if (crc != mycrc32(0, buffer, size)) {
-		return SAUNAFS_ERROR_CRC;
+
+	if (gCheckCrcWhenWriting) {
+		if (crc != mycrc32(0, buffer, size)) { return SAUNAFS_ERROR_CRC; }
 	}
 
 	chunk->setWasChanged(1U);
