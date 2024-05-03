@@ -367,7 +367,9 @@ void write_job_delayed_end(inodedata* id, int status, int seconds, Glock &lock) 
 		write_cb_release_blocks(id->dataChain.size(), lock);
 		id->dataChain.clear();
 		id->inqueue = false;
-		id->maxfleng = 0; // proper file length is now on the master server, remove our length cache
+		// We don't reset maxfleng (id->maxfleng = 0;) for a while longer, to
+		// have its value ready to some quick cache responses in lookup and
+		// getattr syscalls
 		if (id->flushwaiting > 0) {
 			id->flushcond.notify_all();
 		}
@@ -954,6 +956,7 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 		write_data_flushwaiting_decrease(id, lock);
 		write_data_lcnt_decrease(id, lock);
 		if (status == SAUNAFS_STATUS_OK) {
+			id->maxfleng = length;
 			return 0;
 		} else {
 			// status is now SFS status, so we cannot return any errno
@@ -996,6 +999,7 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 		}
 	}
 
+	id->maxfleng = length;
 	// Now we can tell the master server to finish the truncate operation and then unblock the inode
 	lock.unlock();
 	status = fs_truncateend(inode, uid, gid, length, lockId, attr);
