@@ -983,6 +983,9 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	});
 
 	if (endOffset > length) {
+		// Make maxfleng big enough for the upcoming writes
+		id->maxfleng = endOffset;
+
 		// Something has to be written, so pass our lock to writing threads
 		sassert(id->dataChain.empty());
 		id->locator.reset(new TruncateWriteChunkLocator(inode, length / SFSCHUNKSIZE, lockId));
