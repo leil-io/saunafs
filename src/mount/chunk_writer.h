@@ -127,7 +127,10 @@ public:
 
 	bool acceptsNewOperations() { return acceptsNewOperations_; }
 
-	void setChunkSizeInBlocks(uint32_t chunkSize);
+	inline void setChunkSizeInBlocks(uint32_t chunkSize) {
+		chunkSizeInBlocks_ =
+		    (chunkSize == 0 ? 0 : (chunkSize - 1) / SFSBLOCKSIZE + 1);
+	}
 
 private:
 	typedef uint32_t WriteId;
@@ -189,7 +192,8 @@ private:
 	void startOperation(Operation operation);
 	void fillOperation(Operation &operation, int first_block, int first_index, int size,
 			std::vector<uint8_t *> &stripe_element);
-	void fillNotExisting(Operation &operation, int first_block, int first_index, int size,
+	void fillNotExisting(Operation &operation, int first_block, int first_index,
+	                     int blocks_number,
 	                     std::vector<uint8_t *> &stripe_element);
 	void fillStripe(Operation &operation, int first_block, std::vector<uint8_t *> &stripe_element);
 	void readBlocks(int block_index, int size, int block_from, int block_to,

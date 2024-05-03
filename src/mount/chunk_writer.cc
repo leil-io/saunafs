@@ -328,11 +328,6 @@ std::list<WriteCacheBlock> ChunkWriter::releaseJournal() {
 	return std::move(journal_);
 }
 
-void ChunkWriter::setChunkSizeInBlocks(uint32_t chunkSize) {
-	chunkSizeInBlocks_ =
-	    (chunkSize == 0 ? 0 : (chunkSize - 1) / SFSBLOCKSIZE + 1);
-}
-
 void ChunkWriter::addOperation(WriteCacheBlock&& block) {
 	sassert(block.type != WriteCacheBlock::kParityBlock);
 	sassert(acceptsNewOperations_);
@@ -449,10 +444,11 @@ void ChunkWriter::fillOperation(Operation &operation, int first_block, int first
  * \param size number of required blocks
  * \param stripe_element map of blocks in a stripe
  */
-void ChunkWriter::fillNotExisting(Operation &operation, int first_block, int first_index, int size,
-		std::vector<uint8_t *> &stripe_element) {
-	assert(size >= 0);
-	if (size == 0) {
+void ChunkWriter::fillNotExisting(Operation &operation, int first_block,
+                                  int first_index, int blocks_number,
+                                  std::vector<uint8_t *> &stripe_element) {
+	assert(blocks_number >= 0);
+	if (blocks_number == 0) {
 		return;
 	}
 	int block_from = operation.journalPositions.front()->from;
@@ -460,9 +456,10 @@ void ChunkWriter::fillNotExisting(Operation &operation, int first_block, int fir
 	int beyond_start = first_block + first_index;
 
 	std::vector<WriteCacheBlock> blocks;
-	blocks.reserve(size);
+	blocks.reserve(blocks_number);
 	// Fills not existing blocks with zeroes
-	for (int index = beyond_start; index < beyond_start + size; ++index) {
+	for (int index = beyond_start; index < beyond_start + blocks_number;
+	     ++index) {
 		WriteCacheBlock block(locator_->chunkIndex(), index,
 		                      WriteCacheBlock::kReadBlock);
 		memset(block.data(), 0, SFSBLOCKSIZE);
@@ -470,9 +467,9 @@ void ChunkWriter::fillNotExisting(Operation &operation, int first_block, int fir
 		block.to = block_to;
 		blocks.push_back(std::move(block));
 	}
-	assert(blocks.size() == (size_t)size);
+	assert(blocks.size() == (size_t)blocks_number);
 
-	for (int index = 0; index < size; ++index) {
+	for (int index = 0; index < blocks_number; ++index) {
 		// Insert the new block into the journal just after the last block of the operation
 		auto position = journal_.insert(operation.journalPositions.back(), std::move(blocks[index]));
 		operation.journalPositions.push_back(position);

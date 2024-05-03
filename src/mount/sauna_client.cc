@@ -2363,13 +2363,14 @@ BytesWritten write(Context &ctx, Inode ino, const char *buf, size_t size, off_t 
 	Attributes attr;
 	attr.fill(0);
 	if (usedircache) {
-		gDirEntryCache.lookup(ctx, ino, attr); 
+		gDirEntryCache.lookup(ctx, ino, attr);
 	}
 	struct stat stbuf;
 	attr_to_stat(ino, attr, &stbuf);
 	size_t currentSize = stbuf.st_size;
 
-	err = write_data(fileinfo->data,off,size,(const uint8_t*)buf, currentSize);
+	err = write_data(fileinfo->data, off, size, (const uint8_t *)buf,
+	                 currentSize);
 	gDirEntryCache.lockAndInvalidateInode(ino);
 	if (err != SAUNAFS_STATUS_OK) {
 		oplog_printf(ctx, "write (%lu,%" PRIu64 ",%" PRIu64 "): (physical) %s",

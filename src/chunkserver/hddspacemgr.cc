@@ -775,6 +775,8 @@ int hddRead(uint64_t chunkId, uint32_t version, ChunkPartType chunkType,
 	LOG_AVG_TILL_END_OF_SCOPE0("hddRead");
 	TRACETHIS3(chunkId, offset, size);
 
+	safs_silent_syslog(LOG_DEBUG, "chunkserver.hddRead");
+
 	uint32_t offsetWithinBlock = offset % SFSBLOCKSIZE;
 
 	if ((size == 0) || ((offsetWithinBlock + size) > SFSBLOCKSIZE)) {
