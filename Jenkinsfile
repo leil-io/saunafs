@@ -5,8 +5,8 @@ pipeline {
         PROJECT_NAME = 'saunafs'
         DOCKER_INTERNAL_REGISTRY = "registry.ci.leil.io"
         DOCKER_INTERNAL_REGISTRY_URL= "https://${DOCKER_INTERNAL_REGISTRY}"
-        dockerImageSaunafs = 'registry.ci.leil.io/saunafs-test:dev-ubuntu-22.04-latest'
-        dockerImageSaunafsGanesha = 'registry.ci.leil.io/saunafs-test:dev-ganesha-ubuntu-22.04-latest'
+        dockerImageSaunafs = 'registry.ci.leil.io/saunafs-test:dev-ubuntu-24.04-latest'
+        dockerImageSaunafsGanesha = 'registry.ci.leil.io/saunafs-test:dev-ganesha-ubuntu-24.04-latest'
         dockerRegistrySecretId = 'private-docker-registry-credentials'
         nexusUrl = "http://192.168.50.208:8081"
     }
