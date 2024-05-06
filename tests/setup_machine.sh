@@ -289,6 +289,7 @@ fi
 if ! [[ -f /etc/sudoers.d/saunafstest ]] || \
 		! grep drop_caches /etc/sudoers.d/saunafstest >/dev/null; then
 	cat >/etc/sudoers.d/saunafstest <<-END
+		Defaults rlimit_core=default
 		ALL ALL = (saunafstest) NOPASSWD: ALL
 		ALL ALL = NOPASSWD: /usr/bin/pkill -9 -u saunafstest
 		ALL ALL = NOPASSWD: /bin/rm -rf /tmp/saunafs_error_dir

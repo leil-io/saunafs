@@ -94,20 +94,22 @@ unwrap_generators $1
 
 nice nice sudo -HEu saunafstest sh -c "chmod -Rf a+rwX ${ERROR_DIR}"
 for log_file in "$ERROR_DIR"/* ; do
-	log_file_name=$(basename "$log_file")
+	log_file_basename=$(basename "$log_file")
 	if [[ -s ${log_file} ]]; then
 		status=1
-		if [[ $log_file_name != syslog.log ]]; then
+		if [[ $log_file_basename != syslog.log ]]; then
 			# Do not inform users that there is nonempty syslog
 			# It is always nonempty if the test failed
-			echo "(FATAL) Errors in ${log_file_name}" | tee "${ERROR_FILE}" #error file lifetime is: all tests
+			echo "(FATAL) Errors in ${log_file_basename}" | tee "${ERROR_FILE}" #error file lifetime is: all tests
 			# print all non-binary files to stdout
-			if file --mime-encoding "${log_file_name}" | awk '{exit $2=="binary"}'; then
+			# awk will return 0 if it doesn't find binary, and 1 if
+			# it does, which is what we want for the return value
+			if file --mime-encoding "${log_file}" | awk '{exit $2=="binary"}'; then
 				cat "${log_file}"
 			fi
 		fi
 		if [[ $TEST_OUTPUT_DIR ]]; then
-			cp "${log_file}" "$TEST_OUTPUT_DIR/$(date '+%F_%T')__$(basename $1 .sh)__${log_file_name}"
+			cp "${log_file}" "$TEST_OUTPUT_DIR/$(date '+%F_%T')__$(basename $1 .sh)__${log_file_basename}"
 		fi
 	fi
 done
