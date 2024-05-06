@@ -1,0 +1,43 @@
+#
+# -modernize-use-trailing-return-type,
+# -modernize-use-nodiscard,
+# -modernize-avoid-bind,
+# -modernize-use-transparent-functors,
+# -modernize-use-bool-literals,
+# -modernize-use-uncaught-exceptions,
+# -modernize-use-noexcept,
+# -modernize-concat-nested-namespaces,
+# -modernize-deprecated-headers,
+# -modernize-raw-string-literal,
+# -modernize-replace-random-shuffle,
+# -modernize-use-nullptr,
+# -modernize-use-override,
+# -modernize-use-using,
+#
+# -cppcoreguidelines-pro-type-vararg,
+# -cppcoreguidelines-avoid-magic-numbers,
+# -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+# -readability-magic-numbers,
+# -misc-non-private-member-variables-in-classes,
+Checks: "-*,
+  bugprone-*,
+    -bugprone-easily-swappable-parameters,
+  cert-*,
+  -cert-err58-cpp
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  -google-*,
+  -llvm*,
+  misc-*,
+    -misc-non-private-member-variables-in-classes,
+  modernize-*,
+    -modernize-use-trailing-return-type,
+    -modernize-use-nodiscard,
+  performance-*,
+  portability-*,
+  readability-*,"
+
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+FormatStyle:     file
+
