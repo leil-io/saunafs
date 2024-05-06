@@ -1,0 +1,20 @@
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[*{.cc,h}]
+indent_style = tab
+indent_size = 4
+
+[{*.bash,*.sh,Dockerfile,Dockerfile.*,Makefile,*.mk}]
+indent_style = tab
+indent_size = 4
+space_redirects = true
+keep_padding = true
+
