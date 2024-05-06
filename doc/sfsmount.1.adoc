@@ -205,9 +205,13 @@ Equivalent to *--nostdopts* (*-n*) option for use in fstab.
 Equivalent to *--nonempty* option for use in fstab.
 
 *-o sfsignoreflush*::
-Advanced: use with caution. Ignore flush usual behavior by replying SUCCESS to it 
-immediately. Targets fast creation of small files, but may cause data loss 
+Advanced: use with caution. Ignore flush usual behavior by replying SUCCESS to it
+immediately. Targets fast creation of small files, but may cause data loss
 during crashes when allegedly flushed data is still being processed.
+
+*-o sfsdirectio=*'0|1'::
+Whether to use FUSE DirectIO. This may improve performance when reading large
+files under certain conditions.
 
 General mount options (see *mount*(8) manual):
 
