@@ -50,7 +50,7 @@
 #include "common/sfserr.h"
 
 int main(int argc, const char** argv) {
-	std::vector<const SaunaFsProbeCommand*> allCommands = {
+	std::vector<const SaunaFsAdminCommand*> allCommands = {
 			new ChunksHealthCommand(),
 			new InfoCommand(),
 			new IoLimitsStatusCommand(),

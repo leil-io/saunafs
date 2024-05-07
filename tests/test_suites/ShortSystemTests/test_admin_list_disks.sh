@@ -12,7 +12,7 @@ for goal in xor3 3; do
 	FILE_SIZE=60M file-generate dir_$goal/file
 done
 
-disks=$(saunafs-probe list-disks --porcelain localhost "${info[matocl]}")
+disks=$(saunafs-admin list-disks --porcelain localhost "${info[matocl]}")
 expect_equals 12 $(wc -l <<< "$disks")
 for i in {0..3}; do
 	cs_data="$(grep ":${info[chunkserver${i}_port]} " <<< "$disks")"

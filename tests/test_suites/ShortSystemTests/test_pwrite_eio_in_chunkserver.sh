@@ -27,7 +27,7 @@ FILE_SIZE=1M   assert_success file-generate test/big_{1..10}
 
 # Assert that exactly disks marked "pwrite_EIO" are marked as damaged
 sleep 1
-list=$(saunafs_probe_master list-disks)
+list=$(saunafs_admin_master_no_password list-disks)
 assert_equals 3 "$(wc -l <<< "$list")"
 assert_awk_finds_no '(/EIO/ && $4 != "yes") || (!/EIO/ && $4 != "no")' "$list"
 

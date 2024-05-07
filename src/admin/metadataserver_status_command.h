@@ -31,7 +31,7 @@ struct MetadataserverStatus {
 	uint64_t metadataVersion;
 };
 
-class MetadataserverStatusCommand : public SaunaFsProbeCommand {
+class MetadataserverStatusCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

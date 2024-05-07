@@ -12,7 +12,7 @@ for i in {1..5} ; do
 done
 
 # Test fresh metadata + changelogs
-latest_metadata_version=$(saunafs_probe_master metadataserver-status | cut -f3)
+latest_metadata_version=$(saunafs_admin_master_no_password metadataserver-status | cut -f3)
 on_disk_metadata_version=$(sfsmetarestore -g -d "${info[master_data_path]}")
 assert_equals "$latest_metadata_version" "$on_disk_metadata_version"
 
@@ -21,12 +21,12 @@ FILE_SIZE=1K assert_success file-generate "${info[mount0]}"/file_{6..10}_{1..10}
 # and don't save it
 
 # Test old metadata + changelogs
-latest_metadata_version=$(saunafs_probe_master metadataserver-status | cut -f3)
+latest_metadata_version=$(saunafs_admin_master_no_password metadataserver-status | cut -f3)
 saunafs_master_daemon kill
 on_disk_metadata_version=$(sfsmetarestore -g -d "${info[master_data_path]}")
 assert_equals "$latest_metadata_version" "$on_disk_metadata_version"
 assert_success saunafs_master_daemon start -o auto-recovery
-assert_equals "$(saunafs_probe_master metadataserver-status | cut -f3)" "$on_disk_metadata_version"
+assert_equals "$(saunafs_admin_master_no_password metadataserver-status | cut -f3)" "$on_disk_metadata_version"
 
 # Test broken changelogs fail
 rm "${info[mount0]}"/file_*
@@ -44,7 +44,7 @@ assert_equals "0" "$on_disk_metadata_version"
 mv "${info[master_data_path]}"/changelog.sfs.2.tmp "${info[master_data_path]}"/changelog.sfs.2
 on_disk_metadata_version=$(sfsmetarestore -g -d "${info[master_data_path]}")
 assert_success saunafs_master_daemon start -o auto-recovery
-assert_equals "$(saunafs_probe_master metadataserver-status | cut -f3)" "$on_disk_metadata_version"
+assert_equals "$(saunafs_admin_master_no_password metadataserver-status | cut -f3)" "$on_disk_metadata_version"
 
 # Test sfsmetarestore on clean installation
 assert_success saunafs_master_daemon kill

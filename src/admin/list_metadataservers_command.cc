@@ -41,7 +41,7 @@ void ListMetadataserversCommand::usage() const {
 	std::cerr << "    Prints status of active metadata servers" << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions ListMetadataserversCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListMetadataserversCommand::supportedOptions() const {
 	return { {kPorcelainMode, kPorcelainModeDescription} };
 }
 

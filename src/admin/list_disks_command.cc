@@ -183,7 +183,7 @@ std::string ListDisksCommand::name() const {
 	return "list-disks";
 }
 
-SaunaFsProbeCommand::SupportedOptions ListDisksCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListDisksCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{kVerboseMode,   "Be a little more verbose and show operations statistics."},
