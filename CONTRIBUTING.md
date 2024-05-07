@@ -1,10 +1,6 @@
 <!-- omit in toc -->
 # Contributing to SaunaFS
 
-***PLEASE NOTE: We cannot currently accept contributions from individuals who
-have not signed a copyright assignment agreement. See this
-[issue](https://github.com/leil-io/saunafs/issues/8) for more information***
-
 First off, thanks for taking the time to contribute!
 
 All types of contributions are encouraged and valued. See the [Table of
@@ -185,6 +181,21 @@ This is to to keep both the issue tracker and the pull requests clean and
 focused. Each release we will address the issues in this mega issue and include
 the fixes in one commit. We will credit all contributors in the commit message
 as co-authors.
+
+### Contributing code/PR's for a feature/bug fix
+
+There is no procedure currently for outside contributions, but we still
+encourage you to engage with us if you want to contribute code.
+
+Currently, the preferred ways to indicate you want to contribute code are (in
+order):
+* Commenting on a specific Github issue
+* [Slack](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog),
+* [Email](mailto:contact@saunafs.com?subject=RFI),
+
+Through this, we can also tell whether it's something we would also accept.
+
+If you get an OK from us, please read below for more details.
 
 ## Style guides
 
