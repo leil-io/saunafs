@@ -36,7 +36,7 @@ void MetadataserverStatusCommand::usage() const {
 	std::cerr << "    Prints status of a master or shadow master server" << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions MetadataserverStatusCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions MetadataserverStatusCommand::supportedOptions() const {
 	return { {kPorcelainMode, kPorcelainModeDescription} };
 }
 

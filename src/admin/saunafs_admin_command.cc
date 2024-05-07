@@ -21,7 +21,7 @@
 #include "common/platform.h"
 #include "admin/saunafs_admin_command.h"
 
-const std::string SaunaFsProbeCommand::kPorcelainMode = "--porcelain";
-const std::string SaunaFsProbeCommand::kPorcelainModeDescription =
+const std::string SaunaFsAdminCommand::kPorcelainMode = "--porcelain";
+const std::string SaunaFsAdminCommand::kPorcelainModeDescription =
 		"Make the output parsing-friendly.";
-const std::string SaunaFsProbeCommand::kVerboseMode = "--verbose";
+const std::string SaunaFsAdminCommand::kVerboseMode = "--verbose";

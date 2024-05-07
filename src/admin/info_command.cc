@@ -32,7 +32,7 @@ std::string InfoCommand::name() const {
 	return "info";
 }
 
-SaunaFsProbeCommand::SupportedOptions InfoCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions InfoCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 	};

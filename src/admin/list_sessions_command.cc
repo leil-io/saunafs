@@ -38,7 +38,7 @@ void ListSessionsCommand::usage() const {
 	std::cerr << "    Lists all currently open sessions\n";
 }
 
-SaunaFsProbeCommand::SupportedOptions ListSessionsCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListSessionsCommand::supportedOptions() const {
 	return {};
 }
 

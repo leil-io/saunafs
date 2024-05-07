@@ -37,7 +37,7 @@ void MagicRecalculateMetadataChecksumCommand::usage() const {
 	std::cerr << "    Authentication with the admin password is required." << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions MagicRecalculateMetadataChecksumCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions MagicRecalculateMetadataChecksumCommand::supportedOptions() const {
 	return { {"--async", "Don't wait for the task to finish."},
 	         {"--timeout=", "Operation timeout" }};
 }
