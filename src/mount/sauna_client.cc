@@ -211,6 +211,7 @@ static unsigned gDirEntryCacheMaxSize = 100000;
 
 static int debug_mode = 0;
 static int usedircache = 1;
+static bool ignore_flush = false;
 static int keep_cache = 0;
 static double direntry_cache_timeout = 0.1;
 static double entry_cache_timeout = 0.0;
@@ -2390,6 +2391,12 @@ BytesWritten write(Context &ctx, Inode ino, const char *buf, size_t size, off_t 
 }
 
 void flush(Context &ctx, Inode ino, FileInfo* fi) {
+	if (ignore_flush) {
+		oplog_printf(ctx, "flush (%lu): OK",
+				(unsigned long int)ino);
+		return;
+	}
+
 	finfo *fileinfo = reinterpret_cast<finfo*>(fi->fh);
 	int err;
 
@@ -3380,11 +3387,13 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 #ifdef _WIN32
 		, int mounting_uid_, int mounting_gid_
 #endif
+		, bool ignore_flush_
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
 #endif
+	ignore_flush = ignore_flush_;
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
 	direntry_cache_timeout = direntry_cache_timeout_;
@@ -3480,6 +3489,7 @@ void fs_init(FsInitParams &params) {
 #ifdef _WIN32
 		, params.mounting_uid, params.mounting_gid
 #endif
+		, params.ignore_flush
 		);
 }
 
