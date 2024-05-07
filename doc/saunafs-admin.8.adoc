@@ -9,6 +9,11 @@ saunafs-admin, saunafs-probe - SaunaFS monitoring and administration tool
 
 **saunafs-admin** __COMMAND__ [OPTIONS...] [ARGUMENTS...]
 
+== NOTES
+
+**saunafs-probe** is deprecated, saunafs-admin should be used instead.
+
+
 == Available COMMANDs
 
 *chunks-health* __<master ip> <master port>__:: Returns chunks health reports
@@ -147,6 +152,7 @@ chunks with number of copies specified in the label to replicate/delete. +
 
 Report bugs to the Github repository <https://github.com/leil/saunafs> as an
 issue
+
 
 == COPYRIGHT
 

@@ -25,7 +25,7 @@
 #include "admin/saunafs_admin_command.h"
 #include "common/server_connection.h"
 
-class ListDefectiveFilesCommand : public SaunaFsProbeCommand {
+class ListDefectiveFilesCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

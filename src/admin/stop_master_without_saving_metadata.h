@@ -25,7 +25,7 @@
 #include "common/server_connection.h"
 #include "admin/saunafs_admin_command.h"
 
-class MetadataserverStopWithoutSavingMetadataCommand : public SaunaFsProbeCommand {
+class MetadataserverStopWithoutSavingMetadataCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

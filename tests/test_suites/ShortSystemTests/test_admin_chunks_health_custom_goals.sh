@@ -18,12 +18,12 @@ for goal in $goals; do
 done
 
 function chunks-health-trimmed() {
-	saunafs-probe chunks-health --porcelain localhost "${info[matocl]}" \
+	saunafs-admin chunks-health --porcelain localhost "${info[matocl]}" \
 		| egrep -o "^... [234AB_]+ (0 )*[1-9]+" \
 		| tr "\n" "|" \
 		| sed 's/|$//'
 }
-# Check if the probe outputs proper values
+# Check if the admin outputs proper values
 first_output="AVA 2 1|AVA 3 1|AVA 4 1|REP 2 1|REP 3 0 1|REP 4 0 0 1|DEL 2 1|DEL 3 1|DEL 4 1"
 expect_equals "$first_output" "$(chunks-health-trimmed)"
 
@@ -39,7 +39,7 @@ output+=([AB_]="AVA AB_ 3|REP AB_ 0 3|DEL AB_ 3")
 output+=([BB_]="AVA BB_ 3|REP BB_ 0 0 3|DEL BB_ 0 3")
 output+=([B__]="AVA B__ 3|REP B__ 0 3|DEL B__ 3")
 
-# Check if the probe outputs proper values when we change
+# Check if the admin outputs proper values when we change
 # files goal back and forth
 for new_goal in "${!output[@]}"; do
 	MESSAGE="Testing goal ${new_goal}"

@@ -30,7 +30,7 @@
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(WrongUsageException, Exception);
 
-class SaunaFsProbeCommand {
+class SaunaFsAdminCommand {
 public:
 	typedef std::vector<std::pair<std::string, std::string>> SupportedOptions;
 
@@ -38,7 +38,7 @@ public:
 	static const std::string kPorcelainModeDescription;
 	static const std::string kVerboseMode;
 
-	virtual ~SaunaFsProbeCommand() {}
+	virtual ~SaunaFsAdminCommand() {}
 	virtual std::string name() const = 0;
 	virtual void usage() const = 0;
 	virtual SupportedOptions supportedOptions() const { return {}; }
