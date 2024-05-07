@@ -222,9 +222,9 @@ void usage(const char *progname) {
 "    -o enablefilelocks=0|1      enables/disables global file locking "
 				"(disabled by default)\n"
 "    -o nonempty                 allow mounts over non-empty file/dir\n"
-"    -o sfsignoreflush           DANGEROUS. Ignore flush usual behavior by "
-				"replying SUCCESS to it inmediately. Targets fast creation of "
-				"small files, but may cause data loss during crashes.\n"
+"    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
+				"behavior by replying SUCCESS to it immediately. Targets fast "
+				"creation of small files, but may cause data loss during crashes.\n"
 "\n",
 		SaunaClient::FsInitParams::kDefaultUseRwLock,
 		SaunaClient::FsInitParams::kDefaultMkdirCopySgid,

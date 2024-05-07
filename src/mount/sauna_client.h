@@ -78,11 +78,10 @@ struct FsInitParams {
 
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
+	static constexpr bool     kDefaultIgnoreFlush = false;
 #ifdef _WIN32
-	static constexpr bool     kDefaultSpecialWriteMode = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 #else
-	static constexpr bool     kDefaultIgnoreFlush = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
@@ -145,11 +144,9 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_write_mode(kDefaultSpecialWriteMode),
-#else
-	             ignore_flush(kDefaultIgnoreFlush),
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
-	             verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -179,11 +176,9 @@ struct FsInitParams {
 	             use_rw_lock(kDefaultUseRwLock),
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
-	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID), special_write_mode(kDefaultSpecialWriteMode),
-#else
-	             ignore_flush(kDefaultIgnoreFlush),
+	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
-	             verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
 	std::string bind_host;
@@ -233,11 +228,7 @@ struct FsInitParams {
 	int mounting_gid;
 #endif
 
-#ifdef _WIN32
-	bool special_write_mode;
-#else
 	bool ignore_flush;
-#endif
 	bool verbose;
 	bool direct_io;
 
@@ -341,7 +332,6 @@ struct RequestException : public std::exception {
 
 #ifdef _WIN32
 
-bool get_ignore_read();
 uint8_t get_session_flags();
 
 void update_last_winfsp_context(const unsigned int uid, const unsigned int gid);
