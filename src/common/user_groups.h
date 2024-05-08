@@ -26,6 +26,7 @@
 namespace user_groups {
 
 constexpr std::uint32_t kSecondaryGroupsBit = (std::uint32_t)1 << 31;
+constexpr std::uint64_t kPrimaryGroupPosition = 0;
 
 constexpr bool isGroupCacheId(std::uint32_t groupsId) noexcept {
   return static_cast<bool>(groupsId & kSecondaryGroupsBit);
