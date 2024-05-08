@@ -1,12 +1,13 @@
 # INSTALL - SaunaFS
 
 You can install SaunaFS from pre-built packages or from source. The
-pre-built packages are available for the following platforms:
+pre-built packages are currently available for the following platforms:
 
 - Linux (x86_64)
-  - [Ubuntu 24.04 (Noble)](#ubuntu-2404-noble)
+  - [Ubuntu 24.04 (Noble)](#ubuntu)
+  - [Ubuntu 22.04 (Jammy)](#ubuntu)
 
-Please, follow the instructions below to install SaunaFS on your
+Please follow the instructions below to install SaunaFS on your
 system.
 
 ## Installing from pre-built packages
@@ -35,12 +36,23 @@ system.
 
 2. Add the SaunaFS repository to your system:
 
-   The repository is available at <https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/>. You can
-   either add it to your system manually or use the following command:
+   The repository is available at
+   <https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/> for Ubuntu 24.04
+   or <https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/> for Ubuntu 22.04.
+
+   For Ubuntu 24.04, use:
 
    ```shell
    cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
-   deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/ jammy main
+   deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/ noble main
+   EOF
+   ```
+
+   For Ubuntu 22.04:
+
+   ```shell
+   cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
+   deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/ jammy main
    EOF
    ```
 
