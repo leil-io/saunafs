@@ -128,65 +128,14 @@ pipeline {
                 }
             }
         }
-        stage('Package') {
-            when {
-                beforeAgent true
-                expression { env.BRANCH_NAME ==~ /(main|dev|PR-.*)/ }
-            }
-            agent {
-                docker {
-                    label 'docker'
-                    image env.dockerImageSaunafs
-                    registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
-                    registryCredentialsId env.dockerRegistrySecretId
-                    args  '--security-opt seccomp=unconfined'
-                }
-            }
-            steps {
-                cleanAndClone()
-                script {
-                    sh "./package.sh"
-                    stash allowEmpty: false, name: 'bundle', includes: "*bundle*.tar"
-                    archiveArtifacts artifacts: '*bundle*.tar', followSymlinks: false
-                }
-            }
-        }
         stage('Delivery') {
             when {
                 beforeAgent true
                 expression { env.BRANCH_NAME ==~ /(main|dev)/ }
             }
-            agent {
-                docker {
-                    label 'docker'
-                    image "ictus4u/ssh-courier:1.1.1"
-                }
-            }
             steps {
                 cleanAndClone()
-                script {
-                    unstash 'bundle'
-                    withCredentials([usernamePassword(credentialsId: 'nexus-deployment-credentials', passwordVariable: 'nexusDeploymentPassword', usernameVariable: 'nexusDeploymentUsername')]) {
-                        withEnv([
-                            "NEXUS_USERNAME=${nexusDeploymentUsername}",
-                            "NEXUS_PASSWORD=${nexusDeploymentPassword}",
-                            "NEXUS_URL=${env.nexusUrl}"
-                        ]) {
-                            sh '''
-                                bundle_name=$(ls -1t *bundle*.tar | head -1)
-                                nexusRepoName="${PROJECT_NAME}-$(echo "${bundle_name}" | cut -d- -f3-4)"
-                                if [ "${BRANCH_NAME}" != "main" ]; then
-                                    nexusRepoName="${nexusRepoName}-${BRANCH_NAME}"
-                                fi
-                                tar -vxf ${bundle_name}
-                                bundle_dir=$(basename ${bundle_name} .tar)
-                                NEXUS_REPO_NAME=${nexusRepoName} \
-                                    bash -x tests/ci_build/run-delivery-nexus-deb.sh \
-                                        ${bundle_dir}
-                            '''
-                        }
-                    }
-                }
+                build job: 'saunafs_deliver', parameters: [string(name: 'BRANCH_NAME', value: env.BRANCH_NAME)]
             }
         }
     }
