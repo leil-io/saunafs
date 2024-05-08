@@ -2,8 +2,8 @@
 
 #include "common/platform.h"
 
-#include <boost/asio.hpp>
 #include <boost/array.hpp>
+#include <boost/asio.hpp>
 
 /*! \brief Implementation of modified Raft consensus algorithm.
  *
