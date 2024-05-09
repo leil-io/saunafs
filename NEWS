@@ -1,6 +1,23 @@
 This file lists noteworthy changes in SaunaFS.
 
- * SaunaFS (4.0.1) (2024-02-28)
+ * SaunaFS (4.1.0) (2024-05-09)
+ - (master) Improve master startup time by allowing parallel metadata loading
+ - (mount) Add `sfsdirectio` mount option
+   Previously you had to edit .saunafs_tweaks file.
+ - (mount) Fix undefined behavior in client
+   Could cause a deadlock when reconnecting after a session was lost.
+ - (mount) Fix wrong GID being shown in .oplog
+ - (mount) Improve DirEntryCache behaviour by caching getattr/lookup operations
+ - (admin) Add `--help option` in saunafs-admin
+ - (admin) Add `--defaults` option for `dump-config` in saunafs-admin
+ - (cgi) Update saunafs-cgi.
+ - (all) Add support for Ubuntu 24.04
+ - (all) Fix compilation issues on GCC 13
+ - (all) Various bug fixes, especially regarding tests
+ - (windows) Support compiling common and client library
+ - (windows) Improve behavior for Windows client
+
+ * SaunaFS (4.0.1) (2024-03-01)
  - (docs) Fix README.md and CONTRIBUTING.md links.
 
  * SaunaFS (4.0.0) (2024-02-28)
