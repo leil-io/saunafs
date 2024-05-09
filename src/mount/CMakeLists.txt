@@ -28,3 +28,7 @@ link_unittest(mount mount sfscommon)
 if (ENABLE_CLIENT_LIB)
   add_subdirectory(client)
 endif()
+
+if(MINGW)
+  add_subdirectory(windows)
+endif()

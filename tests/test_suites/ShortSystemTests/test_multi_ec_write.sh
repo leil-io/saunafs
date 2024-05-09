@@ -33,16 +33,25 @@ cd ${info[mount0]}
 # Produce first version chunks
 dd if=/dev/zero of=file bs=1k count=5k
 saunafs setgoal ec4_1 file
+
+wait_if_windows
+
 while (( $(saunafs fileinfo file | grep -c copy) < 6 )); do # 1 [goal1] + 5 [ec4_1]
 	sleep 1
 done
 saunafs setgoal ec5_4 file
+
+wait_if_windows
+
 while (( $(saunafs fileinfo file | grep -c copy) < 15 )); do # 1 [goal1] + 5 [ec4_1] + 9 [ec5_4]
 	sleep 1
 done
 sleep 2
 # Overwrite the file
 file-overwrite file
+
+wait_if_windows
+
 # Stop all chunkservers
 for_chunkservers stop {0..14}
 

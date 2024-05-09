@@ -45,3 +45,9 @@ expect_equals $mounts $(grep "${mount_config_value//=/: }" <<< "$config" | wc -l
 config=$(saunafs-admin dump-config localhost "$shadow_port" <<< "$password")
 printf "${config}\n"
 expect_equals 1 $(grep "${master_config_value// = /: }" <<< "${config}" | wc -l)
+
+# Test defaults dump
+config=$(saunafs-admin dump-config --defaults localhost "$master_port" <<< "$password")
+printf "${config}\n"
+expect_equals 1 $(grep "GLOBALIOLIMITS_RENEGOTIATION_PERIOD_SECONDS: 0.1" <<< "${config}" | wc -l)
+expect_equals 5 $(grep "REPLICATION_BANDWIDTH_LIMIT_KBPS: 0" <<< "${config}" | wc -l)

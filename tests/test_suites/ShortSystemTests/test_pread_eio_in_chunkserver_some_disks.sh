@@ -1,4 +1,8 @@
-timeout_set '45 seconds'
+if is_windows_system; then
+	timeout_set '2 minutes'
+else
+	timeout_set '45 seconds'
+fi
 
 # Create an installation with 2 chunkservers, 3 disks each.
 # Two out of three disks in CS 0 will fail during the test.
@@ -29,9 +33,9 @@ FILE_SIZE=300K file-generate goal{1..2}/medium_{1..10}
 FILE_SIZE=5M   file-generate goal{1..2}/big_{1..10}
 
 # Count chunks in the system. Expect that each chunk has one copy on CS0 and one copy on CS1.
-chunks=$(saunafs_probe_master info | awk '{print $12}')
+chunks=$(saunafs_probe_master info | awk '{print $13}')
 assert_equals 60 $chunks
-assert_equals 90 $(saunafs_probe_master info | awk '{print $13}')
+assert_equals 90 $(saunafs_probe_master info | awk '{print $14}')
 assert_less_than 30 "$(find_chunkserver_metadata_chunks 0 | wc -l)"
 assert_less_than 30 "$(find_chunkserver_metadata_chunks 1 | wc -l)"
 

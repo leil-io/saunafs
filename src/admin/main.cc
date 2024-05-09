@@ -97,7 +97,7 @@ int main(int argc, const char** argv) {
 				}
 			}
 		}
-		if (command_name == "help" || command_name == "-h") {
+		if (command_name == "help" || command_name == "-h" || command_name == "--help") {
 			command_name.clear();
 		}
 		throw WrongUsageException("Unknown command " + command_name

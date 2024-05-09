@@ -72,6 +72,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfssugidclearmode=%s", sugidclearmodestr, 0),
 	SFS_OPT("sfsattrcacheto=%lf", attrcacheto, 0),
 	SFS_OPT("sfsentrycacheto=%lf", entrycacheto, 0),
+	SFS_OPT("sfsdirectio=%d", directio, 0),
 	SFS_OPT("sfsdirentrycacheto=%lf", direntrycacheto, 0),
 	SFS_OPT("sfsaclcacheto=%lf", aclcacheto, 0),
 	SFS_OPT("sfsreportreservedperiod=%u", reportreservedperiod, 0),
@@ -115,11 +116,6 @@ void usage(const char *progname) {
 
 	printf("general options:\n");
 	fuse_cmdline_help();
-printf(
-"    -o opt,[opt...]         mount options\n"
-"    -h   --help             print help\n"
-"    -V   --version          print version\n"
-"\n");
 
 	printf(
 "SFS options:\n"
@@ -157,6 +153,7 @@ printf(
 				"(default: %.2f)\n"
 "    -o sfsentrycacheto=SEC      set file entry cache timeout in seconds "
 				"(default: %.2f)\n"
+"    -o sfsdirectio=0|1          set DirectIO mode (default: 0)\n"
 "    -o sfsdirentrycacheto=SEC   set directory entry cache timeout in seconds "
 				"(default: %.2f)\n"
 "    -o sfsdirentrycachesize=N   define directory entry cache size in number "

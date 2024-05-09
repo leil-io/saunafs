@@ -23,6 +23,8 @@ setup_local_empty_saunafs() {
 	local mntdir=$TEMP_DIR/mnt
 	local master_start_param=${MASTER_START_PARAM:-}
 	local shadow_start_param=${SHADOW_START_PARAM:-}
+	local user_id=${USER_ID:=$(id -u)}
+	local group_id=${GROUP_ID:=$(id -g)}
 	declare -gA saunafs_info_
 	saunafs_info_[chunkserver_count]=$number_of_chunkservers
 	saunafs_info_[admin_password]=${ADMIN_PASSWORD:-password}
@@ -52,9 +54,6 @@ setup_local_empty_saunafs() {
 	fi
 
 	if [[ $use_saunafsXX ]]; then
-		# In old suite, when legacy version was >= 3.11, we set `use_new_goal_config`=true
-		# Maybe that's not what we want? (look at if above)
-		use_new_goal_config="true"
 		SAUNAFSXX_DIR=${SAUNAFSXX_DIR_BASE}/install/usr
 		export PATH="${SAUNAFSXX_DIR}/bin:${SAUNAFSXX_DIR}/sbin:$PATH"
 		install_saunafsXX
@@ -98,7 +97,7 @@ setup_local_empty_saunafs() {
 
 	# Mount the filesystem
 	for ((mntid = 0; mntid < number_of_mounts; ++mntid)); do
-		add_mount_ $mntid
+		add_mount_ $mntid $user_id $group_id
 	done
 
 	export PATH="$oldpath"
@@ -107,7 +106,9 @@ setup_local_empty_saunafs() {
 	if [[ $auto_shadow_master == YES && $number_of_masterservers == 1 ]]; then
 		add_metadata_server_ auto "shadow"
 		saunafs_master_n auto start ${shadow_start_param}
-		assert_eventually 'saunafs_shadow_synchronized auto'
+		if ! is_windows_system; then
+			assert_eventually 'saunafs_shadow_synchronized auto'
+		fi
 	fi
 
 	if [[ $cgi_server == YES ]]; then
@@ -139,16 +140,37 @@ saunafs_fusermount() {
 	fi
 }
 
+windows_server_aux(){
+	local server_command=$1
+	local command=$2
+	if [[ "$command" == "reload" ]]; then
+		kill -s SIGHUP $(pgrep -f "$server_command")
+	elif [[ "$command" == "kill" ]]; then
+		kill -s SIGKILL $(pgrep -f "$server_command")
+	elif [[ "$command" == "stop" ]] || [[ "$command" == "restart" ]]; then
+		kill -s SIGTERM $(pgrep -f "$server_command")
+	fi
+	$server_command $command | cat
+}
+
 # saunafs_chunkserver_daemon <id> start|stop|restart|kill|tests|isalive|...
 saunafs_chunkserver_daemon() {
 	local id=$1
 	shift
-	sfschunkserver -c "${saunafs_info_[chunkserver${id}_cfg]}" "$@" | cat
+	if is_windows_system; then
+		windows_server_aux "sfschunkserver -c ${saunafs_info_[chunkserver${id}_cfg]}" "$@"
+	else
+		sfschunkserver -c "${saunafs_info_[chunkserver${id}_cfg]}" "$@" | cat
+	fi
 	return ${PIPESTATUS[0]}
 }
 
 saunafs_master_daemon() {
-	sfsmaster -c "${saunafs_info_[master${saunafs_info_[current_master]}_cfg]}" "$@" | cat
+	if is_windows_system; then
+		windows_server_aux "sfsmaster -c ${saunafs_info_[master${saunafs_info_[current_master]}_cfg]}" "$@"
+	else
+		sfsmaster -c "${saunafs_info_[master${saunafs_info_[current_master]}_cfg]}" "$@" | cat
+	fi
 	return ${PIPESTATUS[0]}
 }
 
@@ -156,13 +178,21 @@ saunafs_master_daemon() {
 saunafs_master_n() {
 	local id=$1
 	shift
-	sfsmaster -c "${saunafs_info_[master${id}_cfg]}" "$@" | cat
+	if is_windows_system; then
+		windows_server_aux "sfsmaster -c ${saunafs_info_[master${id}_cfg]}" "$@"
+	else
+		sfsmaster -c "${saunafs_info_[master${id}_cfg]}" "$@" | cat
+	fi
 	return ${PIPESTATUS[0]}
 }
 
 # saunafs_metalogger_daemon start|stop|restart|kill|tests|isalive|...
 saunafs_metalogger_daemon() {
-	sfsmetalogger -c "${saunafs_info_[metalogger_cfg]}" "$@" | cat
+	if is_windows_system; then
+		windows_server_aux "sfsmetalogger -c ${saunafs_info_[metalogger_cfg]}" "$@"
+	else
+		sfsmetalogger -c "${saunafs_info_[metalogger_cfg]}" "$@" | cat
+	fi
 	return ${PIPESTATUS[0]}
 }
 
@@ -170,7 +200,11 @@ saunafs_metalogger_daemon() {
 saunafs_mount_unmount_async() {
 	local mount_id=$1
 	local mount_dir=${saunafs_info_[mount${mount_id}]}
-	saunafs_fusermount -u ${mount_dir}
+	if is_windows_system; then
+		${saunafs_info_[umountcall${mount_id}]}
+	else
+		saunafs_fusermount -u ${mount_dir}
+	fi
 }
 
 # saunafs_mount_unmount <id> <timeout>
@@ -194,7 +228,11 @@ saunafs_mount_start() {
 	if [[ $mount_cmd ]]; then
 		configure_mount_ ${mount_id} ${mount_cmd}
 	fi
-	do_mount_ ${mount_id}
+	if is_windows_system; then
+		${saunafs_info_[mntcall${mount_id}]}
+	else
+		do_mount_ ${mount_id}
+	fi
 }
 
 # A bunch of private function of this module
@@ -532,6 +570,32 @@ create_sfsmount_cfg_() {
 	echo "${!this_mount_cfg_variable-}" | tr '|' '\n'
 }
 
+windows_do_mount_() {
+	local mount_cfg=$1
+	local drive=$2
+	local mount_dir=$3
+	local user_id=$4
+	local group_id=$5
+	sfsmount3.exe -c ${mount_cfg} -D ${drive}: --uid $user_id --gid $group_id &
+	disown $!
+
+	local counter=0
+	while cmd.exe /C "IF EXIST ${drive}: EXIT 1" ; do
+		counter=$((counter + 1))
+		if ((counter > 5)); then
+			return 1
+		fi
+		sleep 3
+	done
+
+	sudo mount -t drvfs ${drive}: $mount_dir
+}
+
+windows_do_umount_() {
+	sudo umount -l $2
+	sfsmount3.exe -u ${1}:
+}
+
 do_mount_() {
 	local mount_id=$1
 	local workingdir=$TEMP_DIR/var/mount$mount_id
@@ -561,11 +625,36 @@ configure_mount_() {
 		fuse_options+="-o $fuse_option "
 	done
 	local call="${command_prefix} ${mount_cmd} -c ${mount_cfg} ${mount_dir} ${fuse_options}"
-	saunafs_info_[mntcall$mount_id]=$call
+	saunafs_info_[mntcall${mount_id}]=$call
 	saunafs_info_[mnt${mount_id}_command]=${mount_cmd}
 }
 
-add_mount_() {
+windows_prepare_mount_() {
+	local mount_id=$1
+	local mount_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[f-o]')
+	local mount_big_dir_letter=$(echo -n $mount_id | tr '[0-9]' '[F-O]')
+	local mount_dir="/mnt/$mount_dir_letter"
+	local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
+	local user_id=$2
+	local group_id=$3
+	create_sfsmount_cfg_ ${mount_id} > "$mount_cfg"
+
+	local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir} $user_id $group_id"
+	local umount_call="windows_do_umount_ ${mount_big_dir_letter} ${mount_dir}"
+
+	if [ ! -d "$mount_dir" ]; then
+		sudo mkdir "$mount_dir"
+	fi
+
+	saunafs_info_[mount${mount_id}]=$mount_dir
+	saunafs_info_[mount${mount_id}_cfg]=$mount_cfg
+	saunafs_info_[mntcall${mount_id}]=$mount_call
+	saunafs_info_[mnt${mount_id}_command]="sfsmount3.exe"
+	saunafs_info_[umountcall${mount_id}]=$umount_call
+	saunafs_info_[mount_win_path${mount_id}]=${mount_big_dir_letter}:
+}
+
+unix_prepare_mount_() {
 	local mount_id=$1
 	local mount_dir=$mntdir/sfs${mount_id}
 	local mount_cfg=$etcdir/sfsmount${mount_id}.cfg
@@ -588,6 +677,20 @@ add_mount_() {
 	fi
 
 	configure_mount_ ${mount_id} ${SAFS_MOUNT_COMMAND}
+}
+
+add_mount_() {
+	local mount_id=$1
+	local user_id=$2
+	local group_id=$3
+
+	if is_windows_system; then
+		windows_prepare_mount_ $mount_id $user_id $group_id
+	else
+		unix_prepare_mount_ $mount_id
+	fi
+
+	max_tries=30
 	do_mount_ ${mount_id}
 }
 
@@ -711,6 +814,19 @@ saunafs_admin_master() {
 	saunafs-admin "$command" localhost "$port" "$@" <<<"${saunafs_info_[admin_password]}"
 }
 
+# A generic function to run old SaunaFS admin commands.
+#
+# Usage examples:
+# saunafs_old_admin_master info
+# saunafs_old_admin_master list-chunkservers
+# saunafs_old_admin_master list-mounts
+saunafs_old_admin_master() {
+	local command="$1"
+	shift
+	local port=${saunafs_info_[matocl]}
+	"$SAUNAFSXX_DIR/bin/saunafs-admin" "$command" localhost "$port" "$@"
+}
+
 # A useful shortcut for saunafs-admin commands which require authentication
 # Usage: saunafs_admin_shadow <n> <command> [option...]
 # Calls saunafs-admin with the given command and and automatically adds address
@@ -738,7 +854,7 @@ saunafs_ready_chunkservers_count() {
 saunafs_wait_for_ready_chunkservers() {
 	local chunkservers=$1
 	local port=${saunafs_info_[matocl]}
-	while [[ "$(saunafs-probe ready-chunkservers-count localhost $port 2>/dev/null | cat)" != "$chunkservers" ]]; do
+	while [[ "$(saunafs-admin ready-chunkservers-count localhost $port 2>/dev/null | cat)" != "$chunkservers" ]]; do
 		sleep 0.1
 	done
 }

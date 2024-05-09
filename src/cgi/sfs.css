@@ -25,9 +25,9 @@ body {
 	bottom:0;
 	right:0;
 	overflow:auto;
-	background:#010101;
+	background:#EFF2F6;
 	padding:15px 2px 15px 2px;
-	color:#fff;
+	color:#000;
 	text-align:center;
 }
 
@@ -43,7 +43,7 @@ body {
 	width:100%;
 	height:54px;
 	overflow:hidden;
-	background:#1a202c;
+	background:#374151;
 	color:#FFF
 }
 * html #header {height:54px;}
@@ -56,7 +56,7 @@ body {
 	height:19px;
 	overflow:hidden;
 	padding:0;
-	background:#1a202c;
+	background:#374151;
 	border: none;
 	color:#FFF;
 	display: flex;
@@ -90,29 +90,29 @@ a:link {color: #fff;}
 a:active {color: #fff;}
 a:visited {color: #fff;}
 
-a.VISIBLELINK {color: #1a202c;}
+a.VISIBLELINK {color: #64bc46;}
 
-span.DELETEREADY {color: #999;}
-span.DELETEPENDING {color: #b972e8;}
-span.OVERGOAL {color: #9393fb;}
-span.NORMAL {color: #4fc34f;}
-span.UNDERGOAL {color: #EA0;}
-span.ENDANGERED {color: #e0711b;}
-span.MISSING {color: #f9373f;}
+span.DELETEREADY {color: #7e7b7b;}
+span.DELETEPENDING {color: #9110e6;}
+span.OVERGOAL {color: #2727c7;}
+span.NORMAL {color: #007600;}
+span.UNDERGOAL {color: #e08500;}
+span.ENDANGERED {color: #795548;}
+span.MISSING {color: #ca0000;}
 
-span.DELETEREADYBOX {background: #999; width:8px; height:8px; display: inline-block;}
-span.DELETEPENDINGBOX {background: #b972e8; width:8px; height:8px; display: inline-block;}
-span.OVERGOALBOX {background: #9393fb; width:8px; height:8px; display: inline-block;}
-span.NORMALBOX {background: #4fc34f; width:8px; height:8px; display: inline-block;}
-span.UNDERGOALBOX {background: #EA0; width:8px; height:8px; display: inline-block;}
-span.ENDANGEREDBOX {background: #e0711b; width:8px; height:8px; display: inline-block;}
-span.MISSINGBOX {background:#f9373f; width:8px; height:8px; display: inline-block;}
+span.DELETEREADYBOX {background: #7e7b7b; width:8px; height:8px; display: inline-block;}
+span.DELETEPENDINGBOX {background: #9110e6; width:8px; height:8px; display: inline-block;}
+span.OVERGOALBOX {background: #2727c7; width:8px; height:8px; display: inline-block;}
+span.NORMALBOX {background: #007600; width:8px; height:8px; display: inline-block;}
+span.UNDERGOALBOX {background: #e08500; width:8px; height:8px; display: inline-block;}
+span.ENDANGEREDBOX {background: #795548; width:8px; height:8px; display: inline-block;}
+span.MISSINGBOX {background:#ca0000; width:8px; height:8px; display: inline-block;}
 
-span.NOTEXCEEDED {color: #4fc34f;}
-span.EXCEEDED {color: #f9373f;}
-span.SEXCEEDED {color: #E80;}
+span.NOTEXCEEDED {color: #007600;}
+span.EXCEEDED {color: #ca0000;}
+span.SEXCEEDED {color: #e08500;}
 
-span.DISCONNECTED {color: #f9373f;}
+span.DISCONNECTED {color: #ca0000;}
 
 table {border: 1px solid black; border-spacing: 0px; border-collapse:collapse;}
 td {white-space:nowrap; border: 1px solid black; border-spacing: 0px; border-collapse:collapse; font-family: sans-serif; font-size: 12px;}
@@ -128,20 +128,20 @@ table.MENU a:link {color:#FFF; text-decoration:none;}
 table.MENU a:active {color:#FFF; text-decoration:none;}
 table.MENU a:visited {color:#FFF; text-decoration:none;}
 table.MENU td {padding: 8px; font-family: sans-serif; font-size: 16px; text-align:center; white-space: nowrap; color:#FFF}
-table.MENU td.UU {background-color: #295b18;}
-table.MENU td.SU {background-color: #295b18;}
-table.MENU td.US {background-color: #4fa431;}
-table.MENU td.SS {background-color: #4fa431;}
-table.MENU td.LUU {background-color: #295b18;}
-table.MENU td.LSU {background-color: #295b18;}
-table.MENU td.LUS {background-color: #4fa431;}
-table.MENU td.LSS {background-color: #295b18;}
+table.MENU td.UU {background-color: #008028;}
+table.MENU td.SU {background-color: #008028;}
+table.MENU td.US {background-color: #64bc46;}
+table.MENU td.SS {background-color: #64bc46;}
+table.MENU td.LUU {background-color: #008028;}
+table.MENU td.LSU {background-color: #008028;}
+table.MENU td.LUS {background-color: #64bc46;}
+table.MENU td.LSS {background-color: #008028;}
 
 table.FR {width: 1010px; margin-left:auto; margin-right:auto;}
-table.FR td, table.FR tr.C1 td {background-color: #3c5148;}
-table.FR tr.C2 td {background-color: #3c5148;}
-table.FR tr:first-child th {background-color: #1b2727; color: #fff}
-table.FR th {background-color: #708c66; color: #fff}
+table.FR td, table.FR tr.C1 td {background-color: #e2e2e2;}
+table.FR tr.C2 td {background-color: #e2e2e2;}
+table.FR tr:first-child th {background-color: #008028; color: #fff}
+table.FR th {background-color: #6a6a6a; color: #fff}
 table.FR th.SMPROGBAR {width: 102px;}
 table.FR th.PROGBAR {width: 202px;}
 table.FR th.PERC4 {width: 4%;}
@@ -151,20 +151,20 @@ table.FR th.PERC20 {width: 20%;}
 table.FR th.PERC88 {width: 88%;}
 table.FR th.PERC96 {width: 96%;}
 table.FR .LEFT {text-align: left; padding-left: 7px}
-table.FR td.REL {background-color: #D0D0F0;}
-table.FR td.PR {background-color: #7878B8;}
+table.FR td.REL {background-color: #008028;}
+table.FR td.PR {background-color: #64bc46;}
 
 table.CR {width: 1010px; margin-left:auto; margin-right:auto;}
-table.CR td, table.CR tr.C1 td {background-color: #43523e;}
-table.CR tr.C2 td {background-color: #E0E0E0;}
-table.CR tr.C3 td {background-color: #D0D0D0;}
-table.CR tr.C4 td {background-color: #D8D8D8;}
-table.CR tr:first-child th {background-color: #1b2727;}
-table.CR th {background-color: #4f6159; color: #fff}
+table.CR td, table.CR tr.C1 td {background-color: #e2e2e2;}
+table.CR tr.C2 td {background-color: #e2e2e2;}
+table.CR tr.C3 td {background-color: #e2e2e2;}
+table.CR tr.C4 td {background-color: #e2e2e2;}
+table.CR tr:first-child th {background-color: #008028;}
+table.CR th {background-color: #6a6a6a; color: #fff}
 
 table.CR > tbody > tr:nth-child(even):hover > td,
 table.CR > tbody > tr:nth-child(even):hover + tr > td,
-table.FR > tbody > tr:hover > td { background-color: #6b8e4e; }
+table.FR > tbody > tr:hover > td { background-color: #afbaac; }
 
 table.BOTMENU {width: 1000px; margin-left:auto; margin-right:auto;}
 

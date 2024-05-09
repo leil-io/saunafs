@@ -3,10 +3,20 @@ set -eux -o pipefail
 PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
 WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
 die() { echo "Error: $*" >&2; exit 1; }
+test_extra_args=()
+if [ -n "${1:-}" ]; then
+	test_extra_args+=("--gtest_filter=${1}")
+	shift 1
+else
+	test_extra_args+=("--gtest_filter=SanityChecks.*")
+fi
 
-test_filter="${1:-}"
-[ -n "${test_filter}" ] || test_filter="SanityChecks.*"
-echo "test_filter: ${test_filter}"
+while [ -n "${1:-}" ]; do
+	test_extra_args+=("${1}")
+	shift 1
+done
+
+echo "test_extra_args: ${test_extra_args[*]}"
 
 export SAUNAFS_ROOT=${WORKSPACE}/install/saunafs
 echo "SAUNAFS_ROOT: ${SAUNAFS_ROOT}"
@@ -23,4 +33,4 @@ rm -rf /mnt/ramdisk/* || true
 export PATH="${SAUNAFS_ROOT}/bin:${PATH}"
 sudo sed -E -i '\,.*:\s+\$\{SAUNAFS_ROOT\s*:=.*,d' /etc/saunafs_tests.conf || true
 echo ": \${SAUNAFS_ROOT:=${SAUNAFS_ROOT}}" | sudo tee -a /etc/saunafs_tests.conf >/dev/null || true
-sudo "${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes --gtest_filter="${test_filter}"  --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml"
+sudo "${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml" "${test_extra_args[@]}"

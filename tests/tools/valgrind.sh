@@ -1,5 +1,6 @@
 # Not enabled yet.
 valgrind_enabled_=
+valgrind_tool_="memcheck"
 
 # A script which runs valgrind. Its file name will be generated in valgrind_enable
 valgrind_script_=
@@ -8,8 +9,45 @@ valgrind_enabled() {
 	test -z $valgrind_enabled_ && return 1 || return 0
 }
 
+getMemcheckOptions() {
+	local options=""
+
+	options+=" --leak-check=full"
+
+	# New ( >= 3.9) versions of valgrind support some nice heuristics which remove
+	# a couple of false positives (eg. leak reports when there is a reachable std::string).
+	# Use the heuristics if available.
+	if valgrind --leak-check-heuristics=all true &>/dev/null; then
+		options+=" --leak-check-heuristics=all"
+	fi
+
+	echo $options
+}
+
+getHelgrindOptions() {
+	local options=""
+
+	options+=" --ignore-thread-creation=no"
+	options+=" --track-lockorders=yes"
+	options+=" --read-var-info=no"
+	# Possible values: full, approx, none
+	options+=" --history-level=none"
+	options+=" --delta-stacktrace=yes"
+	options+=" --free-is-write=yes"
+	options+=" --cmp-race-err-addrs=yes"
+	options+=" --check-stack-refs=yes"
+
+	echo $options
+}
+
 # Enables valgrind, can be called at the beginning of a test case.
 valgrind_enable() {
+	if [[ $# -gt 1 ]]; then
+		echo " --- Error: valgrind_enable accepts at most one argument --- "
+		echo " --- valgrind won't be enabled --- "
+		return 1
+	fi
+
 	assert_program_installed valgrind
 	valgrind_version=$(valgrind --version | cut -d'-' -f 2)
 	if ! version_compare_gte "$valgrind_version" "3.15.0" ; then
@@ -17,19 +55,31 @@ valgrind_enable() {
 		echo " --- valgrind won't be enabled --- "
 		return 1
 	fi
+
+	# If one argument was provided, then it must be memcheck or helgrind
+	if [[ $# -eq 1 ]]; then
+		if [[ $1 == "memcheck" || $1 == "helgrind" ]]; then
+			valgrind_tool_="$1"
+		else
+			echo " --- Error: valgrind tool must be memcheck or helgrind --- "
+			echo " --- valgrind won't be enabled --- "
+			return 1
+		fi
+	fi
+
 	if [[ -z $valgrind_enabled_ ]]; then
 		valgrind_enabled_=1
 
-		# Build a valgrind invocation which will properly run memcheck.
-		local valgrind_command="valgrind -q --tool=memcheck --leak-check=full`
-				` --suppressions=$SOURCE_DIR/tests/tools/valgrind.supp"
+		valgrind_command="valgrind -q --tool=${valgrind_tool_} ";
 
-		# New ( >= 3.9) versions of valgrind support some nice heuristics which remove
-		# a couple of false positives (eg. leak reports when there is a reachable std::string).
-		# Use the heuristics if available.
-		if valgrind --leak-check-heuristics=all true &>/dev/null; then
-			valgrind_command+=" --leak-check-heuristics=all"
+		if [[ $valgrind_tool_ == "memcheck" ]]; then
+			valgrind_command+="$(getMemcheckOptions)"
+		else
+			valgrind_command+="$(getHelgrindOptions)"
 		fi
+
+		# Supressions files for known false positives
+		valgrind_command+=" --suppressions=$SOURCE_DIR/tests/tools/valgrind-${valgrind_tool_}.supp"
 
 		# Valgrind error messages will be written here.
 		valgrind_command+=" --log-file=${ERROR_DIR}/valgrind__\${1}_%p.log"
@@ -52,21 +102,21 @@ valgrind_enable() {
 	fi
 }
 
-# Terminate valgrind processes to get complete memcheck logs from them
+# Terminate valgrind processes to get complete valgrind logs from them
 valgrind_terminate() {
-	# Disable starting new memcheck processes
+	# Disable starting new valgrind processes
 	local tmpfile="$TEMP_DIR/$(unique_file)_fake_valgrind.txt"
 	echo -e "#!/usr/bin/env bash\n\"\$@\"" > "$tmpfile"
 	chmod +x "$tmpfile"
 	mv "$tmpfile" "$valgrind_script_"
 	# Wait a bit if there are any valgrind processes which have just started. This is
-	# because of a bug in glibc/valgrind which results in SIGSEGV if we kill memcheck too soon.
-	wait_for "! pgrep -u saunafstest -d, memcheck | xargs -r ps -o etime= -p | grep -q '^ *00:0[0-3]$'" '5 seconds' || true
-	local pattern='memcheck|polonaise-'
+	# because of a bug in glibc/valgrind which results in SIGSEGV if we kill it too soon.
+	wait_for "! pgrep -u saunafstest -d, ${valgrind_tool_} | xargs -r ps -o etime= -p | grep -q '^ *00:0[0-3]$'" '5 seconds' || true
+	local pattern="${valgrind_tool_}|polonaise-"
 	if pgrep -u saunafstest "$pattern" >/dev/null; then
 		echo " --- valgrind: Waiting for all processes to be terminated --- "
 		pkill -TERM -u saunafstest "$pattern"
-		wait_for '! pgrep -u saunafstest memcheck >/dev/null' '60 seconds' || true
+		wait_for "! pgrep -u saunafstest ${valgrind_tool_} >/dev/null" '60 seconds' || true
 		if pgrep -u saunafstest "$pattern" >/dev/null; then
 			echo " --- valgrind: Stop FAILED --- "
 		else

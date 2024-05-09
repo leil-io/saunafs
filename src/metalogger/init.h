@@ -20,25 +20,17 @@
 
 #include "common/platform.h"
 
-#include <stdio.h>
+#include <vector>
 
+#include "common/run_tab.h"
 #include "master/masterconn.h"
 
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
+/// Functions to call before normal startup
+inline const std::vector<RunTab> earlyRunTabs = {};
 
-/* Run Tab */
-typedef int (*runfn)(void);
-struct run_tab {
-	runfn fn;
-	const char *name;
-};
+/// Functions to call during normal startup
+inline const std::vector<RunTab> runTabs = {
+    RunTab{masterconn_init, "connection with master"}};
 
-run_tab RunTab[]={
-	{masterconn_init,"connection with master"},
-	{(runfn)0,"****"}
-},LateRunTab[]={
-	{(runfn)0,"****"}
-},EarlyRunTab[]={
-	{(runfn)0,"****"}
-};
+/// Functions to call delayed after the initialization is correct
+inline const std::vector<RunTab> lateRunTabs = {};

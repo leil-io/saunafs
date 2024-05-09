@@ -73,6 +73,12 @@ namespace InodeTweaks {
 static void release(FileInfo *fi) {
 	MagicFile *file = reinterpret_cast<MagicFile*>(fi->fh);
 	if (file->wasWritten) {
+#ifdef _WIN32
+		if (isWStringFromWindows(file->value)) {
+			file->value = convertWStringFromWindowsToString(file->value);
+		}
+#endif
+
 		auto separatorPos = file->value.find('=');
 		if (separatorPos == file->value.npos) {
 			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Wrong value '%s'",

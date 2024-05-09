@@ -27,6 +27,7 @@
 
 #include "common/attributes.h"
 #include "common/event_loop.h"
+#include "filesystem_metadata.h"
 #include "master/changelog.h"
 #include "master/chunks.h"
 #include "master/filesystem.h"
@@ -36,8 +37,8 @@
 #include "master/filesystem_quota.h"
 #include "master/fs_context.h"
 #include "master/locks.h"
-#include "master/matocsserv.h"
 #include "master/matoclserv.h"
+#include "master/matocsserv.h"
 #include "master/matomlserv.h"
 #include "master/recursive_remove_task.h"
 #include "master/task_manager.h"
@@ -271,9 +272,10 @@ uint8_t fs_purge(const FsContext &context, uint32_t inode) {
 }
 
 #ifndef METARESTORE
-void fs_info(uint64_t *totalspace, uint64_t *availspace, uint64_t *trspace, uint32_t *trnodes,
-		uint64_t *respace, uint32_t *renodes, uint32_t *inodes, uint32_t *dnodes,
-		uint32_t *fnodes) {
+void fs_info(uint64_t *totalspace, uint64_t *availspace, uint64_t *trspace,
+             uint32_t *trnodes, uint64_t *respace, uint32_t *renodes,
+             uint32_t *inodes, uint32_t *dnodes, uint32_t *fnodes,
+             uint32_t *lnodes) {
 	matocsserv_getspace(totalspace, availspace);
 	*trspace = gMetadata->trashspace;
 	*trnodes = gMetadata->trashnodes;
@@ -282,6 +284,7 @@ void fs_info(uint64_t *totalspace, uint64_t *availspace, uint64_t *trspace, uint
 	*inodes = gMetadata->nodes;
 	*dnodes = gMetadata->dirnodes;
 	*fnodes = gMetadata->filenodes;
+	*lnodes = gMetadata->linknodes;
 }
 
 uint8_t fs_getrootinode(uint32_t *rootinode, const uint8_t *path) {
@@ -2798,9 +2801,10 @@ void fs_getdirpath_data(uint32_t inode, uint8_t *buff, uint32_t size) {
 	}
 }
 
-uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode, uint32_t *inodes,
-			uint32_t *dirs, uint32_t *files, uint32_t *chunks, uint64_t *length,
-			uint64_t *size, uint64_t *rsize) {
+uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode,
+                         uint32_t *inodes, uint32_t *dirs, uint32_t *files,
+                         uint32_t *links, uint32_t *chunks, uint64_t *length,
+                         uint64_t *size, uint64_t *rsize) {
 	FSNode *p;
 	statsrecord sr;
 
@@ -2819,6 +2823,7 @@ uint8_t fs_get_dir_stats(const FsContext &context, uint32_t inode, uint32_t *ino
 	*inodes = sr.inodes;
 	*dirs = sr.dirs;
 	*files = sr.files;
+	*links = sr.links;
 	*chunks = sr.chunks;
 	*length = sr.length;
 	*size = sr.size;

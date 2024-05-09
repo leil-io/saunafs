@@ -85,7 +85,7 @@ void CmrDisk::refreshDataDiskUsage() {
 
 int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 	assert(chunk);
-	TRACETHIS1(chunk->chunkid);
+	TRACETHIS1(chunk->id());
 
 	(void)isFromScan;  // Not needed for conventional disks
 
@@ -353,7 +353,7 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
                              const uint8_t *buffer) {
 	assert(chunk);
 	LOG_AVG_TILL_END_OF_SCOPE0("writeChunkBlock");
-	TRACETHIS3(chunk->chunkid, offset, size);
+	TRACETHIS3(chunk->id(), offsetInBlock, size);
 	uint32_t preCrc, postCrc, combinedCrc, chcrc;
 
 	if (chunk->version() != version && version > 0) {

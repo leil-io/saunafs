@@ -33,6 +33,9 @@
 #endif
 #endif /* __printflike */
 
+#ifdef _WIN32
+void set_debug_mode(int debug_mode);
+#endif
 void oplog_printf(
 		const struct SaunaClient::Context &ctx,const char *format,...) __printflike(2, 3);
 void oplog_printf(const char *format,...) __printflike(1, 2);

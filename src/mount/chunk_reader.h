@@ -72,7 +72,7 @@ public:
 		return location_->version;
 	}
 
-	/// Counter for the .saunafds_tweaks file.
+	/// Counter for the .saunafs_tweaks file.
 	static std::atomic<uint64_t> preparations;
 
 private:

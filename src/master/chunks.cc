@@ -34,26 +34,26 @@
 #include <algorithm>
 #include <deque>
 
-#include "common/chunks_availability_state.h"
 #include "common/chunk_copies_calculator.h"
 #include "common/chunk_version_with_todel_flag.h"
+#include "common/chunks_availability_state.h"
 #include "common/compact_vector.h"
-#include "common/counting_sort.h"
 #include "common/coroutine.h"
+#include "common/counting_sort.h"
 #include "common/datapack.h"
-#include "common/exceptions.h"
 #include "common/event_loop.h"
+#include "common/exceptions.h"
 #include "common/flat_set.h"
 #include "common/goal.h"
 #include "common/hashfn.h"
-#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
+#include "common/saunafs_version.h"
 #include "common/slice_traits.h"
 #include "common/small_vector.h"
-#include "master/chunkserver_db.h"
 #include "master/checksum.h"
 #include "master/chunk_goal_counters.h"
+#include "master/chunkserver_db.h"
 #include "master/filesystem.h"
 #include "master/get_servers_for_new_chunk.h"
 #include "master/goal_cache.h"
@@ -521,7 +521,7 @@ struct ChunksMetadata {
 	Chunk *lastchunkptr;
 
 	// other chunks metadata information
-	uint64_t nextchunkid;
+	uint64_t nextchunkid; /// serial id of the next chunk to be created
 	uint64_t chunksChecksum;
 	uint64_t chunksChecksumRecalculated;
 	uint32_t checksumRecalculationPosition;
@@ -2651,47 +2651,28 @@ void chunk_dump(void) {
 
 #endif
 
-int chunk_load(FILE *fd, bool loadLockIds) {
-	uint8_t hdr[8];
-	const uint8_t *ptr;
-	int32_t r;
-	Chunk *c;
-// chunkdata
-	uint64_t chunkid;
-
-	if (fread(hdr,1,8,fd)!=8) {
-		return -1;
-	}
-	ptr = hdr;
+bool chunksLoadFromFile(MetadataLoader::Options options) {
+	const uint8_t *ptr = options.metadataFile->seek(options.offset);
 	gChunksMetadata->nextchunkid = get64bit(&ptr);
-	int32_t serializedChunkSize = (loadLockIds
-			? kSerializedChunkSizeWithLockId : kSerializedChunkSizeNoLockId);
-	std::vector<uint8_t> loadbuff(serializedChunkSize);
-	for (;;) {
-		r = fread(loadbuff.data(), 1, serializedChunkSize, fd);
-		if (r != serializedChunkSize) {
-			return -1;
+	options.offset = options.metadataFile->offset(ptr);
+
+	while (true) {
+		uint64_t chunkId = get64bit(&ptr);
+		uint32_t version = get32bit(&ptr);
+		uint32_t lockedTo = get32bit(&ptr);
+		uint32_t lockId = 0;
+		if (options.loadLockIds) {
+			lockId = get32bit(&ptr);
 		}
-		ptr = loadbuff.data();
-		chunkid = get64bit(&ptr);
-		if (chunkid>0) {
-			uint32_t version = get32bit(&ptr);
-			c = chunk_new(chunkid, version);
-			c->lockedto = get32bit(&ptr);
-			if (loadLockIds) {
-				c->lockid = get32bit(&ptr);
-			}
-		} else {
-			uint32_t version = get32bit(&ptr);
-			uint32_t lockedto = get32bit(&ptr);
-			if (version==0 && lockedto==0) {
-				return 0;
-			} else {
-				return -1;
-			}
+		if (chunkId > 0) {
+			Chunk * chunk = chunk_new(chunkId, version);
+			chunk->lockedto = lockedTo;
+			chunk->lockid = lockId;
+			continue;
 		}
+		options.offset = options.metadataFile->offset(ptr);
+		return (version == 0 && lockedTo == 0);
 	}
-	return 0;       // unreachable
 }
 
 void chunk_store(FILE *fd) {

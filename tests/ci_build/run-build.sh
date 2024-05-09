@@ -19,7 +19,7 @@ usage() {
 }
 
 declare -a CMAKE_SAUNAFS_ARGUMENTS=(
-  -G 'Unix Makefiles'
+	-G 'Unix Makefiles'
 	-DENABLE_DOCS=ON
 	-DENABLE_CLIENT_LIB=ON
 	-DENABLE_URAFT=ON
@@ -29,7 +29,8 @@ declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 )
 
 [ -n "${1:-}" ] || usage
-build_type="${1}"
+declare build_type="${1}"
+declare build_dir
 shift
 case "${build_type,,}" in
 	debug)
@@ -41,6 +42,7 @@ case "${build_type,,}" in
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
 		)
+		build_dir="${WORKSPACE}/build/saunafs-debug"
 		;;
 	coverage)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -51,16 +53,18 @@ case "${build_type,,}" in
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=OFF
 		)
+		build_dir="${WORKSPACE}/build/saunafs-coverage"
 		;;
 	test)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
-			-DCMAKE_BUILD_TYPE=RelWithDbInfo
+			-DCMAKE_BUILD_TYPE=RelWithDebInfo
 			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=OFF
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
 		)
+		build_dir="${WORKSPACE}/build/saunafs"
 		;;
 	release)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -71,6 +75,7 @@ case "${build_type,,}" in
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=OFF
 			-DENABLE_WERROR=OFF
 		)
+		build_dir="${WORKSPACE}/build/saunafs-release"
 		;;
 	*) die "Unsupported build type: ${build_type}"
 		;;
@@ -81,9 +86,10 @@ if [ -n "${PACKAGE_VERSION:-}" ]; then
 fi
 
 declare -a EXTRA_ARGUMENTS=("${@}")
-rm -r "${WORKSPACE:?}/build/saunafs"/{,.}* 2>/dev/null || true
-cmake -B "${WORKSPACE}/build/saunafs" \
+# shellcheck disable=SC2115
+rm -r "${build_dir:?}"/{,.}* 2>/dev/null || true
+cmake -B "${build_dir}" \
 	"${CMAKE_SAUNAFS_ARGUMENTS[@]}" \
 	"${EXTRA_ARGUMENTS[@]}" "${WORKSPACE}"
 
-nice make -C "${WORKSPACE}/build/saunafs" -j "$(nproc)" install
+nice make -C "${build_dir}" -j "$(nproc)" install

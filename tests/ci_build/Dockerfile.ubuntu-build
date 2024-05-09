@@ -1,14 +1,11 @@
-ARG DEBIAN_VERSION=bookworm-20221205
-FROM debian:${DEBIAN_VERSION}
+ARG BASE_IMAGE=ubuntu:24.04
+FROM ${BASE_IMAGE}
 ARG DEBIAN_FRONTEND=noninteractive
-ENV LC_ALL="C"
-ENV TZ=Europe/Warsaw
+ENV LC_ALL="C.UTF-8"
+ENV TZ=Europe/Tallinn
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
 COPY ./tests/setup_machine.sh /tmp/
-COPY ./tests/ci_build/setup-test-machine.sh \
-    ./tests/ci_build/60-ip_port_range.conf \
-    ./tests/ci_build/zonefs-tools-setup.sh \
-    /tmp/ci_build/
+COPY ./tests/ci_build/setup-build-machine.sh /tmp/ci_build/
 ARG GROUP_ID=1000
 ARG USER_ID=1000
 ARG USERNAME=jenkins
@@ -25,10 +22,7 @@ RUN set -e ; \
     groupadd -g ${GROUP_ID} ${USERNAME}; \
     useradd -r -m -u ${USER_ID} -g ${GROUP_ID} -d ${USER_HOME} ${USERNAME}; \
     mkdir -p ${USER_HOME}/.cache/ccache; \
-    chmod -R ugo+rwX ${USER_HOME}; \
-    echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers ; \
-    chmod 0440 /etc/sudoers
-
+    chmod -R ugo+rwX ${USER_HOME}
 WORKDIR ${USER_HOME}
 
 # Setup python3 with a global virtual env (new recommended way)
@@ -48,26 +42,15 @@ RUN set -e ; \
 # Run the setup-test-machine.sh script
 RUN set -e ; \
     apt-get update ; \
-    chmod +x /tmp/ci_build/setup-test-machine.sh ; \
-    /tmp/ci_build/setup-test-machine.sh ; \
+    chmod +x /tmp/ci_build/setup-build-machine.sh ; \
+    /tmp/ci_build/setup-build-machine.sh ; \
     rm -rf /var/lib/apt/lists/*
 
 # Enable additional basic tools
 RUN set -e ; \
     apt-get update ; \
     apt-get install --yes \
-      lcov \
-      procps \
-      rsyslog \
-      systemd \
-      tini ; \
-    rm -rf /var/lib/apt/lists/* ; \
-    sed -i '/imklog/s/^/#/' /etc/rsyslog.conf ; \
-    touch /var/log/syslog ; \
-    chmod -R a+rwX-t /tmp /var/log /mnt/ramdisk; \
-    chown -R ${USERNAME}:${USERNAME} /tmp /var/log; \
-    pip install lcov_cobertura; \
-    true
-COPY ./tests/ci_build/docker_entrypoint.test /docker_entrypoint.sh
-RUN chmod +x /docker_entrypoint.sh
-ENTRYPOINT ["tini", "--", "/docker_entrypoint.sh" ]
+        lcov \
+        tini ; \
+    rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["tini", "--"]

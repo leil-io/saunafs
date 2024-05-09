@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable symbol export for loadable modules, ensuring same shared resource
+# references. Needed for the plugins, as they are shared libraries.
+set(CMAKE_ENABLE_EXPORTS ON)
+
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -36,13 +40,18 @@ option(ENABLE_POLONAISE         "Enable polonaise"                              
 option(ENABLE_CLIENT_LIB        "Enable dynamic client library (libsaunafs-client)"     OFF)
 # end of SaunaFS options
 option(ENABLE_TRACES            "Enable traces"                                          OFF)
+option(ENABLE_SYSLOG_FOR_TRACES "Enable usage of syslog instead of stdout for traces"    OFF)
 option(ENABLE_CRC               "Enable checksums"                                       ON)
 option(ENABLE_REQUEST_LOG       "Enable logging request times"                           OFF)
 option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"           OFF)
 option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              OFF)
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
 option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                         ON)
+option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"             ON)
 
+# If enabled (default), the file compile_commands.json is generated in the build
+# directory. Tools like clangd and vscode use this file for proper analysis.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ${ENABLE_COMPILE_COMMANDS})
 
 find_program(CCACHE_FOUND ccache)
 message(STATUS "ENABLE_CCACHE: ${ENABLE_CCACHE}")
@@ -120,10 +129,12 @@ message(STATUS "ENABLE_CLIENT_LIB: ${ENABLE_CLIENT_LIB}")
 message(STATUS "ENABLE_URAFT: ${ENABLE_URAFT}")
 # end of SaunaFS options values
 message(STATUS "ENABLE_TRACES: ${ENABLE_TRACES}")
+message(STATUS "ENABLE_SYSLOG_FOR_TRACES: ${ENABLE_SYSLOG_FOR_TRACES}")
 message(STATUS "ENABLE_CRC: ${ENABLE_CRC}")
 message(STATUS "ENABLE_REQUEST_LOG: ${ENABLE_REQUEST_LOG}")
 message(STATUS "USE_LEGACY_READ_MESSAGES: ${USE_LEGACY_READ_MESSAGES}")
 message(STATUS "ENABLE_NFS_GANESHA: ${ENABLE_NFS_GANESHA}")
+message(STATUS "ENABLE_COMPILE_COMMANDS: ${CMAKE_EXPORT_COMPILE_COMMANDS}")
 
 execute_process(COMMAND "git" "rev-parse" "HEAD"
   OUTPUT_VARIABLE GIT_SHA1 RESULT_VARIABLE GIT_SHA1_RETURN_VALUE
@@ -182,7 +193,7 @@ endif()
 project(saunafs)
 
 if(NOT PACKAGE_VERSION)
-  set(PACKAGE_VERSION "4.0.1-devel" CACHE STRING "Package version")
+  set(PACKAGE_VERSION "4.1.0-devel" CACHE STRING "Package version")
 endif()
 
 string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" PACKAGE_VERSION_MATCH ${PACKAGE_VERSION})
@@ -282,6 +293,10 @@ endif()
 
 if(ENABLE_TRACES)
   add_definitions(-DENABLE_TRACES)
+
+  if (ENABLE_SYSLOG_FOR_TRACES)
+    add_definitions(-DENABLE_SYSLOG_FOR_TRACES)
+  endif()
 endif()
 
 if(ENABLE_REQUEST_LOG)
@@ -330,6 +345,17 @@ if(ZLIB_FOUND)
 endif()
 include_directories(src) # Allow paths relative to src, eg. #include common/crc.h
 link_directories(${LINK_DIRECTORIES} ${FUSE_LIBRARY_DIR})
+
+if(MINGW)
+  option(ENABLE_WINFSP_WINCLIENT  "Enable winfsp library based windows client build"    ON)
+
+  if(ENABLE_WINFSP_WINCLIENT)
+    set(WINFSP_FUSE3_INCLUDE_DIR  "C:/Program Files (x86)/WinFsp/inc/fuse3"             CACHE STRING "winfsp installation /inc directory")
+    set(WINFSP_FUSE_DLL  "C:/Program Files (x86)/WinFsp/bin/winfsp-x64.dll"    CACHE STRING "winfsp-fuse dll for specific arch")
+    set(WINFSP_FUSE_LIBRARY  "C:/Program Files (x86)/WinFsp/lib/winfsp-x64.lib"    CACHE STRING "winfsp-fuse lib for specific arch")
+  endif()
+endif()
+
 add_subdirectory(external)
 add_subdirectory(src/admin)
 add_subdirectory(src/common)

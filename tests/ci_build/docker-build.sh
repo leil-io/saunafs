@@ -8,7 +8,7 @@ die() { echo "Error: ${*}" >&2; usage; exit 1; }
 run() { echo "[${me}] ${*}" >&2; "${@}"; }
 
 get_options() {
-	find  "${script_dir}" -type f -name 'Dockerfile.*' \
+	find "${script_dir}" -type f -name 'Dockerfile.*' \
 		-exec sh -c 'basename "${1}" | cut -d. -f2-' shell {} \; | \
 	sort -u
 }
@@ -46,10 +46,9 @@ usage() {
 	EOF
 }
 
-is_true_value() {
-	local value="${1:-}"
-	[ -n "${value}" ] || return 1
-	case "${value,,}" in
+parse_true() {
+	[ -n "${1:-}" ] || return 1
+	case "${1,,}" in
 		1|true|t|yes|y|on|enabled)
 			return 0
 			;;
@@ -112,13 +111,13 @@ load_env "${WORKSPACE}/.env"
 : "${DOCKER_INTERNAL_REGISTRY:=registry.ci.leil.io}"
 : "${DOCKER_REGISTRY_USERNAME:=}"
 : "${DOCKER_REGISTRY_PASSWORD:=}"
-: "${DOCKER_BASE_IMAGE:=}"
+: "${DOCKER_BASE_IMAGE:=ubuntu:24.04}"
 : "${DOCKER_IMAGE_GROUP_ID:=$(id -g)}"
 : "${DOCKER_IMAGE_USER_ID:=$(id -u)}"
 : "${DOCKER_IMAGE_USERNAME:=$(id -un)}"
 : "${DOCKER_ENABLE_PULL_CACHE_IMAGE:=false}"
 : "${DOCKER_ENABLE_PUSH_IMAGE:=false}"
-:	"${DOCKER_IMAGE:="${PROJECT_NAME}"}"
+: "${DOCKER_IMAGE:="${PROJECT_NAME}"}"
 DOCKER_IMAGE="${DOCKER_IMAGE//[\/.]/-}"
 DOCKER_IMAGE="${DOCKER_IMAGE,,}"
 : "${BRANCH_NAME:="$(get_branch_name)"}"
@@ -129,15 +128,15 @@ option="${1:-}"
 [ -n "${option}" ] || die "Option not specified"
 shift
 case "${option,,}" in
-	--help | -h	)
+	--help | -h)
 		usage
 		exit 0
 		;;
-	--list | -l	)
+	--list | -l)
 		get_options
 		exit 0
 		;;
-	--env | -e	)
+	--env | -e)
 		hint_used_variables
 		exit 0
 		;;
@@ -152,35 +151,37 @@ case "${option,,}" in
 		;;
 esac
 
-latest_tag="$(get_partial_tag "${BRANCH_NAME}" "${option}")"
-container_tag="$(get_partial_tag "${BRANCH_NAME}" "${option}" "$(get_commit_id)")"
+tag_option="${DOCKER_BASE_IMAGE//:/-}"
+if [ -n "${DOCKER_CUSTOM_TAG:-}" ]; then
+	tag_option="${DOCKER_CUSTOM_TAG}"
+fi
+tag_option="${tag_option##*/}"
+
+latest_tag="$(get_partial_tag "${BRANCH_NAME}" "${tag_option}")"
+container_tag="$(get_partial_tag "${BRANCH_NAME}" "${tag_option}" "$(get_commit_id)")"
 
 [ -n "${DOCKER_INTERNAL_REGISTRY}" ] || die "DOCKER_REGISTRY not set"
 [ -n "${DOCKER_IMAGE}" ] || die "DOCKER_IMAGE not set"
 
-if [ -n "${DOCKER_BASE_IMAGE}" ]; then
-  build_extra_args+=(--build-arg BASE_IMAGE="${DOCKER_BASE_IMAGE}")
-else
-  build_extra_args+=(--build-arg BASE_IMAGE="${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:$(get_partial_tag "${BRANCH_NAME}" "ubuntu22.04-test")")
-fi
+build_extra_args+=(--build-arg BASE_IMAGE="${DOCKER_BASE_IMAGE}")
 
-if is_true_value "${DOCKER_ENABLE_PULL_CACHE_IMAGE}"; then
+if parse_true "${DOCKER_ENABLE_PULL_CACHE_IMAGE}"; then
 	docker_login
 	run docker pull "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${latest_tag}" 2>/dev/null || true
 	build_extra_args+=(--cache-from "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${latest_tag}")
 fi
 
-run docker build \
+run docker buildx build --load --progress=plain \
 	--build-arg GROUP_ID="${DOCKER_IMAGE_GROUP_ID}" \
 	--build-arg USER_ID="${DOCKER_IMAGE_USER_ID}" \
 	--build-arg USERNAME="${DOCKER_IMAGE_USERNAME}" \
-	${build_extra_args[@]+"${build_extra_args[@]}"} \
+	"${build_extra_args[@]}" \
 	--tag "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${container_tag}" \
 	--tag "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${latest_tag}" \
 	--file "${dockerfile}" \
 	"${docker_context_dir}"
 
-if is_true_value "${DOCKER_ENABLE_PUSH_IMAGE}"; then
+if parse_true "${DOCKER_ENABLE_PUSH_IMAGE}"; then
 	docker_login
 	run docker push "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${container_tag}"
 	run docker push "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${latest_tag}"

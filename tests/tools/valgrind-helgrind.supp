@@ -1,0 +1,12 @@
+# MOUNT
+
+{
+   fuse_session_loop_mt initialization
+   # fuse_session_loop_mt is called only once at starting time. Looks like
+   # related to fuse and not to our client.
+   Helgrind:PthAPIerror
+   ...
+   fun:fuse_session_loop_mt
+   fun:fuse_session_loop_mt
+   ...
+}

@@ -123,8 +123,14 @@ static std::vector<uint8_t> read(const Context &ctx,
 namespace InodeOplog {
 static std::vector<uint8_t> read(const Context &ctx,
 		size_t size, off_t off, FileInfo *fi, int debug_mode) {
+#ifdef _WIN32
+	(void) ctx;
+	(void) off;
+#endif
 	if (debug_mode) {
+#ifndef _WIN32
 		printDebugReadInfo(ctx, SPECIAL_INODE_OPLOG, size, off);
+#endif
 	}
 	uint32_t ssize;
 	uint8_t *buff;
@@ -156,6 +162,30 @@ static std::vector<uint8_t> read(const Context &ctx,
 	}
 	MagicFile *file = reinterpret_cast<MagicFile*>(fi->fh);
 	std::unique_lock<std::mutex> lock(file->mutex);
+
+#ifdef _WIN32
+	if (file->wasWritten) {
+		if (isWStringFromWindows(file->value)) {
+			file->value = convertWStringFromWindowsToString(file->value);
+		}
+
+		auto separatorPos = file->value.find('=');
+		if (separatorPos == file->value.npos) {
+			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Wrong value '%s'",
+			                   file->value.c_str());
+		} else {
+			std::string name = file->value.substr(0, separatorPos);
+			std::string value = file->value.substr(separatorPos + 1);
+			if (!value.empty() && value.back() == '\n') {
+				value.resize(value.size() - 1);
+			}
+			gTweaks.setValue(name, value);
+			safs_pretty_syslog(LOG_INFO, "TWEAKS_FILE: Setting '%s' to '%s'",
+			                   name.c_str(), value.c_str());
+		}
+	}
+#endif
+
 	if (!file->wasRead) {
 		file->value = gTweaks.getAllValues();
 		file->wasRead = true;

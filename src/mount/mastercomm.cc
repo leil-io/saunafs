@@ -95,6 +95,15 @@ static bool disconnect;
 static time_t lastwrite;
 static int sessionlost;
 
+// This constant means no master side mapping of uid/gid coming from client
+#define DEFAULT_UID_GID_MAPPING 999
+
+#ifdef _WIN32
+uint8_t *sessionFlags = nullptr;
+int *mountingUid  = nullptr;
+int *mountingGid = nullptr;
+#endif
+
 static uint32_t maxretries;
 
 static pthread_t rpthid,npthid;
@@ -719,6 +728,9 @@ int fs_connect(bool verbose) {
 	}
 	sessionid = get32bit(&rptr);
 	sesflags = get8bit(&rptr);
+#ifdef _WIN32
+	*sessionFlags = sesflags;
+#endif
 	if (!gInitParams.meta) {
 		rootuid = get32bit(&rptr);
 		rootgid = get32bit(&rptr);
@@ -746,7 +758,6 @@ int fs_connect(bool verbose) {
 		mintrashtime = 0;
 		maxtrashtime = 0;
 	}
-	fs_register_config();
 	free(regbuff);
 	lastwrite=time(NULL);
 	if (!verbose) {
@@ -806,7 +817,25 @@ int fs_connect(bool verbose) {
 			}
 #else
 			fprintf(stderr, " ; root mapped to %" PRIu32 ":%" PRIu32, rootuid, rootgid);
-			fprintf(stderr, " ; users mapped to %" PRIu32 ":%" PRIu32, mapalluid, mapallgid);
+			// The Windows specific code makes consistent the use of client side
+			// uid/gid mappings and master side uid/gid mappings.
+			if (mapalluid != DEFAULT_UID_GID_MAPPING ||
+			    mapallgid != DEFAULT_UID_GID_MAPPING) {
+				if (*mountingUid != USE_LOCAL_ID &&
+				    *mountingGid != USE_LOCAL_ID) {
+					fprintf(stderr, " ; master server overwrote users mapping");
+				}
+				*mountingUid = mapalluid;
+				*mountingGid = mapallgid;
+			}
+			// At last, the final mapping is shown in the connection parameters
+			// line.
+			if (*mountingUid == USE_LOCAL_ID && *mountingGid == USE_LOCAL_ID) {
+				fprintf(stderr, " ; users mapped to local IDs");
+			} else {
+				fprintf(stderr, " ; users mapped to %" PRIu32 ":%" PRIu32,
+				        *mountingUid, *mountingGid);
+			}
 #endif
 		} else {
 			// meta
@@ -1140,6 +1169,9 @@ void* fs_receive_thread(void *) {
 			if (sessionlost) {      // if previous session is lost then try to register as a new session
 				if (fs_connect(false)==0) {
 					sessionlost=0;
+					fdLock.unlock();
+					fs_register_config();
+					fdLock.lock();
 				}
 			} else {        // if other problem occurred then try to resolve hostname and portname then try to reconnect using the same session id
 				if (fs_resolve(false, gInitParams.bind_host, gInitParams.host, gInitParams.port) == 0) {
@@ -1246,7 +1278,11 @@ void* fs_receive_thread(void *) {
 }
 
 // called before fork
-int fs_init_master_connection(SaunaClient::FsInitParams &params) {
+int fs_init_master_connection(SaunaClient::FsInitParams &params
+#ifdef _WIN32
+, uint8_t &session_flags, int &mounting_uid, int &mounting_gid
+#endif
+) {
 	master_statsptr_init();
 
 	gInitParams = params;
@@ -1260,7 +1296,16 @@ int fs_init_master_connection(SaunaClient::FsInitParams &params) {
 	if (params.delayed_init) {
 		return 1;
 	}
-	return fs_connect(params.verbose);
+#ifdef _WIN32
+	sessionFlags = &session_flags;
+	mountingUid  = &mounting_uid;
+	mountingGid = &mounting_gid;
+#endif
+	int connectResult = fs_connect(params.verbose);
+	if (connectResult == 0) {
+		fs_register_config();
+	}
+	return connectResult;
 }
 
 // called after fork

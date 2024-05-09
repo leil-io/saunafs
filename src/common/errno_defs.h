@@ -24,8 +24,14 @@
 #include "common/platform.h"
 
 #ifdef _WIN32
+#ifdef ENODATA
+#undef ENODATA
+#endif
 #define ENODATA    61  /* No data available */
 #define ENOTBLK    15  /* Block device required */
 #define EDQUOT     122 /* Quota exceeded */
+#ifdef ETXTBSY
+#undef ETXTBSY
+#endif
 #define ETXTBSY    26  /* Text file busy */
 #endif

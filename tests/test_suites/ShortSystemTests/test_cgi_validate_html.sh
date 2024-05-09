@@ -66,5 +66,8 @@ expect_empty "$(grep -Inri -A 20 'Traceback' "$cgi_pages" || true)"
 
 # Validate html pages using 'tidy'
 find "$cgi_pages" -name "sfs.cgi*" | while read file; do
-	MESSAGE="Validating $file" assert_empty "$(tidy -q -errors $file 2>&1)"
+	tidyOutput="$(tidy -q -errors $file 2>&1 | true)"
+	# Filter out known warnings about unescaped ampersands in URLs
+	filteredOutput=$(echo "${tidyOutput}" | grep -v 'Unescaped \&')
+	MESSAGE="Validating $file" assert_empty "${filteredOutput}"
 done

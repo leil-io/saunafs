@@ -36,6 +36,7 @@
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
+#include <cstdint>
 #include <fstream>
 #include <memory>
 
@@ -1411,9 +1412,11 @@ void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) 
 	}
 	statistics.version = saunafsVersion(SAUNAFS_PACKAGE_VERSION_MAJOR,
 			SAUNAFS_PACKAGE_VERSION_MINOR, SAUNAFS_PACKAGE_VERSION_MICRO);
-	fs_info(&statistics.totalSpace, &statistics.availableSpace, &statistics.trashSpace,
-			&statistics.trashNodes, &statistics.reservedSpace, &statistics.reservedNodes,
-			&statistics.allNodes, &statistics.dirNodes, &statistics.fileNodes);
+	fs_info(&statistics.totalSpace, &statistics.availableSpace,
+	        &statistics.trashSpace, &statistics.trashNodes,
+	        &statistics.reservedSpace, &statistics.reservedNodes,
+	        &statistics.allNodes, &statistics.dirNodes, &statistics.fileNodes,
+	        &statistics.symlinkNodes);
 	chunk_info(&statistics.chunks, &statistics.chunkCopies, &statistics.regularCopies);
 	statistics.memoryUsage = chartsdata_memusage();
 	std::vector<uint8_t> response;
@@ -3631,8 +3634,10 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr, PacketHeader header, const 
 	}
 }
 
+constexpr uint8_t kDirStatsEmptyPayload = 5;
 void matoclserv_fuse_getdirstats_old(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode = 0, inodes = 0, files = 0, dirs = 0, chunks = 0;
+	constexpr uint8_t kDirStatsLegacyFullPayload = 64;
+	uint32_t inode = 0, inodes = 0, files = 0, dirs = 0, links = 0, chunks = 0;
 	uint64_t leng = 0, size = 0, rsize = 0;
 	uint32_t msgid;
 	uint8_t *ptr;
@@ -3644,15 +3649,21 @@ void matoclserv_fuse_getdirstats_old(matoclserventry *eptr,const uint8_t *data,u
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
-	status = fs_get_dir_stats(matoclserv_get_context(eptr),inode,&inodes,&dirs,&files,&chunks,&leng,&size,&rsize);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,(status!=SAUNAFS_STATUS_OK)?5:60);
+	status = fs_get_dir_stats(matoclserv_get_context(eptr), inode,
+							  &inodes, &dirs, &files, &links, &chunks,
+							  &leng, &size, &rsize);
+	ptr = matoclserv_createpacket(eptr, MATOCL_FUSE_GETDIRSTATS,
+	                              (status != SAUNAFS_STATUS_OK)
+	                                  ? ::kDirStatsEmptyPayload
+	                                  : kDirStatsLegacyFullPayload);
 	put32bit(&ptr,msgid);
-	if (status!=SAUNAFS_STATUS_OK) {
+	if (status != SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put32bit(&ptr,inodes);
 		put32bit(&ptr,dirs);
 		put32bit(&ptr,files);
+		put32bit(&ptr, links);
 		put32bit(&ptr,0);
 		put32bit(&ptr,0);
 		put32bit(&ptr,chunks);
@@ -3664,21 +3675,28 @@ void matoclserv_fuse_getdirstats_old(matoclserventry *eptr,const uint8_t *data,u
 	}
 }
 
+
 void matoclserv_fuse_getdirstats(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode = 0, inodes = 0, files = 0, dirs = 0, chunks = 0;
+	constexpr uint8_t kDirStatsFullPayload = 48;
+	uint32_t inode = 0, inodes = 0, files = 0, dirs = 0, links = 0, chunks = 0;
 	uint64_t leng = 0, size = 0, rsize = 0;
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
-	if (length!=8) {
+	if (length != 8) {
 		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_GETDIRSTATS - wrong size (%" PRIu32 "/8)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
-	status = fs_get_dir_stats(matoclserv_get_context(eptr),inode,&inodes,&dirs,&files,&chunks,&leng,&size,&rsize);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,(status!=SAUNAFS_STATUS_OK)?5:44);
+	status = fs_get_dir_stats(matoclserv_get_context(eptr), inode,
+							  &inodes, &dirs, &files, &links, &chunks,
+							  &leng, &size, &rsize);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETDIRSTATS,
+								  (status != SAUNAFS_STATUS_OK) ?
+								  ::kDirStatsEmptyPayload :
+								  kDirStatsFullPayload);
 	put32bit(&ptr,msgid);
 	if (status!=SAUNAFS_STATUS_OK) {
 		put8bit(&ptr,status);
@@ -3686,6 +3704,7 @@ void matoclserv_fuse_getdirstats(matoclserventry *eptr,const uint8_t *data,uint3
 		put32bit(&ptr,inodes);
 		put32bit(&ptr,dirs);
 		put32bit(&ptr,files);
+		put32bit(&ptr, links);
 		put32bit(&ptr,chunks);
 		put64bit(&ptr,leng);
 		put64bit(&ptr,size);

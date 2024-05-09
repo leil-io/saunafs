@@ -23,6 +23,7 @@
 #include "common/platform.h"
 
 #include "common/compact_vector.h"
+#include "common/memory_mapped_file.h"
 #include "protocol/lock_info.h"
 
 #include <unordered_map>
@@ -326,10 +327,13 @@ public:
 	void copyPendingToVector(uint32_t inode, int64_t index, int64_t count,
 	                        std::vector<safs_locks::Info> &data);
 
-	/*! \brief Load class state from stream.
-	 * \param file pointer to FILE structure that specifies input stream
+	/**
+	 * \brief Load class state from stream.
+	 * @param metadataFile pointer to MemoryMappedFile structure
+	 * @param offsetBegin	pointer to offsetBegin variable that specifies
+	 * offset
 	 */
-	void load(FILE *file);
+	void load(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_t &offsetBegin);
 
 	/*! \brief Save class state to stream.
 	 * \param file pointer to FILE structure that specifies output stream
@@ -339,11 +343,12 @@ public:
 	/*! \brief Removes all locks from the class. */
 	void clear();
 
-private:
 	FileLocks(const FileLocks &other) = delete;
 	FileLocks(FileLocks &&other) = delete;
 	FileLocks &operator=(const FileLocks &) = delete;
 	FileLocks &operator=(FileLocks &&) = delete;
+
+private:
 
 	/*! \brief Enqueues a lock */
 	void enqueue(uint32_t inode, Lock lock);
