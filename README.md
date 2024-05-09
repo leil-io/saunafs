@@ -72,12 +72,6 @@ There are 2 types of documentation available:
 
 ## Contributing
 
-***Currently, we do not accept outside contributions. We still allow (and
-encourage) pull requests, but without approval they won't be merged at the
-moment. We are currently working on creating a system to allow seamless pull
-requests outside with as little fuss as possible. See this
-[issue](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog) for more details.***
-
 See the [Contributing Guide](CONTRIBUTING.md) for detailed information on how
 to contribute to SaunaFS.
 
@@ -86,7 +80,7 @@ point for how to setup a development environment and run tests.
 
 ## Contact us
 
-Join our [Slack community]() to connect with fellow
+Join our [Slack community](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog) to connect with fellow
 SaunaFS enthusiasts, developers, and users. In our Slack channels, you can:
 
 - **Ask Questions**: Seek guidance, share your experiences, and ask questions
