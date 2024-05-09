@@ -33,6 +33,8 @@
 #define localtime_r(T, Tm) localtime_s(Tm, T)
 #endif
 
+#include "common/user_groups.h"
+
 #define OPBUFFSIZE 0x1000000
 #define LINELENG 1000
 #define MAXHISTORYSIZE 0xF00000
@@ -125,11 +127,17 @@ void oplog_printf(const struct SaunaClient::Context &ctx,const char *format,...)
 	int r, leng = 0;
 	char buff[LINELENG];
 
+	auto groupId = ctx.gid;
+
+	if (user_groups::isGroupCacheId(groupId)) {
+		groupId = ctx.gids.at(user_groups::kPrimaryGroupPosition);
+	}
+
 	get_time(tv, ltime);
 	// Update TIMEDATAPREFFIXSIZE constant if changing the time format
 	r  = snprintf(buff, LINELENG, "%llu %02u.%02u %02u:%02u:%02u.%06u: uid:%u gid:%u pid:%u cmd:",
 		(unsigned long long)tv.tv_sec, ltime.tm_mon + 1, ltime.tm_mday, ltime.tm_hour, ltime.tm_min, ltime.tm_sec, (unsigned)tv.tv_usec,
-		(unsigned)ctx.uid, (unsigned)ctx.gid, (unsigned)ctx.pid);
+		(unsigned)ctx.uid, groupId, (unsigned)ctx.pid);
 	if (r < 0) {
 		return;
 	}
