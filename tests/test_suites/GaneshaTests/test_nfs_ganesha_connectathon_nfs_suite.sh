@@ -72,7 +72,7 @@ assert_eventually 'showmount -e localhost'
 sudo mount -vvvv localhost:/data $TEMP_DIR/mnt/ganesha
 
 # Run connectathon nfs suite
-cd $TEMP_DIR/mnt/ganesha
+#cd $TEMP_DIR/mnt/ganesha
 
 mkdir cthon_tests
 export NFSTESTDIR=$TEMP_DIR/mnt/ganesha/cthon_tests
