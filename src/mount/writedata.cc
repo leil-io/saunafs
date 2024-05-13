@@ -852,11 +852,20 @@ static void write_data_lcnt_increase(inodedata *id, Glock&) {
 	id->lcnt++;
 }
 
-static void write_data_lcnt_decrease(inodedata *id, Glock& lock) {
+static void	write_data_lcnt_decrease_check_deleted(inodedata *id, Glock& lock, bool& isDeleted) {
+	// As long as it is not freed, then we don't consider the inodedata deleted
+	isDeleted = false;
 	id->lcnt--;
 	if (id->lcnt == 0 && !id->inqueue && id->flushwaiting == 0 && id->writewaiting == 0) {
 		write_free_inodedata(id, lock);
+		isDeleted = true;
 	}
+}
+
+static void write_data_lcnt_decrease(inodedata *id, Glock& lock) {
+	bool dummy_isDeleted;
+	write_data_lcnt_decrease_check_deleted(id, lock, dummy_isDeleted);
+	(void) dummy_isDeleted;
 }
 
 void* write_data_new(uint32_t inode) {
@@ -963,10 +972,13 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	lock.lock();
 	if (status != 0 || !writeNeeded) {
 		// Something failed or we have nothing to do more (master server managed to do the truncate)
+		bool isDeleted = false;
 		write_data_flushwaiting_decrease(id, lock);
-		write_data_lcnt_decrease(id, lock);
+		write_data_lcnt_decrease_check_deleted(id, lock, isDeleted);
 		if (status == SAUNAFS_STATUS_OK) {
-			id->maxfleng = length;
+			if (!isDeleted) {
+				id->maxfleng = length;
+			}
 			return 0;
 		} else {
 			// status is now SFS status, so we cannot return any errno
