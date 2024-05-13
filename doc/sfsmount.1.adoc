@@ -162,6 +162,12 @@ disables cache (default: 0).
 *-o readaheadmaxwindowsize=*'KB'::
 Set max value of readahead window per single descriptor in kibibytes (default: 16384).
 
+*-o readworkers=*'N'::
+Define number of read workers (default: 30).
+
+*-o maxreadaheadrequests=*'N'::
+Define number of readahead requests per inode (default: 5).
+
 *-o sfsrlimitnofile=*'N'::
 Try to change limit of simultaneously opened file descriptors on startup
 (default: 100000).
