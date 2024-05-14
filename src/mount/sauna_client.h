@@ -334,6 +334,8 @@ struct RequestException : public std::exception {
 
 uint8_t get_session_flags();
 
+bool isMasterDisconnected();
+
 void update_last_winfsp_context(const unsigned int uid, const unsigned int gid);
 
 void convert_winfsp_context_to_master_context(unsigned int& uid, unsigned int& gid);

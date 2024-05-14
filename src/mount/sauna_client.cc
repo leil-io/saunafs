@@ -230,6 +230,8 @@ uint8_t session_flags;
 
 uint8_t get_session_flags() { return session_flags; }
 
+bool isMasterDisconnected() { return gIsDisconnectedFromMaster.load(); }
+
 #define LOCAL_USERS_THRESHOLD 0x30000
 static int32_t mounting_uid = USE_LOCAL_ID;
 static int32_t mounting_gid = USE_LOCAL_ID;
