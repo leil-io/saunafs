@@ -862,7 +862,7 @@ static void	write_data_lcnt_decrease_check_deleted(inodedata *id, Glock& lock, b
 	}
 }
 
-static void write_data_lcnt_decrease(inodedata *id, Glock& lock) {
+inline void write_data_lcnt_decrease(inodedata *id, Glock& lock) {
 	bool dummy_isDeleted;
 	write_data_lcnt_decrease_check_deleted(id, lock, dummy_isDeleted);
 	(void) dummy_isDeleted;
