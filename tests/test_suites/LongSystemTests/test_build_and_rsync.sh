@@ -24,7 +24,7 @@ test_worker() {
 
 CHUNKSERVERS=3 \
 	MOUNTS=1 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0" \
 	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
