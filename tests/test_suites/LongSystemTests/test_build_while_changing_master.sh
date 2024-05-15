@@ -5,7 +5,7 @@ MASTERSERVERS=$metaservers_nr \
 	CHUNKSERVERS=2 \
 	CHUNKSERVER_EXTRA_CONFIG="MASTER_RECONNECTION_DELAY = 1" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0" \
 	MASTER_EXTRA_CONFIG="MAGIC_AUTO_FILE_REPAIR = 1" \
 	setup_local_empty_saunafs info
 
