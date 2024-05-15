@@ -2129,6 +2129,8 @@ int hddChunkOperation(uint64_t chunkId, uint32_t chunkVersion,
 static UniqueQueue<ChunkWithVersionAndType> gTestChunkQueue;
 
 static void hddTestChunkThread() {
+	pthread_setname_np(pthread_self(), "testChunkThread");
+
 	bool terminate = false;
 
 	while (!terminate) {
@@ -2164,6 +2166,9 @@ void hddAddChunkToTestQueue(ChunkWithVersionAndType chunk) {
 
 void hddTesterThread() {
 	TRACETHIS();
+
+	pthread_setname_np(pthread_self(), "testerThread");
+
 	IChunk *chunk;
 	uint64_t chunkId;
 	uint32_t version;
@@ -2466,6 +2471,9 @@ void hddDiskScanThread(IDisk *disk) {
 
 void hddDisksThread() {
 	TRACETHIS();
+
+	pthread_setname_np(pthread_self(), "disksThread");
+
 	while (!gTerminate) {
 		hddCheckDisks();
 		sleep(1);
@@ -2476,6 +2484,8 @@ void hddFreeResourcesThread() {
 	static const int kDelayedStep = 2;
 	static const int kMaxFreeUnused = 1024;
 	TRACETHIS();
+
+	pthread_setname_np(pthread_self(), "freeResThread");
 
 	while (!gTerminate) {
 		gOpenChunks.freeUnused(eventloop_time(), gChunksMapMutex,
