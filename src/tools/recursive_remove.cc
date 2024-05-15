@@ -122,7 +122,7 @@ static int recursive_remove(const char *file_name, int long_wait) {
 }
 
 int recursive_remove_run(int argc, char **argv) {
-	char ch;
+	int ch;
 	int status;
 	int long_wait = 0;
 
