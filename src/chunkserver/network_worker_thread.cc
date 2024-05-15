@@ -1527,6 +1527,11 @@ NetworkWorkerThread::NetworkWorkerThread(uint32_t nrOfBgjobsWorkers, uint32_t bg
 
 void NetworkWorkerThread::operator()() {
 	TRACETHIS();
+
+	static std::atomic_uint16_t threadCounter(0);
+	std::string threadName = "networkWorker " + std::to_string(threadCounter++);
+	pthread_setname_np(pthread_self(), threadName.c_str());
+
 	while (!doTerminate) {
 		preparePollFds();
 		int i = poll(pdesc.data(), pdesc.size(), 50);
