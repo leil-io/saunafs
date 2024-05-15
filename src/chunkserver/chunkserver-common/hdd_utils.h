@@ -28,8 +28,11 @@ inline std::atomic_bool gResetTester = false;
 // master reports = damaged chunks, lost chunks, new chunks
 inline std::mutex gMasterReportsLock;
 
-/// Avoid deadlock by waiting for specified time
-static constexpr uint8_t kSecondsToWaitForLockedChunk_ = 2;
+/// Avoid and point out possible deadlocks, by waiting for the specified time to
+/// release the condition variable waiting on a Chunk. The number is small
+/// enough not to stop the operation (mount retries) and big enough to detect
+/// unusual/unexpected behavior.
+static constexpr uint8_t kSecondsToWaitForLockedChunk_ = 20;
 
 /// Adds the error to the Disk owner of chunk in a thread sage way and preserves
 /// the errno to be used in later checks.
