@@ -182,6 +182,11 @@ static inline int job_receive_status(jobpool *jp,uint32_t *jobid,uint8_t *status
 
 void* job_worker(void *th_arg) {
 	TRACETHIS();
+
+	static std::atomic_uint16_t workersCounter(0);
+	std::string threadName = "jobWorker " + std::to_string(workersCounter++);
+	pthread_setname_np(pthread_self(), threadName.c_str());
+
 	jobpool *jp = (jobpool*)th_arg;
 	job *jptr;
 	uint8_t *jptrarg;
