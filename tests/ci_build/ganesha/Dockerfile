@@ -60,6 +60,7 @@ RUN set -e ; \
           libsqlite3-dev \
           liburcu-dev \
           pkg-config \
+          pv \
           wget \
           unzip \
           rpcbind \

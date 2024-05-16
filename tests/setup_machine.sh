@@ -86,6 +86,7 @@ common_packages=(
 	python3-setuptools
 	python3-wheel
 	psmisc
+	pv
 	rsync
 	rsyslog
 	socat
