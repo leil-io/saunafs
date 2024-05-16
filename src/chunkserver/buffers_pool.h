@@ -48,11 +48,12 @@ public:
 	 * @return The existent buffer or a newly created one.
 	 */
 	std::shared_ptr<T> get(size_t capacity) {
+		std::lock_guard lock(mutex_);
+
 		if (buffers_.empty()) {
 			return std::make_shared<T>(capacity);
 		}
 
-		std::lock_guard lock(mutex_);
 		auto buffer = buffers_.front();
 
 		if (buffer->capacity() == capacity) {
@@ -80,7 +81,7 @@ public:
 
 private:
 	/// Maximum number of buffers in the pool.
-	static constexpr size_t kMaxSize = 128;
+	static constexpr size_t kMaxSize = 1024;
 	/// Buffers pool (container).
 	std::queue<std::shared_ptr<T>> buffers_;
 	/// Mutex to protect the pool.
