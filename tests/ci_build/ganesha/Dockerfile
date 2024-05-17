@@ -34,7 +34,6 @@ RUN set -e ; \
           bison \
           build-essential \
           byacc \
-          ceph \
           cmake \
           dbus \
           docbook \
@@ -50,21 +49,16 @@ RUN set -e ; \
           libboost-program-options-dev \
           libboost-system-dev \
           libcap-dev \
-          libcephfs-dev \
           libdbus-1-dev \
-          libglusterfs-dev \
           libgssapi-krb5-2 \
           libjemalloc-dev \
           libjudy-dev \
           libkrb5-dev \
           libkrb5support0 \
           libnfsidmap-dev \
-          libradospp-dev \
-          libradosstriper-dev \
-          librgw-dev \
+          libnsl-dev \
           libsqlite3-dev \
           liburcu-dev \
-          xfslibs-dev \
           pkg-config \
           wget \
           unzip \
@@ -84,8 +78,18 @@ RUN set -e ; \
         mkdir nfs-ganesha-${GANESHA_VERSION}/build ; \
         cmake -Bnfs-ganesha-${GANESHA_VERSION}/build \
             -DCMAKE_INSTALL_PREFIX=/ \
+            -DUSE_9P=NO \
+            -DUSE_FSAL_CEPH=NO \
+            -DUSE_FSAL_GLUSTER=NO \
+            -DUSE_FSAL_GPFS=NO \
+            -DUSE_FSAL_KVSFS=NO \
+            -DUSE_FSAL_LIZARDFS=NO \
+            -DUSE_FSAL_LUSTRE=NO \
+            -DUSE_FSAL_PROXY_V3=NO \
+            -DUSE_FSAL_PROXY_V4=NO \
+            -DUSE_FSAL_RGW=NO \
+            -DUSE_FSAL_XFS=NO \
             -DUSE_GSS=NO \
-            -DUSE_FSAL_SAUNAFS=NO \
             -Snfs-ganesha-${GANESHA_VERSION}/src; \
         make -Cnfs-ganesha-${GANESHA_VERSION}/build -j$(($(nproc)*3/4+1)) install ; \
         rm -rf nfs-ganesha-${GANESHA_VERSION} ntirpc-${NTIRPC_VERSION} ; \
