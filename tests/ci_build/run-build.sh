@@ -3,6 +3,7 @@ set -eux -o pipefail
 PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
 WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
 die() { echo "Error: $*" >&2; exit 1; }
+warn() { echo "Warning: $*" >&2; }
 
 usage() {
 	cat <<-EOT
@@ -101,4 +102,6 @@ fi
 
 if [ -f "${build_dir}/CPackConfig.cmake" ]; then
 	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"
+else
+	warn "No CPack configuration found in ${build_dir}. Skipping packaging."
 fi
