@@ -48,6 +48,7 @@
 #include "master/metadata_dumper.h"
 #include "master/metadata_loader.h"
 #include "master/restore.h"
+#include "metrics/metrics.h"
 
 
 // TODO (Baldor): Review the need for these constants below

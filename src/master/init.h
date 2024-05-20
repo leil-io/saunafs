@@ -18,12 +18,15 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sys/syslog.h>
+#include "common/cfg.h"
 #include "common/platform.h"
 
 #include <vector>
 
 #include "common/random.h"
 #include "common/run_tab.h"
+#include "common/event_loop.h"
 #include "master/chartsdata.h"
 #include "master/datacachemgr.h"
 #include "master/exports.h"
@@ -35,6 +38,7 @@
 #include "master/matomlserv.h"
 #include "master/personality.h"
 #include "master/topology.h"
+#include "metrics/metrics.h"
 
 /// Functions to call before normal startup
 inline const std::vector<RunTab> earlyRunTabs = {
@@ -42,6 +46,19 @@ inline const std::vector<RunTab> earlyRunTabs = {
 
 /// Functions to call during normal startup
 inline const std::vector<RunTab> runTabs = {
+    RunTab{[]() {
+	           if (cfg_getuint8("ENABLE_PROMETHEUS", 0) != 1) {
+		           safs::log_info(
+		               "Prometheus disabled, no Prometheus metrics will be "
+		               "gathered");
+		           return 0;
+	           }
+	           metrics::metrics_init(
+	               cfg_getstr("PROMETHEUS_HOST", "0.0.0.0:8080"));
+	           eventloop_destructregister(metrics::metrics_destroy);
+	           return 0;
+           },
+           "prometheus module"},
     // has to be first
     RunTab{hstorage_init, "name storage"},
     // has to be second

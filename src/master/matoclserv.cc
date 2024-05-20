@@ -83,6 +83,7 @@
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
 #include "protocol/SFSCommunication.h"
+#include "metrics/metrics.h"
 
 #define MaxPacketSize 1000000
 
@@ -5334,6 +5335,7 @@ void matoclserv_read(matoclserventry *eptr) {
 			eptr->inputpacket.startptr = eptr->hdrbuff;
 			matoclserv_gotpacket(eptr,type,eptr->inputpacket.packet,size);
 			stats_prcvd++;
+			metrics::rx_client_packets.increment();
 
 			if (eptr->inputpacket.packet) {
 				free(eptr->inputpacket.packet);
@@ -5375,6 +5377,7 @@ void matoclserv_write(matoclserventry *eptr) {
 		}
 		free(pack->packet);
 		stats_psent++;
+		metrics::tx_client_packets.increment();
 		eptr->outputhead = pack->next;
 		if (eptr->outputhead==NULL) {
 			eptr->outputtail = &(eptr->outputhead);

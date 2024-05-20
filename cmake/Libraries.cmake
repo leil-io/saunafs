@@ -180,3 +180,8 @@ if(ENABLE_NFS_GANESHA)
                     "https://github.com/nfs-ganesha/ntirpc/archive/v4.3.zip")
 endif()
 
+find_package(prometheus-cpp CONFIG)
+if (PROMETHEUS_CPP_ENABLE_PULL)
+    add_definitions(-DHAVE_PROMETHEUS)
+endif()
+message(STATUS "Prometheus C++ Client Library: ${PROMETHEUS_CPP_ENABLE_PULL}")

@@ -92,7 +92,6 @@ common_packages=(
 	socat
 	sudo
 	tidy
-	time
 	valgrind
 	wget
 	## For NFS-Ganesha tests (duplicate are commented out as reference)
@@ -157,6 +156,9 @@ apt_packages=(
 	libnsl-dev
 	libsqlite3-dev
 )
+noble_packages=(
+	prometheus-cpp-dev
+)
 dnf_packages=(
 	boost-filesystem
 	boost-iostreams
@@ -209,6 +211,8 @@ dnf_packages=(
 	libcap-devel
 	libnfsidmap-devel
 	libsqlite3x-devel
+	xfsprogs-devel
+	libprometheus-cpp-devel
 )
 python_packages=(
 	asciidoc
@@ -224,6 +228,11 @@ python_packages=(
 # determine which OS we are running and choose the right set of packages to be installed
 release="$(lsb_release -si)/$(lsb_release -sr)"
 case "${release}" in
+	Ubuntu/24.04)
+		echo $release
+		apt-get -y install ca-certificates-java # https://www.mail-archive.com/debian-bugs-dist@lists.debian.org/msg1911078.html
+		apt-get -y install "${common_packages[@]}" "${apt_packages[@]}" "${noble_packages[@]}"
+		;;
 	LinuxMint/*|Ubuntu/*|Debian/*)
 		apt-get -y install ca-certificates-java # https://www.mail-archive.com/debian-bugs-dist@lists.debian.org/msg1911078.html
 		apt-get -y install "${common_packages[@]}" "${apt_packages[@]}"

@@ -8,7 +8,7 @@ if(NOT DB_FOUND)
 endif()
 
 add_library(master ${MASTER_SOURCES})
-target_link_libraries(master sfscommon ${ADDITIONAL_LIBS})
+target_link_libraries(master sfscommon metrics ${ADDITIONAL_LIBS})
 if(JUDY_LIBRARY)
   target_link_libraries(master ${JUDY_LIBRARY})
 endif()
