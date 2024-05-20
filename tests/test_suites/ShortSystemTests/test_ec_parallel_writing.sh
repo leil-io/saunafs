@@ -8,13 +8,14 @@ fi
 CHUNKSERVERS=4 \
 	MOUNTS=10 \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MASTER_CUSTOM_GOALS="10 ec_3_1: \$ec(3,1)" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 
-# Create an empty file on the SaunaFS filesystem with xor3 goal
+# Create an empty file on the SaunaFS filesystem with ec_3_1 goal
 file="${info[mount0]}/file"
 touch "$file"
-saunafs setgoal xor3 "$file"
+saunafs setgoal ec_3_1 "$file"
 
 # Create a temporary file with 25 megabytes of generated data
 tmpf=$RAMDISK_DIR/tmpf
@@ -35,7 +36,7 @@ wait
 MESSAGE="Data is corrupted after writing" expect_success file-validate "$file"
 
 # Validate the parity part
-csid=$(find_first_chunkserver_with_chunks_matching 'chunk_xor_1_of_3*')
+csid=$(find_first_chunkserver_with_chunks_matching 'chunk_ec2_1_of_3*')
 saunafs_chunkserver_daemon $csid stop
 
 MESSAGE="Parity is corrupted after writing" expect_success file-validate "$file"

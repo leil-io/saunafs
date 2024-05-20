@@ -1,6 +1,6 @@
 timeout_set 3 hours
 
-source test_utils/test_xor_consistency_utils.sh
+source test_utils/test_consistency_utils.sh
 
 CHUNKSERVERS=3
 MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
