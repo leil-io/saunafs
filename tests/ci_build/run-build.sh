@@ -3,6 +3,7 @@ set -eux -o pipefail
 PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
 WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
 die() { echo "Error: $*" >&2; exit 1; }
+warn() { echo "Warning: $*" >&2; }
 
 usage() {
 	cat <<-EOT
@@ -31,6 +32,7 @@ declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 [ -n "${1:-}" ] || usage
 declare build_type="${1}"
 declare build_dir
+declare do_install=true
 shift
 case "${build_type,,}" in
 	debug)
@@ -68,7 +70,7 @@ case "${build_type,,}" in
 		;;
 	release)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
-			-DCMAKE_BUILD_TYPE=Release
+			-DCMAKE_BUILD_TYPE=RelWithDebInfo
 			-DCMAKE_INSTALL_PREFIX=/
 			-DENABLE_TESTS=OFF
 			-DCODE_COVERAGE=OFF
@@ -76,6 +78,7 @@ case "${build_type,,}" in
 			-DENABLE_WERROR=OFF
 		)
 		build_dir="${WORKSPACE}/build/saunafs-release"
+		do_install=false
 		;;
 	*) die "Unsupported build type: ${build_type}"
 		;;
@@ -92,4 +95,13 @@ cmake -B "${build_dir}" \
 	"${CMAKE_SAUNAFS_ARGUMENTS[@]}" \
 	"${EXTRA_ARGUMENTS[@]}" "${WORKSPACE}"
 
-nice make -C "${build_dir}" -j "$(nproc)" install
+nice make -C "${build_dir}" -j "$(nproc)"
+if [ "${do_install}" = true ]; then
+	nice make -C "${build_dir}" install
+fi
+
+if [ -f "${build_dir}/CPackConfig.cmake" ]; then
+	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"
+else
+	warn "No CPack configuration found in ${build_dir}. Skipping packaging."
+fi
