@@ -52,17 +52,16 @@
 #include "common/human_readable_format.h"
 #include "common/io_limits_config_loader.h"
 #include "common/io_limits_database.h"
-#include "common/saunafs_statistics.h"
-#include "common/saunafs_version.h"
+#include "common/legacy_vector.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/md5.h"
 #include "common/metadata.h"
-#include "common/legacy_vector.h"
 #include "common/network_address.h"
 #include "common/random.h"
+#include "common/saunafs_statistics.h"
+#include "common/saunafs_version.h"
 #include "common/serialized_goal.h"
-#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/user_groups.h"
 #include "master/changelog.h"
@@ -80,9 +79,11 @@
 #include "master/matomlserv.h"
 #include "master/personality.h"
 #include "master/settrashtime_task.h"
+#include "metrics/metrics.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
-#include "protocol/SFSCommunication.h"
+#include "slogger/slogger.h"
 
 #define MaxPacketSize 1000000
 
@@ -5334,6 +5335,7 @@ void matoclserv_read(matoclserventry *eptr) {
 			eptr->inputpacket.startptr = eptr->hdrbuff;
 			matoclserv_gotpacket(eptr,type,eptr->inputpacket.packet,size);
 			stats_prcvd++;
+			metrics::Counter::increment(metrics::Counter::CLIENT_RX_PACKETS);
 
 			if (eptr->inputpacket.packet) {
 				free(eptr->inputpacket.packet);
@@ -5375,6 +5377,7 @@ void matoclserv_write(matoclserventry *eptr) {
 		}
 		free(pack->packet);
 		stats_psent++;
+		metrics::Counter::increment(metrics::Counter::CLIENT_TX_PACKETS);
 		eptr->outputhead = pack->next;
 		if (eptr->outputhead==NULL) {
 			eptr->outputtail = &(eptr->outputhead);
