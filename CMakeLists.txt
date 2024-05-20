@@ -402,3 +402,5 @@ endif()
 if (ENABLE_URAFT)
   add_subdirectory(src/uraft)
 endif()
+
+include(Packing)

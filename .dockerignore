@@ -12,6 +12,7 @@ compile_commands.json
 
 # Commonly used build directory #
 #################################
+/_packages/
 /build*
 /cmake-build-*
 /install/
