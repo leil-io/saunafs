@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2013-2015 Skytechnology sp. z o.o.
    Copyright 2023      Leil Storage OÜ
 
