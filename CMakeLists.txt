@@ -193,7 +193,7 @@ endif()
 project(saunafs)
 
 if(NOT PACKAGE_VERSION)
-  set(PACKAGE_VERSION "4.1.0-devel" CACHE STRING "Package version")
+  set(PACKAGE_VERSION "4.1.1-devel" CACHE STRING "Package version")
 endif()
 
 string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" PACKAGE_VERSION_MATCH ${PACKAGE_VERSION})
