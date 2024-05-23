@@ -46,7 +46,7 @@
 #include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/output_packet.h"
 #include "common/random.h"
 #include "common/slice_traits.h"

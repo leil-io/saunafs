@@ -30,7 +30,7 @@
 #include <sys/statvfs.h>
 
 #include "common/datapack.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/serialization.h"
 #include "common/special_inode_defs.h"
 #include "common/sockets.h"

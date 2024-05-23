@@ -25,7 +25,7 @@
 #include <stdlib.h>
 
 #include "common/datapack.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "tools/tools_commands.h"
 #include "tools/tools_common_functions.h"
 

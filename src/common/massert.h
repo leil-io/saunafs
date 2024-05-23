@@ -25,8 +25,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "common/sfserr.h"
+#include <sys/syslog.h>
 #include "common/slogger.h"
 
 #ifdef THROW_INSTEAD_OF_ABORT

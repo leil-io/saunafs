@@ -47,7 +47,7 @@
 #include "common/goal.h"
 #include "common/saunafs_version.h"
 #include "common/md5.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/sockets.h"
 #include "common/slogger.h"
 #include "mount/exports.h"

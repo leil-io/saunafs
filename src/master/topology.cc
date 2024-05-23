@@ -33,6 +33,7 @@
 #include "common/cfg.h"
 #include "common/event_loop.h"
 #include "common/massert.h"
+#include "common/sfserr/sfserr.h"
 #include "common/slogger.h"
 #include "master/itree.h"
 

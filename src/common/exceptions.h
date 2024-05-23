@@ -24,7 +24,7 @@
 
 #include "common/chunk_part_type.h"
 #include "common/exception.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/network_address.h"
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(ConfigurationException, Exception);

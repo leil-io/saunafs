@@ -34,7 +34,7 @@
 
 #include "common/cwrap.h"
 #include "common/datapack.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/slogger.h"
 
 #define METADATA_FILENAME_TEMPL "metadata.sfs"

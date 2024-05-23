@@ -25,7 +25,6 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#include "common/sfserr.h"
 #include "tools/tools_commands.h"
 #include "tools/tools_common_functions.h"
 

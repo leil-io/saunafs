@@ -1,4 +1,5 @@
 #include "disk_plugin.h"
+#include <spdlog/sinks/syslog_sink.h>
 
 #include "chunkserver-common/disk_with_fd.h"
 

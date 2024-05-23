@@ -1,4 +1,4 @@
-﻿/*
+/*
    Copyright 2017 Skytechnology sp. z o.o.
    Copyright 2023 Leil Storage OÜ
 
@@ -28,7 +28,7 @@
 #include "fsal_convert.h"
 #include "FSAL/fsal_commonlib.h"
 
-#include "common/saunafs_error_codes.h"
+#include "common/sfserr/saunafs_error_codes.h"
 #include "context_wrap.h"
 #include "saunafs_internal.h"
 

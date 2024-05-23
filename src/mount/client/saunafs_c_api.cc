@@ -28,7 +28,7 @@
 #pragma GCC diagnostic pop
 
 #include "saunafs_c_api.h"
-#include "common/saunafs_error_codes.h"
+#include "common/sfserr/saunafs_error_codes.h"
 #include "common/md5.h"
 #include "common/small_vector.h"
 #include "mount/client/iovec_traits.h"

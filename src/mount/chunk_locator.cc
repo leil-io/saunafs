@@ -24,7 +24,7 @@
 
 #include "protocol/SFSCommunication.h"
 #include "common/exceptions.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "devtools/request_log.h"
 #include "mount/mastercomm.h"
 

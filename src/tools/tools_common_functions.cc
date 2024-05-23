@@ -32,7 +32,7 @@
 #include <string.h>
 
 #include "common/human_readable_format.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/server_connection.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"

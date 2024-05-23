@@ -24,7 +24,7 @@
 
 #include <inttypes.h>
 
-#include "common/saunafs_error_codes.h"
+#include "saunafs_error_codes.h"
 #include "protocol/SFSCommunication.h"
 
 /// returns errno string representation

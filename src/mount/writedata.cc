@@ -43,7 +43,7 @@
 #include "common/goal.h"
 #include "common/massert.h"
 #include "common/message_receive_buffer.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/multi_buffer_writer.h"
 #include "common/pcqueue.h"
 #include "common/slice_traits.h"

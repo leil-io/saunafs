@@ -32,7 +32,7 @@ if(BUILD_TESTS)
       ${CMAKE_SOURCE_DIR}/src/mount/client/saunafs_c_api.h
       ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_c_api.h
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-      ${CMAKE_SOURCE_DIR}/src/common/saunafs_error_codes.h
+      ${CMAKE_SOURCE_DIR}/src/common/sfserr/saunafs_error_codes.h
       ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_error_codes.h
   )
   add_executable(c-client-example

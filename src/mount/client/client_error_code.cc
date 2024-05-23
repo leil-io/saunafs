@@ -20,7 +20,7 @@
 
 #include <string>
 #include "common/platform.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 
 #include "client_error_code.h"
 

@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <sys/syslog.h>
 #include "common/platform.h"
 
 #include <map>

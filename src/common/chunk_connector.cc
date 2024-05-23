@@ -24,7 +24,7 @@
 #include <algorithm>
 
 #include "common/exceptions.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 

@@ -27,7 +27,7 @@
 #include <string>
 
 #include "protocol/SFSCommunication.h"
-#include "common/sfserr.h"
+#include "common/sfserr/sfserr.h"
 
 class Exception : public std::exception {
 public:
