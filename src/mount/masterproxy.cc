@@ -49,6 +49,8 @@ void masterproxy_getlocation(uint8_t *masterinfo) {
 }
 
 static void* masterproxy_server(void *args) {
+	pthread_setname_np(pthread_self(), "masterProxyServ");
+
 	std::vector<uint8_t> buffer;
 	int sock = *((int*)args);
 	free(args);
@@ -107,6 +109,8 @@ static void* masterproxy_server(void *args) {
 }
 
 static void* masterproxy_acceptor(void *args) {
+	pthread_setname_np(pthread_self(), "masterProxyAcc");
+
 	pthread_t clientthread;
 	pthread_attr_t thattr;
 	int sock;

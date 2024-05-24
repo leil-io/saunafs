@@ -311,6 +311,8 @@ static bool delayed_queue_remove(inodedata* id, Glock&) {
 }
 
 void* delayed_queue_worker(void*) {
+	pthread_setname_np(pthread_self(), "delQueueWriter");
+
 	for (;;) {
 		Timeout timeout(std::chrono::microseconds(1000000 / DelayedQueueEntry::kTicksPerSecond));
 		Glock lock(gMutex);
@@ -655,6 +657,11 @@ bool InodeChunkWriter::haveBlockWorthWriting(uint32_t unfinishedOperationCount, 
 /* main working thread | glock:UNLOCKED */
 void* write_worker(void*) {
 	InodeChunkWriter inodeDataWriter;
+	
+	static std::atomic_uint16_t writeWorkersCounter(0);
+	std::string threadName = "writeWorker " + std::to_string(writeWorkersCounter++);
+	pthread_setname_np(pthread_self(), threadName.c_str());
+
 	for (;;) {
 		// get next job
 		uint32_t z1, z2, z3;
