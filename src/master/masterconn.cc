@@ -46,7 +46,7 @@
 #include "common/massert.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "master/changelog.h"

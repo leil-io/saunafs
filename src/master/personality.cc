@@ -28,7 +28,7 @@
 #include "common/event_loop.h"
 #include "common/main.h"
 #include "common/massert.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 
 namespace metadataserver {
 

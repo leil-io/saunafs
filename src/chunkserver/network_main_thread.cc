@@ -57,7 +57,7 @@
 #include "common/massert.h"
 #include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "common/sockets.h"
 #include "devtools/TracePrinter.h"
 

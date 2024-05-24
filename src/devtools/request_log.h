@@ -42,7 +42,7 @@
 #include <boost/iostreams/filtering_stream.hpp>
 
 #include "common/massert.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "devtools/configuration.h"
 
 class RequestLogConfiguration : Configuration {

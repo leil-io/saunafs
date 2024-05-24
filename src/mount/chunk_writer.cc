@@ -33,7 +33,7 @@
 #include "common/massert.h"
 #include "common/read_operation_executor.h"
 #include "common/read_plan_executor.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "devtools/request_log.h"

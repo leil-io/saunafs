@@ -18,7 +18,9 @@ endif()
 
 
 shared_add_library(sfscommon ${COMMON_SOURCES})
-shared_target_link_libraries(sfscommon ${YAML_CPP_LIBRARIES} STATIC sfserr SHARED sfserr_pic)
+shared_target_link_libraries(
+    sfscommon ${YAML_CPP_LIBRARIES} STATIC sfserr slogger SHARED sfserr_pic slogger_pic
+)
 
 if (HAVE_CRCUTIL)
   # Use crcutil Library

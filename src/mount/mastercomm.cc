@@ -49,7 +49,7 @@
 #include "common/md5.h"
 #include "errors/sfserr.h"
 #include "common/sockets.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "mount/exports.h"
 #include "mount/stats.h"
 #include "protocol/cltoma.h"

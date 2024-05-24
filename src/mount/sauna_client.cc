@@ -49,7 +49,7 @@
 #include "common/lru_cache.h"
 #include "errors/sfserr.h"
 #include "common/richacl_converter.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/special_inode_defs.h"
 #include "common/time_utils.h"

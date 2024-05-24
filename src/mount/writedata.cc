@@ -47,7 +47,7 @@
 #include "common/multi_buffer_writer.h"
 #include "common/pcqueue.h"
 #include "common/slice_traits.h"
-#include "common/slogger.h"
+#include "common/slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "devtools/request_log.h"
