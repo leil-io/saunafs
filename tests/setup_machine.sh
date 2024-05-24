@@ -101,7 +101,6 @@ common_packages=(
 	# fio
 	bison
 	byacc
-	ceph
 	dbus
 	doxygen
 	flex
@@ -147,19 +146,14 @@ apt_packages=(
 	krb5-user
 	libacl1-dev
 	libcap-dev
-	libcephfs-dev
 	libdbus-1-dev
-	libglusterfs-dev
 	libgssapi-krb5-2
 	libjemalloc-dev
 	libkrb5-dev
 	libkrb5support0
 	libnfsidmap-dev
-	libradospp-dev
-	libradosstriper-dev
-	librgw-dev
+	libnsl-dev
 	libsqlite3-dev
-	xfslibs-dev
 )
 dnf_packages=(
 	boost-filesystem
@@ -178,6 +172,7 @@ dnf_packages=(
 	libblkid-devel
 	libcutl-devel
 	libdb-devel
+	libnsl
 	libtirpc-devel
 	netcat
 	pam-devel
@@ -209,14 +204,8 @@ dnf_packages=(
 	krb5-workstation
 	libacl-devel
 	libcap-devel
-	libcephfs-devel
-	libglusterfs-devel
 	libnfsidmap-devel
-	librados-devel
-	libradosstriper-devel
-	librgw-devel
 	libsqlite3x-devel
-	xfsprogs-devel
 )
 python_packages=(
 	asciidoc
