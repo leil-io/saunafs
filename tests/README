@@ -118,7 +118,7 @@ Merry testing!
 Experimental features
 =====================
 
-These features can be enabled by setting the required ENV variable.
+These features can be enabled by setting the required ENV variable to 1.
 
 - COREDUMP_WATCH - Watch for any coredumps and terminate the test if found.
   Also print out useful information from GDB. Note that this requires setting

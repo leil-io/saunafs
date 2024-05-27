@@ -40,7 +40,7 @@ setup_local_empty_saunafs() {
 	# Try to enable core dumps if possible
 	ulimit -c unlimited || ulimit -c 100000000 || ulimit -c 1000000 || ulimit -c 10000 || :
 	# Try to enable coredump analysis
-	if [[ ! -z ${COREDUMP_WATCH:-} ]]; then
+	if parse_true "${COREDUMP_WATCH:-}"; then
 		coredump_setup
 		if coredump_is_enabled; then
 			( coredump_watcher & )
