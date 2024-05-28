@@ -1024,6 +1024,8 @@ static void usr1_handler(int) {
 #endif
 
 void* fs_nop_thread(void *arg) {
+	pthread_setname_np(pthread_self(), "nopThread");
+
 	uint8_t *ptr,hdr[12],*inodespacket;
 	int32_t inodesleng;
 	acquired_file *afptr;
@@ -1140,6 +1142,9 @@ bool fs_deserialize_from_master(uint32_t& remainingBytes, Args&... destination) 
 void* fs_receive_thread(void *) {
 	uint32_t initialReconnectSleep_ms = 100;
 	uint32_t reconnectSleep_ms = initialReconnectSleep_ms;
+	
+	pthread_setname_np(pthread_self(), "recFromMaster");
+
 	for (;;) {
 		std::unique_lock<std::mutex>fdLock(fdMutex);
 		if (fterm) {
