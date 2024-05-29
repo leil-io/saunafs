@@ -2,7 +2,6 @@ collect_sources(CLIENT)
 
 shared_add_library(saunafs-client client.cc saunafs_c_api.cc client_error_code.cc)
 shared_target_link_libraries(saunafs-client mount)
-shared_target_link_libraries(saunafs-client sfserr_pic)
 
 shared_add_library(saunafs-client-cpp client.cc client_error_code.cc)
 shared_target_link_libraries(saunafs-client-cpp mount)
