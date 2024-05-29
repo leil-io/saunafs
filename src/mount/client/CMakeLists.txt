@@ -2,15 +2,16 @@ collect_sources(CLIENT)
 
 shared_add_library(saunafs-client client.cc saunafs_c_api.cc client_error_code.cc)
 shared_target_link_libraries(saunafs-client mount)
-shared_target_link_libraries(saunafs-client ${CMAKE_DL_LIBS})
+shared_target_link_libraries(saunafs-client sfserr_pic)
 
 shared_add_library(saunafs-client-cpp client.cc client_error_code.cc)
 shared_target_link_libraries(saunafs-client-cpp mount)
 
+shared_target_link_libraries(saunafs-client ${CMAKE_DL_LIBS})
 
 add_library(saunafs-client_shared SHARED client.cc saunafs_c_api.cc client_error_code.cc)
-target_link_libraries(saunafs-client_shared ${CMAKE_DL_LIBS} mount_pic)
 set_target_properties(saunafs-client_shared PROPERTIES OUTPUT_NAME "saunafs-client")
+target_link_libraries(saunafs-client_shared ${CMAKE_DL_LIBS} mount_pic)
 
 add_library(saunafsmount_shared SHARED ${MOUNT_SOURCES} sauna_client_c_linkage.cc)
 target_link_libraries(saunafsmount_shared mount_pic ${ADDITIONAL_LIBS})

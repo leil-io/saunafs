@@ -1,3 +1,3 @@
 collect_sources(SFSERR)
 
-add_library(sfserr ${SFSERR_SOURCES})
+shared_add_library(sfserr ${SFSERR_SOURCES})
