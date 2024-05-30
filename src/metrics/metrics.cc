@@ -1,10 +1,10 @@
-#include <memory>
 #ifdef HAVE_PROMETHEUS
 #include <prometheus/detail/builder.h>
 #include <prometheus/family.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <exception>
+#include <memory>
 #endif
 
 #include "metrics.h"
@@ -49,11 +49,10 @@ void metrics_destroy() {
 }
 
 #ifndef HAVE_PROMETHEUS
-int metrics_init(const std::string& /* unused */) {
+void metrics_init(const char* /* unused */) {
 	safs::log_err(
 	    "could not setup prometheus server: Prometheus isn't compiled with "
 	    "this program");
-	return 1;
 }
 }
 #else
