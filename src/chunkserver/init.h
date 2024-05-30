@@ -18,8 +18,10 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/config/config.h"
 #include "common/platform.h"
 
+#include <cstdint>
 #include <vector>
 
 #include "chunkserver/chartsdata.h"
@@ -28,6 +30,29 @@
 #include "chunkserver/network_main_thread.h"
 #include "common/random.h"
 #include "common/run_tab.h"
+
+using ConfigString = std::pair<std::string, std::string>;
+using ConfigInt = std::pair<std::string, int>;
+using ConfigInt32 = std::pair<std::string, int32_t>;
+using ConfigUint32 = std::pair<std::string, uint32_t>;
+
+const std::pair<std::string, std::string> CONFIG_LABEL = {"LABEL", "_"};
+const std::pair<std::string, std::string> CONFIG_WORKING_USER = {"WORKING_USER", "saunafs"};
+const std::pair<std::string, std::string> CONFIG_WORKING_GROUP = {"WORKING_GROUP", "saunafs"};
+const std::pair<std::string, std::string> CONFIG_SYSLOG_IDENT = {"SYSLOG_IDENT", "saunafs"};
+
+inline void setDefaultConfig() {
+	Config &config = Config::instance();
+
+	config.addOption(ConfigString("LABEL", MediaLabelManager::kWildcard));
+	config.addOption(ConfigString{"WORKING_USER", "saunafs"});
+	config.addOption(ConfigString{"WORKING_GROUP", "saunafs"});
+	config.addOption(ConfigString{"SYSLOG_IDENT", "sfschunkserver"});
+	config.addOption(ConfigInt{"LOCK_MEMORY", 0});
+	config.addOption(ConfigInt32{"NICE_LEVEL", -19});
+	config.addOption(ConfigString{"DATA_PATH", DATA_PATH});
+	config.addOption(ConfigUint32{"MASTER_RECONNECTION_DELAY", 5});
+};
 
 /// Functions to call before normal startup
 inline const std::vector<RunTab> earlyRunTabs = {};

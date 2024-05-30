@@ -19,6 +19,7 @@
  */
 
 #include "common/platform.h"
+#include "devtools/configuration.h"
 #include "init.h"
 
 #include <errno.h>
@@ -57,6 +58,8 @@
 #include "slogger/slogger.h"
 #include "common/time_utils.h"
 #include "protocol/SFSCommunication.h"
+
+#include "common/config/config.h"
 
 #if defined(SAUNAFS_HAVE_MLOCKALL)
 #  if defined(SAUNAFS_HAVE_SYS_MMAN_H)
@@ -902,6 +905,21 @@ int main(int argc,char **argv) {
 			set_signal_handlers(0);
 		}
 		makePidFile(pidfile);
+	}
+
+	try {
+		Config &config = Config::instance();
+		config.readConfig(cfgfile, logundefined != 0);
+	} catch (std::runtime_error &e) {
+		safs::log_err(LOG_ERR, "failed loading configuration file: {}",
+		              e.what());
+		safs::log_warn(
+		    "configuration file {} could not be loaded - using "
+		    "defaults; please create one to remove this "
+		    "warning (you can copy sample configuration "
+		    "from '{}.cfg' to get a base "
+		    "configuration)",
+		    cfgfile.c_str(), APP_EXAMPLES_SUBDIR "/" STR(CFGNAME));
 	}
 
 	ch = cfg_load(cfgfile.c_str(), logundefined);
