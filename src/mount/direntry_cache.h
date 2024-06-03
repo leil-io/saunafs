@@ -493,9 +493,7 @@ public:
 		// the parent, like in unlink
 		auto iter = inode_multiset_.lower_bound(parent_inode, InodeCompare());
 
-		while (iter != inode_multiset_.end() &&
-		       (iter->inode == parent_inode ||
-		        iter->parent_inode == kInvalidParent)) {
+		while (iter != inode_multiset_.end() && iter->inode == parent_inode) {
 			DirEntry *entry = std::addressof(*iter);
 			++iter;
 			erase(entry);
@@ -514,12 +512,14 @@ public:
 		// lookup_set_ should contain all the elements inside index_set
 		auto it = lookup_set_.lower_bound(
 		    std::make_tuple(parent_inode, ctx.uid, ctx.gid, ""), LookupCompare());
-		while (it != lookup_set_.end() &&
-		       std::make_tuple(parent_inode, ctx.uid, ctx.gid) ==
-		               std::make_tuple(it->parent_inode, it->uid, it->gid)) {
-			DirEntry *entry = std::addressof(*it);
+		while (it != lookup_set_.end() && parent_inode == it->parent_inode) {
+			if (ctx.uid == it->uid && ctx.gid == it->gid) {
+				DirEntry *entry = std::addressof(*it);
+				++it;
+				erase(entry);
+				continue;
+			}
 			++it;
-			erase(entry);
 		}
 
 		// Make sure inode_multiset_ is also clean of outdated entries.
@@ -527,12 +527,14 @@ public:
 		// the parent, like in unlink
 		auto iter = inode_multiset_.lower_bound(parent_inode, InodeCompare());
 
-		while (iter != inode_multiset_.end() &&
-		       (iter->inode == parent_inode ||
-		        iter->parent_inode == kInvalidParent)) {
-			DirEntry *entry = std::addressof(*iter);
+		while (iter != inode_multiset_.end() && iter->inode == parent_inode) {
+			if (ctx.uid == iter->uid && ctx.gid == iter->gid) {
+				DirEntry *entry = std::addressof(*iter);
+				++iter;
+				erase(entry);
+				continue;
+			}
 			++iter;
-			erase(entry);
 		}
 	}
 
