@@ -40,8 +40,8 @@ using ConfigBool = std::pair<std::string, bool>;
 
 template<typename... Options>
 inline void setConfigOptions(Options&&... options) {
-    Config &config = Config::instance();
-    (config.addOption(std::forward<Options>(options)), ...);
+    auto config = Config::instance();
+    (config->addOption(std::forward<Options>(options)), ...);
 }
 
 inline void setDefaultConfig() {
