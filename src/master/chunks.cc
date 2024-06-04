@@ -90,6 +90,8 @@ static uint32_t gRedundancyLevel;
 static uint64_t gEndangeredChunksServingLimit;
 static uint64_t gEndangeredChunksMaxCapacity;
 static uint64_t gDisconnectedCounter = 0;
+inline LinearAssignmentCache gLinearAssignmentCache;
+inline bool gUseLinearAssignmentOptimizer;
 bool gAvoidSameIpChunkservers = false;
 
 struct ChunkPart {
@@ -378,7 +380,7 @@ public:
 			all.addPart(part.type, csdb_find(part.csid)->label);
 		}
 
-		all.optimize();
+		all.optimize(gUseLinearAssignmentOptimizer, &gLinearAssignmentCache);
 
 		allFullCopies_ = std::min(kMaxStatCount, all.getFullCopiesCount());
 		allAvailabilityState_ = all.getState();
@@ -1312,7 +1314,7 @@ int chunk_repair(uint8_t goal, uint64_t ochunkid, uint32_t *nversion, uint8_t co
 	for (auto &version_and_calculator : calculators) {
 		uint32_t version = version_and_calculator.first;
 		ChunkCopiesCalculator &calculator = version_and_calculator.second;
-		calculator.optimize();
+		calculator.optimize(gUseLinearAssignmentOptimizer, &gLinearAssignmentCache);
 		// calculator.isRecoveryPossible() won't work below, because target goal is empty.
 		if (calculator.getFullCopiesCount() > 0) {
 			best_version = version;
@@ -2374,7 +2376,7 @@ void ChunkWorker::doChunkJobs(Chunk *c, uint16_t serverCount) {
 			++invalid_parts;
 		}
 	}
-	calc.optimize();
+	calc.optimize(gUseLinearAssignmentOptimizer, &gLinearAssignmentCache);
 
 	// step 1a. count number of chunk parts on servers with the same ip
 	IpCounter ip_occurrence;
@@ -2758,6 +2760,7 @@ void chunk_reload(void) {
 	gOperationsDelayDisconnect = cfg_getuint32("OPERATIONS_DELAY_DISCONNECT", gOperationsDelayDisconnect);
 	gAvoidSameIpChunkservers = cfg_getuint32("AVOID_SAME_IP_CHUNKSERVERS", 0);
 	gRedundancyLevel = cfg_getuint32("REDUNDANCY_LEVEL", 0);
+	gUseLinearAssignmentOptimizer = cfg_getuint32("USE_LINEAR_ASSIGNMENT_OPTIMIZER", 1);
 
 	uint32_t disableChunksDel = cfg_getuint32("DISABLE_CHUNKS_DEL", 0);
 	if (disableChunksDel) {
@@ -2852,6 +2855,7 @@ int chunk_strinit(void) {
 	gOperationsDelayDisconnect = cfg_getuint32("OPERATIONS_DELAY_DISCONNECT", gOperationsDelayDisconnect);
 	gAvoidSameIpChunkservers = cfg_getuint32("AVOID_SAME_IP_CHUNKSERVERS", 0);
 	gRedundancyLevel = cfg_getuint32("REDUNDANCY_LEVEL", 0);
+	gUseLinearAssignmentOptimizer = cfg_getuint32("USE_LINEAR_ASSIGNMENT_OPTIMIZER", 1);
 
 	if (disableChunksDel) {
 		MaxDelHardLimit = MaxDelSoftLimit = 0;

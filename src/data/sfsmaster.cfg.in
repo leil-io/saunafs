@@ -118,6 +118,11 @@
 ## (Default: 60)
 # CHUNKS_LOOP_MAX_CPU = 60
 
+## Use linear assignment in chunks optimization. It is suggested to 
+## disable it if not using labeled chunkservers (Boolean, 0 or 1).
+## (Default: 1)
+# USE_LINEAR_ASSIGNMENT_OPTIMIZER = 1
+
 ## Soft maximum number of chunks to delete on one chunkserver.
 ## (Default: 10)
 # CHUNKS_SOFT_DEL_LIMIT = 10
