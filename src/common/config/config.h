@@ -1,10 +1,14 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <sstream>
+#include <map>
 #include <string>
 #include <utility>
+
+
+struct ConfigValue {
+	std::string value;
+	std::string defaultValue;
+};
 
 struct Config {
 	/// Get the instance of the Configuration class.
@@ -32,6 +36,13 @@ struct Config {
 	void addOption(const std::pair<std::string, T> &option);
 
 	// May throw std::runtime_error
-	void readConfig(const std::string&, bool logUndefined);
+	void readConfig(const std::string& filename, bool logUndefined);
+
+private:
+	/// Private constructor for the singleton pattern
+	Config() = default;
+
+	/// Map with all the configuration options.
+	std::map<std::string, ConfigValue> options_{};
 };
 

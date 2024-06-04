@@ -18,7 +18,7 @@ create_unittest(chunkserver ${CHUNKSERVER_TESTS})
 link_unittest(chunkserver chunkserver sfscommon)
 
 add_executable(sfschunkserver ${MAIN_SRC})
-target_link_libraries(sfschunkserver chunkserver ${PAM_LIBRARIES})
+target_link_libraries(sfschunkserver chunkserver config ${PAM_LIBRARIES})
 
 if(SYSTEMD_FOUND)
   target_link_libraries(sfschunkserver ${SYSTEMD_LIBRARIES})

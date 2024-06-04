@@ -35,24 +35,56 @@ using ConfigString = std::pair<std::string, std::string>;
 using ConfigInt = std::pair<std::string, int>;
 using ConfigInt32 = std::pair<std::string, int32_t>;
 using ConfigUint32 = std::pair<std::string, uint32_t>;
+using ConfigUint64 = std::pair<std::string, uint32_t>;
+using ConfigBool = std::pair<std::string, bool>;
 
-const std::pair<std::string, std::string> CONFIG_LABEL = {"LABEL", "_"};
-const std::pair<std::string, std::string> CONFIG_WORKING_USER = {"WORKING_USER", "saunafs"};
-const std::pair<std::string, std::string> CONFIG_WORKING_GROUP = {"WORKING_GROUP", "saunafs"};
-const std::pair<std::string, std::string> CONFIG_SYSLOG_IDENT = {"SYSLOG_IDENT", "saunafs"};
+template<typename... Options>
+inline void setConfigOptions(Options&&... options) {
+    Config &config = Config::instance();
+    (config.addOption(std::forward<Options>(options)), ...);
+}
 
 inline void setDefaultConfig() {
-	Config &config = Config::instance();
-
-	config.addOption(ConfigString("LABEL", MediaLabelManager::kWildcard));
-	config.addOption(ConfigString{"WORKING_USER", "saunafs"});
-	config.addOption(ConfigString{"WORKING_GROUP", "saunafs"});
-	config.addOption(ConfigString{"SYSLOG_IDENT", "sfschunkserver"});
-	config.addOption(ConfigInt{"LOCK_MEMORY", 0});
-	config.addOption(ConfigInt32{"NICE_LEVEL", -19});
-	config.addOption(ConfigString{"DATA_PATH", DATA_PATH});
-	config.addOption(ConfigUint32{"MASTER_RECONNECTION_DELAY", 5});
-};
+	// clang-format off
+    setConfigOptions(
+        ConfigString("LABEL", MediaLabelManager::kWildcard),
+        ConfigString{"WORKING_USER", "saunafs"},
+        ConfigString{"WORKING_GROUP", "saunafs"},
+        ConfigString{"SYSLOG_IDENT", "sfschunkserver"},
+        ConfigInt{"LOCK_MEMORY", 0},
+        ConfigInt32{"NICE_LEVEL", -19},
+        ConfigString{"DATA_PATH", DATA_PATH},  // Replace with your actual data path
+        ConfigUint32{"MASTER_RECONNECTION_DELAY", 5},
+        ConfigString{"BIND_HOST", "*"},
+        ConfigString{"MASTER_HOST", "sfsmaster"},
+        ConfigUint32{"MASTER_PORT", 9420},
+        ConfigUint32{"MASTER_TIMEOUT", 60},
+        ConfigString{"CSSERV_LISTEN_HOST", "*"},
+        ConfigUint32{"CSSERV_LISTEN_PORT", 9422},
+        ConfigUint32{"NR_OF_NETWORK_WORKERS", 1},
+        ConfigUint32{"NR_OF_HDD_WORKERS_PER_NETWORK_WORKER", 20},
+        ConfigUint32{"BGJOBSCNT_PER_NETWORK_WORKER", 1000},
+        ConfigUint32{"READ_AHEAD_KB", 0},
+        ConfigUint32{"MAX_READ_BEHIND_KB", 0},
+        ConfigString{"HDD_CONF_FILENAME", "/usr/local/etc/saunafs/sfshdd.cfg"},
+        ConfigUint64{"HDD_LEAVE_SPACE_DEFAULT", 4 * 1024 * 1024}, // Convert GiB to KiB
+        ConfigUint32{"HDD_TEST_FREQ", 10},
+        ConfigBool{"HDD_CHECK_CRC_WHEN_READING", true},
+        ConfigBool{"HDD_CHECK_CRC_WHEN_WRITING", true},
+        ConfigBool{"HDD_ADVISE_NO_CACHE", false},
+        ConfigBool{"HDD_PUNCH_HOLES", true},
+        ConfigBool{"ENABLE_LOAD_FACTOR", false},
+        ConfigUint32{"REPLICATION_BANDWIDTH_LIMIT_KBPS", 102400},
+        ConfigUint32{"REPLICATION_TOTAL_TIMEOUT_MS", 60000},
+        ConfigUint32{"REPLICATION_CONNECTION_TIMEOUT_MS", 1000},
+        ConfigUint32{"REPLICATION_WAVE_TIMEOUT_MS", 500},
+        ConfigBool{"PERFORM_FSYNC", true},
+        // Deprecated configurations
+        ConfigInt32{"BACK_LOGS", 50},  // Deprecated, to be removed
+        ConfigUint32{"CSSERV_TIMEOUT", 5}  // Deprecated, to be removed
+		);
+	// clang-format on
+}
 
 /// Functions to call before normal startup
 inline const std::vector<RunTab> earlyRunTabs = {};
