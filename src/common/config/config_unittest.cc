@@ -2,21 +2,22 @@
 #include <boost/filesystem/path.hpp>
 #include <fstream>
 #include <stdexcept>
-#include "config.cc"
+#include "config.h"
 
 #include <gtest/gtest.h>
 
 TEST(INIConfigParsing, ParseSimpleConfig) {
-	const auto *test_config = "PERSONALITY = master";
+	const auto *test_config = "PERSONALITY = shadow";
 	auto temp = boost::filesystem::unique_path();
 	std::ofstream file(temp.native());
 	file << test_config << "\n";
 
 	file.close();
 
-	auto config = loadINIConfigFile(temp.native().data());
-	ASSERT_EQ(config.count("PERSONALITY"), 1);
-	EXPECT_EQ(config["PERSONALITY"], "master");
+	auto &config = Config::instance();
+	config.addOption<std::string>({"PERSONALITY", "master"});
+	config.readConfig(temp.native(), false);
+	ASSERT_EQ(config.getOption<std::string>("PERSONALITY"), "shadow");
 }
 
 TEST(INIConfigParsing, ParseAdvancedConfig) {
@@ -48,23 +49,28 @@ NICE_LEVEL = -19
 
 	file.close();
 
-	auto config = loadINIConfigFile(temp.native().data());
+	auto &config = Config::instance();
+	// Default values, must be set otherwise readConfig won't add the values
+	config.addOption<std::string>({"SYSLOG_IDENT", "unknown"});
+	config.addOption<bool>({"LOCK_MEMORY", true});
+	config.addOption<int8_t>({"NICE_LEVEL", 20});
+	config.addOption<bool>({"PREFER_LOCAL_CHUNKSERVER", false});
 
-	ASSERT_EQ(config.count("SYSLOG_IDENT"), 1);
-	EXPECT_EQ(config["SYSLOG_IDENT"], "sfsmaster");
+	config.readConfig(temp.native(), false);
 
-	ASSERT_EQ(config.count("LOCK_MEMORY"), 1);
-	EXPECT_EQ(config["LOCK_MEMORY"], "0");
+	EXPECT_EQ(config.getOption<std::string>("SYSLOG_IDENT"), "sfsmaster");
 
-	ASSERT_EQ(config.count("NICE_LEVEL"), 1);
-	EXPECT_EQ(config["NICE_LEVEL"], "-19");
+	EXPECT_EQ(config.getOption<bool>("LOCK_MEMORY"), false);
 
-	ASSERT_EQ(config.count("PREFER_LOCAL_CHUNKSERVER"), 0);
+	EXPECT_EQ(config.getOptionInt8("NICE_LEVEL"), -19);
+
+	EXPECT_EQ(config.getOption<bool>("PREFER_LOCAL_CHUNKSERVER"), false);
 }
 
 TEST(INIConfigParsing, NoConfigFile) {
 	try {
-	auto config = loadINIConfigFile("non-existant");
+	auto &config = Config::instance();
+	config.readConfig("non-existant", true);
 	} catch (std::runtime_error& e) {
 		std::cout << e.what() << '\n';
 		return;
