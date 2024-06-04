@@ -911,7 +911,7 @@ int main(int argc,char **argv) {
 		Config &config = Config::instance();
 		config.readConfig(cfgfile, logundefined != 0);
 	} catch (std::runtime_error &e) {
-		safs::log_err(LOG_ERR, "failed loading configuration file: {}",
+		safs::log_err("failed loading configuration file: {}",
 		              e.what());
 		safs::log_warn(
 		    "configuration file {} could not be loaded - using "

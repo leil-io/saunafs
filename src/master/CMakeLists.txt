@@ -19,7 +19,7 @@ create_unittest(master ${MASTER_TESTS})
 link_unittest(master master sfscommon)
 
 add_executable(sfsmaster ${MAIN_SRC})
-target_link_libraries(sfsmaster master metrics ${PAM_LIBRARIES})
+target_link_libraries(sfsmaster master config metrics ${PAM_LIBRARIES})
 if(SYSTEMD_FOUND)
   target_link_libraries(sfsmaster ${SYSTEMD_LIBRARIES})
 endif()

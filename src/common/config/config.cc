@@ -7,6 +7,8 @@
 #include <map>
 #include <string>
 
+#include "config.h"
+
 enum Types {
 	UINT16,
 	UINT32,
@@ -17,7 +19,7 @@ enum Types {
 	STRING,
 };
 
-std::map<std::string, std::string> loadINIConfigFile(const char* configFileName) {
+std::map<std::string, std::string> loadINIConfigFile(const std::string& configFileName) {
 	std::map<std::string, std::string> config;
 	std::ifstream file(configFileName);
 
@@ -54,102 +56,78 @@ std::map<std::string, std::string> loadINIConfigFile(const char* configFileName)
 	return config;
 }
 
-struct ConfigValue {
-	std::string value;
-	std::string defaultValue;
-};
-
 // Helper to check if `operator<<` is defined for type T
 template <typename T, typename = void>
 struct has_insertion_operator : std::false_type {};
 template <typename T>
 struct has_insertion_operator<T, std::void_t<decltype(std::declval<std::ostream&>() << std::declval<T>())>> : std::true_type {};
 
-struct Config {
-	/// Get the instance of the Configuration class.
-	static Config& instance() {
-		static Config instance;
-		return instance;
+Config& Config::instance() {
+	static Config instance;
+	return instance;
+}
+
+/// Retrieves an option from the configuration file as uint32_t.
+/// \param optionName The name of the option to retrieve.
+/// In the future, the option will be cached and only read from the file
+/// once, unless reaload is requested.
+template <typename T>
+auto Config::getOption(const std::string &name) {
+	auto ite = options_.find(name);
+	if (ite != options_.end()) {
+		T result;
+		std::istringstream iss(ite->second.value);
+		if (!(iss >> result)) {
+			std::cerr << "Type conversion failed for key: " + name + '\n';
+			std::cerr << "Using default value for this key: " + name + '\n';
+			// This is most of the time a safe option, due to a compile time
+			// check to make sure the initial addOption calls are correctly
+			// setting the value. However it can still fail if the getOption
+			// T differs (and if they do, shame on you!)
+			return static_cast<T>(ite->second.defaultValue);
+		}
+		return result;
+	}
+	throw std::runtime_error("Key not found: " + name);
+}
+
+/// Adds an option to the map. All options should be added at start time.
+/// \param option The option to add.
+template <typename T>
+void Config::addOption(const std::pair<std::string, T> &option) {
+	// Check if you are actually declaring the correct value
+	static_assert(has_insertion_operator<T>::value,
+	              "Type T must support output to std::ostream "
+	              "(operator<< must be defined)");
+
+	// TODO(Urmas): Replace cerr with safs::log_warn
+	if (options_.find(option.first) != options_.end()) {
+		std::cerr << "Option " << option.first.c_str()
+		          << "already exists in the configuration";
+		return;
 	}
 
-	// Not needed methods
-	Config(const Config &) = delete;
-	Config &operator=(const Config &) = delete;
-	Config(Config &&) = delete;
-	Config &operator=(Config &&) = delete;
+	std::ostringstream oss;
+	oss << option.second;
+	std::string valueAsString = oss.str();
+	ConfigValue value(valueAsString, valueAsString);
 
-	/// Default destructor
-	~Config() = default;
+	options_.insert({option.first, value});
+}
 
-	/// Retrieves an option from the configuration file as uint32_t.
-	/// \param optionName The name of the option to retrieve.
-	/// In the future, the option will be cached and only read from the file
-	/// once, unless reaload is requested.
-	template<typename T>
-	auto getOption(const std::string &name) {
-		auto ite = options_.find(name);
-		if (ite != options_.end()) {
-			T result;
-			std::istringstream iss(ite->second.value);
-			if (!(iss >> result)) {
-				std::cerr << "Type conversion failed for key: " + name + '\n';
-				std::cerr << "Using default value for this key: " + name + '\n';
-				// This is most of the time a safe option, due to a compile time
-				// check to make sure the initial addOption calls are correctly
-				// setting the value. However it can still fail if the getOption
-				// T differs (and if they do, shame on you!)
-				return static_cast<T>(ite->second.defaultValue);
-			}
-			return result;
-		}
-		throw std::runtime_error("Key not found: " + name);
+// May throw std::runtime_error
+void Config::readConfig(const std::string &filename, bool logUndefined) {
+	auto iniConfig = loadINIConfigFile(filename);
+	for (auto const &[key, value] : iniConfig) {
+		if (options_.contains(key)) { options_[key].value = value; }
 	}
-
-	/// Adds an option to the map. All options should be added at start time.
-	/// \param option The option to add.
-	template <typename T>
-	void addOption(const std::pair<std::string, T> &option) {
-		// Check if you are actually declaring the correct value
-		static_assert(has_insertion_operator<T>::value,
-		              "Type T must support output to std::ostream "
-		              "(operator<< must be defined)");
-
-		// TODO(Urmas): Replace cerr with safs::log_warn
-		if (options_.find(option.first) != options_.end()) {
-			std::cerr << "Option " << option.first.c_str() << "already exists in the configuration";
-			return;
-		}
-
-		std::ostringstream oss;
-		oss << option.second;
-		std::string valueAsString = oss.str();
-		ConfigValue value(valueAsString, valueAsString);
-
-		options_.insert({option.first, value});
-	}
-
-	// May throw std::runtime_error
-	void readConfig(const char *filename, const bool logUndefined) {
-		auto iniConfig = loadINIConfigFile(filename);
-		for (auto const& [key, value] : iniConfig) {
-			if (options_.contains(key)) {
-				options_[key].value = value;
-			}
-		}
-		if (logUndefined) {
-			for (auto const& [key, value] : options_) {
-				// TODO(Urmas): Convert to safs::log_notice
-				if (!iniConfig.contains(key)) {
-					std::cerr << "config: using default value for option '" + key + "' - '" + value.value + "'";
-				}
+	if (logUndefined) {
+		for (auto const &[key, value] : options_) {
+			// TODO(Urmas): Convert to safs::log_notice
+			if (!iniConfig.contains(key)) {
+				std::cerr << "config: using default value for option '" + key +
+				                 "' - '" + value.value + "'";
 			}
 		}
 	}
-
-private:
-	/// Private constructor for the singleton pattern
-	Config() = default;
-
-	/// Map with all the configuration options.
-	std::map<std::string, ConfigValue> options_{};
-};
+}

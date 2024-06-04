@@ -10,7 +10,7 @@ target_link_libraries(metalogger sfscommon)
 create_unittest(metalogger ${METALOGGER_TESTS})
 
 add_executable(sfsmetalogger ${MAIN_SRC})
-target_link_libraries(sfsmetalogger metalogger ${PAM_LIBRARIES})
+target_link_libraries(sfsmetalogger metalogger config ${PAM_LIBRARIES})
 if(SYSTEMD_FOUND)
   target_link_libraries(sfsmetalogger ${SYSTEMD_LIBRARIES})
 endif()
