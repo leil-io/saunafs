@@ -1,13 +1,13 @@
 timeout_set 3 hours
 
-source test_utils/test_xor_consistency_utils.sh
+source test_utils/test_consistency_utils.sh
 
 CHUNKSERVERS=3
 MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 dir="${info[mount0]}/dir"
 mkdir "$dir"
-saunafs setgoal xor2 "$dir"
+saunafs setgoal ec21 "$dir"
 
 DATA_SIZE_PER_THREAD=$(parse_si_suffix 3G)
 thread_count=10
