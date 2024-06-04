@@ -3,6 +3,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <map>
 #include <string>
@@ -18,6 +19,8 @@ enum Types {
 	INT64,
 	STRING,
 };
+
+std::shared_ptr<Config> configPtr;
 
 std::map<std::string, std::string> loadINIConfigFile(const std::string& configFileName) {
 	std::map<std::string, std::string> config;
@@ -56,14 +59,17 @@ std::map<std::string, std::string> loadINIConfigFile(const std::string& configFi
 	return config;
 }
 
-Config& Config::instance() {
-	static Config instance;
-	return instance;
+std::shared_ptr<Config> Config::instance() {
+	if (!configPtr) {
+		configPtr = std::make_shared<Config>();
+	}
+	return configPtr;
 }
 
 // May throw std::runtime_error
 void Config::readConfig(const std::string &filename, bool logUndefined) {
 	auto iniConfig = loadINIConfigFile(filename);
+	filename_ = filename;
 	for (auto const &[key, value] : iniConfig) {
 		if (options_.contains(key)) { options_[key].value = value; }
 	}
@@ -72,8 +78,20 @@ void Config::readConfig(const std::string &filename, bool logUndefined) {
 			// TODO(Urmas): Convert to safs::log_notice
 			if (!iniConfig.contains(key)) {
 				std::cerr << "config: using default value for option '" + key +
-				                 "' - '" + value.value + "'";
+				                 "' - '" + value.value + "'\n";
 			}
+		}
+	}
+}
+
+void Config::reloadConfig() {
+	auto iniConfig = loadINIConfigFile(filename_);
+	for (auto &[key, value] : options_) {
+		// TODO(Urmas): Convert to safs::log_notice
+		if (!iniConfig.contains(key)) {
+			value.value = value.defaultValue;
+		} else {
+			options_[key].value = iniConfig[key];
 		}
 	}
 }
