@@ -27,6 +27,7 @@
 #include "common/chunks_availability_state.h"
 #include "common/goal.h"
 #include "common/flat_map.h"
+#include "common/linear_assignment_cache.h"
 #include "common/media_label.h"
 
 /*! \brief Class used to calculate required operations to achieve chunk goal.
@@ -79,7 +80,9 @@ public:
 	 *
 	 * All query functions might be used only after this function has been executed.
 	 */
-	void optimize();
+	void optimize(bool useLinearAssignmentOptimizer = true,
+	              LinearAssignmentCache *linearAssignmentCache =
+	                  LinearAssignmentCache::kNotProvidedCache);
 
 	/*! \brief Evaluate chunk redundancy level.
 	 *
