@@ -63,44 +63,88 @@ void ChunkCopiesCalculator::removePart(const Goal::Slice::Type &slice_type, int 
 	}
 }
 
-void ChunkCopiesCalculator::optimize() {
+/**
+ * @brief Check if the provided slice should be skipped or not by the optimize function. 
+ * 
+ * A slice can be skipped if all their parts require the same because all of its 
+ * permutations are equal.
+ * 
+ * @param slice ```Slice``` to be checked.
+ * @return true The slice should be skipped. --
+ * @return false The slice should not be skipped.
+ */
+bool isSkippable(Goal::Slice &slice) {
+	for (int i = 1; i < slice.size(); ++i) {
+		if (!LinearAssignmentCache::OptimizerInputOutput::partsMatch(
+		        slice[0], slice[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void ChunkCopiesCalculator::optimize(
+    bool useLinearAssignmentOptimizer,
+    LinearAssignmentCache *linearAssignmentCache) {
 	constexpr int max_slice_op = 10 * Goal::kMaxExpectedCopies;
 
 	for (auto &target_slice : target_) {
+		if (!useLinearAssignmentOptimizer) {
+			break;
+		}
+
 		auto slice_it = available_.find(target_slice.getType());
-		if (slice_it == available_.end() ||
-		    target_slice.size() <= 1) {
+		if (slice_it == available_.end() || target_slice.size() <= 1) {
 			continue;
 		}
-		const Goal::Slice &src_slice = *slice_it;
 
-		std::array<std::array<int, Goal::Slice::kMaxPartsCount>,
-		           Goal::Slice::kMaxPartsCount> cost;
-		std::array<int, Goal::Slice::kMaxPartsCount> assignment, object_assignment;
-
-		int i = 0;
-		for(const auto &src_part : src_slice) {
-			int j = 0;
-			for(const auto &target_part : static_cast<const Goal::Slice&>(target_slice)) {
-				auto op_count = operationCount(src_part, target_part);
-				op_count =
-				        std::make_pair(std::min(op_count.first, max_slice_op - 1),
-				                       std::min(op_count.second, max_slice_op - 1));
-				cost[i][j] = max_slice_op * max_slice_op -
-				             (max_slice_op * op_count.first + op_count.second);
-				++j;
-			}
-			++i;
+		if (isSkippable(target_slice)) {
+			continue;
 		}
 
-		linear_assignment::auctionOptimization(cost, assignment, object_assignment,
-		                                       target_slice.size());
+		Goal::Slice &src_slice = *slice_it;
+		std::array<int, Goal::Slice::kMaxPartsCount> assignment;
+		bool isCacheAvailable =
+		    (linearAssignmentCache != LinearAssignmentCache::kNotProvidedCache);
+		if (!isCacheAvailable ||
+		    !linearAssignmentCache
+		         ->checkMatchAndGetResult<Goal::Slice::kMaxPartsCount>(
+		             target_slice, src_slice, assignment)) {
+			std::array<std::array<int, Goal::Slice::kMaxPartsCount>,
+			           Goal::Slice::kMaxPartsCount>
+			    cost;
+			std::array<int, Goal::Slice::kMaxPartsCount> object_assignment;
+
+			int src = 0;
+			for (const auto &src_part :
+			     static_cast<const Goal::Slice&>(src_slice)) {
+				int target = 0;
+				for (const auto &target_part :
+				     static_cast<const Goal::Slice&>(target_slice)) {
+					auto op_count = operationCount(src_part, target_part);
+					op_count = std::make_pair(
+					    std::min(op_count.first, max_slice_op - 1),
+					    std::min(op_count.second, max_slice_op - 1));
+					cost[src][target] =
+					    max_slice_op * max_slice_op -
+					    (max_slice_op * op_count.first + op_count.second);
+					++target;
+				}
+				++src;
+			}
+
+			linear_assignment::auctionOptimization(
+			    cost, assignment, object_assignment, target_slice.size());
+
+			if (isCacheAvailable) {
+				linearAssignmentCache->store<Goal::Slice::kMaxPartsCount>(
+				    target_slice, src_slice, assignment);
+			}
+		}
 
 		Goal::Slice result(target_slice.getType());
-		i = 0;
-		for (auto result_part : result) {
-			result_part = target_slice[assignment[i]];
-			++i;
+		for (int k = 0; k < target_slice.size(); ++k) {
+			result[k] = target_slice[assignment[k]];
 		}
 		target_slice = std::move(result);
 	}
