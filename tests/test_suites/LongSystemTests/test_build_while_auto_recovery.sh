@@ -2,11 +2,11 @@ timeout_set 1 hour
 assert_program_installed git
 assert_program_installed cmake
 
-CHUNKSERVERS=2 \
+CHUNKSERVERS=3 \
 	MOUNTS=1 \
 	CHUNKSERVER_EXTRA_CONFIG="MASTER_RECONNECTION_DELAY = 1" \
 	MASTER_EXTRA_CONFIG="AUTO_RECOVERY = 1"\
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0" \
 	setup_local_empty_saunafs info
 
 MINIMUM_PARALLEL_JOBS=5
