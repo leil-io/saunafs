@@ -20,7 +20,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/syslog.h>
 #include <unistd.h>
 #include <stdexcept>
 #include <vector>
