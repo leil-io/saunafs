@@ -5,12 +5,13 @@
 #include "common/slogger.h"
 
 bool PluginManager::loadPlugins(const std::string &directory) {
-	// Check whether directory exists or is empty
 	if (!boost::filesystem::is_directory(directory) ||
 	    boost::filesystem::is_empty(directory)) {
-		safs_pretty_errlog(LOG_WARNING,
-		                   "Directory %s does not exist or is empty",
-		                   directory.c_str());
+		// It is normal to not have any plugins in many scenarios
+		safs_pretty_syslog(
+		    LOG_NOTICE,
+		    "PluginManager: Directory %s does not exist or is empty",
+		    directory.c_str());
 		return false;
 	}
 

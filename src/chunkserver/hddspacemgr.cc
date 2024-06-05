@@ -2924,14 +2924,21 @@ int loadPlugins() {
 	std::string pluginsInstallDirPath = PLUGINS_PATH "/chunkserver";
 	std::string pluginsBuildDirPath = BUILD_PATH "/plugins/chunkserver";
 
+	// Try to load plugins first from the installation directory
 	if (!pluginManager.loadPlugins(pluginsInstallDirPath)) {
-		safs_pretty_syslog(LOG_WARNING, "Loading plugins from %s failed!!!",
+		safs_pretty_syslog(LOG_NOTICE,
+		                   "PluginManager: No plugins loaded from: %s",
 		                   pluginsInstallDirPath.c_str());
+
+		// If no plugins were loaded from the installation directory,
+		// try to load them from the build directory (useful for development)
 		if (!pluginManager.loadPlugins(pluginsBuildDirPath)) {
-			safs_pretty_syslog(LOG_WARNING, "Loading plugins from %s failed!!!",
+			safs_pretty_syslog(LOG_NOTICE,
+			                   "PluginManager: No plugins loaded from: %s",
 			                   pluginsBuildDirPath.c_str());
 		}
 	}
+
 	pluginManager.showLoadedPlugins();
 
 	return SAUNAFS_STATUS_OK;
