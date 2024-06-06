@@ -47,7 +47,7 @@
 #include "common/goal.h"
 #include "common/saunafs_version.h"
 #include "common/md5.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/sockets.h"
 #include "common/slogger.h"
 #include "mount/exports.h"
@@ -1152,7 +1152,7 @@ bool fs_deserialize_from_master(uint32_t& remainingBytes, Args&... destination) 
 void* fs_receive_thread(void *) {
 	uint32_t initialReconnectSleep_ms = 100;
 	uint32_t reconnectSleep_ms = initialReconnectSleep_ms;
-	
+
 	pthread_setname_np(pthread_self(), "recFromMaster");
 
 	for (;;) {

@@ -28,7 +28,7 @@
 
 #include "common/massert.h"
 #include "devtools/TracePrinter.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 
 typedef struct _qentry {
 	uint32_t id;

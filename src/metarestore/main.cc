@@ -36,7 +36,7 @@
 
 #include "common/cfg.h"
 #include "common/metadata.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/rotate_files.h"
 #include "common/setup.h"
 #include "common/slogger.h"

@@ -30,7 +30,7 @@
 #include "common/lambda_guard.h"
 #include "common/saunafs_version.h"
 #include "common/massert.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/read_operation_executor.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"

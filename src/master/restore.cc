@@ -27,7 +27,7 @@
 #include <string.h>
 
 #include "protocol/SFSCommunication.h"
-#include "common/sfserr/saunafs_error_codes.h"
+#include "errors/saunafs_error_codes.h"
 #include "common/slogger.h"
 #include "master/filesystem.h"
 #include "master/filesystem_snapshot.h"

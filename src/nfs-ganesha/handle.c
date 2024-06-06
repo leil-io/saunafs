@@ -28,7 +28,7 @@
 #include "fsal_convert.h"
 #include "FSAL/fsal_commonlib.h"
 
-#include "common/sfserr/saunafs_error_codes.h"
+#include "errors/saunafs_error_codes.h"
 #include "context_wrap.h"
 #include "saunafs_internal.h"
 

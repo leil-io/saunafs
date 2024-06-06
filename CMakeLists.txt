@@ -361,10 +361,10 @@ endif()
 
 add_subdirectory(external)
 add_subdirectory(src/admin)
+add_subdirectory(src/errors)
 add_subdirectory(src/common)
 add_subdirectory(src/protocol)
 add_subdirectory(src/mount)
-add_subdirectory(src/common/sfserr)
 
 if(ENABLE_POLONAISE)
   add_subdirectory(src/mount/polonaise)

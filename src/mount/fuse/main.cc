@@ -29,7 +29,7 @@
 
 #include "common/crc.h"
 #include "common/md5.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/sockets.h"
 #include "mount/fuse/daemonize.h"
 #include "mount/fuse/sfs_fuse.h"

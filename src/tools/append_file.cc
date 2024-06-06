@@ -26,8 +26,8 @@
 #include <sys/stat.h>
 
 #include "common/datapack.h"
-#include "common/sfserr/saunafs_error_codes.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/saunafs_error_codes.h"
+#include "errors/sfserr.h"
 #include "tools/tools_commands.h"
 #include "tools/tools_common_functions.h"
 

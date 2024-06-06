@@ -37,7 +37,7 @@
 #include "common/connection_pool.h"
 #include "common/datapack.h"
 #include "common/exceptions.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/read_plan_executor.h"
 #include "common/slogger.h"
 #include "common/sockets.h"

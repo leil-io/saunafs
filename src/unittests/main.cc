@@ -24,7 +24,7 @@
 #include <gtest/gtest.h>
 
 #include "common/crc.h"
-#include "common/sfserr/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/random.h"
 #include "common/sockets.h"
 
