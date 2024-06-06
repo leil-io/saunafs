@@ -31,6 +31,7 @@
 #include "common/cfg.h"
 #include "common/exception.h"
 #include "common/massert.h"
+#include "common/sfserr/sfserr.h"
 
 #if defined(_WIN32)
   #include "common/sockets.h"

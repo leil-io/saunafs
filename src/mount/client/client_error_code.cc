@@ -20,6 +20,7 @@
 
 #include <string>
 #include "common/platform.h"
+#include "common/sfserr/saunafs_error_codes.h"
 #include "common/sfserr/sfserr.h"
 
 #include "client_error_code.h"

@@ -22,10 +22,10 @@
 #include "common/cfg.h"
 
 #include <map>
+#include <cinttypes>
 #include <yaml-cpp/yaml.h>
 
 #include "common/massert.h"
-#include "common/sfserr/sfserr.h"
 
 static char *cfgfname;
 static std::map<std::string, std::string> configParameters;

@@ -21,8 +21,6 @@
 
 #pragma once
 
-#include "common/platform.h"
-
 #include <stdint.h>
 
 enum saunafs_error_code {

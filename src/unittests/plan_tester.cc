@@ -24,9 +24,9 @@
 #include <iostream>
 
 #include "common/block_xor.h"
-#include "common/massert.h"
 #include "common/reed_solomon.h"
 #include "common/slice_traits.h"
+#include "protocol/SFSCommunication.h"
 
 namespace unittests {
 

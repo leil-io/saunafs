@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <sys/syslog.h>
 #include "common/slogger.h"
+#include "common/sfserr/sfserr.h"
 
 #ifdef THROW_INSTEAD_OF_ABORT
 #  include <stdexcept>
