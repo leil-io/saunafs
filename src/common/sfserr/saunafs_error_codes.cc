@@ -19,6 +19,8 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/platform.h"
+
 #include "saunafs_error_codes.h"
 
 const char *saunafs_error_string(uint8_t status) {

@@ -18,14 +18,17 @@
    along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/platform.h"
 #include "sfserr.h"
 
 #include <cerrno>
 #include <cstring>
-
 #include <mutex>
-#include <string>
 #include <unordered_map>
+
+#include "saunafs_error_codes.h"
+
+
 
 #ifndef EDQUOT
 # define EDQUOT ENOSPC
