@@ -249,8 +249,12 @@ rm -rf "${gtest_temp_build_dir:?}"
 VIRTUAL_ENV=/var/lib/saunafs_setup_machine_venv
 export VIRTUAL_ENV
 if ! grep -Eq 'PATH=.*'"${VIRTUAL_ENV}/bin\b"'' /etc/environment ; then
+	# Add the virtualenv to the end of the PATH in /etc/environment
+	# Select three groups: PATH=, optional quote, rest of the path,
+	# then add the virtualenv bin directory to the end of the path, keeping the correct quoting
 	sed -E 's@(PATH=)([:"'\'']?)(.*)\2@\1\2\3:'"${VIRTUAL_ENV}/bin"'\2@' -i /etc/environment;
 fi
+# Add VIRTUAL_ENV to /etc/environment if it's not there
 sed '\@VIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@!s@$@\nVIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@' -zi /etc/environment
 python3 -m venv "${VIRTUAL_ENV}"
 "${VIRTUAL_ENV}/bin/python3" -m pip install install "${python_packages[@]}"
