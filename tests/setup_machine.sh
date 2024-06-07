@@ -109,6 +109,7 @@ common_packages=(
 )
 apt_packages=(
 	build-essential
+	iproute2
 	libblkid-dev
 	libboost-filesystem-dev
 	libboost-iostreams-dev
@@ -167,6 +168,7 @@ dnf_packages=(
 	gcc-c++
 	gperftools-libs
 	gtest-devel
+	iproute
 	isa-l-devel
 	Judy-devel
 	kernel-devel
