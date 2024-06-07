@@ -204,9 +204,10 @@ test_cleanup() {
 	fi
 
 	# Clean the disks used by chunkservers
-	for d in $SAUNAFS_DISKS $SAUNAFS_LOOP_DISKS; do
-		rm -rf "$d"/chunks[0-9A-F][0-9A-F]
-		rm -f "$d"/.lock
+	for disk in ${SAUNAFS_DISKS} ${SAUNAFS_LOOP_DISKS}; do
+		rm -rf "${disk}"/meta/chunks[0-9A-F][0-9A-F]
+		rm -rf "${disk}"/data/chunks[0-9A-F][0-9A-F]
+		rm -f "${disk}"/.lock
 	done
 }
 
