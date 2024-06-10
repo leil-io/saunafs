@@ -102,6 +102,7 @@ const static std::unordered_map<std::string, std::string> defaultOptionsMaster =
     {"CHUNKS_LOOP_MIN_TIME", "300"},
     {"CHUNKS_LOOP_PERIOD", "1000"},
     {"CHUNKS_LOOP_MAX_CPU", "60"},
+    {"USE_LINEAR_ASSIGNMENT_OPTIMIZER", "1"},
     {"CHUNKS_SOFT_DEL_LIMIT", "10"},
     {"CHUNKS_HARD_DEL_LIMIT", "25"},
     {"CHUNKS_WRITE_REP_LIMIT", "2"},
