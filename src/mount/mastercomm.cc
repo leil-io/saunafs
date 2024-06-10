@@ -365,6 +365,11 @@ static bool fs_threc_send_receive(threc *rec, bool filter, PacketHeader::Type ex
 					}
 				}
 			}
+#ifdef _WIN32
+			else if (gIsDisconnectedFromMaster.load()) {
+				return false;
+			}
+#endif
 			sleep(sleep_time(cnt));
 			continue;
 		}
@@ -376,13 +381,6 @@ static bool fs_threc_send_receive(threc *rec, bool filter, PacketHeader::Type ex
 const uint8_t* fs_sendandreceive(threc *rec, uint32_t expected_cmd, uint32_t *answer_leng) {
 	// this function is only for compatibility with Legacy code
 	sassert(expected_cmd <= PacketHeader::kMaxOldPacketType);
-
-#ifdef _WIN32
-	if (gIsDisconnectedFromMaster.load()) {
-		*answer_leng = 0;
-		return NO_DATA_RECEIVED_FROM_MASTER;
-	}
-#endif
 
 	if (fs_threc_send_receive(rec, true, expected_cmd)) {
 		const uint8_t *answer;
