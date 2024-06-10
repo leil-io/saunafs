@@ -8,6 +8,8 @@
 #include "common/chunk_part_type.h"
 #include "common/disk_info.h"
 
+constexpr IDisk* DiskNotFound = nullptr;
+
 class IChunk;
 
 /// Represents a data disk in the Chunkserver context.
