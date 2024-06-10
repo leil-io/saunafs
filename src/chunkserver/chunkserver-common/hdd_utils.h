@@ -9,7 +9,6 @@
 #include "protocol/chunks_with_type.h"
 
 #define ChunkNotFound nullptr
-#define DiskNotFound nullptr
 
 // master reports
 inline std::deque<ChunkWithType> gDamagedChunks;
