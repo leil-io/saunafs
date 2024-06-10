@@ -311,23 +311,6 @@ if ! grep 'pam_limits.so' /etc/pam.d/sudo > /dev/null; then
 	END
 fi
 
-case "${release}" in
-	LinuxMint/*|Ubuntu/*|Debian/*)
-		echo ; echo 'Configure SaunaFS repository'
-		gpg --no-default-keyring \
-			--keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
-			--keyserver hkps://keyserver.ubuntu.com \
-			--receive-keys 0xA80B96E2C79457D4
-		sudo tee /etc/apt/sources.list.d/saunafs.list <<-EOF
-		deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-$(lsb_release -si | tr '[:upper:]' '[:lower:]')-$(lsb_release -sr | tr '/' '-') $(lsb_release -sc) main
-		EOF
-		;;
-	*)
-		set +x
-		echo "Configuration of packages repository SKIPPED, '${release}' isn't supported by this script"
-		;;
-esac
-
 echo ; echo 'Add users saunafstest_{0..9}'
 for username in saunafstest_{0..9}; do
 	if ! getent passwd ${username} > /dev/null; then
