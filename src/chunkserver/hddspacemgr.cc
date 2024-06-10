@@ -74,6 +74,7 @@
 #include "chunkserver/chartsdata.h"
 #include "chunkserver/chunk_filename_parser.h"
 #include "chunkserver/cmr_disk.h"
+#include "chunkserver/default_disk_energy_manager.h"
 #include "chunkserver/iostat.h"
 #include "chunkserver/plugin_manager.h"
 #include "common/cfg.h"
@@ -108,6 +109,9 @@ static std::atomic_bool gAdviseNoCache;
 static IoStat gIoStat;
 
 static PluginManager pluginManager;
+
+static std::unique_ptr<IDiskEnergyManager> gDiskEnergyManager =
+    std::make_unique<DefaultDiskEnergyManager>();
 
 void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks,
                          std::size_t limit) {
@@ -230,76 +234,7 @@ static IChunk *hddChunkCreate(IDisk *disk, uint64_t chunkId,
 }
 
 static inline IDisk* hddGetDiskForNewChunk() {
-	TRACETHIS();
-	IDisk *bestDisk = DiskNotFound;
-	double maxCarry = 1.0;
-	double minPercentAvail = std::numeric_limits<double>::max();
-	double maxPercentAvail = 0.0;
-	double s,d;
-	double percentAvail;
-
-	if (gDisks.empty())
-		return DiskNotFound;
-
-	for (auto &disk : gDisks) {
-		if (!disk->isSelectableForNewChunk())
-			continue;
-
-		if (disk->carry() >= maxCarry) {
-			maxCarry = disk->carry();
-			bestDisk = disk.get();
-		}
-
-		percentAvail = static_cast<double>(disk->availableSpace()) /
-		               static_cast<double>(disk->totalSpace());
-		minPercentAvail = std::min(minPercentAvail, percentAvail);
-		maxPercentAvail = std::max(maxPercentAvail, percentAvail);
-	}
-
-	if (bestDisk) {
-		bestDisk->setCarry(bestDisk->carry() - 1.0);  // Lower the probability of being choosen again
-		return bestDisk;
-	}
-
-	if (maxPercentAvail == 0.0) {  // no space
-		return DiskNotFound;
-	}
-
-	if (maxPercentAvail < 0.01) {
-		s = 0.0;
-	} else {
-		s = minPercentAvail * 0.8;
-		if (s < 0.01) {
-			s = 0.01;
-		}
-	}
-
-	d = maxPercentAvail - s;
-	maxCarry = 1.0;
-
-	for (auto &disk : gDisks) {
-		if (!disk->isSelectableForNewChunk()) {
-			continue;
-		}
-
-		percentAvail = static_cast<double>(disk->availableSpace()) /
-		               (double)(disk->totalSpace());
-
-		if (percentAvail > s) {
-			disk->setCarry(disk->carry() + ((percentAvail - s) / d));
-		}
-
-		if (disk->carry() >= maxCarry) {
-			maxCarry = disk->carry();
-			bestDisk = disk.get();
-		}
-	}
-
-	if (bestDisk) {       // should be always true
-		bestDisk->setCarry(bestDisk->carry() - 1.0);
-	}
-
-	return bestDisk;
+	return gDiskEnergyManager->getDiskForNewChunk();
 }
 
 void hddSendDataToMaster(IDisk *disk, bool isForRemoval) {
