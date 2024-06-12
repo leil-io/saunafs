@@ -39,7 +39,7 @@
 #include "common/exceptions.h"
 #include "errors/sfserr.h"
 #include "common/read_plan_executor.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "mount/chunk_locator.h"

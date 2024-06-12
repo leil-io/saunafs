@@ -24,7 +24,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "cwrap.h"
 
 class MemoryMappedFile::Impl {

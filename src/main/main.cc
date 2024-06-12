@@ -54,7 +54,7 @@
 #include "common/main.h"
 #include "common/massert.h"
 #include "common/setup.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/time_utils.h"
 #include "protocol/SFSCommunication.h"
 

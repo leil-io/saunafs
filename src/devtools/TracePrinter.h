@@ -38,7 +38,7 @@
 #include <boost/format.hpp>
 
 #ifdef ENABLE_SYSLOG_FOR_TRACES
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #endif
 
 class ThreadPrinter {

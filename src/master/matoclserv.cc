@@ -62,7 +62,7 @@
 #include "common/network_address.h"
 #include "common/random.h"
 #include "common/serialized_goal.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/user_groups.h"
 #include "master/changelog.h"

@@ -25,7 +25,7 @@
 #include <map>
 #include <string>
 
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 
 #define _CONFIG_MAKE_PROTOTYPE(fname,type) type cfg_get##fname(const char *name,const type def)
 

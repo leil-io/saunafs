@@ -51,7 +51,7 @@
 #include "common/legacy_vector.h"
 #include "common/output_packet.h"
 #include "common/random.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "devtools/request_log.h"

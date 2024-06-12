@@ -35,7 +35,7 @@
 
 #include "common/crc.h"
 #include "common/errno_defs.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "mount/g_io_limiters.h"
 #include "mount/sauna_client.h"

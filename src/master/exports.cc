@@ -42,7 +42,7 @@
 #include "common/massert.h"
 #include "common/md5.h"
 #include "protocol/SFSCommunication.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 
 typedef struct _exports {
 	uint32_t pleng;

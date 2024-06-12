@@ -31,7 +31,7 @@
 
 #include "common/datapack.h"
 #include "protocol/SFSCommunication.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/special_inode_defs.h"
 #include "mount/exports.h"
 #include "mount/mastercomm.h"

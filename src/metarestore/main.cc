@@ -39,7 +39,7 @@
 #include "errors/sfserr.h"
 #include "common/rotate_files.h"
 #include "common/setup.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "master/chunks.h"
 #include "master/filesystem.h"
 #include "master/hstring_memstorage.h"

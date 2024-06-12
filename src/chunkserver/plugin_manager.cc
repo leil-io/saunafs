@@ -2,7 +2,7 @@
 
 #include <sys/syslog.h>
 
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 
 bool PluginManager::loadPlugins(const std::string &directory) {
 	if (!boost::filesystem::is_directory(directory) ||

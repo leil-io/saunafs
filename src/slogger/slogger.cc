@@ -19,7 +19,7 @@
  */
 
 #include "common/platform.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 
 #include <errno.h>
 #include <stdarg.h>

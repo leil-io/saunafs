@@ -88,7 +88,7 @@
 #include "errors/saunafs_error_codes.h"
 #include "common/serialization.h"
 #include "common/slice_traits.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 #include "common/time_utils.h"
 #include "common/unique_queue.h"
 #include "devtools/TracePrinter.h"
