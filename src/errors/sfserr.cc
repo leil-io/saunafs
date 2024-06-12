@@ -28,8 +28,6 @@
 
 #include "saunafs_error_codes.h"
 
-
-
 #ifndef EDQUOT
 # define EDQUOT ENOSPC
 #endif
