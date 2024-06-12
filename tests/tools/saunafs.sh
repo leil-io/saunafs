@@ -701,7 +701,8 @@ add_cgi_server_() {
 	saunafs-cgiserver -P "$cgi_server_port" -p "$pidfile"
 	saunafs_info_[cgi_pidfile]=$pidfile
 	saunafs_info_[cgi_port]=$cgi_server_port
-	saunafs_info_[cgi_url]="http://localhost:$cgi_server_port/sfs.cgi?masterport=${saunafs_info_[matocl]}"
+	saunafs_info_[cgi_url]="http://localhost:$cgi_server_port/sfs.cgi?masterhost=localhost&masterport=${saunafs_info_[matocl]}"
+	echo "CGI URL: ${saunafs_info_[cgi_url]}"
 }
 
 # Some helper functions for tests to manipulate the existing installation
