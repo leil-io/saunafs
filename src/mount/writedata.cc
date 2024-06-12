@@ -43,7 +43,7 @@
 #include "common/goal.h"
 #include "common/massert.h"
 #include "common/message_receive_buffer.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/multi_buffer_writer.h"
 #include "common/pcqueue.h"
 #include "common/slice_traits.h"
@@ -657,7 +657,7 @@ bool InodeChunkWriter::haveBlockWorthWriting(uint32_t unfinishedOperationCount, 
 /* main working thread | glock:UNLOCKED */
 void* write_worker(void*) {
 	InodeChunkWriter inodeDataWriter;
-	
+
 	static std::atomic_uint16_t writeWorkersCounter(0);
 	std::string threadName = "writeWorker " + std::to_string(writeWorkersCounter++);
 	pthread_setname_np(pthread_self(), threadName.c_str());

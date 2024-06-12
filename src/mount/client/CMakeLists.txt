@@ -23,4 +23,4 @@ install(TARGETS saunafsmount_shared DESTINATION ${LIB_SUBDIR})
 install(TARGETS saunafs-client_shared DESTINATION ${LIB_SUBDIR})
 
 install(FILES saunafs_c_api.h DESTINATION ${INCL_SUBDIR})
-install(FILES ../../common/saunafs_error_codes.h DESTINATION ${INCL_SUBDIR})
+install(FILES ../../errors/saunafs_error_codes.h DESTINATION ${INCL_SUBDIR})

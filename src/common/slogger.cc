@@ -28,7 +28,7 @@
 #include <string>
 
 #include "common/cfg.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 
 static safs::log_level::LogLevel log_level_from_syslog(int priority) {
 	static const std::array<safs::log_level::LogLevel, 8> kSyslogToLevel = {{

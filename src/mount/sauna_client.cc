@@ -47,7 +47,7 @@
 #include "common/datapack.h"
 #include "common/errno_defs.h"
 #include "common/lru_cache.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/richacl_converter.h"
 #include "common/slogger.h"
 #include "common/sockets.h"

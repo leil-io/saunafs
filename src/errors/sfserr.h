@@ -22,10 +22,14 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 
-#include "common/saunafs_error_codes.h"
-#include "protocol/SFSCommunication.h"
+/* Workaround for Debian/kFreeBSD which does not define ENODATA */
+#if defined(__FreeBSD_kernel__) || defined(__FreeBSD__)
+#ifndef ENODATA
+#define ENODATA ENOATTR
+#endif
+#endif
 
 /// returns errno string representation
 const char* strerr(int error);
