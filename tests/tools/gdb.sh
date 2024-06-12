@@ -60,6 +60,6 @@ coredump_analyze() {
 
 coredump_restore() {
 	if parse_true "${coredump_pattern_restore}"; then
-		echo $coredump_original_pattern > /proc/sys/kernel/core_pattern || true
+		echo ${coredump_original_pattern} > /proc/sys/kernel/core_pattern || true
 	fi
 }
