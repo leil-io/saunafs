@@ -8,7 +8,7 @@
 #include "chunkserver-common/subfolder.h"
 #include "chunkserver/cmr_chunk.h"
 #include "common/crc.h"
-#include "common/saunafs_error_codes.h"
+#include "errors/saunafs_error_codes.h"
 #include "devtools/TracePrinter.h"
 #include "devtools/request_log.h"
 

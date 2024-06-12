@@ -47,7 +47,7 @@
 #include "admin/list_sessions_command.h"
 #include "common/human_readable_format.h"
 #include "protocol/SFSCommunication.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/sockets.h"
 
 int main(int argc, const char** argv) {

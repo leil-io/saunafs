@@ -26,8 +26,7 @@
 #include <exception>
 #include <string>
 
-#include "protocol/SFSCommunication.h"
-#include "common/sfserr.h"
+#include "errors/saunafs_error_codes.h"
 
 class Exception : public std::exception {
 public:

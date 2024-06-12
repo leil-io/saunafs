@@ -85,7 +85,7 @@
 #include "common/exceptions.h"
 #include "common/massert.h"
 #include "common/legacy_vector.h"
-#include "common/saunafs_error_codes.h"
+#include "errors/saunafs_error_codes.h"
 #include "common/serialization.h"
 #include "common/slice_traits.h"
 #include "common/slogger.h"

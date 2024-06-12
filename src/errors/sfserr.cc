@@ -19,20 +19,14 @@
  */
 
 #include "common/platform.h"
-#include "common/sfserr.h"
+#include "sfserr.h"
 
-#include <cstdio>
-#include <cstdlib>
+#include <cerrno>
 #include <cstring>
-#include <errno.h>
-#include <inttypes.h>
-
-#include <array>
 #include <mutex>
-#include <string>
 #include <unordered_map>
 
-#include "common/errno_defs.h"
+#include "saunafs_error_codes.h"
 
 #ifndef EDQUOT
 # define EDQUOT ENOSPC

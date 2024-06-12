@@ -19,8 +19,7 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __SAUNAFS_ERROR_CODES_H
-#define __SAUNAFS_ERROR_CODES_H
+#pragma once
 
 #include <stdint.h>
 
@@ -86,5 +85,3 @@ enum saunafs_error_code {
 };
 
 const char *saunafs_error_string(uint8_t status);
-
-#endif
