@@ -27,7 +27,7 @@
 #include <vector>
 
 #include "common/chunk_type_with_address.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 
 struct ChunkLocationInfo {
 	typedef std::vector<ChunkTypeWithAddress> ChunkLocations;
@@ -97,8 +97,8 @@ public:
 	virtual void locateAndLockChunk(uint32_t inode, uint32_t index);
 	virtual void unlockChunk();
 
-	inline uint64_t fileLength() const { 
-		return locationInfo_.fileLength; 
+	inline uint64_t fileLength() const {
+		return locationInfo_.fileLength;
 	}
 
 	uint32_t chunkIndex() {

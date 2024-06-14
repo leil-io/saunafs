@@ -49,7 +49,7 @@
 #include "common/lru_cache.h"
 #include "errors/sfserr.h"
 #include "common/richacl_converter.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/special_inode_defs.h"
 #include "common/time_utils.h"
@@ -841,7 +841,7 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 	}
 
 	// If lookup succeeded and data did not come from cache, then cache it.
-	// Files with at least one hardlink are impossible to keep track of, so it is 
+	// Files with at least one hardlink are impossible to keep track of, so it is
 	// better to don't track them.
 	if (!icacheflag && !(e.attr.st_nlink > 1 && attr[0] == TYPE_FILE)) {
 		auto data_acquire_time = gDirEntryCache.updateTime();
@@ -924,7 +924,7 @@ AttrReply getattr(Context &ctx, Inode ino) {
 #endif
 
 	// If lookup succeeded and data did not come from cache, then cache it.
-	// Files with at least one hardlink are impossible to keep track of, so it is 
+	// Files with at least one hardlink are impossible to keep track of, so it is
 	// better to don't track them.
 	if (!fromCache && !(o_stbuf.st_nlink > 1 && attr[0] == TYPE_FILE)) {
 		auto data_acquire_time = gDirEntryCache.updateTime();
