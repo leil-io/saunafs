@@ -8,7 +8,7 @@
 #endif
 
 #include "metrics.h"
-#include "common/slogger/slogger.h"
+#include "slogger/slogger.h"
 
 
 namespace metrics {
