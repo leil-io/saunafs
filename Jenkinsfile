@@ -128,6 +128,22 @@ pipeline {
                 }
             }
         }
+        stage('ShortSystemTests') {
+            agent {
+                docker {
+                    label 'docker'
+                    image env.dockerImageSaunafs
+                    registryUrl env.DOCKER_INTERNAL_REGISTRY_URL
+                    registryCredentialsId env.dockerRegistrySecretId
+                    args  '--security-opt seccomp=unconfined --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt="apparmor=unconfined" --tmpfs /mnt/ramdisk:rw,mode=1777,size=2g --ulimit core=-1'
+                }
+            }
+            steps {
+                cleanAndClone()
+                unstash 'test-binaries'
+                sh 'tests/ci_build/run-sanity-check.sh "ShortSystemTests*"'
+            }
+        }
         stage('Delivery') {
             when {
                 beforeAgent true
