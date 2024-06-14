@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/time_utils.h"
 
 class MetadataDumper {

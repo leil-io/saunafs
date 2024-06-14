@@ -27,7 +27,7 @@
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
 #include "common/token_bucket.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "mount/io_limit_group.h"
 
 using namespace ioLimiting;

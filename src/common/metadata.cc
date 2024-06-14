@@ -33,7 +33,7 @@
 
 #include "common/cwrap.h"
 #include "common/datapack.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "protocol/SFSCommunication.h"
 
 #define METADATA_FILENAME_TEMPL "metadata.sfs"

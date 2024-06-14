@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "errors/sfserr.h"
 #ifndef _WIN32
 #include <sys/syslog.h>

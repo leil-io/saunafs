@@ -50,7 +50,7 @@
 #include "common/output_packet.h"
 #include "common/random.h"
 #include "common/slice_traits.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "master/chunks.h"

@@ -19,7 +19,7 @@
 
 #include <sys/syslog.h>
 
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/time_utils.h"
 
 namespace util {

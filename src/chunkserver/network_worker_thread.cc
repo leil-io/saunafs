@@ -53,7 +53,7 @@
 #include "protocol/SFSCommunication.h"
 #include "common/legacy_vector.h"
 #include "protocol/packet.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "devtools/request_log.h"
 #include "devtools/TracePrinter.h"

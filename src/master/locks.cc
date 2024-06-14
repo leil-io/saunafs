@@ -22,7 +22,7 @@
 #include "master/locks.h"
 
 #include "common/memory_mapped_file.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 
 #include <functional>
 

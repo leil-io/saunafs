@@ -44,7 +44,7 @@
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/metadata.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "master/filesystem.h"
 #include "master/personality.h"
