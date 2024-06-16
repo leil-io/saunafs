@@ -26,7 +26,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -52,6 +58,13 @@ typedef uint32_t NamedInodeOffset;
 
 void update_readdir_session(uint64_t sessId, uint64_t entryIno);
 void drop_readdir_session(uint64_t opendirSessionID);
+
+static std::jthread gMountpointMonitorThread;
+static std::atomic<bool> stopMonitoringThread;
+
+bool isStatsFilePresent(const std::string &mountPointPath);
+
+void monitorMountPointThread(const std::string &mountPointPath);
 
 struct FsInitParams {
 	static constexpr const char *kDefaultSubfolder = DEFAULT_MOUNTED_SUBFOLDER;
@@ -115,6 +128,7 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultAclCacheSize = 1000;
 	static constexpr bool     kDefaultVerbose = false;
 	static constexpr bool     kDirectIO = false;
+	static constexpr bool     kDefaultForceUnmountLazy = false;
 
 	// Thank you, GCC 4.6, for no delegating constructors
 	FsInitParams()
@@ -146,7 +160,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO), force_umount_lazy(kDefaultForceUnmountLazy) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -178,7 +192,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO), force_umount_lazy(kDefaultForceUnmountLazy) {
 	}
 
 	std::string bind_host;
@@ -231,6 +245,7 @@ struct FsInitParams {
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;
+	bool force_umount_lazy;
 
 	std::string io_limits_config_file;
 };

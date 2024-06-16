@@ -92,6 +92,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
 	SFS_OPT("sfsignoreflush", ignoreflush, 1),
+	SFS_OPT("sfsfumountlazy=%d", fumountlazy, 0),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
 	SFS_OPT("nonempty", nonemptymount, 1),
@@ -225,6 +226,8 @@ void usage(const char *progname) {
 "    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
 				"behavior by replying SUCCESS to it immediately. Targets fast "
 				"creation of small files, but may cause data loss during crashes.\n"
+"    -o sfsfumountlazy=0|1       enables/disables force umount when lazy "
+				"umount executed (default: 0)\n"
 "\n",
 		SaunaClient::FsInitParams::kDefaultUseRwLock,
 		SaunaClient::FsInitParams::kDefaultMkdirCopySgid,
