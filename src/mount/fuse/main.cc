@@ -39,6 +39,7 @@
 #include "mount/mastercomm.h"
 #include "mount/masterproxy.h"
 #include "mount/readdata.h"
+#include "mount/sauna_client.h"
 #include "mount/stats.h"
 #include "mount/symlinkcache.h"
 #include "mount/writedata.h"
@@ -251,6 +252,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	params.debug_mode = gMountOptions.debug;
 	params.direct_io = gMountOptions.directio;
 	params.ignore_flush = gMountOptions.ignoreflush;
+	params.force_umount_lazy = gMountOptions.fumountlazy;
 
 	if (!gMountOptions.meta) {
 		SaunaClient::fs_init(params);
@@ -327,6 +329,11 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 		}
 	}
 
+	if (gMountOptions.fumountlazy) {
+		SaunaClient::gMountpointMonitorThread = std::jthread(
+		    SaunaClient::monitorMountPointThread, params.mountpoint);
+	}
+
 	int err;
 	if (multithread) {
 		err = fuse_session_loop_mt(se, fuse_opts->clone_fd);
@@ -336,6 +343,10 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	fuse_remove_signal_handlers(se);
 	fuse_session_unmount(se);
 	fuse_session_destroy(se);
+	SaunaClient::stopMonitoringThread.store(true);
+	if (SaunaClient::gMountpointMonitorThread.joinable()) {
+		SaunaClient::gMountpointMonitorThread.join();
+	}
 	if (!gMountOptions.meta) {
 		SaunaClient::fs_term();
 	} else {
