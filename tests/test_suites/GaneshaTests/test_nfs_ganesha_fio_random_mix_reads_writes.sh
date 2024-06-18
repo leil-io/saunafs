@@ -11,7 +11,7 @@
 #
 assert_program_installed fio
 
-timeout_set 3 minutes
+timeout_set 45 seconds
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
@@ -74,7 +74,7 @@ EOF
 
 sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
 
-sleep 15
+assert_eventually 'showmount -e localhost'
 sudo mount -vvvv localhost:/ $TEMP_DIR/mnt/ganesha
 
 echo ""
@@ -84,7 +84,7 @@ cd ${TEMP_DIR}/mnt/ganesha
 # Run fio random mix of read and write on top of Ganesha Client
 fio --name=fiotest_random_mix_read_write --directory=${TEMP_DIR}/mnt/ganesha \
     --size=200M --rw=randrw --numjobs=5 --ioengine=psync --group_reporting   \
-    --bs=4M --direct=1 --iodepth=4
+    --bs=4M --direct=1 --iodepth=1
 
 echo ""
 echo "List of created files at the Ganesha Client:"

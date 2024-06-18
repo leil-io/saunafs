@@ -11,7 +11,7 @@
 #
 assert_program_installed fio
 
-timeout_set 3 minutes
+timeout_set 45 seconds
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
@@ -74,7 +74,7 @@ EOF
 
 sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
 
-sleep 15
+assert_eventually 'showmount -e localhost'
 sudo mount -vvvv localhost:/ $TEMP_DIR/mnt/ganesha
 
 echo ""
