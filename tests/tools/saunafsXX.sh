@@ -164,7 +164,9 @@ assert_saunafsXX_services_count_equals() {
 }
 
 assert_no_saunafsXX_services_active() {
-	assert_saunafsXX_services_count_equals 0 0 0
+	assert_equals 0 "$(saunafs_admin_master info | grep "${SAUNAFSXX_TAG}" | wc -l)"
+	assert_equals 0 "$(saunafs_admin_master list-chunkservers | grep "${SAUNAFSXX_TAG}" | wc -l)"
+	assert_equals 0 "$(saunafs_admin_master list-mounts | grep "${SAUNAFSXX_TAG}" | wc -l)"
 }
 
 # TODO: Add metalogger and other service support

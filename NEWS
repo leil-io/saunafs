@@ -1,5 +1,8 @@
 This file lists noteworthy changes in SaunaFS.
 
+ * SaunaFS (4.1.1) (2024-05-22)
+ - (docs) Add missing options in sfsmount.1
+
  * SaunaFS (4.1.0) (2024-05-09)
  - (master) Improve master startup time by allowing parallel metadata loading
  - (mount) Add `sfsdirectio` mount option
