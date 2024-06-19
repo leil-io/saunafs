@@ -45,7 +45,7 @@ NFS_KRB5 {
 }
 NFSV4 {
 	Grace_Period = 5;
-	Lease_Lifetime = 3;
+	Lease_Lifetime = 5;
 }
 EXPORT {
 	Attr_Expiration_Time = 0;

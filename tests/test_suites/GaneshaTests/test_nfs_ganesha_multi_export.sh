@@ -7,7 +7,7 @@
 # The path for the Ganesha daemon should match the installation folder inside the test.
 #
 
-timeout_set 2 minutes
+timeout_set 45 seconds
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
