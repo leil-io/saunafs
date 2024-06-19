@@ -1,3 +1,8 @@
+saunafs (4.1.1) stable; urgency=low
+  * (docs) Add missing options in sfsmount.1
+
+ -- SaunaFS Team <contact@saunafs.com>  Wed, 22 May 2024 14:51:30 +0300
+
 saunafs (4.1.0) stable; urgency=medium
   * (master) Improve master startup time by allowing parallel metadata loading
   * (mount) Add `sfsdirectio` mount option
