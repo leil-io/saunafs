@@ -60,6 +60,7 @@ RUN set -e ; \
           libsqlite3-dev \
           liburcu-dev \
           pkg-config \
+          pv \
           wget \
           unzip \
           rpcbind \
@@ -139,10 +140,11 @@ COPY --from=ganesha-builder /tmp/dependencies/lib /lib
 COPY --from=ganesha-builder /tmp/dependencies/lib64 /lib64
 
 RUN set -e ; \
-    if ! type showmount > /dev/null 2>&1; then \
-        apt update; apt install -y --no-install-recommends nfs-common ; \
-        rm -rf /var/lib/apt/lists/* ; \
-    fi ;
+    apt update; \
+    apt install -y --no-install-recommends \
+        nfs-common ; \
+    rm -rf /var/lib/apt/lists/* ; \
+    true
 
 COPY --chmod=0755 services/ganesha/entrypoint.sh /docker-entrypoint.d/99-ganesha.sh
 COPY --chmod=0755 services/ganesha/healthcheck.sh /healthcheck.d/99-ganesha.sh

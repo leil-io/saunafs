@@ -86,6 +86,7 @@ common_packages=(
 	python3-setuptools
 	python3-wheel
 	psmisc
+	pv
 	rsync
 	rsyslog
 	socat
@@ -108,6 +109,7 @@ common_packages=(
 )
 apt_packages=(
 	build-essential
+	iproute2
 	libblkid-dev
 	libboost-filesystem-dev
 	libboost-iostreams-dev
@@ -166,6 +168,7 @@ dnf_packages=(
 	gcc-c++
 	gperftools-libs
 	gtest-devel
+	iproute
 	isa-l-devel
 	Judy-devel
 	kernel-devel
@@ -245,9 +248,14 @@ rm -rf "${gtest_temp_build_dir:?}"
 # Setup python3 with a global virtual env (new recommended way)
 VIRTUAL_ENV=/var/lib/saunafs_setup_machine_venv
 export VIRTUAL_ENV
+if ! grep -Eq 'PATH=.*'"${VIRTUAL_ENV}/bin\b"'' /etc/environment ; then
+	# Add the virtualenv to the end of the PATH in /etc/environment
+	# Select three groups: PATH=, optional quote, rest of the path,
+	# then add the virtualenv bin directory to the end of the path, keeping the correct quoting
+	sed -E 's@(PATH=)([:"'\'']?)(.*)\2@\1\2\3:'"${VIRTUAL_ENV}/bin"'\2@' -i /etc/environment;
+fi
+# Add VIRTUAL_ENV to /etc/environment if it's not there
 sed '\@VIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@!s@$@\nVIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@' -zi /etc/environment
-# shellcheck disable=SC2016
-sed '\@PATH="'"${VIRTUAL_ENV}"'/bin@!s@$@\nPATH="'"${VIRTUAL_ENV}"'/bin:${PATH}"@' -zi /etc/environment
 python3 -m venv "${VIRTUAL_ENV}"
 "${VIRTUAL_ENV}/bin/python3" -m pip install install "${python_packages[@]}"
 
@@ -302,23 +310,6 @@ if ! grep 'pam_limits.so' /etc/pam.d/sudo > /dev/null; then
 		session required pam_limits.so
 	END
 fi
-
-case "${release}" in
-	LinuxMint/*|Ubuntu/*|Debian/*)
-		echo ; echo 'Configure SaunaFS repository'
-		gpg --no-default-keyring \
-			--keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
-			--keyserver hkps://keyserver.ubuntu.com \
-			--receive-keys 0xA80B96E2C79457D4
-		sudo tee /etc/apt/sources.list.d/saunafs.list <<-EOF
-		deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-$(lsb_release -si | tr '[:upper:]' '[:lower:]')-$(lsb_release -sr | tr '/' '-') $(lsb_release -sc) main
-		EOF
-		;;
-	*)
-		set +x
-		echo "Configuration of packages repository SKIPPED, '${release}' isn't supported by this script"
-		;;
-esac
 
 echo ; echo 'Add users saunafstest_{0..9}'
 for username in saunafstest_{0..9}; do
