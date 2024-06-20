@@ -1,5 +1,34 @@
 This file lists noteworthy changes in SaunaFS.
 
+ * SaunaFS (4.2.0) (2024-06-19)
+ - (all) Fix slogger dependencies compilation
+ - (common) Split off slogger from common
+ - (common) Split off error code from common
+ - (master) Improve auction optimization
+ - (master) Cache auction optimizer input/output
+ - (master) Apply result of auction optimization
+ - (chunkserver) Improve plugin related logs
+ - (mount) Fix master connection checking
+ - (mount) Fix mount when master is down
+ - (mount) Apply fixes to DirEntryCache
+ - (mount) Label mount threads for better debugging
+ - (admin) Add missing option to master default config
+ - (protocol): Add protocol documentation
+ - (tests) Bump OS version to Ubuntu 24.04
+ - (tests) Update GaneshaTests suite
+ - (tests) Fix race condition in metadata_dump_period_seconds
+ - (tests) Add ss and pv dependencies
+ - (tests) Fix test_cgi_validate_html test
+ - (tests) Clean up space used by the tests
+ - (tests) Fix LongSystemTests related to building
+ - (tests) Migrate XOR tests to erasure coding
+ - (tests) Improve DirEntryCache tests coverage
+ - (tests) Remove Ganesha unneeded dependencies
+ - (tests) Add Ganesha test for validating file corruption
+ - (tests) Enable nfs v4.1 in Ganesha multi export test
+ - (ci) Create NFS-Ganesha config's directory
+ - (ci) Fix nfs-ganesha image build for latest OS
+
  * SaunaFS (4.1.1) (2024-05-22)
  - (docs) Add missing options in sfsmount.1
 
