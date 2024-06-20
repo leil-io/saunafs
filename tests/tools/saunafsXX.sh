@@ -4,22 +4,25 @@
 # TODO: Don't use build information in debian package versions. It causes
 # problems when downgrading, because you need to include the build information
 # in the downgrade command.
-SAUNAFSXX_TAG_APT="4.0.1-20240301-164017-stable-main-82161d4f"
-SAUNAFSXX_TAG="4.0.1"
+
+SAUNAFSXX_TAG="4.1.0"
 
 install_saunafsXX() {
-	rm -rf "$SAUNAFSXX_DIR"
-	mkdir -p "$SAUNAFSXX_DIR"
+	rm -rf "${SAUNAFSXX_DIR}"
+	mkdir -p "${SAUNAFSXX_DIR}"
 	local distro="$(lsb_release -si)"
-	case "$distro" in
+	case "${distro}" in
 	Ubuntu | Debian)
-		local codename="$(lsb_release -sc)"
-		mkdir -p ${TEMP_DIR}/apt/apt.conf.d
-		mkdir -p ${TEMP_DIR}/apt/var/lib/apt/partial
-		mkdir -p ${TEMP_DIR}/apt/var/cache/apt/archives/partial
-		mkdir -p ${TEMP_DIR}/apt/var/lib/dpkg
-		cp /var/lib/dpkg/status ${TEMP_DIR}/apt/var/lib/dpkg/status
-		cat >${TEMP_DIR}/apt/apt.conf <<END
+		local distro_id="$(lsb_release -si | tr '[:upper:]' '[:lower:]' | tail -1)"
+		local codename="$(lsb_release -sc | tail -1)"
+		local release="$(lsb_release -sr | tail -1)"
+		mkdir -p "${TEMP_DIR}/apt/apt.conf.d"
+		mkdir -p "${TEMP_DIR}/apt/var/lib/apt/partial"
+		mkdir -p "${TEMP_DIR}/apt/var/cache/apt/archives/partial"
+		mkdir -p "${TEMP_DIR}/apt/var/lib/dpkg"
+		mkdir -p "${TEMP_DIR}/usr/share/keyrings"
+		cp /var/lib/dpkg/status "${TEMP_DIR}/apt/var/lib/dpkg/status"
+		cat >"${TEMP_DIR}/apt/apt.conf" <<END
 Dir::State "${TEMP_DIR}/apt/var/lib/apt";
 Dir::State::status "${TEMP_DIR}/apt/var/lib/dpkg/status";
 Dir::Etc::SourceList "${TEMP_DIR}/apt/saunafs.list";
@@ -27,56 +30,70 @@ Dir::Cache "${TEMP_DIR}/apt/var/cache/apt";
 Dir::Etc::Parts "${TEMP_DIR}/apt/apt.conf.d";
 END
 		local destdir="${TEMP_DIR}/apt/var/cache/apt/archives"
+		echo "deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-${distro_id}-${release}/ ${codename} main" >"${TEMP_DIR}/apt/saunafs.list"
 		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get update
-		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get -y --allow-downgrades install -d \
-			saunafs-master=${SAUNAFSXX_TAG_APT} \
-			saunafs-chunkserver=${SAUNAFSXX_TAG_APT} \
-			saunafs-client=${SAUNAFSXX_TAG_APT} \
-			saunafs-adm=${SAUNAFSXX_TAG_APT}
+		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get install --yes libyaml-cpp*
+		SAUNAFSXX_TAG_APT="4.1.0-20240509-152518-stable-main-a7cb5669"
+		if [ "${distro}" == Ubuntu ]; then
+			case "${release}" in
+				'22.04')
+					SAUNAFSXX_TAG_APT="4.1.0-20240509-152513-stable-main-a7cb5669"
+				;;
+				'24.04')
+					SAUNAFSXX_TAG_APT="4.1.0-20240509-152518-stable-main-a7cb5669"
+				;;
+				*)
+					test_fail "Your Ubuntu release (${release}) is not supported."
+				;;
+			esac
+		fi
+		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get --yes --allow-downgrades install --download-only \
+			saunafs-master="${SAUNAFSXX_TAG_APT}" \
+			saunafs-chunkserver="${SAUNAFSXX_TAG_APT}" \
+			saunafs-client="${SAUNAFSXX_TAG_APT}" \
+			saunafs-adm="${SAUNAFSXX_TAG_APT}"
 			# Not used right now
-			# saunafs-metalogger=${SAUNAFSXX_TAG_APT}
+			# saunafs-metalogger="${SAUNAFSXX_TAG_APT}"
 		# unpack binaries
-		cd ${destdir}
-		find . -name "*master*.deb" | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/sfsmaster
-		find . -name "*chunkserver*.deb" | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/sfschunkserver
-		find . -name "*client*.deb" | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/bin/
-		find . -name "*adm*.deb" | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/bin/
-		# find . -name "*metalogger*.deb" | xargs dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/
-		cp -Rp usr/ ${SAUNAFSXX_DIR_BASE}/install
-		cd -
-		;;
-#  We don't support testing CentOS and Fedora anymore, but the code is left
-#  here for reference.
-#
-# 	CentOS | Fedora)
-# 		local destdir="${TEMP_DIR}/saunafsxx_packages"
-# 		mkdir ${destdir}
-# 		local url=""
-# 		if [ "$distro" == CentOS ]; then
-# 			url="http://dev.saunafs.com/packages/centos.saunafs.repo"
-# 		else
-# 			url="http://dev.saunafs.com/packages/fedora.saunafs.repo"
-# 		fi
-# 		mkdir -p ${TEMP_DIR}/dnf/etc/yum.repos.d
-# 		cat >${TEMP_DIR}/dnf/dnf.conf <<END
-# [main]
-# logdir=${TEMP_DIR}/dnf/var/log
-# cachedir=${TEMP_DIR}/dnf/var/cache
-# persistdir=${TEMP_DIR}/dnf/var/lib/dnf
-# reposdir=${TEMP_DIR}/dnf/etc/yum.repos.d
-# END
-# 		wget "$url" -O ${TEMP_DIR}/dnf/etc/yum.repos.d/saunafs.repo
-# 		for pkg in {saunafs-master,saunafs-chunkserver,saunafs-client}-${SAUNAFSXX_TAG}; do
-# 			fakeroot dnf -y --config=${TEMP_DIR}/dnf/dnf.conf --destdir=${destdir} download ${pkg}
-# 		done
-# 		# unpack binaries
-# 		cd ${destdir}
-# 		find . -name "*master*.rpm" | xargs rpm2cpio | cpio -idm ./usr/sbin/sfsmaster
-# 		find . -name "*chunkserver*.rpm" | xargs rpm2cpio | cpio -idm ./usr/sbin/sfschunkserver
-# 		find . -name "*client*.rpm" | xargs rpm2cpio | cpio -idm ./usr/bin/*
-#
+		(	cd "${destdir}" || return 1
+			find . -name "*master*.deb" -print0 | xargs -0 dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/sfsmaster
+			find . -name "*chunkserver*.deb" -print0 | xargs -0 dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/sfschunkserver
+			find . -name "*client*.deb" -print0 | xargs -0 dpkg-deb --fsys-tarfile | tar -x ./usr/bin/
+			find . -name "*adm*.deb" -print0 | xargs -0 dpkg-deb --fsys-tarfile | tar -x ./usr/bin/
+			# find . -name "*metalogger*.deb" -print0 | xargs -0 dpkg-deb --fsys-tarfile | tar -x ./usr/sbin/
+			cp -Rp usr/ "${SAUNAFSXX_DIR_BASE}/install"
+		)
+		;; # end of Ubuntu | Debian case
+	CentOS | Fedora)
+		local destdir="${TEMP_DIR}/saunafsxx_packages"
+		mkdir "${destdir}"
+		local url=""
+		if [ "${distro}" == CentOS ]; then
+			url="http://dev.saunafs.com/packages/centos.saunafs.repo"
+		else
+			url="http://dev.saunafs.com/packages/fedora.saunafs.repo"
+		fi
+		mkdir -p "${TEMP_DIR}/dnf/etc/yum.repos.d"
+		cat >"${TEMP_DIR}/dnf/dnf.conf" <<END
+[main]
+logdir="${TEMP_DIR}/dnf/var/log"
+cachedir="${TEMP_DIR}/dnf/var/cache"
+persistdir="${TEMP_DIR}/dnf/var/lib/dnf"
+reposdir="${TEMP_DIR}/dnf/etc/yum.repos.d"
+END
+		wget "${url}" -O "${TEMP_DIR}/dnf/etc/yum.repos.d/saunafs.repo"
+		for pkg in {saunafs-master,saunafs-chunkserver,saunafs-client}-${SAUNAFSXX_TAG}; do
+			fakeroot dnf -y --config="${TEMP_DIR}/dnf/dnf.conf" --destdir="${destdir}" download "${pkg}"
+		done
+		# unpack binaries
+		(	cd "${destdir}"
+		find . -name "*master*.rpm" -print0 | xargs -0 rpm2cpio | cpio -idm ./usr/sbin/sfsmaster
+		find . -name "*chunkserver*.rpm" -print0 | xargs -0 rpm2cpio | cpio -idm ./usr/sbin/sfschunkserver
+		find . -name "*client*.rpm" -print0 | xargs -0 rpm2cpio | cpio -idm ./usr/bin/*
+		)
+		;; # end of CentOS | Fedora case
 	*)
-		test_fail "Your distribution ($distro) is not supported."
+		test_fail "Your distribution (${distro}) is not supported."
 		;;
 	esac
 	test_saunafsXX_executables
@@ -84,37 +101,38 @@ END
 }
 
 test_saunafsXX_executables() {
-	local awk_version_pattern="/$(sed 's/[.]/[.]/g' <<<$SAUNAFSXX_TAG)/"
-	echo $($SAUNAFSXX_DIR/bin/sfsmount --version 2>&1)
-	echo $($SAUNAFSXX_DIR/sbin/sfschunkserver -v)
-	echo $($SAUNAFSXX_DIR/sbin/sfsmaster -v)
-	test -x "$SAUNAFSXX_DIR/bin/sfsmount"
-	test -x "$SAUNAFSXX_DIR/sbin/sfschunkserver"
-	test -x "$SAUNAFSXX_DIR/sbin/sfsmaster"
-	assert_awk_finds $awk_version_pattern "$($SAUNAFSXX_DIR/bin/sfsmount --version 2>&1)"
-	assert_awk_finds $awk_version_pattern "$($SAUNAFSXX_DIR/sbin/sfschunkserver -v)"
-	assert_awk_finds $awk_version_pattern "$($SAUNAFSXX_DIR/sbin/sfsmaster -v)"
+	local awk_version_pattern="/${SAUNAFSXX_TAG//./\\.}/"
+	test -x "${SAUNAFSXX_DIR}/bin/sfsmount"
+	test -x "${SAUNAFSXX_DIR}/sbin/sfschunkserver"
+	test -x "${SAUNAFSXX_DIR}/sbin/sfsmaster"
+	"${SAUNAFSXX_DIR}/bin/sfsmount" --version 2>&1
+	"${SAUNAFSXX_DIR}/sbin/sfschunkserver" -v
+	"${SAUNAFSXX_DIR}/sbin/sfsmaster" -v
+	assert_awk_finds "${awk_version_pattern}" "$("${SAUNAFSXX_DIR}/bin/sfsmount" --version 2>&1)"
+	assert_awk_finds "${awk_version_pattern}" "$("${SAUNAFSXX_DIR}/sbin/sfschunkserver" -v)"
+	assert_awk_finds "${awk_version_pattern}" "$("${SAUNAFSXX_DIR}/sbin/sfsmaster" -v)"
 }
 
 saunafsXX_chunkserver_daemon() {
-	"$SAUNAFSXX_DIR/sbin/sfschunkserver" -c "${saunafs_info_[chunkserver$1_cfg]}" "$2" | cat
-	return ${PIPESTATUS[0]}
+	# shellcheck disable=SC2154
+	"${SAUNAFSXX_DIR}/sbin/sfschunkserver" -c "${saunafs_info_[chunkserver${1_cfg}]}" "${2}" | cat
+	return "${PIPESTATUS[0]}"
 }
 
 saunafsXX_master_daemon() {
-	"$SAUNAFSXX_DIR/sbin/sfsmaster" -c "${saunafs_info_[master_cfg]}" "$1" | cat
-	return ${PIPESTATUS[0]}
+	"${SAUNAFSXX_DIR}/sbin/sfsmaster" -c "${saunafs_info_[master_cfg]}" "${1}" | cat
+	return "${PIPESTATUS[0]}"
 }
 
 saunafsXX_shadow_daemon_n() {
-	local id=$1
+	local id="${1}"
 	shift
 	if is_windows_system; then
-		windows_server_aux "$SAUNAFSXX_DIR/sbin/sfsmaster -c ${saunafs_info_[master${id}_cfg]}" "$@"
+		windows_server_aux "${SAUNAFSXX_DIR}/sbin/sfsmaster -c ${saunafs_info_[master${id}_cfg]}" "${@}"
 	else
-		"$SAUNAFSXX_DIR/sbin/sfsmaster" -c "${saunafs_info_[master${id}_cfg]}" "$@" | cat
+		"${SAUNAFSXX_DIR}/sbin/sfsmaster" -c "${saunafs_info_[master${id}_cfg]}" "${@}" | cat
 	fi
-	return ${PIPESTATUS[0]}
+	return "${PIPESTATUS[0]}"
 }
 
 # A generic function to run SaunaFS commands.
@@ -124,19 +142,25 @@ saunafsXX_shadow_daemon_n() {
 #   sfs sfsdirinfo file
 #   sfs sfsmetalogger stop
 saunafsXX() {
-	local command="$1"
+	local command="${1}"
 	shift
-	"$SAUNAFSXX_DIR/"*bin"/$command" "$@" | cat
-	return ${PIPESTATUS[0]}
+	for path in "${SAUNAFSXX_DIR}/bin" "${SAUNAFSXX_DIR}/sbin"; do
+		if [ -x "${path}/${command}" ]; then
+			command="${path}/${command}"
+			break
+		fi
+	done
+	"${command}" "${@}"
+	return "${PIPESTATUS[0]}"
 }
 
 assert_saunafsXX_services_count_equals() {
 	local mas_expected="${1}"
 	local cs_expected="${2}"
 	local cli_expected="${3}"
-	assert_equals "${mas_expected}" "$(saunafs_old_admin_master info | grep "${SAUNAFSXX_TAG}" | wc -l)"
-	assert_equals "${cs_expected}" "$(saunafs_old_admin_master list-chunkservers | grep "${SAUNAFSXX_TAG}" | wc -l)"
-	assert_equals "${cli_expected}" "$(saunafs_old_admin_master list-mounts | grep "${SAUNAFSXX_TAG}" | wc -l)"
+	assert_equals "${mas_expected}" "$(saunafs_old_admin_master info | grep -c "${SAUNAFSXX_TAG}")"
+	assert_equals "${cs_expected}" "$(saunafs_old_admin_master list-chunkservers | grep -c "${SAUNAFSXX_TAG}")"
+	assert_equals "${cli_expected}" "$(saunafs_old_admin_master list-mounts | grep -c "${SAUNAFSXX_TAG}")"
 }
 
 assert_no_saunafsXX_services_active() {

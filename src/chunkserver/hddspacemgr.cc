@@ -85,10 +85,10 @@
 #include "common/exceptions.h"
 #include "common/massert.h"
 #include "common/legacy_vector.h"
-#include "common/saunafs_error_codes.h"
+#include "errors/saunafs_error_codes.h"
 #include "common/serialization.h"
 #include "common/slice_traits.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/time_utils.h"
 #include "common/unique_queue.h"
 #include "devtools/TracePrinter.h"
@@ -774,6 +774,8 @@ int hddRead(uint64_t chunkId, uint32_t version, ChunkPartType chunkType,
             OutputBuffer *outputBuffer) {
 	LOG_AVG_TILL_END_OF_SCOPE0("hddRead");
 	TRACETHIS3(chunkId, offset, size);
+
+	safs_silent_syslog(LOG_DEBUG, "chunkserver.hddRead");
 
 	uint32_t offsetWithinBlock = offset % SFSBLOCKSIZE;
 
@@ -2127,6 +2129,8 @@ int hddChunkOperation(uint64_t chunkId, uint32_t chunkVersion,
 static UniqueQueue<ChunkWithVersionAndType> gTestChunkQueue;
 
 static void hddTestChunkThread() {
+	pthread_setname_np(pthread_self(), "testChunkThread");
+
 	bool terminate = false;
 
 	while (!terminate) {
@@ -2162,6 +2166,9 @@ void hddAddChunkToTestQueue(ChunkWithVersionAndType chunk) {
 
 void hddTesterThread() {
 	TRACETHIS();
+
+	pthread_setname_np(pthread_self(), "testerThread");
+
 	IChunk *chunk;
 	uint64_t chunkId;
 	uint32_t version;
@@ -2464,6 +2471,9 @@ void hddDiskScanThread(IDisk *disk) {
 
 void hddDisksThread() {
 	TRACETHIS();
+
+	pthread_setname_np(pthread_self(), "disksThread");
+
 	while (!gTerminate) {
 		hddCheckDisks();
 		sleep(1);
@@ -2474,6 +2484,8 @@ void hddFreeResourcesThread() {
 	static const int kDelayedStep = 2;
 	static const int kMaxFreeUnused = 1024;
 	TRACETHIS();
+
+	pthread_setname_np(pthread_self(), "freeResThread");
 
 	while (!gTerminate) {
 		gOpenChunks.freeUnused(eventloop_time(), gChunksMapMutex,
@@ -2863,6 +2875,7 @@ void hddReload(void) {
 	gHDDTestFreq_ms =
 	    cfg_ranged_get("HDD_TEST_FREQ", 10., 0.001, 1000000.) * 1000;
 	gCheckCrcWhenReading = cfg_getuint8("HDD_CHECK_CRC_WHEN_READING", 1) != 0U;
+	gCheckCrcWhenWriting = cfg_getuint8("HDD_CHECK_CRC_WHEN_WRITING", 1) != 0U;
 	gPunchHolesInFiles = cfg_getuint32("HDD_PUNCH_HOLES", 0);
 
 	char *LeaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT",
@@ -2911,14 +2924,21 @@ int loadPlugins() {
 	std::string pluginsInstallDirPath = PLUGINS_PATH "/chunkserver";
 	std::string pluginsBuildDirPath = BUILD_PATH "/plugins/chunkserver";
 
+	// Try to load plugins first from the installation directory
 	if (!pluginManager.loadPlugins(pluginsInstallDirPath)) {
-		safs_pretty_syslog(LOG_WARNING, "Loading plugins from %s failed!!!",
+		safs_pretty_syslog(LOG_NOTICE,
+		                   "PluginManager: No plugins loaded from: %s",
 		                   pluginsInstallDirPath.c_str());
+
+		// If no plugins were loaded from the installation directory,
+		// try to load them from the build directory (useful for development)
 		if (!pluginManager.loadPlugins(pluginsBuildDirPath)) {
-			safs_pretty_syslog(LOG_WARNING, "Loading plugins from %s failed!!!",
+			safs_pretty_syslog(LOG_NOTICE,
+			                   "PluginManager: No plugins loaded from: %s",
 			                   pluginsBuildDirPath.c_str());
 		}
 	}
+
 	pluginManager.showLoadedPlugins();
 
 	return SAUNAFS_STATUS_OK;
@@ -2975,6 +2995,7 @@ int hddInit() {
 	gHDDTestFreq_ms =
 	    cfg_ranged_get("HDD_TEST_FREQ", 10., 0.001, 1000000.) * 1000;
 	gCheckCrcWhenReading = cfg_getuint8("HDD_CHECK_CRC_WHEN_READING", 1) != 0U;
+	gCheckCrcWhenWriting = cfg_getuint8("HDD_CHECK_CRC_WHEN_WRITING", 1) != 0U;
 
 	gPunchHolesInFiles = cfg_getuint32("HDD_PUNCH_HOLES", 0);
 

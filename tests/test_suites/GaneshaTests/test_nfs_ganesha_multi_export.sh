@@ -7,7 +7,7 @@
 # The path for the Ganesha daemon should match the installation folder inside the test.
 #
 
-timeout_set 2 minutes
+timeout_set 45 seconds
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
@@ -113,7 +113,7 @@ sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
 assert_eventually 'showmount -e localhost'
 
 for x in 1 2 99; do
-	sudo mount localhost:/e$x $TEMP_DIR/mnt/nfs$x
+	sudo mount -o v4.1 localhost:/e${x} ${TEMP_DIR}/mnt/nfs${x}
 done
 sudo mount -o nfsvers=4 localhost:/e97 $TEMP_DIR/mnt/nfs97
 

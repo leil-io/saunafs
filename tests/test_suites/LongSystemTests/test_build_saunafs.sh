@@ -1,7 +1,9 @@
 timeout_set 10 minutes
+assert_program_installed git
+assert_program_installed cmake
 
 CHUNKSERVERS=8 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0" \
 	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
 	setup_local_empty_saunafs info
 
@@ -16,11 +18,11 @@ saunafs setgoal ec43 work
 
 cd work
 
-git clone "https://github.com/saunafs/saunafs.git"
+assert_success git clone "https://github.com/leil-io/saunafs.git"
 
 cd saunafs
 
 mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-make -j${PARALLEL_JOBS}
+assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=RelWithDebInfo
+assert_success make -j${PARALLEL_JOBS}

@@ -36,6 +36,10 @@
 #include "protocol/directory_entry.h"
 #include "protocol/named_inode_entry.h"
 
+#ifdef _WIN32
+inline std::atomic_bool gIsDisconnectedFromMaster;
+#endif
+
 void fs_getmasterlocation(uint8_t loc[14]);
 uint32_t fs_getsrcip(void);
 

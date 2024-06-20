@@ -1,0 +1,26 @@
+# Top most .editorconfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Tab indentation for shell scripts, Dockerfiles and Makefiles
+[{*.{bash,sh},Dockerfile,Dockerfile.*,Makefile,*.mk}]
+indent_style = tab
+# Unsupported in some editors
+keep_padding = true
+space_redirects = true
+
+# Tab indentation for C/C++ files
+[*.{c,cc,h,cpp,hpp,c++,h++,cxx,hxx}]
+indent_style = tab
+
+# Markdown files should allow trailing whitespace
+[*.{md,markdown,txt}]
+trim_trailing_whitespace = false

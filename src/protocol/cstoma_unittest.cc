@@ -23,7 +23,7 @@
 #include <gtest/gtest.h>
 
 #include "common/crc.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "unittests/chunk_type_constants.h"
 #include "unittests/inout_pair.h"
 #include "unittests/packet.h"

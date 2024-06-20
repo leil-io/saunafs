@@ -22,6 +22,7 @@
 #include "common/cfg.h"
 
 #include <map>
+#include <cinttypes>
 #include <yaml-cpp/yaml.h>
 
 #include "common/massert.h"

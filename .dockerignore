@@ -1,0 +1,77 @@
+*~
+.DS_Store
+.git
+
+# Vim files #
+#############
+.clang_complete
+tags
+*.taghl
+compile_commands.json
+.ycm_extra_conf.py
+
+# Commonly used build directory #
+#################################
+/_packages/
+/build*
+/cmake-build-*
+/install/
+/test_output/
+
+# Eclipse project files #
+#########################
+/.project
+/.cproject
+/.settings
+
+# Jetbrains IDE project files #
+###############################
+/.idea
+
+# KDevelop4 project file #
+##########################
+*.kdev4
+
+# QtCreator user profiles #
+###########################
+*.user
+
+# Debian builds #
+#################
+/Makefile
+/debian/files
+/debian/*.debhelper
+/debian/*.substvars
+/debian/*.debhelper.log
+/debian/debhelper-build-stamp
+/debian/saunafs-adm/
+/debian/saunafs-cgi/
+/debian/saunafs-cgiserv/
+/debian/saunafs-chunkserver/
+/debian/saunafs-client/
+/debian/saunafs-client3/
+/debian/saunafs-common/
+/debian/saunafs-dbg/
+/debian/saunafs-lib-client/
+/debian/saunafs-master/
+/debian/saunafs-metalogger/
+/debian/saunafs-nfs-ganesha/
+/debian/saunafs-uraft/
+/debian/tmp/
+/saunafs-bundle-*
+
+# Mypy #
+########
+.mypy_cache
+
+# VSCode #
+##########
+.vscode
+
+# clangd #
+##########
+.cache
+
+# Test setup #
+##############
+tests/hdd*

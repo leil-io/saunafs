@@ -37,9 +37,9 @@
 #include "common/connection_pool.h"
 #include "common/datapack.h"
 #include "common/exceptions.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/read_plan_executor.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "mount/chunk_locator.h"
@@ -326,6 +326,9 @@ inline void clear_active_read_records()
 
 void* read_data_delayed_ops(void *arg) {
 	(void)arg;
+
+	pthread_setname_np(pthread_self(), "readDelayedOps");
+
 	for (;;) {
 		gReadConnectionPool.cleanup();
 		std::unique_lock lock(gMutex);
@@ -354,6 +357,11 @@ void* read_data_delayed_ops(void *arg) {
 
 void* read_worker(void *arg) {
 	(void)arg;
+
+	static std::atomic_uint16_t readWorkersCounter(0);
+	std::string threadName = "readWorker " + std::to_string(readWorkersCounter++);
+	pthread_setname_np(pthread_self(), threadName.c_str());
+
 	for (;;) {
 		std::unique_lock operationsLock(gReadaheadOperationsManagerMutex);
 		if (gReadaheadOperationsManager.empty()) {

@@ -8,7 +8,7 @@
 #include "chunkserver-common/subfolder.h"
 #include "chunkserver/cmr_chunk.h"
 #include "common/crc.h"
-#include "common/saunafs_error_codes.h"
+#include "errors/saunafs_error_codes.h"
 #include "devtools/TracePrinter.h"
 #include "devtools/request_log.h"
 
@@ -369,8 +369,9 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 	    (offsetInBlock + size > SFSBLOCKSIZE)) {
 		return SAUNAFS_ERROR_WRONGOFFSET;
 	}
-	if (crc != mycrc32(0, buffer, size)) {
-		return SAUNAFS_ERROR_CRC;
+
+	if (gCheckCrcWhenWriting) {
+		if (crc != mycrc32(0, buffer, size)) { return SAUNAFS_ERROR_CRC; }
 	}
 
 	chunk->setWasChanged(1U);

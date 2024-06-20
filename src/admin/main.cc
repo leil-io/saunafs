@@ -47,10 +47,11 @@
 #include "admin/list_sessions_command.h"
 #include "common/human_readable_format.h"
 #include "protocol/SFSCommunication.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
+#include "common/sockets.h"
 
 int main(int argc, const char** argv) {
-	std::vector<const SaunaFsProbeCommand*> allCommands = {
+	std::vector<const SaunaFsAdminCommand*> allCommands = {
 			new ChunksHealthCommand(),
 			new InfoCommand(),
 			new IoLimitsStatusCommand(),
@@ -80,6 +81,9 @@ int main(int argc, const char** argv) {
 		if (argc < 2) {
 			throw WrongUsageException("No command name provided");
 		}
+#ifdef _WIN32
+		socketinit();
+#endif
 		command_name = argv[1];
 		std::vector<std::string> arguments(argv + 2, argv + argc);
 		for (auto command : allCommands) {
@@ -90,6 +94,9 @@ int main(int argc, const char** argv) {
 						supportedOptions.push_back(optionWithDescription.first);
 					}
 					command->run(Options(supportedOptions, arguments));
+#ifdef _WIN32
+					socketrelease();
+#endif
 					return 0;
 				} catch (Options::ParseError& ex) {
 					throw WrongUsageException("Wrong usage of " + command->name()
@@ -139,8 +146,14 @@ int main(int argc, const char** argv) {
 				}
 			}
 		}
+#ifdef _WIN32
+		socketrelease();
+#endif
 		return 1;
 	} catch (Exception& ex) {
+#ifdef _WIN32
+		socketrelease();
+#endif
 		std::cerr << "Error: " << ex.what() << std::endl;
 		return 1;
 	}

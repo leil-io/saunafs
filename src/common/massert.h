@@ -25,9 +25,11 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "common/sfserr.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
+#include "errors/sfserr.h"
+#ifndef _WIN32
+#include <sys/syslog.h>
+#endif
 
 #ifdef THROW_INSTEAD_OF_ABORT
 #  include <stdexcept>

@@ -290,3 +290,134 @@ TEST(DirEntryCache, RandomOrder) {
 	};
 	check_expected_content(cache, index_output, lookup_output);
 }
+
+TEST(DirEntryCache, LatestLookup) {
+	DirEntryCacheIntrospect cache(5000000);
+
+	Attributes dummy_attributes;
+	dummy_attributes.fill(0);
+	Attributes attributes_with_6 = dummy_attributes;
+	Attributes attributes_with_9 = dummy_attributes;
+	attributes_with_6[0] = 6;
+	attributes_with_9[0] = 9;
+	auto current_time = cache.updateTime();
+
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 11, attributes_with_9,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 12, attributes_with_6,
+	             current_time + 500);
+	cache.insertSequence(
+		SaunaClient::Context(0, 0, 0, 0), 9,
+		std::vector<DirectoryEntry>{
+			{7, 8, 10, "a1", dummy_attributes},
+			{8, 9, 11, "a2", dummy_attributes},
+			{9, 10, 12, "a3", dummy_attributes}
+		}, current_time + 1
+	);
+
+	Attributes attr;
+	dummy_attributes.fill(0);
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 9, attr));
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 10, attr));
+	ASSERT_EQ(attr[0], 0);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 11, attr));
+	ASSERT_EQ(attr[0], 9);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 12, attr));
+	ASSERT_EQ(attr[0], 6);
+}
+
+TEST(DirEntryCache, InvalidateParentItself) {
+	DirEntryCacheIntrospect cache(5000000);
+
+	Attributes dummy_attributes;
+	dummy_attributes.fill(0);
+	Attributes attributes_with_6 = dummy_attributes;
+	Attributes attributes_with_9 = dummy_attributes;
+	attributes_with_6[0] = 6;
+	attributes_with_9[0] = 9;
+	auto current_time = cache.updateTime();
+
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 8, attributes_with_6,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(1, 1, 0, 0), 8, attributes_with_9,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 9, attributes_with_6,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(1, 0, 0, 0), 11, attributes_with_9,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 12, attributes_with_6,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 13, attributes_with_9,
+	             current_time + 500);
+	cache.insert(SaunaClient::Context(0, 0, 0, 0), 15, attributes_with_6,
+	             current_time + 500);
+	cache.insertSequence(
+		SaunaClient::Context(0, 0, 0, 0), 8,
+		std::vector<DirectoryEntry>{
+			{7, 8, 10, "a1", dummy_attributes},
+			{8, 9, 11, "a2", dummy_attributes},
+			{9, 10, 12, "a3", dummy_attributes}
+		}, current_time + 1
+	);
+	cache.insertSequence(
+		SaunaClient::Context(1, 0, 0, 0), 8,
+		std::vector<DirectoryEntry>{
+			{7, 8, 10, "a10", dummy_attributes},
+			{8, 9, 11, "a11", dummy_attributes},
+			{9, 10, 22, "a22", dummy_attributes}
+		}, current_time + 1
+	);
+	cache.insertSequence(
+		SaunaClient::Context(1, 1, 0, 0), 12,
+		std::vector<DirectoryEntry>{
+			{7, 8, 14, "a4", dummy_attributes},
+			{8, 9, 15, "a5", dummy_attributes},
+			{9, 10, 16, "a6", dummy_attributes}
+		}, current_time + 1
+	);
+
+	Attributes attr;
+	dummy_attributes.fill(0);
+	cache.lockAndInvalidateParent(12);
+
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 12, attr));
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(1, 1, 0, 0), 12, attr));
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 13, attr));
+	ASSERT_EQ(attr[0], 9);
+
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(1, 1, 0, 0), 14, attr));
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(1, 1, 0, 0), 16, attr));
+
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(1, 1, 0, 0), 15, attr));
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 15, attr));
+	ASSERT_EQ(attr[0], 6);
+
+	cache.lockAndInvalidateParent(SaunaClient::Context(0, 0, 0, 0), 8);
+
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 8, attr));
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 10, attr));
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 11, attr));
+	ASSERT_FALSE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 12, attr));
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(1, 1, 0, 0), 8, attr));
+	ASSERT_EQ(attr[0], 9);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(0, 0, 0, 0), 9, attr));
+	ASSERT_EQ(attr[0], 6);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(1, 0, 0, 0), 10, attr));
+	ASSERT_EQ(attr[0], 0);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(1, 0, 0, 0), 10, attr));
+	ASSERT_EQ(attr[0], 0);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(1, 0, 0, 0), 11, attr));
+	ASSERT_EQ(attr[0], 9);
+
+	ASSERT_TRUE(cache.lookup(SaunaClient::Context(1, 0, 0, 0), 22, attr));
+	ASSERT_EQ(attr[0], 0);
+}

@@ -19,5 +19,5 @@ fi
 saunafs_chunkserver_daemon 0 reload
 
 # Check the disk was removed correctly
-assert_eventually_prints 2 "saunafs-probe list-disks \
+assert_eventually_prints 2 "saunafs-admin list-disks \
 	--porcelain localhost ${info[matocl]} | wc -l" "30 seconds"

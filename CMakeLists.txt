@@ -136,11 +136,6 @@ message(STATUS "USE_LEGACY_READ_MESSAGES: ${USE_LEGACY_READ_MESSAGES}")
 message(STATUS "ENABLE_NFS_GANESHA: ${ENABLE_NFS_GANESHA}")
 message(STATUS "ENABLE_COMPILE_COMMANDS: ${CMAKE_EXPORT_COMPILE_COMMANDS}")
 
-execute_process(COMMAND "git" "rev-parse" "HEAD"
-  OUTPUT_VARIABLE GIT_SHA1 RESULT_VARIABLE GIT_SHA1_RETURN_VALUE
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-
 if(ENABLE_TESTS)
   if(NOT THROW_INSTEAD_OF_ABORT)
     message(STATUS "Tests require THROW_INSTEAD_OF_ABORT to be set to YES, changing passed value:")
@@ -193,7 +188,15 @@ endif()
 project(saunafs)
 
 if(NOT PACKAGE_VERSION)
-  set(PACKAGE_VERSION "4.1.1-devel" CACHE STRING "Package version")
+  set(DEFAULT_MIN_VERSION "4.2.0")
+  execute_process(COMMAND "git" "rev-parse" "--short" "HEAD"
+    OUTPUT_VARIABLE GIT_SHA1_SHORT RESULT_VARIABLE GIT_SHA1_SHORT_RETURN_VALUE
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND "git" "rev-parse" "--abbrev-ref" "HEAD"
+    OUTPUT_VARIABLE GIT_BRANCH_NAME RESULT_VARIABLE GIT_BRANCH_NAME_RETURN_VALUE
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(TIMESTAMP BUILD_TIMESTAMP "%y%m%d-%H%M%S")
+  set(PACKAGE_VERSION "${DEFAULT_MIN_VERSION}-${BUILD_TIMESTAMP}-unstable-${GIT_BRANCH_NAME}-${GIT_SHA1_SHORT}")
 endif()
 
 string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" PACKAGE_VERSION_MATCH ${PACKAGE_VERSION})
@@ -358,6 +361,8 @@ endif()
 
 add_subdirectory(external)
 add_subdirectory(src/admin)
+add_subdirectory(src/errors)
+add_subdirectory(src/slogger)
 add_subdirectory(src/common)
 add_subdirectory(src/protocol)
 add_subdirectory(src/mount)
@@ -399,3 +404,5 @@ endif()
 if (ENABLE_URAFT)
   add_subdirectory(src/uraft)
 endif()
+
+include(Packing)

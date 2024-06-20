@@ -23,7 +23,6 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
-#include "common/stat32.h"
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -34,8 +33,8 @@
 
 #include "common/cwrap.h"
 #include "common/datapack.h"
-#include "common/sfserr.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
+#include "protocol/SFSCommunication.h"
 
 #define METADATA_FILENAME_TEMPL "metadata.sfs"
 const char kMetadataFilename[] = METADATA_FILENAME_TEMPL;

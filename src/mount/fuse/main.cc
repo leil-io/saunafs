@@ -29,7 +29,7 @@
 
 #include "common/crc.h"
 #include "common/md5.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/sockets.h"
 #include "mount/fuse/daemonize.h"
 #include "mount/fuse/sfs_fuse.h"
@@ -250,6 +250,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	params.acl_cache_size = gMountOptions.aclcachesize;
 	params.debug_mode = gMountOptions.debug;
 	params.direct_io = gMountOptions.directio;
+	params.ignore_flush = gMountOptions.ignoreflush;
 
 	if (!gMountOptions.meta) {
 		SaunaClient::fs_init(params);

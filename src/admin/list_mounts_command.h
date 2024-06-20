@@ -24,7 +24,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class ListMountsCommand : public SaunaFsProbeCommand {
+class ListMountsCommand : public SaunaFsAdminCommand {
 public:
 	virtual std::string name() const;
 	virtual SupportedOptions supportedOptions() const;

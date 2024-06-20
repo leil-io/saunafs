@@ -47,9 +47,9 @@
 #include "common/datapack.h"
 #include "common/errno_defs.h"
 #include "common/lru_cache.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/richacl_converter.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/special_inode_defs.h"
 #include "common/time_utils.h"
@@ -211,6 +211,7 @@ static unsigned gDirEntryCacheMaxSize = 100000;
 
 static int debug_mode = 0;
 static int usedircache = 1;
+static bool ignore_flush = false;
 static int keep_cache = 0;
 static double direntry_cache_timeout = 0.1;
 static double entry_cache_timeout = 0.0;
@@ -228,6 +229,8 @@ static std::mutex lock_request_mutex;
 uint8_t session_flags;
 
 uint8_t get_session_flags() { return session_flags; }
+
+bool isMasterDisconnected() { return gIsDisconnectedFromMaster.load(); }
 
 #define LOCAL_USERS_THRESHOLD 0x30000
 static int32_t mounting_uid = USE_LOCAL_ID;
@@ -837,8 +840,10 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 		e.attr.st_size=maxfleng;
 	}
 
-	// If lookup succeeded and data did not come from cache, then cache it
-	if (!icacheflag) {
+	// If lookup succeeded and data did not come from cache, then cache it.
+	// Files with at least one hardlink are impossible to keep track of, so it is
+	// better to don't track them.
+	if (!icacheflag && !(e.attr.st_nlink > 1 && attr[0] == TYPE_FILE)) {
 		auto data_acquire_time = gDirEntryCache.updateTime();
 
 		std::unique_lock<shared_mutex> write_guard(gDirEntryCache.rwlock());
@@ -918,8 +923,10 @@ AttrReply getattr(Context &ctx, Inode ino) {
 	patch_uid_gid_fields(o_stbuf);
 #endif
 
-	// If getattr succeeded and data did not come from cache, then cache it
-	if (!fromCache) {
+	// If lookup succeeded and data did not come from cache, then cache it.
+	// Files with at least one hardlink are impossible to keep track of, so it is
+	// better to don't track them.
+	if (!fromCache && !(o_stbuf.st_nlink > 1 && attr[0] == TYPE_FILE)) {
 		auto data_acquire_time = gDirEntryCache.updateTime();
 
 		std::unique_lock<shared_mutex> write_guard(gDirEntryCache.rwlock());
@@ -2359,7 +2366,18 @@ BytesWritten write(Context &ctx, Inode ino, const char *buf, size_t size, off_t 
 		fileinfo->mode = IO_WRITE;
 		fileinfo->data = write_data_new(ino);
 	}
-	err = write_data(fileinfo->data,off,size,(const uint8_t*)buf);
+
+	Attributes attr;
+	attr.fill(0);
+	if (usedircache) {
+		gDirEntryCache.lookup(ctx, ino, attr);
+	}
+	struct stat stbuf;
+	attr_to_stat(ino, attr, &stbuf);
+	size_t currentSize = stbuf.st_size;
+
+	err = write_data(fileinfo->data, off, size, (const uint8_t *)buf,
+	                 currentSize);
 	gDirEntryCache.lockAndInvalidateInode(ino);
 	if (err != SAUNAFS_STATUS_OK) {
 		oplog_printf(ctx, "write (%lu,%" PRIu64 ",%" PRIu64 "): (physical) %s",
@@ -2379,6 +2397,12 @@ BytesWritten write(Context &ctx, Inode ino, const char *buf, size_t size, off_t 
 }
 
 void flush(Context &ctx, Inode ino, FileInfo* fi) {
+	if (ignore_flush) {
+		oplog_printf(ctx, "flush (%lu): OK",
+				(unsigned long int)ino);
+		return;
+	}
+
 	finfo *fileinfo = reinterpret_cast<finfo*>(fi->fh);
 	int err;
 
@@ -3369,11 +3393,13 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 #ifdef _WIN32
 		, int mounting_uid_, int mounting_gid_
 #endif
+		, bool ignore_flush_
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
 #endif
+	ignore_flush = ignore_flush_;
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
 	direntry_cache_timeout = direntry_cache_timeout_;
@@ -3469,6 +3495,7 @@ void fs_init(FsInitParams &params) {
 #ifdef _WIN32
 		, params.mounting_uid, params.mounting_gid
 #endif
+		, params.ignore_flush
 		);
 }
 

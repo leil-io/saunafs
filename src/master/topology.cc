@@ -33,7 +33,8 @@
 #include "common/cfg.h"
 #include "common/event_loop.h"
 #include "common/massert.h"
-#include "common/slogger.h"
+#include "errors/sfserr.h"
+#include "slogger/slogger.h"
 #include "master/itree.h"
 
 static void *racktree;

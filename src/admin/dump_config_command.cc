@@ -38,7 +38,7 @@ void DumpConfigurationCommand::usage() const {
 	std::cerr << "    Authentication with the admin password is required\n";
 }
 
-SaunaFsProbeCommand::SupportedOptions DumpConfigurationCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions DumpConfigurationCommand::supportedOptions() const {
 	return {
 		{
 			defaultsMode,
@@ -102,6 +102,7 @@ const static std::unordered_map<std::string, std::string> defaultOptionsMaster =
     {"CHUNKS_LOOP_MIN_TIME", "300"},
     {"CHUNKS_LOOP_PERIOD", "1000"},
     {"CHUNKS_LOOP_MAX_CPU", "60"},
+    {"USE_LINEAR_ASSIGNMENT_OPTIMIZER", "1"},
     {"CHUNKS_SOFT_DEL_LIMIT", "10"},
     {"CHUNKS_HARD_DEL_LIMIT", "25"},
     {"CHUNKS_WRITE_REP_LIMIT", "2"},
@@ -155,6 +156,7 @@ const static std::unordered_map<std::string, std::string> defaultOptionsCS = {
     {"HDD_CONF_FILENAME", ETC_PATH "/sfshdd.cfg"},
     {"HDD_TEST_FREQ", "10.0"},
     {"HDD_CHECK_CRC_WHEN_READING", "1"},
+    {"HDD_CHECK_CRC_WHEN_WRITING", "1"},
     {"HDD_ADVISE_NO_CACHE", "0"},
     {"HDD_PUNCH_HOLES", "0"},
     {"ENABLE_LOAD_FACTOR", "0"},

@@ -19,7 +19,7 @@
 #include "admin/saunafs_admin_command.h"
 #include "common/server_connection.h"
 
-class DeleteSessionsCommand : public SaunaFsProbeCommand {
+class DeleteSessionsCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const final;
 	void usage() const final;

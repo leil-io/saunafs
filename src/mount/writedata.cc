@@ -43,11 +43,11 @@
 #include "common/goal.h"
 #include "common/massert.h"
 #include "common/message_receive_buffer.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/multi_buffer_writer.h"
 #include "common/pcqueue.h"
 #include "common/slice_traits.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "devtools/request_log.h"
@@ -311,6 +311,8 @@ static bool delayed_queue_remove(inodedata* id, Glock&) {
 }
 
 void* delayed_queue_worker(void*) {
+	pthread_setname_np(pthread_self(), "delQueueWriter");
+
 	for (;;) {
 		Timeout timeout(std::chrono::microseconds(1000000 / DelayedQueueEntry::kTicksPerSecond));
 		Glock lock(gMutex);
@@ -441,6 +443,10 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 	try {
 		try {
 			locator->locateAndLockChunk(inodeData_->inode, chunkIndex_);
+			Glock lock(gMutex);
+			inodeData_->maxfleng =
+			    std::max(inodeData_->maxfleng, locator->fileLength());
+			lock.unlock();
 
 			// Optimization -- talk with chunkservers only if we have to write any data.
 			// Don't do this if we just have to release some previously unlocked lock.
@@ -449,13 +455,14 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 				processDataChain(writer);
 				writer.finish(kTimeToFinishOperations * 1000);
 
-				Glock lock(gMutex);
+				lock.lock();
 				returnJournalToDataChain(writer.releaseJournal(), lock);
+				lock.unlock();
 			}
 			locator->unlockChunk();
 			read_inode_ops(inodeData_->inode);
 
-			Glock lock(gMutex);
+			lock.lock();
 			inodeData_->minimumBlocksToWrite = writer.getMinimumBlockCountWorthWriting();
 			bool canWait = !inodeData_->requiresFlushing();
 			if (!haveAnyBlockInCurrentChunk(lock)) {
@@ -573,6 +580,9 @@ void InodeChunkWriter::processDataChain(ChunkWriter& writer) {
 			can_expect_next_block = haveAnyBlockInCurrentChunk(lock);
 		}
 
+		writer.setChunkSizeInBlocks(
+		    std::min(inodeData_->maxfleng - chunkIndex_ * SFSCHUNKSIZE,
+		             (uint64_t)SFSCHUNKSIZE));
 		if (writer.startNewOperations(can_expect_next_block) > 0) {
 			Glock lock(gMutex);
 			inodeData_->lastWriteToChunkservers.reset();
@@ -647,6 +657,11 @@ bool InodeChunkWriter::haveBlockWorthWriting(uint32_t unfinishedOperationCount, 
 /* main working thread | glock:UNLOCKED */
 void* write_worker(void*) {
 	InodeChunkWriter inodeDataWriter;
+
+	static std::atomic_uint16_t writeWorkersCounter(0);
+	std::string threadName = "writeWorker " + std::to_string(writeWorkersCounter++);
+	pthread_setname_np(pthread_self(), threadName.c_str());
+
 	for (;;) {
 		// get next job
 		uint32_t z1, z2, z3;
@@ -798,7 +813,8 @@ int write_blocks(inodedata *id, uint64_t offset, uint32_t size, const uint8_t* d
 	return 0;
 }
 
-int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t* data) {
+int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t *data,
+               size_t currentSize) {
 	LOG_AVG_TILL_END_OF_SCOPE0("write_data");
 	int status;
 	inodedata *id = (inodedata*) vid;
@@ -808,6 +824,7 @@ int write_data(void *vid, uint64_t offset, uint32_t size, const uint8_t* data) {
 
 	Glock lock(gMutex);
 	status = id->status;
+	id->maxfleng = std::max(id->maxfleng, currentSize);
 	if (status == SAUNAFS_STATUS_OK) {
 		if (offset + size > id->maxfleng) {     // move fleng
 			id->maxfleng = offset + size;
@@ -842,11 +859,20 @@ static void write_data_lcnt_increase(inodedata *id, Glock&) {
 	id->lcnt++;
 }
 
-static void write_data_lcnt_decrease(inodedata *id, Glock& lock) {
+static void	write_data_lcnt_decrease_check_deleted(inodedata *id, Glock& lock, bool& isDeleted) {
+	// As long as it is not freed, then we don't consider the inodedata deleted
+	isDeleted = false;
 	id->lcnt--;
 	if (id->lcnt == 0 && !id->inqueue && id->flushwaiting == 0 && id->writewaiting == 0) {
 		write_free_inodedata(id, lock);
+		isDeleted = true;
 	}
+}
+
+inline void write_data_lcnt_decrease(inodedata *id, Glock& lock) {
+	bool dummy_isDeleted;
+	write_data_lcnt_decrease_check_deleted(id, lock, dummy_isDeleted);
+	(void) dummy_isDeleted;
 }
 
 void* write_data_new(uint32_t inode) {
@@ -953,10 +979,13 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	lock.lock();
 	if (status != 0 || !writeNeeded) {
 		// Something failed or we have nothing to do more (master server managed to do the truncate)
+		bool isDeleted = false;
 		write_data_flushwaiting_decrease(id, lock);
-		write_data_lcnt_decrease(id, lock);
+		write_data_lcnt_decrease_check_deleted(id, lock, isDeleted);
 		if (status == SAUNAFS_STATUS_OK) {
-			id->maxfleng = length;
+			if (!isDeleted) {
+				id->maxfleng = length;
+			}
 			return 0;
 		} else {
 			// status is now SFS status, so we cannot return any errno
@@ -973,6 +1002,9 @@ int write_data_truncate(uint32_t inode, bool opened, uint32_t uid, uint32_t gid,
 	});
 
 	if (endOffset > length) {
+		// Make maxfleng big enough for the upcoming writes
+		id->maxfleng = endOffset;
+
 		// Something has to be written, so pass our lock to writing threads
 		sassert(id->dataChain.empty());
 		id->locator.reset(new TruncateWriteChunkLocator(inode, length / SFSCHUNKSIZE, lockId));

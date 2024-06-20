@@ -53,9 +53,8 @@
 #include "common/event_loop.h"
 #include "common/main.h"
 #include "common/massert.h"
-#include "common/sfserr.h"
 #include "common/setup.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "common/time_utils.h"
 #include "protocol/SFSCommunication.h"
 

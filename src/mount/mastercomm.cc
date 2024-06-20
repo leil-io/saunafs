@@ -47,9 +47,9 @@
 #include "common/goal.h"
 #include "common/saunafs_version.h"
 #include "common/md5.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/sockets.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 #include "mount/exports.h"
 #include "mount/stats.h"
 #include "protocol/cltoma.h"
@@ -80,10 +80,9 @@ typedef struct _acquired_file {
 	struct _acquired_file *next;
 } acquired_file;
 
-
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
 #define DEFAULT_INPUT_BUFFSIZE 0x10000
-
+#define NO_DATA_RECEIVED_FROM_MASTER NULL
 #define RECEIVE_TIMEOUT 10
 
 static threc *threchead=NULL;
@@ -205,6 +204,9 @@ void master_stats_add(uint8_t id,uint64_t s) {
 static inline void setDisconnect(bool value) {
 	std::unique_lock<std::mutex> fdLock(fdMutex);
 	disconnect = value;
+#ifdef _WIN32
+	gIsDisconnectedFromMaster.store(value);
+#endif
 	if(value) {
 		SaunaClient::masterDisconnectedCallback();
 		safs_pretty_syslog(LOG_WARNING,"master: disconnected");
@@ -363,6 +365,11 @@ static bool fs_threc_send_receive(threc *rec, bool filter, PacketHeader::Type ex
 					}
 				}
 			}
+#ifdef _WIN32
+			else if (gIsDisconnectedFromMaster.load()) {
+				return false;
+			}
+#endif
 			sleep(sleep_time(cnt));
 			continue;
 		}
@@ -374,6 +381,7 @@ static bool fs_threc_send_receive(threc *rec, bool filter, PacketHeader::Type ex
 const uint8_t* fs_sendandreceive(threc *rec, uint32_t expected_cmd, uint32_t *answer_leng) {
 	// this function is only for compatibility with Legacy code
 	sassert(expected_cmd <= PacketHeader::kMaxOldPacketType);
+
 	if (fs_threc_send_receive(rec, true, expected_cmd)) {
 		const uint8_t *answer;
 		answer = rec->inputBuffer.data();
@@ -385,7 +393,7 @@ const uint8_t* fs_sendandreceive(threc *rec, uint32_t expected_cmd, uint32_t *an
 
 		return answer;
 	}
-	return NULL;
+	return NO_DATA_RECEIVED_FROM_MASTER;
 }
 
 bool fs_sausendandreceive(threc *rec, uint32_t expectedCommand, MessageBuffer& messageData) {
@@ -1024,6 +1032,8 @@ static void usr1_handler(int) {
 #endif
 
 void* fs_nop_thread(void *arg) {
+	pthread_setname_np(pthread_self(), "nopThread");
+
 	uint8_t *ptr,hdr[12],*inodespacket;
 	int32_t inodesleng;
 	acquired_file *afptr;
@@ -1140,6 +1150,9 @@ bool fs_deserialize_from_master(uint32_t& remainingBytes, Args&... destination) 
 void* fs_receive_thread(void *) {
 	uint32_t initialReconnectSleep_ms = 100;
 	uint32_t reconnectSleep_ms = initialReconnectSleep_ms;
+
+	pthread_setname_np(pthread_self(), "recFromMaster");
+
 	for (;;) {
 		std::unique_lock<std::mutex>fdLock(fdMutex);
 		if (fterm) {
@@ -1193,6 +1206,9 @@ void* fs_receive_thread(void *) {
 			continue;
 		} else {
 			// connecection succeeded -- reset timeout the initial value
+#ifdef _WIN32
+			gIsDisconnectedFromMaster.store(false);
+#endif
 			reconnectSleep_ms = initialReconnectSleep_ms;
 		}
 		fdLock.unlock();

@@ -31,7 +31,7 @@
 #include "common/main.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 
 /// Base name of a changelog file.
 /// Sometthing like "changelog.sfs" or "changelog_ml.sfs"

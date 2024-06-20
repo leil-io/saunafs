@@ -17,7 +17,7 @@
 
 #include "admin/saunafs_admin_command.h"
 
-class ListSessionsCommand : public SaunaFsProbeCommand {
+class ListSessionsCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const final;
 	SupportedOptions supportedOptions() const final;

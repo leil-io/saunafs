@@ -91,6 +91,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("bandwidthoveruse=%lf", bandwidthoveruse, 1),
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
+	SFS_OPT("sfsignoreflush", ignoreflush, 1),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
 	SFS_OPT("nonempty", nonemptymount, 1),
@@ -221,6 +222,9 @@ void usage(const char *progname) {
 "    -o enablefilelocks=0|1      enables/disables global file locking "
 				"(disabled by default)\n"
 "    -o nonempty                 allow mounts over non-empty file/dir\n"
+"    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
+				"behavior by replying SUCCESS to it immediately. Targets fast "
+				"creation of small files, but may cause data loss during crashes.\n"
 "\n",
 		SaunaClient::FsInitParams::kDefaultUseRwLock,
 		SaunaClient::FsInitParams::kDefaultMkdirCopySgid,

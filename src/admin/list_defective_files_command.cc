@@ -45,7 +45,7 @@ void ListDefectiveFilesCommand::usage() const {
 	std::cerr << "    Lists files which currently have defective chunks" << std::endl;
 }
 
-SaunaFsProbeCommand::SupportedOptions ListDefectiveFilesCommand::supportedOptions() const {
+SaunaFsAdminCommand::SupportedOptions ListDefectiveFilesCommand::supportedOptions() const {
 	return {
 		{kPorcelainMode, kPorcelainModeDescription},
 		{"--unavailable", "Print unavailable files"},

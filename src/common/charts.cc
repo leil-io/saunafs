@@ -42,7 +42,7 @@
 #include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/massert.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 
 #ifdef SAUNAFS_HAVE_ZLIB_H
 #  include <zlib.h>

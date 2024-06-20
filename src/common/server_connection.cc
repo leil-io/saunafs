@@ -25,7 +25,7 @@
 #include "common/exceptions.h"
 #include "common/message_receive_buffer.h"
 #include "protocol/SFSCommunication.h"
-#include "common/sfserr.h"
+#include "errors/sfserr.h"
 #include "common/multi_buffer_writer.h"
 #include "protocol/packet.h"
 #include "common/sockets.h"

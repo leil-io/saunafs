@@ -25,7 +25,7 @@
 #include "admin/saunafs_admin_command.h"
 #include "common/server_connection.h"
 
-class StopTaskCommand : public SaunaFsProbeCommand {
+class StopTaskCommand : public SaunaFsAdminCommand {
 public:
 	std::string name() const override;
 	void usage() const override;

@@ -26,7 +26,7 @@
 #include "common/cwrap.h"
 #include "common/exceptions.h"
 #include "common/massert.h"
-#include "common/slogger.h"
+#include "slogger/slogger.h"
 
 namespace {
 

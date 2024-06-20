@@ -18,6 +18,7 @@ compile_commands.json
 
 # Commonly used build directory #
 #################################
+/_packages/
 /build*
 /cmake-build-*
 /install/
@@ -78,12 +79,18 @@ compile_commands.json
 .cache
 
 # submodules #
-##########
+##############
 src/chunkserver/plugins/zonefs_disk
+src/chunkserver/plugins/ice_disk_energy_manager
 tests/ci_build/run-smr-tests.sh
 tests/test_suites/SMRTests
+tests/test_suites/ICETests
 
-# Windows
-##########
+# Windows #
+###########
 src/mount/windows
 create-win-release.bat
+
+# Test setup #
+##############
+tests/hdd*

@@ -86,8 +86,12 @@ debug_command() {
 	fi
 	if (( depth <= DEBUG_LEVEL )); then
 		local indent=">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-		echo "${indent:0:$depth} $(basename "${BASH_SOURCE[1]}"):${BASH_LINENO[0]}:`
-				`${FUNCNAME[1]}(): ${BASH_COMMAND}" >&2 | true
+		local level=${indent:0:$depth}
+		local source=$(basename "${BASH_SOURCE[1]}")
+		local line=${BASH_LINENO[0]}
+		local function=${FUNCNAME[1]}
+		local command=${BASH_COMMAND}
+		echo "${level} ${source}:${line}: ${function}(): ${command}" >&2 | true
 	fi
 }
 
@@ -200,9 +204,10 @@ test_cleanup() {
 	fi
 
 	# Clean the disks used by chunkservers
-	for d in $SAUNAFS_DISKS $SAUNAFS_LOOP_DISKS; do
-		rm -rf "$d"/chunks[0-9A-F][0-9A-F]
-		rm -f "$d"/.lock
+	for disk in ${SAUNAFS_DISKS} ${SAUNAFS_LOOP_DISKS}; do
+		rm -rf "${disk}"/meta/chunks[0-9A-F][0-9A-F]
+		rm -rf "${disk}"/data/chunks[0-9A-F][0-9A-F]
+		rm -f "${disk}"/.lock
 	done
 }
 
