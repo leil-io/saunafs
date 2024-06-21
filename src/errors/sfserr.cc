@@ -24,6 +24,7 @@
 #include <cerrno>
 #include <cstring>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
 #include "saunafs_error_codes.h"
