@@ -110,9 +110,6 @@ static IoStat gIoStat;
 
 static PluginManager pluginManager;
 
-static std::unique_ptr<IDiskManager> gDiskManager =
-    std::make_unique<DefaultDiskManager>();
-
 void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks,
                          std::size_t limit) {
 	TRACETHIS();
@@ -2853,6 +2850,22 @@ int hddLateInit() {
 	}
 
 	return 0;
+}
+
+/// Initializes the default disk manager and reads the disk manager type from
+/// configuration. This function must be called before plugins initialization.
+int initDiskManager() {
+	// Initialize the default disk manager and set the disk manager type.
+	// The default will be overwritten if the DISK_MANAGER_TYPE is set in
+	// the configuration file.
+	gDiskManager = std::make_unique<DefaultDiskManager>();
+
+	std::string diskManagerType = cfg_get("DISK_MANAGER_TYPE", "default");
+	std::transform(diskManagerType.begin(), diskManagerType.end(),
+	               diskManagerType.begin(), ::tolower);
+	gDiskManagerType = std::move(diskManagerType);
+
+	return SAUNAFS_STATUS_OK;
 }
 
 int loadPlugins() {
