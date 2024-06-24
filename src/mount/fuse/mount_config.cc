@@ -193,7 +193,7 @@ void usage(const char *progname) {
 "    -o sfswritecachesize=N      define size of write cache in MiB (default: %u)\n"
 "    -o sfsaclcachesize=N        define ACL cache size in number of entries "
 				"(0: no cache; default: %u)\n"
-"    -o sfscacheperinodepercentage  define what part of the write cache non "
+"    -o sfscacheperinodepercentage=P  define what part of the write cache non "
 				"occupied by other inodes can a single inode "
 				"occupy (in %%, default: %u)\n"
 "    -o sfswriteworkers=N        define number of write workers (default: %u)\n"
