@@ -93,6 +93,7 @@ int hddChunkOperation(uint64_t chunkId, uint32_t chunkVersion,
 void hddAddChunkToTestQueue(ChunkWithVersionAndType chunk);
 
 /* initialization */
+int initDiskManager();
 int loadPlugins();
 int hddLateInit();
 int hddInit();
