@@ -40,25 +40,25 @@
 #include "master/topology.h"
 #include "metrics/metrics.h"
 
+inline int prometheus_init() {
+	if (cfg_getuint8("ENABLE_PROMETHEUS", 0) != 1) {
+		safs::log_info(
+		    "Prometheus disabled, no Prometheus metrics will be "
+		    "gathered");
+		return 0;
+	}
+	metrics::metrics_init(cfg_getstr("PROMETHEUS_HOST", "0.0.0.0:8080"));
+	eventloop_destructregister(metrics::metrics_destroy);
+	return 0;
+}
+
 /// Functions to call before normal startup
 inline const std::vector<RunTab> earlyRunTabs = {
     RunTab{metadataserver::personality_validate, "validate personality"}};
 
 /// Functions to call during normal startup
 inline const std::vector<RunTab> runTabs = {
-    RunTab{[]() {
-	           if (cfg_getuint8("ENABLE_PROMETHEUS", 0) != 1) {
-		           safs::log_info(
-		               "Prometheus disabled, no Prometheus metrics will be "
-		               "gathered");
-		           return 0;
-	           }
-	           metrics::metrics_init(
-	               cfg_getstr("PROMETHEUS_HOST", "0.0.0.0:8080"));
-	           eventloop_destructregister(metrics::metrics_destroy);
-	           return 0;
-           },
-           "prometheus module"},
+    RunTab{prometheus_init, "prometheus module"},
     // has to be first
     RunTab{hstorage_init, "name storage"},
     // has to be second
