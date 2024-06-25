@@ -81,7 +81,7 @@ void setup_client_packets(const std::shared_ptr<Registry>& registry) {
 
 void prometheus_loop(const char* host) {
 	try {
-		// create an http server running on port 8080
+		// create an http server
 		Exposer exposer{host};
 		const auto registry = std::make_shared<Registry>();
 
