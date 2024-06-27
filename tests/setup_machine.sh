@@ -92,6 +92,7 @@ common_packages=(
 	socat
 	sudo
 	tidy
+	time
 	valgrind
 	wget
 	## For NFS-Ganesha tests (duplicate are commented out as reference)

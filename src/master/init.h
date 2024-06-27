@@ -18,15 +18,15 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sys/syslog.h>
-#include "common/cfg.h"
 #include "common/platform.h"
 
+#include <sys/syslog.h>
 #include <vector>
 
+#include "common/cfg.h"
+#include "common/event_loop.h"
 #include "common/random.h"
 #include "common/run_tab.h"
-#include "common/event_loop.h"
 #include "master/chartsdata.h"
 #include "master/datacachemgr.h"
 #include "master/exports.h"

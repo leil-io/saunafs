@@ -24,6 +24,3 @@ add_library(metrics ${METRICS_SOURCES})
 if (PROMETHEUS_CPP_ENABLE_PULL)
   target_link_libraries(metrics slogger prometheus-cpp::pull)
 endif()
-
-# create_unittest(metrics ${METRICS_TESTS})
-# link_unittest(metrics sfscommon)

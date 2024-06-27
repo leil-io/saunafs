@@ -10,6 +10,8 @@
 #include "metrics.h"
 #include "slogger/slogger.h"
 
+constexpr auto THREAD_SLEEP_TIME_MS = 100;
+
 
 namespace metrics {
 
@@ -33,18 +35,13 @@ MetricCounter rx_client_packets;
 // Sent client packets counter
 MetricCounter tx_client_packets;
 
-// This is used to indicate for the metrics thread to stop, it's managed by a
-// single function (metrics_destroy) and read by prometheus_loop
-std::atomic<bool> destroy = false;
-
-std::unique_ptr<std::thread> thread;
+std::unique_ptr<std::jthread> metrics_main_thread;
 
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void metrics_destroy() {
-	if (thread != nullptr) {
-		destroy = true;
-		thread->join();
+	if (metrics_main_thread != nullptr) {
+		metrics_main_thread->request_stop();
 	}
 }
 
@@ -59,11 +56,10 @@ void metrics_init(const char* /* unused */) {
 
 using namespace prometheus;
 
-inline Family<Counter>& setup_family(const char* name, const char* help, const std::shared_ptr<Registry>& registry) {
-	return BuildCounter()
-	        .Name(name)
-	        .Help(help)
-	        .Register(*registry);
+inline Family<Counter> &setup_family(
+    const char *name, const char *help,
+    const std::shared_ptr<Registry> &registry) {
+	return BuildCounter().Name(name).Help(help).Register(*registry);
 }
 
 void setup_client_packets(const std::shared_ptr<Registry>& registry) {
@@ -79,7 +75,7 @@ void setup_client_packets(const std::shared_ptr<Registry>& registry) {
 
 }
 
-void prometheus_loop(const char* host) {
+void prometheus_loop(const std::stop_token& stop, const char* host) {
 	try {
 		// create an http server
 		Exposer exposer{host};
@@ -90,15 +86,16 @@ void prometheus_loop(const char* host) {
 		exposer.RegisterCollectable(registry);
 		safs::log_info("started prometheus server");
 
-		// Sleep forever this thread
-		while (!destroy) {};
+		while (!stop.stop_requested()) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_SLEEP_TIME_MS));
+		};
 	} catch (std::exception &e) {
 		safs::log_err("could not setup prometheus server: {}", e.what());
 	}
 }
 
 void metrics_init(const char* host) {
-	thread = std::make_unique<std::thread>(std::thread(prometheus_loop, host));
+	metrics_main_thread = std::make_unique<std::jthread>(std::jthread(prometheus_loop, host));
 }
 
 }

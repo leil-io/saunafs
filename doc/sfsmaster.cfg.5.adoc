@@ -243,7 +243,7 @@ collection. Note that this requires compiling with Prometheus support. Set to
 either 1 to enable, or 0 to disable (default is 0)
 
 *PROMETHEUS_HOST*:: Host address where Prometheus metric data can be collected,
-must in the format of HOST:PORT (default 0.0.0.0:8080)
+must be in the format of HOST:PORT (default 0.0.0.0:8080)
 
 == NOTES
 
