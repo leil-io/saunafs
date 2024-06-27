@@ -4,15 +4,15 @@ You can install SaunaFS from pre-built packages or from source. The
 pre-built packages are currently available for the following platforms:
 
 - Linux (x86_64)
-  - [Ubuntu 24.04 (Noble)](#ubuntu)
-  - [Ubuntu 22.04 (Jammy)](#ubuntu)
+  - Ubuntu 24.04 (Noble)
+  - Ubuntu 22.04 (Jammy)
 
 Please follow the instructions below to install SaunaFS on your
 system.
 
 ## Installing from pre-built packages
 
-### Ubuntu 24.04 (Noble)
+### Ubuntu 22.04/24.04
 
 1. Import the public key used to sign the packages:
 
