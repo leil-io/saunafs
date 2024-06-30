@@ -66,7 +66,6 @@
 
 namespace {
 
-// TODO: specific lock for inode
 // TODO: uncomment the lines in the truncate
 
 struct ChunkData;
@@ -81,8 +80,8 @@ struct inodedata {
 	std::condition_variable flushcond; // wait for !inqueue (flush)
 	std::condition_variable writecond; // wait for flushwaiting==0 (write)
 	inodedata *next;
-	ChunkData *chunksDataFirst, *chunksDataLast;
-	uint64_t totalCachedBlocks;
+	std::atomic<ChunkData *> chunksDataFirst;
+	std::atomic<uint64_t> totalCachedBlocks;
 	Timer lastWriteToDataChain;
 	Timer lastWriteToChunkservers;
 
@@ -95,7 +94,6 @@ struct inodedata {
 			  lcnt(0),
 			  next(nullptr),
 			  chunksDataFirst(nullptr),
-			  chunksDataLast(nullptr),
 			  totalCachedBlocks(0) {
 	}
 
@@ -215,7 +213,7 @@ struct ChunkData {
 	}
 
 	bool parentIsDone() const {
-		return parent->totalCachedBlocks == 0;
+		return parent->chunksDataFirst == nullptr;
 	}
 
 	void notifyParentFlushcond() {
@@ -274,12 +272,12 @@ void write_cb_acquire_blocks(uint32_t count, Glock&) {
 void write_cb_wait_for_block(inodedata* id, Glock& glock) {
 	LOG_AVG_TILL_END_OF_SCOPE0("write_cb_wait_for_block");
 	fcbwaiting++;
-	uint64_t dataChainSize = id->totalCachedBlocks;
+	uint64_t totalCachedBlocks = id->totalCachedBlocks;
 	while (freecacheblocks <= 0
-			// dataChainSize / (dataChainSize + freecacheblocks) > gCachePerInodePercentage / 100
-			// really means "0 > 0"
-			|| dataChainSize * 100 > (dataChainSize + freecacheblocks) * gCachePerInodePercentage)
-	{
+	       // totalCachedBlocks / (totalCachedBlocks + freecacheblocks) >
+	       // gCachePerInodePercentage / 100 really means "0 > 0"
+	       || totalCachedBlocks * 100 > (totalCachedBlocks + freecacheblocks) *
+	                                        gCachePerInodePercentage) {
 		fcbcond.wait(glock);
 	}
 	fcbwaiting--;
@@ -327,9 +325,10 @@ void write_free_inodedata(inodedata* fid, Glock&) {
 
 ChunkData *write_get_chunkdata(uint32_t chunk, inodedata *id) {
 	ChunkData *chunkData;
-	for (ChunkData *chunkData = id->chunksDataFirst; id; id = id->next) {
-		if (chunkData->chunkIndex == chunk) { 
-			return chunkData; 
+	for (ChunkData *chunkData = id->chunksDataFirst; chunkData;
+	     chunkData = chunkData->next) {
+		if (chunkData->chunkIndex == chunk) {
+			return chunkData;
 		}
 	}
 	chunkData = new ChunkData(chunk, id);
@@ -340,14 +339,23 @@ ChunkData *write_get_chunkdata(uint32_t chunk, inodedata *id) {
 
 void write_free_chunkdata(ChunkData *fChunkData) {
 	inodedata *id = fChunkData->parent;
-	ChunkData *chunkData, **chunkDataPtr = &(id->chunksDataFirst);
+	ChunkData *cpyChunksDataFirst = id->chunksDataFirst;
+	ChunkData *chunkData, **chunkDataPtr = &(cpyChunksDataFirst);
+	sassert(id->chunksDataFirst != nullptr);
+	bool isFirst = true;
 	while ((chunkData = *chunkDataPtr)) {
 		if (chunkData == fChunkData) {
-			*chunkDataPtr = chunkData->next;
+			if (isFirst) {
+				id->chunksDataFirst = chunkData->next;
+			} else {
+				*chunkDataPtr = chunkData->next;
+			}
 			delete chunkData;
 			return;
 		}
 		chunkDataPtr = &(chunkData->next);
+		sassert(*chunkDataPtr != nullptr);
+		isFirst = false;
 	}
 }
 
@@ -367,14 +375,17 @@ static bool delayed_queue_remove(ChunkData* chunkData, Glock&) {
 	return false;
 }
 
-static bool delayed_queue_remove(inodedata* id, Glock&) {
-	for (auto it = delayedQueue.begin(); it != delayedQueue.end(); ++it) {
+static std::vector<ChunkData*> delayed_queue_remove(inodedata *id, Glock &) {
+	std::vector<ChunkData*> removedChunkData;
+	for (auto it = delayedQueue.begin(); it != delayedQueue.end();) {
 		if (it->chunkData->parent == id) {
-			delayedQueue.erase(it);
-			return true;
+			removedChunkData.push_back(it->chunkData);
+			it = delayedQueue.erase(it);
+		} else {
+			it++;
 		}
 	}
-	return false;
+	return removedChunkData;
 }
 
 void* delayed_queue_worker(void*) {
@@ -411,14 +422,14 @@ void write_delayed_enqueue(ChunkData* chunkData, uint32_t seconds, Glock& lock) 
 	}
 }
 
-void write_enqueue(ChunkData* chunkData, Glock&) {
-	queue_put(jqueue, 0, 0, (uint8_t*) chunkData, 0);
+void write_enqueue(ChunkData *chunkData, Glock &) {
+	queue_put(jqueue, 0, 0, (uint8_t *)chunkData, 0);
 }
 
-void write_enqueue(inodedata *id, Glock &) {
-	for (ChunkData *chunkData = id->chunksDataFirst; chunkData;
-	     chunkData = chunkData->next)
-		queue_put(jqueue, 0, 0, (uint8_t *)chunkData, 0);
+void write_enqueue(std::vector<ChunkData *> &chunks, Glock &) {
+	for (auto chunk : chunks) {
+		queue_put(jqueue, 0, 0, (uint8_t *)chunk, 0);
+	}
 }
 
 void write_job_delayed_end(ChunkData* chunkData, int status, int seconds, Glock &lock) {
@@ -444,10 +455,11 @@ void write_job_delayed_end(ChunkData* chunkData, int status, int seconds, Glock 
 		// We don't reset maxfleng (id->maxfleng = 0;) for a while longer, to
 		// have its value ready to some quick cache responses in lookup and
 		// getattr syscalls
-		if (chunkData->parentIsDone()) {
-			chunkData->notifyParentFlushcond();
-		}
+		inodedata *parent = chunkData->parent;
 		write_free_chunkdata(chunkData);
+		if (parent->chunksDataFirst == nullptr) {
+			parent->flushcond.notify_all();
+		}
 	}
 }
 
@@ -479,9 +491,10 @@ private:
 void InodeChunkWriter::processJob(ChunkData* chunkData) {
 	LOG_AVG_TILL_END_OF_SCOPE0("InodeChunkWriter::processJob");
 	chunkData_ = chunkData;
+	chunkIndex_ = chunkData_->chunkIndex;
 
 	/*  Process the job */
-	ChunkWriter writer(chunkData->chunkIndex, globalChunkserverStats, gChunkConnector, chunkData_->newDataInChainPipe[0]);
+	ChunkWriter writer(chunkData_->chunkIndex, globalChunkserverStats, gChunkConnector, chunkData_->newDataInChainPipe[0]);
 	wholeOperationTimer.reset();
 	std::unique_ptr<WriteChunkLocator> locator = std::move(chunkData_->locator);
 	if (!locator) {
@@ -646,7 +659,9 @@ void InodeChunkWriter::processDataChain(ChunkWriter& writer) {
 void InodeChunkWriter::returnJournalToDataChain(std::list<WriteCacheBlock> &&journal, Glock &lock) {
 	if (!journal.empty()) {
 		write_cb_acquire_blocks(journal.size(), lock);
-		chunkData_->dataChain.splice(chunkData_->dataChain.begin(), std::move(journal));
+		chunkData_->parent->totalCachedBlocks += journal.size();
+		chunkData_->dataChain.splice(chunkData_->dataChain.begin(),
+		                             std::move(journal));
 	}
 }
 
@@ -813,13 +828,14 @@ int write_block(ChunkData* chunkData, uint16_t pos, uint32_t from, uint32_t to, 
 }
 
 /* glock: UNLOCKED */
-int write_blocks(inodedata *id, uint64_t offset, uint32_t size, const uint8_t* data) {
+int write_blocks(inodedata *id, uint64_t offset, uint32_t size,
+                 const uint8_t *data) {
 	LOG_AVG_TILL_END_OF_SCOPE0("write_blocks");
 	uint32_t chindx = offset >> SFSCHUNKBITS;
 	uint16_t pos = (offset & SFSCHUNKMASK) >> SFSBLOCKBITS;
 	uint32_t from = offset & SFSBLOCKMASK;
-	ChunkData* chunkData=write_get_chunkdata(chindx, id);
 	while (size > 0) {
+		ChunkData *chunkData = write_get_chunkdata(chindx, id);
 		if (size > SFSBLOCKSIZE - from) {
 			if (write_block(chunkData, pos, from, SFSBLOCKSIZE, data) < 0) {
 				return SAUNAFS_ERROR_IO;
@@ -831,7 +847,6 @@ int write_blocks(inodedata *id, uint64_t offset, uint32_t size, const uint8_t* d
 			if (pos == SFSBLOCKSINCHUNK) {
 				pos = 0;
 				chindx++;
-				chunkData=write_get_chunkdata(chindx, id);
 			}
 		} else {
 			if (write_block(chunkData, pos, from, from + size, data) < 0) {
@@ -924,12 +939,13 @@ static int write_data_flush(void* vid, Glock& lock) {
 	}
 
 	write_data_flushwaiting_increase(id, lock);
-	// If there are no errors (trycnt==0) and inode is waiting in the delayed queue, speed it up
-	if (id->status == SAUNAFS_STATUS_OK && delayed_queue_remove(id, lock)) {
-		write_enqueue(id, lock);
+	// If there are no errors (status == SAUNAFS_STATUS_OK) and inode is waiting in the delayed queue, speed it up
+	auto delayedEnqueuedChunkData = delayed_queue_remove(id, lock);
+	if (id->status == SAUNAFS_STATUS_OK && !delayedEnqueuedChunkData.empty()) {
+		write_enqueue(delayedEnqueuedChunkData, lock);
 	}
 	// Wait for the data to be flushed
-	while (id->totalCachedBlocks > 0) {
+	while (id->chunksDataFirst != nullptr) {
 		id->flushcond.wait(lock);
 	}
 	write_data_flushwaiting_decrease(id, lock);
