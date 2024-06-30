@@ -53,10 +53,26 @@ unwrap_generators() {
 	fi
 }
 
+stop_ganesha() {
+	# umount all hanging SaunaFS mounts
+	for mount in $(mount | grep /tmp/SaunaFS | awk '{print $3}'); do
+		sudo umount -l $mount
+	done
+
+	# kill ganesha daemon
+	sudo pkill -9 ganesha.nfsd
+}
+
 stop_tests() {
 	local users=$(echo saunafstest saunafstest_{0..9})
 	local users_list=${users// /,}
 	local try_count=0
+
+	# check if there is a hanging ganesha daemon
+	if pgrep ganesha.nfsd > /dev/null; then
+		stop_ganesha
+	fi
+
 	# start with killing saunafstest processes, this will likely suffice
 	sudo pkill -9 -u saunafstest
 	sleep 0.1
