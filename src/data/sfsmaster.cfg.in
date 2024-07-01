@@ -292,4 +292,4 @@
 ## When ENABLE_PROMETHEUS is set, you can use this option to set the host and
 ## port where it will listen for scrapers. Must in the format of HOST:PORT.
 ## (Default: 0.0.0.0:8080)
-# PROMETHEUS_HOST=0.0.0.0:8080
+# PROMETHEUS_HOST=0.0.0.0:9499

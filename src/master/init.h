@@ -47,7 +47,7 @@ inline int prometheus_init() {
 		    "gathered");
 		return 0;
 	}
-	metrics::metrics_init(cfg_getstr("PROMETHEUS_HOST", "0.0.0.0:8080"));
+	metrics::metrics_init(cfg_getstr("PROMETHEUS_HOST", "0.0.0.0:9499"));
 	eventloop_destructregister(metrics::metrics_destroy);
 	return 0;
 }
