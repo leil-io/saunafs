@@ -102,6 +102,10 @@ namespace SaunaClient {
 
 static GroupCache gGroupCache;
 
+const int kDefaultBufferSize = 1024;
+const int kDefaultCommandLength = 1024;
+const char *kEmptyDataFromBuffer = NULL;
+
 struct ReaddirSession {
 	uint64_t lastReadIno;
 	std::atomic<bool> restarted;
@@ -118,6 +122,40 @@ inline ReaddirSessions gReaddirSessions;
 
 static void update_credentials(Context::IdType index, const GroupCache::Groups &groups);
 static void registerGroupsInMaster(Context &ctx);
+
+bool isStatsFilePresent(const std::string &mountPointPath) {
+	std::filesystem::path filePath = mountPointPath + "/.stats";
+
+	char command[kDefaultCommandLength];
+	snprintf(command, sizeof(command), "cat \"%s\"", filePath.string().c_str());
+	FILE *pipe = popen(command, "r");
+	if (!pipe) { return false; }
+
+	std::string commandResult;
+	char bufferCommandResult[kDefaultBufferSize];
+	while (fgets(bufferCommandResult, sizeof(bufferCommandResult), pipe) != kEmptyDataFromBuffer) {
+		commandResult += bufferCommandResult;
+	}
+
+	if (commandResult.empty()) {
+		pclose(pipe);
+		return false;
+	}
+
+	pclose(pipe);
+	return true;
+}
+
+void monitorMountPointThread(const std::string &mountPointPath) {
+	while (!stopMonitoringThread.load()) {
+		if (!isStatsFilePresent(mountPointPath)) {
+			SaunaClient::fs_term();
+			std::exit(EXIT_FAILURE);
+		}
+
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+}
 
 #define RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, context, function_expression) \
 		do { \
@@ -220,6 +258,7 @@ static int mkdir_copy_sgid = 0;
 static int sugid_clear_mode = 0;
 bool use_rwlock = 0;
 static std::atomic<bool> gDirectIo(false);
+static bool force_umount_lazy = false;
 
 // lock_request_counter shared by flock and setlk
 static uint32_t lock_request_counter = 0;
@@ -3389,7 +3428,7 @@ std::vector<ChunkserverListEntry> getchunkservers() {
 void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsigned direntry_cache_size_,
 		double entry_cache_timeout_, double attr_cache_timeout_, int mkdir_copy_sgid_,
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
-		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io
+		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io, bool force_umount_lazy_
 #ifdef _WIN32
 		, int mounting_uid_, int mounting_gid_
 #endif
@@ -3412,6 +3451,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 	gDirEntryCache.setTimeout(timeout);
 	gDirEntryCacheMaxSize = direntry_cache_size_;
 	gDirectIo = direct_io;
+	force_umount_lazy = force_umount_lazy_;
 	if (debug_mode) {
 		safs::log_debug("cache parameters: file_keep_cache={} direntry_cache_timeout={:.2f}"
 		                " entry_cache_timeout={:.2f} attr_cache_timeout={:.2f}",
@@ -3491,7 +3531,7 @@ void fs_init(FsInitParams &params) {
 	init(params.debug_mode, params.keep_cache, params.direntry_cache_timeout, params.direntry_cache_size,
 		params.entry_cache_timeout, params.attr_cache_timeout, params.mkdir_copy_sgid,
 		params.sugid_clear_mode, params.use_rw_lock,
-		params.acl_cache_timeout, params.acl_cache_size, params.direct_io
+		params.acl_cache_timeout, params.acl_cache_size, params.direct_io, params.force_umount_lazy
 #ifdef _WIN32
 		, params.mounting_uid, params.mounting_gid
 #endif

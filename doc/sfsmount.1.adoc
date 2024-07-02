@@ -219,6 +219,10 @@ during crashes when allegedly flushed data is still being processed.
 Whether to use FUSE DirectIO. This may improve performance when reading large
 files under certain conditions.
 
+*-o sfsfumountlazy=*'0|1'::
+Enables monitoring process for avoiding mount process to still run after
+an umount lazy command executed over the client's mountpoint.
+
 General mount options (see *mount*(8) manual):
 
 *-o rw* | *-o ro*::
