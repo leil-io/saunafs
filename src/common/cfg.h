@@ -29,6 +29,8 @@
 
 #define _CONFIG_MAKE_PROTOTYPE(fname,type) type cfg_get##fname(const char *name,const type def)
 
+static constexpr int64_t kInvalidConversion = -1;
+
 int cfg_load (const char *fname,int logundefined);
 int cfg_reload (void);
 void cfg_term (void);
@@ -48,6 +50,19 @@ std::string cfg_yaml_string();
 /// service_name. The value in the map must be a valid YAML string
 std::string cfg_yaml_list(std::string service_name,
                           std::map<std::string, std::string> &services);
+
+/**
+ * @brief Parses a string representing a size and converts it to bytes.
+ *
+ * The function supports suffixes for kilo (K, KB, Ki or KiB) or the same
+ * formats for mega, giga, tera, peta and exa. The function is case insensitive.
+ *
+ * @param str The string to parse.
+ * @return The size in bytes as an int64_t. If the string cannot be parsed,
+ *         or if the parsed value is larger than the maximum representable
+ *         int64_t value, the function returns kInvalidConversion.
+ */
+int64_t cfg_parse_size(const std::string& str);
 
 int cfg_isdefined(const char *name);
 
