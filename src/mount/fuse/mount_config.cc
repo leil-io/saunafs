@@ -114,20 +114,63 @@ void usage(const char *progname) {
 	printf(
 "usage: %s  [HOST[/PORT]:[PATH]] [options] mountpoint\n"
 "\n", progname);
-
-	printf("general options:\n");
 	fuse_cmdline_help();
 
 	printf(
-"SFS options:\n"
+"\nGeneral options:\n"
 "    -c CFGFILE                  equivalent to '-o sfscfgfile=CFGFILE'\n"
-"    -m   --meta                 equivalent to '-o sfsmeta'\n"
 "    -H HOST                     equivalent to '-o sfsmaster=HOST'\n"
 "    -P PORT                     equivalent to '-o sfsport=PORT'\n"
 "    -B IP                       equivalent to '-o sfsbind=IP'\n"
 "    -S PATH                     equivalent to '-o sfssubfolder=PATH'\n"
+"\n"
+"Security/permissions related options:\n"
+"    -o sfspassword=PASSWORD     authenticate to sfsmaster with password\n"
+"    -o sfsmd5pass=MD5           authenticate to sfsmaster using directly "
+				"given md5 (only if sfspassword is not defined)\n"
 "    -p   --password             similar to '-o sfspassword=PASSWORD', but "
 				"show prompt and ask user for password\n"
+"    -o askpassword              show prompt and ask user for password\n"
+"    -o sfsdonotrememberpassword  do not remember password in memory - more "
+				"secure, but when session is lost then new"
+				"session is created without password\n"
+"\n"
+"Read related options:\n"
+"    -o cacheexpirationtime=MSEC  set timeout for read cache entries to be "
+				"considered valid in milliseconds (0 disables "
+				"cache) (default: %u)\n"
+"    -o readaheadmaxwindowsize=KB  set max value of readahead window per single "
+				"descriptor in kibibytes (default: %u)\n"
+"    -o readworkers=N            define number of read workers (default: %u)\n"
+"    -o maxreadaheadrequests=N   define number of readahead requests per inode "
+				"(default: %u)\n"
+"    -o sfschunkserverconnectreadto=MSEC  set timeout for connecting with "
+				"chunkservers during read operation in "
+				"milliseconds (default: %u)\n"
+"    -o sfschunkservertotalreadto=MSEC  set timeout for the whole "
+				"communication with chunkservers during a "
+				"read operation in milliseconds (default: %u)\n"
+"    -o sfsprefetchxorstripes    prefetch full xor stripe on every first read "
+				"of a xor chunk\n"
+"    -o bandwidthoveruse=N       define ratio of allowed bandwidth overuse "
+				"when fetching data (default: %.2f)\n"
+"\n"
+"Write related options:\n"
+"    -o sfschunkserverwriteto=MSEC  set chunkserver response timeout during "
+				"write operation in milliseconds (default: %u)\n"
+"    -o sfswritecachesize=N      define size of write cache in MiB (default: %u)\n"
+"    -o sfscacheperinodepercentage=P  define what part of the write cache non "
+				"occupied by other inodes can a single inode "
+				"occupy (in %%, default: %u)\n"
+"    -o sfswriteworkers=N        define number of write workers (default: %u)\n"
+"    -o sfswritewindowsize=N     define write window size (in blocks) for "
+				"each chunk (default: %u)\n"
+"    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
+				"behavior by replying SUCCESS to it immediately. Targets fast "
+				"creation of small files, but may cause data loss during crashes.\n"
+"\n"
+"Other options:\n"
+"    -m   --meta                 equivalent to '-o sfsmeta'\n"
 "    -n   --nostdopts            do not add standard SaunaFS mount options: "
 "'-o " DEFAULT_OPTIONS ",fsname=SFS'\n"
 "    --nonempty                  allow mounts over non-empty file/dir\n"
@@ -135,7 +178,6 @@ void usage(const char *progname) {
 "    -o sfscfgfile=CFGFILE       load some mount options from external file "
 				"(if not specified then use default file: "
 				ETC_PATH "/sfsmount.cfg)\n"
-"    -o sfsdebug                 print some debugging information\n"
 "    -o sfsmeta                  mount meta filesystem (trash etc.)\n"
 "    -o sfsdelayedinit           connection with master is done in background "
 				"- with this option mount can be run without "
@@ -165,67 +207,43 @@ void usage(const char *progname) {
 "    -o sfschunkserverrtt=MSEC   set timeout after which SYN packet is "
 				"considered lost during the first retry of "
 				"connecting a chunkserver (default: %u)\n"
-"    -o sfschunkserverconnectreadto=MSEC  set timeout for connecting with "
-				"chunkservers during read operation in "
-				"milliseconds (default: %u)\n"
 "    -o sfschunkserverwavereadto=MSEC  set timeout for executing each wave "
 				"of a read operation in milliseconds (default: %u)\n"
-"    -o sfschunkservertotalreadto=MSEC  set timeout for the whole "
-				"communication with chunkservers during a "
-				"read operation in milliseconds (default: %u)\n"
-"    -o cacheexpirationtime=MSEC  set timeout for read cache entries to be "
-				"considered valid in milliseconds (0 disables "
-				"cache) (default: %u)\n"
-"    -o readaheadmaxwindowsize=KB  set max value of readahead window per single "
-				"descriptor in kibibytes (default: %u)\n"
-"    -o readworkers=N            define number of read workers (default: %u)\n"
-"    -o maxreadaheadrequests=N   define number of readahead requests per inode "
-				"(default: %u)\n"
-"    -o sfsprefetchxorstripes    prefetch full xor stripe on every first read "
-				"of a xor chunk\n"
-"    -o sfschunkserverwriteto=MSEC  set chunkserver response timeout during "
-				"write operation in milliseconds (default: %u)\n"
 "    -o sfsnice=N                on startup sfsmount tries to change his "
 				"'nice' value (default: -19)\n"
 #ifdef SFS_USE_MEMLOCK
 "    -o sfsmemlock               try to lock memory\n"
 #endif
-"    -o sfswritecachesize=N      define size of write cache in MiB (default: %u)\n"
 "    -o sfsaclcachesize=N        define ACL cache size in number of entries "
 				"(0: no cache; default: %u)\n"
-"    -o sfscacheperinodepercentage=P  define what part of the write cache non "
-				"occupied by other inodes can a single inode "
-				"occupy (in %%, default: %u)\n"
-"    -o sfswriteworkers=N        define number of write workers (default: %u)\n"
 "    -o sfsioretries=N           define number of retries before I/O error is "
 				"returned (default: %u)\n"
-"    -o sfswritewindowsize=N     define write window size (in blocks) for "
-				"each chunk (default: %u)\n"
 "    -o sfsmaster=HOST           define sfsmaster location (default: sfsmaster)\n"
 "    -o sfsport=PORT             define sfsmaster port number (default: 9421)\n"
 "    -o sfsbind=IP               define source ip address for connections "
 				"(default: NOT DEFINED - chosen automatically "
 				"by OS)\n"
-"    -o sfssubfolder=PATH        define subfolder to mount as root (default: %s)\n"
-"    -o sfspassword=PASSWORD     authenticate to sfsmaster with password\n"
-"    -o sfsmd5pass=MD5           authenticate to sfsmaster using directly "
-				"given md5 (only if sfspassword is not defined)\n"
-"    -o askpassword              show prompt and ask user for password\n"
-"    -o sfsdonotrememberpassword do not remember password in memory - more "
-				"secure, but when session is lost then new "
-				"session is created without password\n"
 "    -o sfsiolimits=FILE         define I/O limits configuration file\n"
 "    -o symlinkcachetimeout=N    define timeout of symlink cache in seconds "
 				"(default: %u)\n"
-"    -o bandwidthoveruse=N       define ratio of allowed bandwidth overuse "
-				"when fetching data (default: %.2f)\n"
 "    -o enablefilelocks=0|1      enables/disables global file locking "
 				"(disabled by default)\n"
 "    -o nonempty                 allow mounts over non-empty file/dir\n"
-"    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
-				"behavior by replying SUCCESS to it immediately. Targets fast "
-				"creation of small files, but may cause data loss during crashes.\n"
+"    -o sfsdebug                 print some debugging information\n"
+"    -o sfssubfolder=PATH        define subfolder to mount as root (default: %s)\n"
 "\n",
+		SaunaClient::FsInitParams::kDefaultCacheExpirationTime,
+		SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize,
+		SaunaClient::FsInitParams::kDefaultReadWorkers,
+		SaunaClient::FsInitParams::kDefaultMaxReadaheadRequests,
+		SaunaClient::FsInitParams::kDefaultChunkserverReadTo,
+		SaunaClient::FsInitParams::kDefaultChunkserverTotalReadTo,
+		SaunaClient::FsInitParams::kDefaultBandwidthOveruse,
+		SaunaClient::FsInitParams::kDefaultChunkserverWriteTo,
+		SaunaClient::FsInitParams::kDefaultWriteCacheSize,
+		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,
+		SaunaClient::FsInitParams::kDefaultWriteWorkers,
+		SaunaClient::FsInitParams::kDefaultWriteWindowSize,
 		SaunaClient::FsInitParams::kDefaultUseRwLock,
 		SaunaClient::FsInitParams::kDefaultMkdirCopySgid,
 		sugidClearModeString(SaunaClient::FsInitParams::kDefaultSugidClearMode),
@@ -236,23 +254,11 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultAclCacheTimeout,
 		SaunaClient::FsInitParams::kDefaultReportReservedPeriod,
 		SaunaClient::FsInitParams::kDefaultRoundTime,
-		SaunaClient::FsInitParams::kDefaultChunkserverReadTo,
 		SaunaClient::FsInitParams::kDefaultChunkserverWaveReadTo,
-		SaunaClient::FsInitParams::kDefaultChunkserverTotalReadTo,
-		SaunaClient::FsInitParams::kDefaultCacheExpirationTime,
-		SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize,
-		SaunaClient::FsInitParams::kDefaultReadWorkers,
-		SaunaClient::FsInitParams::kDefaultMaxReadaheadRequests,
-		SaunaClient::FsInitParams::kDefaultChunkserverWriteTo,
-		SaunaClient::FsInitParams::kDefaultWriteCacheSize,
 		SaunaClient::FsInitParams::kDefaultAclCacheSize,
-		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,
-		SaunaClient::FsInitParams::kDefaultWriteWorkers,
 		SaunaClient::FsInitParams::kDefaultIoRetries,
-		SaunaClient::FsInitParams::kDefaultWriteWindowSize,
-		SaunaClient::FsInitParams::kDefaultSubfolder,
 		SaunaClient::FsInitParams::kDefaultSymlinkCacheTimeout,
-		SaunaClient::FsInitParams::kDefaultBandwidthOveruse
+		SaunaClient::FsInitParams::kDefaultSubfolder
 	);
 	printf(
 "CMODE can be set to:\n"
@@ -280,7 +286,7 @@ void usage(const char *progname) {
 				"bit is set)\n"
 "    SFS                         standard behavior in SFS on Linux (like EXT "
 				"but directories are changed by unprivileged "
-				"users)\n"
+				"users)\n\n"
 "SMODE extra info:\n"
 "    btrfs,ext2,ext3,ext4,hfs[+],jfs,ntfs and reiserfs on Linux work as 'EXT'.\n"
 "    Only sfs on Linux works a little different. Beware that there is a strange\n"
