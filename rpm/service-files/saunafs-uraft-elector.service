@@ -3,6 +3,7 @@ Description=SaunaFS uraft high availability daemon
 Requires=saunafs-ha-master.service
 After=network.target
 After=saunafs-ha-master.service
+Conflicts=saunafs-uraft.service
 
 [Service]
 Type=simple

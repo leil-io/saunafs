@@ -17,13 +17,12 @@ override_dh_strip:
 
 override_dh_installinit:
 	dh_installinit --no-start
-	dh_installinit --no-start -psaunafs-uraft --name=saunafs-ha-master
 	dh_installinit --no-start -psaunafs-uraft --name=saunafs-uraft-elector
+	dh_installinit --no-start -psaunafs-uraft --name=saunafs-ha-master
 
 override_dh_installsystemd:
 	dh_installsystemd --no-enable --no-start
-	dh_installsystemd --no-enable --no-start -psaunafs-uraft --name=saunafs-ha-master
 	dh_installsystemd --no-enable --no-start -psaunafs-uraft --name=saunafs-uraft-elector
-
+	dh_installsystemd --no-enable --no-start -psaunafs-uraft --name=saunafs-ha-master
 %:
 	dh $@
