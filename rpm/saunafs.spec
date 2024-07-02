@@ -417,6 +417,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man5/saunafs-uraft.cfg.5*
 %{sau_uraft_examples}/saunafs-uraft.cfg
 %attr(644,root,root) %{_unitdir}/saunafs-uraft.service
+%attr(644,root,root) %{_unitdir}/saunafs-uraft-elector.service
 %attr(644,root,root) %{_unitdir}/saunafs-ha-master.service
 
 %changelog

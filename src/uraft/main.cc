@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <boost/program_options/value_semantic.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -22,14 +23,15 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 	po::options_description generic("options");
 
 	generic.add_options()
-	("help", "produce help message")
+	("help,h", "produce help message")
 	("config,c", po::value<std::string>()->default_value(ETC_PATH "/saunafs-uraft.cfg"), "configuration file");
 
 	po::options_description config("Configuration");
 	config.add_options()
 	("id", po::value<int>(), "server id")
 	("start-daemon,d", po::bool_switch()->default_value(false), "start in daemon mode")
-	("pidfile,p", po::value<std::string>(), "pidfile name");
+	("pidfile,p", po::value<std::string>(), "pidfile name")
+	("elector,e", po::bool_switch()->default_value(false), "start in elector mode (ADVANCED)");
 
 	po::options_description hidden;
 	hidden.add_options()
@@ -71,7 +73,6 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 		std::cout << visible << "\n";
 		exit(EXIT_FAILURE);
 	}
-
 	if (vm.count("config")) {
 		std::string config_file;
 
@@ -114,6 +115,9 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 
 	if (vm.count("id")) {
 		opt.id = vm["id"].as<int>();
+	}
+	if (vm.count("elector") == 1) {
+		opt.elector_mode = 1;
 	}
 
 	if (opt.id >= (int)opt.server.size()) {
