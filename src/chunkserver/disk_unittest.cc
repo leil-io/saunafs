@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #pragma GCC diagnostic pop
 
-#include "chunkserver/cmr_disk.h"
+#include "chunkserver-common/cmr_disk.h"
 
 TEST(DiskTests, ParseSingleHddLine) {
 	const std::string hddCfgLine {"/mnt/hdd_22/"};

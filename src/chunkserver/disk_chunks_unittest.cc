@@ -9,8 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "chunkserver-common/cmr_chunk.h"
 #include "chunkserver-common/disk_chunks.h"
-#include "chunkserver/cmr_chunk.h"
 #include "common/slice_traits.h"
 
 class DiskChunksTest : public ::testing::Test {

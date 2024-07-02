@@ -18,7 +18,8 @@
 
 #include "common/platform.h"
 
-#include "chunkserver/plugin_manager.h"
+#include "chunkserver-common/plugin_manager.h"
+
 #include "chunkserver-common/disk_plugin.h"
 #include "slogger/slogger.h"
 

@@ -47,6 +47,11 @@ public:
 	/// Virtual destructor needed for correct polymorphism
 	virtual ~DefaultDiskManager() = default;
 
+	virtual int parseCfgLine(std::string hddCfgLine);
+
+	/// Reload the disks from the configuration and populates the gDisks vector.
+	void reloadDisksFromCfg() override;
+
 	/**
 	 * \brief Get the disk to store a new chunk.
 	 *
