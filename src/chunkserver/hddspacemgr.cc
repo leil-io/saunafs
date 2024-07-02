@@ -2510,97 +2510,6 @@ void hddTerminate(void) {
 	gDisks.clear();
 }
 
-int hddSizeParse(const char *str, uint64_t *ret) {
-	TRACETHIS();
-	uint64_t val, frac, fracdiv;
-	double drval, mult;
-	int f;
-	val = 0;
-	frac = 0;
-	fracdiv = 1;
-	f = 0;
-	while (*str >= '0' && *str <= '9') {
-		f = 1;
-		val *= 10;
-		val += (*str - '0');
-		str++;
-	}
-	if (*str == '.') { // accept format ".####" (without 0)
-		str++;
-		while (*str >= '0' && *str <= '9') {
-			fracdiv *= 10;
-			frac *= 10;
-			frac += (*str - '0');
-			str++;
-		}
-		if (fracdiv == 1) { // if there was '.' expect number afterwards
-			return -1;
-		}
-	} else if (f == 0) { // but not empty string
-		return -1;
-	}
-	if (str[0] == '\0' || (str[0] == 'B' && str[1] == '\0')) {
-		mult = 1.0;
-	} else if (str[0] != '\0' &&
-	           (str[1] == '\0' || (str[1] == 'B' && str[2] == '\0'))) {
-		switch (str[0]) {
-		case 'k':
-			mult = 1e3;
-			break;
-		case 'M':
-			mult = 1e6;
-			break;
-		case 'G':
-			mult = 1e9;
-			break;
-		case 'T':
-			mult = 1e12;
-			break;
-		case 'P':
-			mult = 1e15;
-			break;
-		case 'E':
-			mult = 1e18;
-			break;
-		default:
-			return -1;
-		}
-	} else if (str[0] != '\0' && str[1] == 'i' &&
-	           (str[2] == '\0' || (str[2] == 'B' && str[3] == '\0'))) {
-		switch (str[0]) {
-		case 'K':
-			mult = 1024.0;
-			break;
-		case 'M':
-			mult = 1048576.0;
-			break;
-		case 'G':
-			mult = 1073741824.0;
-			break;
-		case 'T':
-			mult = 1099511627776.0;
-			break;
-		case 'P':
-			mult = 1125899906842624.0;
-			break;
-		case 'E':
-			mult = 1152921504606846976.0;
-			break;
-		default:
-			return -1;
-		}
-	} else {
-		return -1;
-	}
-	drval = round(((double)frac / (double)fracdiv + (double)val) * mult);
-	if (drval > 18446744073709551615.0) {
-		return -2;
-	} else {
-		*ret = drval;
-	}
-	return 1;
-}
-
 int hddParseCfgLine(std::string hddCfgLine) {
 	TRACETHIS();
 	uint8_t lockNeeded;
@@ -2810,16 +2719,21 @@ void hddReload(void) {
 	gCheckCrcWhenWriting = cfg_getuint8("HDD_CHECK_CRC_WHEN_WRITING", 1) != 0U;
 	gPunchHolesInFiles = cfg_getuint32("HDD_PUNCH_HOLES", 0);
 
-	char *LeaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT",
+	char *leaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT",
 	                                disk::gLeaveSpaceDefaultDefaultStrValue);
-	if (hddSizeParse(LeaveFreeStr, &disk::gLeaveFree) < 0) {
+	auto parsedLeaveFree = cfg_parse_size(leaveFreeStr);
+
+	if (parsedLeaveFree < 0) {
 		safs_pretty_syslog(LOG_NOTICE,
 		                   "hdd space manager: HDD_LEAVE_SPACE_DEFAULT parse "
 		                   "error - left unchanged");
+	} else {
+		disk::gLeaveFree = parsedLeaveFree;
 	}
-	free(LeaveFreeStr);
 
-	if (disk::gLeaveFree < 0x4000000) {
+	free(leaveFreeStr);
+
+	if (disk::gLeaveFree < static_cast<int64_t>(SFSCHUNKSIZE)) {
 		safs_pretty_syslog(LOG_NOTICE,
 		    "hdd space manager: HDD_LEAVE_SPACE_DEFAULT < chunk size - leaving "
 		    "so small space on hdd is not recommended");
@@ -2899,22 +2813,27 @@ int hddInit() {
 
 	gPerformFsync = cfg_getuint32("PERFORM_FSYNC", 1);
 
-	uint64_t leaveSpaceDefaultDefaultValue = 0;
-	sassert(hddSizeParse(disk::gLeaveSpaceDefaultDefaultStrValue,
-	                     &leaveSpaceDefaultDefaultValue) >= 0);
+	int64_t leaveSpaceDefaultDefaultValue =
+	    cfg_parse_size(disk::gLeaveSpaceDefaultDefaultStrValue);
 	sassert(leaveSpaceDefaultDefaultValue > 0);
 
 	char *leaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT",
 	                                disk::gLeaveSpaceDefaultDefaultStrValue);
-	if (hddSizeParse(leaveFreeStr, &disk::gLeaveFree) < 0) {
-		safs_pretty_syslog(LOG_WARNING,
+	auto parsedLeaveFree = cfg_parse_size(leaveFreeStr);
+
+	if (parsedLeaveFree < 0) {
+		safs_pretty_syslog(
+		    LOG_WARNING,
 		    "%s: HDD_LEAVE_SPACE_DEFAULT parse error - using default (%s)",
-		                   cfg_filename().c_str(), disk::gLeaveSpaceDefaultDefaultStrValue);
+		    cfg_filename().c_str(), disk::gLeaveSpaceDefaultDefaultStrValue);
 		disk::gLeaveFree = leaveSpaceDefaultDefaultValue;
+	} else {
+		disk::gLeaveFree = parsedLeaveFree;
 	}
+
 	free(leaveFreeStr);
 
-	if (disk::gLeaveFree < 0x4000000) {
+	if (disk::gLeaveFree < static_cast<int64_t>(SFSCHUNKSIZE)) {
 		safs_pretty_syslog(LOG_WARNING,
 		                   "%s: HDD_LEAVE_SPACE_DEFAULT < chunk size - "
 		                   "leaving so small space on hdd is not recommended",
