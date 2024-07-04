@@ -4,7 +4,9 @@
 #include "chunkserver-common/disk_interface.h"
 #include "chunkserver-common/disk_manager_interface.h"
 #include "chunkserver-common/indexed_resource_pool.h"
+#include "chunkserver-common/iostat.h"
 #include "chunkserver-common/open_chunk.h"
+#include "chunkserver-common/plugin_manager.h"
 
 inline IndexedResourcePool<OpenChunk> gOpenChunks;
 
@@ -50,3 +52,7 @@ inline std::atomic_int gScansInProgress(0);
 inline std::atomic_bool gPerformFsync(true);
 
 inline std::atomic_bool gCheckCrcWhenWriting{true};
+
+inline IoStat gIoStat;
+
+inline PluginManager pluginManager;

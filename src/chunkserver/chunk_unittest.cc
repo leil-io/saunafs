@@ -21,9 +21,9 @@
 
 #include <gtest/gtest.h>
 
+#include "chunkserver-common/cmr_chunk.h"
+#include "chunkserver-common/cmr_disk.h"
 #include "chunkserver-common/subfolder.h"
-#include "chunkserver/cmr_chunk.h"
-#include "chunkserver/cmr_disk.h"
 #include "common/slice_traits.h"
 
 class ChunkTests : public testing::Test {

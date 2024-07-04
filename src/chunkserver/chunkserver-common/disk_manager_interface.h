@@ -44,6 +44,9 @@ public:
 	/// Virtual destructor needed for correct polymorphism
 	virtual ~IDiskManager() = default;
 
+	/// Reload the disks from the configuration and populates the gDisks vector.
+	virtual void reloadDisksFromCfg() = 0;
+
 	/// Get the disk to use for a new chunk. Concrete implementations will use
 	/// different strategies.
 	virtual IDisk* getDiskForNewChunk() = 0;
