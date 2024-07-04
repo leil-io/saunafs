@@ -67,16 +67,16 @@
 
 #include "chunkserver-common/chunk_interface.h"
 #include "chunkserver-common/chunk_with_fd.h"
+#include "chunkserver-common/cmr_disk.h"
+#include "chunkserver-common/default_disk_manager.h"
 #include "chunkserver-common/global_shared_resources.h"
 #include "chunkserver-common/hdd_stats.h"
 #include "chunkserver-common/hdd_utils.h"
+#include "chunkserver-common/iostat.h"
+#include "chunkserver-common/plugin_manager.h"
 #include "chunkserver-common/subfolder.h"
 #include "chunkserver/chartsdata.h"
 #include "chunkserver/chunk_filename_parser.h"
-#include "chunkserver/cmr_disk.h"
-#include "chunkserver/default_disk_manager.h"
-#include "chunkserver/iostat.h"
-#include "chunkserver/plugin_manager.h"
 #include "common/cfg.h"
 #include "common/chunk_version_with_todel_flag.h"
 #include "common/crc.h"
@@ -105,10 +105,6 @@ inline std::atomic_bool gCheckCrcWhenReading{true};
 
 /// Value of HDD_ADVISE_NO_CACHE from config
 static std::atomic_bool gAdviseNoCache;
-
-static IoStat gIoStat;
-
-static PluginManager pluginManager;
 
 void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks,
                          std::size_t limit) {
@@ -2510,204 +2506,6 @@ void hddTerminate(void) {
 	gDisks.clear();
 }
 
-int hddParseCfgLine(std::string hddCfgLine) {
-	TRACETHIS();
-	uint8_t lockNeeded;
-
-	disk::Configuration configuration(hddCfgLine);
-
-	if (configuration.isComment || configuration.isEmpty) {
-		return 0;
-	}
-
-	if (!configuration.isValid) {
-		throw InitializeException("HDD configuration line not valid: " +
-		                          hddCfgLine);
-	}
-
-	IDisk *currentDisk = DiskNotFound;
-
-	if (configuration.isZoned) {
-		currentDisk = pluginManager.createDisk(configuration);
-	} else {
-		currentDisk = new CmrDisk(configuration);
-	}
-
-	if(currentDisk == DiskNotFound) {
-		throw InitializeException("HDD configuration line not valid: " +
-		                          hddCfgLine);
-	}
-
-	{
-		// Ensure meta + data path remain consistent between reloads
-		std::lock_guard disksLockGuard(gDisksMutex);
-
-		for (const auto& disk : gDisks) {
-			if (disk->metaPath() == currentDisk->metaPath()) {
-				if (disk->dataPath() != currentDisk->dataPath()) {
-					throw InitializeException("Combination of metadata and "
-					                          "data paths have changed between "
-					                          "reloads for line: " +
-					                          hddCfgLine);
-				}
-			}
-		}
-
-		// Lock is not needed if the disk already exists in memory (reload)
-		lockNeeded = 1;
-		for (const auto& disk : gDisks) {
-			if (disk->metaPath() == currentDisk->metaPath()) {
-				lockNeeded = 0;
-				break;
-			}
-		}
-	}
-
-	try {
-		currentDisk->createPathsAndSubfolders();
-		{
-			std::lock_guard disksLockGuard(gDisksMutex);
-			currentDisk->createLockFiles(lockNeeded, gDisks);
-		}
-	} catch (const InitializeException &ie) {
-		delete currentDisk;
-		throw InitializeException(ie.what());
-	}
-
-	std::unique_lock disksUniqueLock(gDisksMutex);
-
-	// This loop is used at reload time, we need to update the already existing
-	// Disks' properties according to the (probably new) hdd.cfg file.
-	for (auto &disk : gDisks) {
-		if (disk->metaPath() == currentDisk->metaPath()) { // Disk already in memory
-			if (disk->isDamaged()) {
-				disk->setScanState(IDisk::ScanState::kNeeded);
-				disk->setScanProgress(0);
-				disk->setIsDamaged(currentDisk->isDamaged());
-				disk->setAvailableSpace(0ULL);
-				disk->setTotalSpace(0ULL);
-				disk->setLeaveFreeSpace(disk::gLeaveFree);
-				disk->getCurrentStats().clear();
-				for (int l = 0 ; l < disk::kStatsHistoryIn24Hours ; ++l) {
-					disk->stats()[l].clear();
-				}
-				disk->setStatsPos(0);
-				for (int l = 0 ; l < disk::kLastErrorSize ; ++l) {
-					disk->lastErrorTab()[l].chunkid = 0ULL;
-					disk->lastErrorTab()[l].timestamp = 0;
-				}
-				disk->setLastErrorIndex(0);
-				disk->setLastRefresh(0);
-				disk->setNeedRefresh(true);
-			} else {
-				if (disk->isMarkedForRemoval() != currentDisk->isMarkedForRemoval()
-				    || disk->isReadOnly() != currentDisk->isReadOnly()) {
-					// important change - chunks need to be send to master again
-					disk->setScanState(IDisk::ScanState::kSendNeeded);
-				}
-			}
-
-			disk->setWasRemovedFromConfig(false);
-			disk->setIsReadOnly(currentDisk->isReadOnly());
-			disk->setIsMarkedForRemoval(currentDisk->isMarkedForRemoval());
-			disksUniqueLock.unlock();
-
-			delete currentDisk; // Also deletes the lock files (smart pointer)
-			return 1;
-		}
-	}
-
-	gDisks.emplace_back(currentDisk);
-	gResetTester = true;
-
-	return 2;
-}
-
-static void hddDisksReinit(void) {
-	TRACETHIS();
-
-	std::string hddFilename = cfg_get("HDD_CONF_FILENAME",
-	                                  ETC_PATH "/sfshdd.cfg");
-	std::ifstream hddFile(hddFilename);
-
-	if (!hddFile.is_open()) {
-		throw InitializeException("can't open hdd config file " + hddFilename +
-		                          ": " + strerr(errno) +
-		                          " - new file can be created using " +
-		                          APP_EXAMPLES_SUBDIR "/sfshdd.cfg");
-	}
-
-	safs_pretty_syslog(LOG_INFO, "hdd configuration file %s opened",
-	                   hddFilename.c_str());
-
-	{
-		std::lock_guard disksLockGuard(gDisksMutex);
-
-		gDiskActions = 0; // stop disk actions
-
-		// Makes sense only at the reload scenario. All Disks are marked as
-		// removed and later scanned and unmarked as they appear in the hdd.cfg.
-		// After reading the hdd.cfg, the missing entries will be actually
-		// deleted from the in-memory data structures.
-		for (auto &disk : gDisks) {
-			disk->setWasRemovedFromConfig(true);
-		}
-	}
-
-	std::string line;
-	while (std::getline(hddFile, line)) {
-		hddParseCfgLine(std::move(line));
-	}
-
-	hddFile.close();
-
-	bool anyDiskAvailable = false;
-
-	{
-		std::lock_guard disksLockGuard(gDisksMutex);
-
-		for (auto &disk : gDisks) {
-			if (!disk->wasRemovedFromConfig()) {
-				anyDiskAvailable = true;
-				if (disk->scanState() == IDisk::ScanState::kNeeded) {
-					safs_pretty_syslog(LOG_NOTICE,
-					    "hdd space manager: disk %s will be scanned",
-					    disk->getPaths().c_str());
-				} else if (disk->scanState() == IDisk::ScanState::kSendNeeded) {
-					safs_pretty_syslog(LOG_NOTICE,
-					    "hdd space manager: disk %s will be resend",
-					    disk->getPaths().c_str());
-				} else {
-					safs_pretty_syslog(LOG_NOTICE,
-					    "hdd space manager: disk %s didn't change",
-					     disk->getPaths().c_str());
-				}
-			} else {
-				safs_pretty_syslog(LOG_NOTICE,
-				                   "hdd space manager: disk %s will be removed",
-				                   disk->getPaths().c_str());
-			}
-		}
-		gDiskActions = 1; // continue disk actions
-	}
-
-	std::vector<std::string> dataPaths;
-
-	{
-		std::lock_guard disksLockGuard(gDisksMutex);
-		for (const auto &disk : gDisks) {
-			dataPaths.emplace_back(disk->dataPath());
-		}
-	}
-
-	gIoStat.resetPaths(dataPaths);
-
-	if (!anyDiskAvailable) {
-		throw InitializeException("no data paths defined in the " +
-		                          hddFilename + " file");
-	}
-}
-
 void hddReload(void) {
 	TRACETHIS();
 
@@ -2742,7 +2540,7 @@ void hddReload(void) {
 	safs_pretty_syslog(LOG_NOTICE,"reloading hdd data ...");
 
 	try {
-		hddDisksReinit();
+		gDiskManager->reloadDisksFromCfg();
 	} catch (const Exception& ex) {
 		safs_pretty_syslog(LOG_ERR, "%s", ex.what());
 	}
@@ -2841,7 +2639,7 @@ int hddInit() {
 	}
 
 	try {
-		hddDisksReinit();
+		gDiskManager->reloadDisksFromCfg();
 	} catch (const Exception& ex) {
 		safs_pretty_syslog(LOG_ERR, "%s", ex.what());
 	}
