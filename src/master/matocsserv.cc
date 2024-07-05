@@ -1028,12 +1028,6 @@ void matocsserv_register_host(matocsserventry *eptr, uint32_t version, uint32_t 
 		free(eptr->servstrip);
 	}
 	eptr->servstrip = matocsserv_makestrip(eptr->servip);
-	if (((eptr->servip)&0xFF000000) == 0x7F000000) {
-		safs_pretty_syslog(LOG_NOTICE, "chunkserver connected using localhost (IP: %s) - you can't use"
-				" localhost for communication between chunkserver and master", eptr->servstrip);
-		eptr->mode=KILL;
-		return;
-	}
 	if (csdb_new_connection(eptr->servip,eptr->servport,eptr)<0) {
 		safs_pretty_syslog(LOG_WARNING,"chunk-server already connected !!!");
 		eptr->mode=KILL;
