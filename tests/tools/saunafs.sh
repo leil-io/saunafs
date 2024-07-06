@@ -449,48 +449,78 @@ prepare_metalogger_() {
 	saunafs_info_[metalogger_cfg]="$etcdir/sfsmetalogger.cfg"
 }
 
+baseMetadataPath="/mnt/ramdisk/metadata/sauna_nullb"
+baseDataPath="/mnt/zoned/sauna_nullb"
+
+# Creates the needed emulated zoned devices for a given chunkserver number.
+#
+# The function also creates the needed directories for the metadata and data
+# paths of the chunkserver. The metadata path is created in the ramdisk and the
+# data path is created in the zoned device. The function also formats and mounts
+# the zoned device using the zonefs filesystem.
+#
+# Parameters:
+# - chunkserver_index (optional): The chunkserver number.
+#   Defaults to "chunkserver_id".
+#
+# Usage:
+# create_emulated_devices_for_cs_number_ [chunkserver_index]
+#
+create_emulated_zoned_devices_for_cs_number_() {
+	if [[ ! $use_zoned_disks || ! $use_ramdisk ]]; then
+        return
+    fi
+
+	local chunkserver_index=${1:-chunkserver_id}
+	local n=${disks_per_chunkserver}
+	local zoned_prefix="zonefs:"
+	local firstDisk=$(echo "${chunkserver_index} * ${n}" | bc)
+	local lastDisk=$(echo "${firstDisk} + ${n} - 1" | bc)
+
+	for disk_number in $(seq -w ${firstDisk} ${lastDisk}); do
+		if mount | grep "sauna_nullb${disk_number}" &>/dev/null; then
+			sudo umount -l "${baseDataPath}${disk_number}" &>/dev/null
+		fi
+
+		create_zoned_nullb 4096 $zone_size_mb $number_of_conv_zones \
+			$number_of_seq_zones ${disk_number}
+
+		if [ -b /dev/sauna_nullb${disk_number} ]; then
+			local devPath="/dev/sauna_nullb${disk_number}"
+		elif [ -b /dev/nullb${disk_number} ]; then
+			local devPath="/dev/nullb${disk_number}"
+		fi
+
+		sudo mkzonefs -f -o perm=666 "${devPath}" &>/dev/null
+
+		local metadataPath="${baseMetadataPath}${disk_number}"
+		local dataPath="${baseDataPath}${disk_number}"
+
+		if [ ! -d "${metadataPath}" ]; then
+			mkdir -pm 777 "${metadataPath}"
+		fi
+
+		# Mount point
+		if [ ! -d "${dataPath}" ]; then
+			sudo mkdir -pm 777 "${dataPath}"
+		fi
+
+		sudo mount -t zonefs "${devPath}" "${dataPath}"
+	done
+}
+
 create_sfshdd_cfg_() {
 	local n=$disks_per_chunkserver
 	local zoned_prefix=""
 
 	if [[ $use_zoned_disks && $use_ramdisk ]]; then
 		zoned_prefix="zonefs:"
-
-		local metadataPath
-		local dataPath
-		local devPath
 		local firstDisk=$(echo "${chunkserver_id} * ${n}" | bc)
 		local lastDisk=$(echo "${firstDisk} + ${n} - 1" | bc)
 
 		for disk_number in $(seq -w ${firstDisk} ${lastDisk}); do
-			if mount | grep "sauna_nullb${disk_number}" &>/dev/null; then
-				sudo umount -l "/mnt/zoned/sauna_nullb${disk_number}" &>/dev/null
-			fi
-
-			create_zoned_nullb 4096 $zone_size_mb $number_of_conv_zones \
-				$number_of_seq_zones ${disk_number}
-
-			if [ -b /dev/sauna_nullb${disk_number} ]; then
-				devPath="/dev/sauna_nullb${disk_number}"
-			elif [ -b /dev/nullb${disk_number} ]; then
-				devPath="/dev/nullb${disk_number}"
-			fi
-
-			sudo mkzonefs -f -o perm=666 "${devPath}" &>/dev/null
-
-			metadataPath="/mnt/ramdisk/metadata/sauna_nullb${disk_number}"
-			dataPath="/mnt/zoned/sauna_nullb${disk_number}"
-
-			if [ ! -d "${metadataPath}" ]; then
-				mkdir -pm 777 "${metadataPath}"
-			fi
-
-			# Mount point
-			if [ ! -d "${dataPath}" ]; then
-				sudo mkdir -pm 777 "${dataPath}"
-			fi
-
-			sudo mount -t zonefs "${devPath}" "${dataPath}"
+			local metadataPath="${baseMetadataPath}${disk_number}"
+			local dataPath="${baseDataPath}${disk_number}"
 
 			echo "${zoned_prefix}${metadataPath} | ${dataPath}"
 		done
@@ -546,8 +576,18 @@ add_chunkserver_() {
 	local hdd_cfg=$etcdir/sfshdd_$chunkserver_id.cfg
 	local chunkserver_cfg=$etcdir/sfschunkserver_$chunkserver_id.cfg
 
+	create_emulated_zoned_devices_for_cs_number_ ${chunkserver_id}
+
+	# Allow custom hdd file content directly from the tests
+	local custom_hdd_variable="CHUNKSERVER${chunkserver_id}_HDD_CONTENT"
+
+	if [[ ${!custom_hdd_variable-} ]]; then
+		echo "${!custom_hdd_variable}" > "${hdd_cfg}"
+	else
+		create_sfshdd_cfg_ > "${hdd_cfg}"
+	fi
+
 	get_next_port_number csserv_port
-	create_sfshdd_cfg_ >"$hdd_cfg"
 	create_sfschunkserver_cfg_ >"$chunkserver_cfg"
 	mkdir -p "$chunkserver_data_path"
 	sfschunkserver -c "$chunkserver_cfg" start
