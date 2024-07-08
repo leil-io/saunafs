@@ -199,6 +199,7 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 	opt.local_master_server       = variable_map["LOCAL_MASTER_ADDRESS"].as<std::string>();
 	opt.local_master_port         = variable_map["LOCAL_MASTER_MATOCL_PORT"].as<int>();
 	opt.check_cmd_status_period   = variable_map["URAFT_CHECK_CMD_PERIOD"].as<int>();
+	opt.no_ip_handling            = variable_map["no-ip"].as<bool>();
 	make_daemon                   = variable_map["start-daemon"].as<bool>();
 	// clang-format on
 
@@ -326,6 +327,17 @@ int main(int argc, char **argv) {
 
 	srand(getSeed());
 	parseOptions(argc, argv, opt, make_daemon, pidfile);
+
+	auto userID = getuid();
+	if (userID != 0 && (!opt.elector_mode || !opt.no_ip_handling)) {
+		safs::log_critical(
+		    "saunafs-uraft requires root privileges to assign/drop IP "
+		    "addresses");
+		return EXIT_FAILURE;
+	}
+	if (opt.no_ip_handling) {
+		setenv("HELPER_NO_IP", "1", 1);
+	}
 
 	if (make_daemon && !daemonize()) {
 		safs::log_critical("Unable to switch to daemon mode");

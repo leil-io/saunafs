@@ -133,7 +133,11 @@ saunafs_promote() {
 		echo -n "${ADMIN_PASSWORD}" | \
 			saunafs_admin promote-shadow "${matocl_host}" ${matocl_port}
 	fi
-	saunafs_assign_ip
+    if [ -z ${HELPER_NO_IP+x} ]; then
+	    saunafs_assign_ip
+    else
+        log_info "No IP management set, not assigning IP address"
+    fi
     log_info "Node successfully promoted to master"
 }
 
@@ -210,6 +214,10 @@ saunafs_isalive() {
 }
 
 saunafs_assign_ip() {
+    if [[ $(id -u) != 0 ]]; then
+        log_err "Can not assign IP as non-root user"
+        return
+    fi
 	load_config
 	sudo ip -f inet addr add $ipaddr/$netmask dev $iface
 	iface_base=$(echo $iface | cut -f1 -d':') # for alias handling
@@ -223,6 +231,10 @@ saunafs_assign_ip() {
 }
 
 saunafs_drop_ip() {
+    if [[ $(id -u) != 0 ]]; then
+        log_err "Can not drop IP as non-root user"
+        return
+    fi
 	load_config
 	sudo ip -f inet addr delete $ipaddr/$netmask dev $iface
 	if [[ "$ipaddr2" != "" ]]; then
@@ -231,7 +243,11 @@ saunafs_drop_ip() {
 }
 
 saunafs_dead() {
-	saunafs_drop_ip
+    if [ -z ${HELPER_NO_IP+x}  ]; then
+	    saunafs_drop_ip
+    else
+        log_info "No IP management set, not dropping IP address"
+    fi
 }
 
 print_help() {
