@@ -228,7 +228,8 @@ void DefaultDiskManager::reloadDisksFromCfg() {
 	}
 }
 
-IDisk* DefaultDiskManager::getDiskForNewChunk() {
+IDisk *DefaultDiskManager::getDiskForNewChunk(
+    [[maybe_unused]] const ChunkPartType &chunkType) {
 	TRACETHIS();
 	IDisk *bestDisk = DiskNotFound;
 	double maxCarry = 1.0;
