@@ -49,5 +49,6 @@ public:
 
 	/// Get the disk to use for a new chunk. Concrete implementations will use
 	/// different strategies.
-	virtual IDisk* getDiskForNewChunk() = 0;
+	virtual IDisk *getDiskForNewChunk(
+	    [[maybe_unused]] const ChunkPartType &chunkType) = 0;
 };
