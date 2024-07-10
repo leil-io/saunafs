@@ -1,4 +1,5 @@
 #include "common/platform.h"
+#include "helpers.h"
 #include "uraftcontroller.h"
 #include "slogger/slogger.h"
 
@@ -51,9 +52,26 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 
 	po::options_description config("Configuration");
 	config.add_options()
-	("id", po::value<int>(), "server id")
-	("start-daemon,d", po::bool_switch()->default_value(false), "start in daemon mode")
-	("pidfile,p", po::value<std::string>(), "pidfile name");
+		(
+		"id",
+		po::value<int>(),
+		"server id"
+		)
+		(
+		"no-ip",
+		po::bool_switch()->default_value(false),
+		"Do not manage IP addresses (advanced, use only for testing/debugging purposes)"
+		)
+		(
+		"start-daemon,d",
+		po::bool_switch()->default_value(false),
+		"start in daemon mode"
+		)
+		(
+		"pidfile,p",
+		po::value<std::string>(),
+		"pidfile name"
+	);
 
 	po::options_description hidden;
 	hidden.add_options()
@@ -296,6 +314,27 @@ void makePidFile(const std::string &name) {
 	ofs << boost::lexical_cast<std::string>(getpid()) << '\n';
 }
 
+void handle_signal(boost::asio::io_service &io_service,
+                   const boost::system::error_code /* &error */, int signal,
+                   const uRaftController::Options &opt) {
+	if (signal == SIGINT && !opt.elector_mode) {
+		helpers::stop();
+		if (!opt.no_ip_handling) {
+			helpers::drop_ip();
+		}
+	}
+
+	if (signal == SIGTERM && !opt.elector_mode) {
+		helpers::quick_stop(opt.local_master_server,
+		                    std::to_string(opt.local_master_port));
+		if (!opt.no_ip_handling) {
+			helpers::drop_ip();
+		}
+	}
+
+	io_service.stop();
+}
+
 int main(int argc, char **argv) {
 
 	uRaftController::Options opt;
@@ -329,7 +368,7 @@ int main(int argc, char **argv) {
 	parseOptions(argc, argv, opt, make_daemon, pidfile);
 
 	auto userID = getuid();
-	if (userID != 0 && (!opt.elector_mode || !opt.no_ip_handling)) {
+	if (userID != 0 && (!opt.elector_mode && !opt.no_ip_handling)) {
 		safs::log_critical(
 		    "saunafs-uraft requires root privileges to assign/drop IP "
 		    "addresses");
@@ -352,10 +391,10 @@ int main(int argc, char **argv) {
 		server.set_options(opt);
 		makePidFile(pidfile);
 		signals.async_wait(
-		    [&io_service](const boost::system::error_code & /*error*/,
-		                       int /*signal*/) {
-			    io_service.stop();
-		    });
+			[&io_service, opt](const boost::system::error_code &error,
+							   int signal) {
+				handle_signal(io_service, error, signal, opt);
+			});
 		server.init();
 
 		io_service.run();
