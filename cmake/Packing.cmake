@@ -11,7 +11,7 @@ set(CPACK_PACKAGE_CONTACT "contact@saunafs.com"
         CACHE STRING "Contact email for package"
 )
 
-set(CPACK_PACKAGE_VENDOR "The SaunaFS Team <"${CPACK_PACKAGE_CONTACT}">"
+set(CPACK_PACKAGE_VENDOR "The SaunaFS Team <${CPACK_PACKAGE_CONTACT}>"
         CACHE STRING "Vendor of package"
 )
 
