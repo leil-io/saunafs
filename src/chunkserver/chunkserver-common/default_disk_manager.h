@@ -58,5 +58,6 @@ public:
 	 * This concrete implementation obtains a balanced distribution using all
 	 * available disks.
 	 */
-	IDisk* getDiskForNewChunk() override;
+	IDisk *getDiskForNewChunk(
+	    [[maybe_unused]] const ChunkPartType &chunkType) override;
 };

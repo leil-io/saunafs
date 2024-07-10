@@ -226,10 +226,6 @@ static IChunk *hddChunkCreate(IDisk *disk, uint64_t chunkId,
 	return chunk;
 }
 
-static inline IDisk* hddGetDiskForNewChunk() {
-	return gDiskManager->getDiskForNewChunk();
-}
-
 void hddSendDataToMaster(IDisk *disk, bool isForRemoval) {
 	TRACETHIS();
 	bool markedForDeletion = disk->isMarkedForDeletion();
@@ -833,7 +829,7 @@ std::pair<int, IChunk *> hddInternalCreateChunk(uint64_t chunkId,
 	{
 		std::scoped_lock disksLockGuard(gDisksMutex);
 
-		disk = hddGetDiskForNewChunk();
+		disk = gDiskManager->getDiskForNewChunk(chunkType);
 
 		if (disk == DiskNotFound) {
 			return {SAUNAFS_ERROR_NOSPACE, ChunkNotFound};
@@ -1019,7 +1015,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 
 	{
 		std::unique_lock disksUniqueLock(gDisksMutex);
-		dupDisk = hddGetDiskForNewChunk();
+		dupDisk = gDiskManager->getDiskForNewChunk(chunkType);
 		if (dupDisk == DiskNotFound) {
 			disksUniqueLock.unlock();
 			hddChunkRelease(originalChunk);
@@ -1523,7 +1519,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 	{
 		std::unique_lock disksUniqueLock(gDisksMutex);
 
-		dupDisk = hddGetDiskForNewChunk();
+		dupDisk = gDiskManager->getDiskForNewChunk(chunkType);
 
 		if (dupDisk == DiskNotFound) {
 			disksUniqueLock.unlock();
