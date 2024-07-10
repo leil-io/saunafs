@@ -25,7 +25,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <cassert>
 #include <string>
+#include <expected>
 
 #include "common/cfg.h"
 #include "errors/sfserr.h"
@@ -43,6 +46,54 @@ static safs::log_level::LogLevel log_level_from_syslog(int priority) {
 	}};
 	return kSyslogToLevel[std::min<int>(priority, kSyslogToLevel.size())];
 }
+
+std::expected<safs::log_level::LogLevel, std::string>
+safs::log_level_from_string(const std::string &level) {
+	const auto lower_level = boost::algorithm::to_lower_copy(level);
+	if (lower_level == "trace") {
+		return safs::log_level::trace;
+	}
+	if (lower_level == "debug") {
+		return safs::log_level::debug;
+	}
+	if (lower_level == "info") {
+		return safs::log_level::info;
+	}
+	if (lower_level == "warn" || lower_level == "warning") {
+		return safs::log_level::warn;
+	}
+	if (lower_level == "err" || lower_level == "error") {
+		return safs::log_level::err;
+	}
+	if (lower_level == "crit" || lower_level == "critical") {
+		return safs::log_level::critical;
+	}
+	if (lower_level == "off") {
+		return safs::log_level::off;
+	}
+	return std::unexpected<std::string>("Invalid log level: " + level);
+}
+
+std::string safs::log_level_to_string(safs::log_level::LogLevel level) {
+	using safs::log_level::LogLevel;
+	switch (level) {
+	case LogLevel::trace:
+		return "trace";
+	case LogLevel::debug:
+		return "debug";
+	case LogLevel::info:
+		return "info";
+	case LogLevel::warn:
+		return "warn";
+	case LogLevel::err:
+		return "err";
+	case LogLevel::critical:
+		return "crit";
+	case LogLevel::off:
+		break;
+	}
+	return "off";
+};
 
 bool safs_add_log_file(const char *path, int priority, int max_file_size, int max_file_count) {
 	return safs::add_log_file(path, log_level_from_syslog(priority), max_file_size, max_file_count);
