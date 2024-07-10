@@ -18,15 +18,15 @@ print_missing_config() {
 }
 
 load_config() {
-	if [ -f $SAUNAFS_MASTER_CONFIG ] ; then
-		. <(sed "s:\ *=\ *:=:g" $SAUNAFS_MASTER_CONFIG | grep "ADMIN_PASSWORD")
-		. <(sed "s:\ *=\ *:=:g" $SAUNAFS_MASTER_CONFIG | grep "DATA_PATH")
+	if [ -f ${SAUNAFS_MASTER_CONFIG} ] ; then
+		. <(sed "s/\ *=\ */=/g" ${SAUNAFS_MASTER_CONFIG} | grep "ADMIN_PASSWORD")
+		. <(sed "s/\ *=\ */=/g" ${SAUNAFS_MASTER_CONFIG} | grep "DATA_PATH")
 	else
 		print_missing_config $SAUNAFS_MASTER_CONFIG
 	fi
 
-	if [ -f $SAUNAFS_URAFT_CONFIG ] ; then
-		. <(sed "s:\ *=\ *:=:g" $SAUNAFS_URAFT_CONFIG)
+	if [ -f ${SAUNAFS_URAFT_CONFIG} ] ; then
+		. <(sed "s/\ *=\ */=/g" ${SAUNAFS_URAFT_CONFIG})
 	else
 		print_missing_config $SAUNAFS_URAFT_CONFIG
 	fi
