@@ -1,14 +1,11 @@
-#include "common/platform.h"
 #include "uraftcontroller.h"
 
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <syslog.h>
 #include <unistd.h>
+#include <cstdint>
 #include <cstdio>
-#include <iostream>
-#include <stdexcept>
 
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <boost/bind.hpp>
@@ -16,26 +13,31 @@
 #include <boost/version.hpp>
 
 #include "common/time_utils.h"
+#include "slogger/slogger.h"
+
+static constexpr int32_t DEFAULT_CHECK_NODE_STATUS_PERIOD = 250;
+static constexpr int32_t DEFAULT_CMD_STATUS_PERIOD = 100;
+static constexpr int32_t DEFAULT_GETVERSION_TIMEOUT = 50;
+static constexpr int32_t DEFAULT_PROMOTE_TIMEOUT = 1000000;
+static constexpr int32_t DEFAULT_DEMOTE_TIMEOUT = 1000000;
+static constexpr int32_t DEFAULT_DEAD_HANDLER_TIMEOUT = 1000000;
 
 uRaftController::uRaftController(boost::asio::io_service &ios)
-	: uRaftStatus(ios),
-	  check_cmd_status_timer_(ios),
-	  check_node_status_timer_(ios),
-	  cmd_timeout_timer_(ios) {
-	command_pid_  = -1;
-	command_type_ = kCmdNone;
-	force_demote_ = false;
-	node_alive_   = false;
+    : uRaftStatus(ios),
+      check_cmd_status_timer_(ios),
+      check_node_status_timer_(ios),
+      cmd_timeout_timer_(ios),
+      command_pid_(-1),
+      command_type_(kCmdNone),
+      force_demote_(false),
+      node_alive_(false) {
 
-	opt_.check_node_status_period = 250;
-	opt_.check_cmd_status_period  = 100;
-	opt_.getversion_timeout       = 50;
-	opt_.promote_timeout          = 1000000;
-	opt_.demote_timeout           = 1000000;
-	opt_.dead_handler_timeout     = 1000000;
-}
-
-uRaftController::~uRaftController() {
+	opt_.check_node_status_period = DEFAULT_CHECK_NODE_STATUS_PERIOD;
+	opt_.check_cmd_status_period  = DEFAULT_CMD_STATUS_PERIOD;
+	opt_.getversion_timeout       = DEFAULT_GETVERSION_TIMEOUT;
+	opt_.promote_timeout          = DEFAULT_PROMOTE_TIMEOUT;
+	opt_.demote_timeout           = DEFAULT_DEMOTE_TIMEOUT;
+	opt_.dead_handler_timeout     = DEFAULT_DEAD_HANDLER_TIMEOUT;
 }
 
 void uRaftController::init() {
@@ -47,14 +49,12 @@ void uRaftController::init() {
 	}
 
 	check_cmd_status_timer_.expires_from_now(boost::posix_time::millisec(opt_.check_cmd_status_period));
-	check_cmd_status_timer_.async_wait(boost::bind(&uRaftController::checkCommandStatus, this,
-	                                   boost::asio::placeholders::error));
+	check_cmd_status_timer_.async_wait([this](const boost::system::error_code & error) { checkCommandStatus(error); });
 
 	check_node_status_timer_.expires_from_now(boost::posix_time::millisec(opt_.check_node_status_period));
-	check_node_status_timer_.async_wait(boost::bind(&uRaftController::checkNodeStatus, this,
-	                                    boost::asio::placeholders::error));
+	check_node_status_timer_.async_wait([this](const boost::system::error_code & error) { checkNodeStatus(error); });
 
-	syslog(LOG_NOTICE, "Saunafs-uraft initialized properly");
+	safs::log_info("Saunafs-uraft initialized properly");
 }
 
 void uRaftController::set_options(const uRaftController::Options &opt) {
@@ -63,10 +63,10 @@ void uRaftController::set_options(const uRaftController::Options &opt) {
 }
 
 void uRaftController::nodePromote() {
-	syslog(LOG_NOTICE, "Starting metadata server switch to master mode");
+	safs::log_info("Starting metadata server switch to master mode");
 
 	if (command_pid_ >= 0 && command_type_ != kCmdPromote) {
-		syslog(LOG_ERR, "Trying to switch metadata server to master during switch to slave");
+		safs::log_err("Can not switch metadata server to master during switch to slave");
 		demoteLeader();
 		set_block_promotion(true);
 		return;
@@ -82,10 +82,10 @@ void uRaftController::nodePromote() {
 }
 
 void uRaftController::nodeDemote() {
-	syslog(LOG_NOTICE, "Starting metadata server switch to slave mode");
+	safs::log_info("Starting metadata server switch to slave mode");
 
 	if (command_pid_ >= 0 && command_type_ != kCmdDemote) {
-		syslog(LOG_ERR, "Trying to switch metadata server to slave during switch to master");
+		safs::log_err("Can not switch metadata server to slave during switch to master");
 		force_demote_ = true;
 		set_block_promotion(true);
 		return;
@@ -106,7 +106,7 @@ uint64_t uRaftController::nodeGetVersion() {
 		return 0;
 	}
 
-	uint64_t    res;
+	uint64_t result = 0;
 
 	try {
 		std::string version;
@@ -117,17 +117,17 @@ uint64_t uRaftController::nodeGetVersion() {
 		};
 
 		if (!runCommand(params, version, opt_.getversion_timeout)) {
-			syslog(LOG_WARNING, "Get metadata version timeout.");
+			safs::log_warn("Get metadata version timeout");
 			return state_.data_version;
 		}
 
-		res = boost::lexical_cast<uint64_t>(version.c_str());
+		result = boost::lexical_cast<uint64_t>(version.c_str());
 	} catch (...) {
-		syslog(LOG_ERR, "Invalid metadata version value.");
-		res = state_.data_version;
+		safs::log_err("Invalid metadata version value");
+		result = state_.data_version;
 	}
 
-	return res;
+	return result;
 }
 
 void uRaftController::nodeLeader(int id) {
@@ -136,52 +136,57 @@ void uRaftController::nodeLeader(int id) {
 	}
 
 	std::string name = opt_.server[id];
-	std::string::size_type p = name.find(":");
+	std::string::size_type pos = name.find(':');
 
-	if (p != std::string::npos) {
-		name = name.substr(0, p);
+	if (pos != std::string::npos) {
+		name = name.substr(0, pos);
 	}
 
-	syslog(LOG_NOTICE, "Node '%s' is now a leader.", name.c_str());
+	safs::log_info("Node '{}' is now a leader.", name);
 }
 
 /*! \brief Check promote/demote script status. */
 void uRaftController::checkCommandStatus(const boost::system::error_code &error) {
-	if (error) return;
+	if (error) {
+		safs::log_err("Error checking command status: {}", error.message());
+		return;
+	}
 
-	int  status;
+	int status = 0;
 	if (checkSlowCommand(status)) {
 		cmd_timeout_timer_.cancel();
 		if (command_type_ == kCmdDemote) {
-			syslog(LOG_NOTICE, "Metadata server switch to slave mode done");
+			safs::log_info("Metadata server switch to slave mode done");
 			command_type_ = kCmdNone;
 			command_pid_  = -1;
 			set_block_promotion(false);
 		} else if (command_type_ == kCmdPromote) {
-			syslog(LOG_NOTICE, "Metadata server switch to master mode done");
+			safs::log_info("Metadata server switch to master mode done");
 			node_alive_ = true;
 			command_type_ = kCmdNone;
 			command_pid_  = -1;
 			if (force_demote_) {
-				syslog(LOG_WARNING, "Staring forced switch to slave mode");
+				safs::log_warn("Staring forced switch to slave mode");
 				nodeDemote();
 				force_demote_ = false;
 			}
 		} else if (command_type_ == kCmdStatusDead) {
-			syslog(LOG_NOTICE, "Waiting for new metadata server instance to be available");
+			safs::log_info("Waiting for new metadata server instance to be available");
 			command_type_ = kCmdNone;
 			command_pid_  = -1;
 		}
 	}
 
 	check_cmd_status_timer_.expires_from_now(boost::posix_time::millisec(opt_.check_cmd_status_period));
-	check_cmd_status_timer_.async_wait(boost::bind(&uRaftController::checkCommandStatus, this,
-	                                   boost::asio::placeholders::error));
+	check_cmd_status_timer_.async_wait([this](const boost::system::error_code & error) { checkCommandStatus(error); });
 }
 
 /*! \brief Check metadata server status. */
 void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
-	if (error) return;
+	if (error) {
+		safs::log_err("Error checking node status: {}", error.message());
+		return;
+	}
 
 	std::vector<std::string> params = { "saunafs-uraft-helper", "isalive" };
 	std::string              result;
@@ -192,18 +197,18 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 			if (result == "alive" || result == "dead") {
 				is_alive = result == "alive";
 			} else {
-				syslog(LOG_ERR, "Invalid metadata server status.");
+				safs::log_err("Invalid metadata server status");
 			}
 		} else {
-			syslog(LOG_WARNING, "Isalive timeout.");
+			safs::log_warn("Isalive timeout");
 		}
 
 		if (is_alive != node_alive_) {
 			if (is_alive) {
-				syslog(LOG_NOTICE, "Metadata server is alive");
+				safs::log_info("Metadata server is alive");
 				set_block_promotion(false);
 			} else {
-				syslog(LOG_NOTICE, "Metadata server is dead");
+				safs::log_info("Metadata server is dead");
 				demoteLeader();
 				set_block_promotion(true);
 				setSlowCommandTimeout(opt_.dead_handler_timeout);
@@ -216,22 +221,21 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 	}
 
 	check_node_status_timer_.expires_from_now(boost::posix_time::millisec(opt_.check_node_status_period));
-	check_node_status_timer_.async_wait(boost::bind(&uRaftController::checkNodeStatus, this,
-	                                    boost::asio::placeholders::error));
+	check_node_status_timer_.async_wait([this](const boost::system::error_code & error) { checkNodeStatus(error); });
 }
 
 void uRaftController::setSlowCommandTimeout(int timeout) {
 	cmd_timeout_timer_.expires_from_now(boost::posix_time::millisec(timeout));
 	cmd_timeout_timer_.async_wait([this](const boost::system::error_code & error) {
 		if (!error) {
-			syslog(LOG_ERR, "Metadata server mode switching timeout");
+			safs::log_err("Metadata server mode switching timeout");
 			stopSlowCommand();
 		}
 	});
 }
 
 //! Check if slow command stopped working.
-bool uRaftController::checkSlowCommand(int &status) {
+bool uRaftController::checkSlowCommand(int &status) const {
 	if (command_pid_ < 0) {
 		return false;
 	}
@@ -244,7 +248,7 @@ bool uRaftController::stopSlowCommand() {
 		return false;
 	}
 
-	int status;
+	int status = 0;
 	kill(command_pid_, SIGKILL);
 	waitpid(command_pid_, &status, 0);
 
@@ -262,9 +266,7 @@ bool uRaftController::stopSlowCommand() {
 bool uRaftController::runSlowCommand(const std::string &cmd) {
 	command_timer_.reset();
 
-#if (BOOST_VERSION >= 104700)
 	io_service_.notify_fork(boost::asio::io_service::fork_prepare);
-#endif
 
 	command_pid_ = fork();
 	if (command_pid_ == -1) {
@@ -275,9 +277,7 @@ bool uRaftController::runSlowCommand(const std::string &cmd) {
 		exit(1);
 	}
 
-#if (BOOST_VERSION >= 104700)
 	io_service_.notify_fork(boost::asio::io_service::fork_parent);
-#endif
 
 	return true;
 }
@@ -290,16 +290,14 @@ bool uRaftController::runSlowCommand(const std::string &cmd) {
  * \return true if there was no error and program did finish in timeout time.
  */
 bool uRaftController::runCommand(const std::vector<std::string> &cmd, std::string &result, int timeout) {
-	pid_t pid;
-	int   pipe_fd[2];
+	pid_t pid = 0;
+	std::array<int, 2> pipe_fd{};
 
-	if (pipe(pipe_fd) == -1) {
+	if (pipe(pipe_fd.data()) == -1) {
 		return false;
 	}
 
-#if (BOOST_VERSION >= 104700)
 	io_service_.notify_fork(boost::asio::io_service::fork_prepare);
-#endif
 
 	pid = fork();
 	if (pid == -1) {
@@ -312,33 +310,31 @@ bool uRaftController::runCommand(const std::vector<std::string> &cmd, std::strin
 		close(pipe_fd[0]);
 		dup2(pipe_fd[1], 1);
 
-		std::vector<const char *> argv(cmd.size() + 1, 0);
+		std::vector<const char *> argv(cmd.size() + 1, nullptr);
 		for (int i = 0; i < (int)cmd.size(); i++) {
 			argv[i] = cmd[i].c_str();
 		}
 
-		execvp(argv[0], (char * const *)&argv[0]);
+		execvp(argv[0], (char * const *)argv.data());
 		exit(1);
 	}
 
-#if (BOOST_VERSION >= 104700)
 	io_service_.notify_fork(boost::asio::io_service::fork_parent);
-#endif
 
 	close(pipe_fd[1]);
 
-	int r = readString(pipe_fd[0], result, timeout);
+	int retValue = readString(pipe_fd[0], result, timeout);
 
 	close(pipe_fd[0]);
 
-	if (r <= 0) {
+	if (retValue <= 0) {
 		kill(pid, SIGKILL);
 	}
 
-	int status;
+	int status = 0;
 	waitpid(pid, &status, 0);
 
-	return r > 0;
+	return retValue > 0;
 }
 
 /*! Read string from file descriptor
@@ -351,39 +347,39 @@ bool uRaftController::runCommand(const std::vector<std::string> &cmd, std::strin
  *         0  timeout did occur
  *         1  no error
  */
-int uRaftController::readString(int fd, std::string &result, const int timeout) {
+int uRaftController::readString(int fileDescriptor, std::string &result, const int timeout) {
 	static const int read_size = 128;
 
-	Timeout tm {std::chrono::milliseconds(timeout)};
-	char    buff[read_size + 1];
-	pollfd  pdata;
+	Timeout time{std::chrono::milliseconds(timeout)};
+	std::array<char, read_size + 1> buff{};
+	pollfd pdata{};
 
-	pdata.fd      = fd;
+	pdata.fd      = fileDescriptor;
 	pdata.events  = POLLIN;
 	pdata.revents = 0;
 
 	result.clear();
 
-	while (1) {
-		int     r;
+	while (true) {
+		int retValue = 0;
 
-		if (tm.expired()) {
+		if (time.expired()) {
 			return 0;
 		}
 
-		r = poll(&pdata, 1, tm.remaining_ms());
-		if (r <= 0) return r;
+		retValue = poll(&pdata, 1, time.remaining_ms());
+		if (retValue <= 0) { return retValue; }
 
-		r = read(fd, buff, read_size);
-		if (r < 0) {
+		retValue = read(fileDescriptor, buff.data(), read_size);
+		if (retValue < 0) {
 			return -1;
 		}
-		if (r == 0) {
+		if (retValue == 0) {
 			break;
 		}
 
-		buff[r] = 0;
-		result += buff;
+		buff.at(retValue) = 0;
+		result += buff.data();
 	}
 
 	return 1;
