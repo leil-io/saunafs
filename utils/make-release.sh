@@ -96,8 +96,10 @@ echo
 echo -e -n "${changelogEntry}"
 
 # Update CMakeLists.txt and other files
-sed -i -E 's/(set[(]DEFAULT_MIN_VERSION (["'\'']?))[^"'\'']*(\2)/\1'${newVersion}'\3/' "CMakeLists.txt"
-sed -i -E 's/(SAUNAFSXX_TAG=(["'\'']?))[^"'\'']*(\2)/\1'${newVersion}'\3/' "tests/tools/saunafsXX.sh"
+cmakeFile="CMakeLists.txt"
+testFile="tests/tools/saunafsXX.sh"
+sed -i -E 's/(set[(]DEFAULT_MIN_VERSION (["'\'']?))[^"'\'']*(\2)/\1'${newVersion}'\3/' "${cmakeFile}"
+sed -i -E 's/(SAUNAFSXX_TAG=(["'\'']?))[^"'\'']*(\2)/\1'${newVersion}'\3/' "${testFile}"
 
 newsFile="NEWS"
 changelogFile="debian/changelog"
@@ -118,12 +120,12 @@ mv "/tmp/newsTemp" ${newsFile}
 } < ${changelogFile} > "/tmp/changelogTemp"
 mv "/tmp/changelogTemp" ${changelogFile}
 
-git add ${newsFile} ${changelogFile}
+git add ${newsFile} ${changelogFile} ${cmakeFile} ${testFile}
 git commit -m "chore: Changelog for ${newVersionTag}"
-git tag -a "${newVersionTag}-rc1"
+git tag -a "${newVersionTag}-rc1" -m "${newVersionTag}"
 newBranch="release/${newVersionTag}"
 git branch -M "${newBranch}"
 git push -u origin "${newBranch}"
-
-# git switch dev
+git switch dev
+git branch -D $releaseBranch
 # git cherry-pick last commit from newVersionTag-rc1
