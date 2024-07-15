@@ -2,6 +2,7 @@
 
 #include "chunkserver-common/chunk_map.h"
 #include "chunkserver-common/disk_interface.h"
+#include "chunkserver-common/disk_manager_interface.h"
 #include "chunkserver-common/indexed_resource_pool.h"
 #include "chunkserver-common/open_chunk.h"
 
@@ -29,6 +30,14 @@ inline std::vector<std::unique_ptr<IDisk>> gDisks;
 
 /// Protects gDisks + all data in structures (except Disk::cstat)
 inline std::mutex gDisksMutex;
+
+/// Configuration variable to define the type of DiskManager to be used.
+/// The default is an instance of DefaultDiskManager, but can be be changed from
+/// plugins offering custom implementations of IDiskManager.
+inline std::string gDiskManagerType = "default";
+
+/// The DiskManager instance to be used by the Chunkserver.
+inline std::unique_ptr<IDiskManager> gDiskManager;
 
 /// Container to reuse free condition variables (guarded by `gChunksMapMutex`)
 inline std::vector<std::unique_ptr<CondVarWithWaitCount>> gFreeCondVars;

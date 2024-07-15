@@ -385,6 +385,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/sfscgi/favicon.svg
 %{_datadir}/sfscgi/index.html
 %{_datadir}/sfscgi/logomini.svg
+%{_datadir}/sfscgi/logomini.png
 %{_datadir}/sfscgi/sfs.css
 %attr(755,root,root) %{_datadir}/sfscgi/sfs.cgi
 %attr(755,root,root) %{_datadir}/sfscgi/chart.cgi

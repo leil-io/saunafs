@@ -3,7 +3,7 @@ configure_file(saunafs-cgiserver.py.in   saunafs-cgiserver)
 configure_file(chart.cgi.in    chart.cgi)
 configure_file(sfs.cgi.in      sfs.cgi)
 
-set(CGI_FILES err.gif favicon.ico favicon.svg index.html logomini.svg sfs.css)
+set(CGI_FILES err.gif favicon.ico favicon.svg index.html logomini.svg logomini.png sfs.css)
 set(CGI_SCRIPTS
     ${CMAKE_CURRENT_BINARY_DIR}/sfs.cgi
     ${CMAKE_CURRENT_BINARY_DIR}/chart.cgi)

@@ -74,6 +74,7 @@
 #include "chunkserver/chartsdata.h"
 #include "chunkserver/chunk_filename_parser.h"
 #include "chunkserver/cmr_disk.h"
+#include "chunkserver/default_disk_manager.h"
 #include "chunkserver/iostat.h"
 #include "chunkserver/plugin_manager.h"
 #include "common/cfg.h"
@@ -230,76 +231,7 @@ static IChunk *hddChunkCreate(IDisk *disk, uint64_t chunkId,
 }
 
 static inline IDisk* hddGetDiskForNewChunk() {
-	TRACETHIS();
-	IDisk *bestDisk = DiskNotFound;
-	double maxCarry = 1.0;
-	double minPercentAvail = std::numeric_limits<double>::max();
-	double maxPercentAvail = 0.0;
-	double s,d;
-	double percentAvail;
-
-	if (gDisks.empty())
-		return DiskNotFound;
-
-	for (auto &disk : gDisks) {
-		if (!disk->isSelectableForNewChunk())
-			continue;
-
-		if (disk->carry() >= maxCarry) {
-			maxCarry = disk->carry();
-			bestDisk = disk.get();
-		}
-
-		percentAvail = static_cast<double>(disk->availableSpace()) /
-		               static_cast<double>(disk->totalSpace());
-		minPercentAvail = std::min(minPercentAvail, percentAvail);
-		maxPercentAvail = std::max(maxPercentAvail, percentAvail);
-	}
-
-	if (bestDisk) {
-		bestDisk->setCarry(bestDisk->carry() - 1.0);  // Lower the probability of being choosen again
-		return bestDisk;
-	}
-
-	if (maxPercentAvail == 0.0) {  // no space
-		return DiskNotFound;
-	}
-
-	if (maxPercentAvail < 0.01) {
-		s = 0.0;
-	} else {
-		s = minPercentAvail * 0.8;
-		if (s < 0.01) {
-			s = 0.01;
-		}
-	}
-
-	d = maxPercentAvail - s;
-	maxCarry = 1.0;
-
-	for (auto &disk : gDisks) {
-		if (!disk->isSelectableForNewChunk()) {
-			continue;
-		}
-
-		percentAvail = static_cast<double>(disk->availableSpace()) /
-		               (double)(disk->totalSpace());
-
-		if (percentAvail > s) {
-			disk->setCarry(disk->carry() + ((percentAvail - s) / d));
-		}
-
-		if (disk->carry() >= maxCarry) {
-			maxCarry = disk->carry();
-			bestDisk = disk.get();
-		}
-	}
-
-	if (bestDisk) {       // should be always true
-		bestDisk->setCarry(bestDisk->carry() - 1.0);
-	}
-
-	return bestDisk;
+	return gDiskManager->getDiskForNewChunk();
 }
 
 void hddSendDataToMaster(IDisk *disk, bool isForRemoval) {
@@ -2918,6 +2850,22 @@ int hddLateInit() {
 	}
 
 	return 0;
+}
+
+/// Initializes the default disk manager and reads the disk manager type from
+/// configuration. This function must be called before plugins initialization.
+int initDiskManager() {
+	// Initialize the default disk manager and set the disk manager type.
+	// The default will be overwritten if the DISK_MANAGER_TYPE is set in
+	// the configuration file.
+	gDiskManager = std::make_unique<DefaultDiskManager>();
+
+	std::string diskManagerType = cfg_get("DISK_MANAGER_TYPE", "default");
+	std::transform(diskManagerType.begin(), diskManagerType.end(),
+	               diskManagerType.begin(), ::tolower);
+	gDiskManagerType = std::move(diskManagerType);
+
+	return SAUNAFS_STATUS_OK;
 }
 
 int loadPlugins() {

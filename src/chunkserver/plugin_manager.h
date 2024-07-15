@@ -1,3 +1,21 @@
+/*
+   Copyright 2023 Leil Storage OÜ
+
+   This file is part of SaunaFS.
+
+   SaunaFS is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, version 3.
+
+   SaunaFS is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #pragma once
 
 // A fix for https://stackoverflow.com/q/77034039/10788155
@@ -13,7 +31,7 @@
 
 #include "chunkserver-common/disk_plugin.h"
 
-using DiskPlugin_t = boost::shared_ptr<DiskPlugin>();
+using IPlugin_t = boost::shared_ptr<IPlugin>();
 
 /// Responsible for loading and managing plugins and for creating the concrete
 /// Disks for the given prefixes.
@@ -31,11 +49,15 @@ public:
 	void showLoadedPlugins();
 
 	/// True if this plugin manager can handle the plugin based on the version.
-	bool checkVersion(boost::shared_ptr<DiskPlugin> &plugin);
+	bool checkVersion(IPlugin *plugin);
 
 private:
 	/// Creators should never be out of scope or the plugin will be unloaded
-	std::map<std::string, boost::function<DiskPlugin_t>> creators_;
-	/// Container for the loaded plugins
-	std::map<std::string, boost::shared_ptr<DiskPlugin>> plugins_;
+	std::map<std::string, boost::function<IPlugin_t>> creators_;
+
+	/// Container for all the loaded plugins
+	std::map<std::string, boost::shared_ptr<IPlugin>> allPlugins_;
+
+	/// Container for the loaded disk plugins
+	std::map<std::string, boost::shared_ptr<DiskPlugin>> diskPlugins_;
 };

@@ -133,6 +133,12 @@
 ## (Default: 1), i.e. enabled.
 #PERFORM_FSYNC = 1
 
+## [ADVANCED] The DiskManager is responsible for assigning each chunk to a
+## specific disk. By default the chunks are distributed in a balanced way among
+## all the available disks. This variable can be changed to select a custom
+## DiskManager implementation loaded from plugins.
+## (Default: DEFAULT), the default balanced distribution will be used.
+# DISK_MANAGER_TYPE = DEFAULT
 
 ## deprecated, to be removed.
 # BACK_LOGS = 50
