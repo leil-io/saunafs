@@ -17,17 +17,26 @@ install_saunafsXX() {
 		local codename="$(lsb_release -sc | tail -1)"
 		local release="$(lsb_release -sr | tail -1)"
 		mkdir -p "${TEMP_DIR}/apt/apt.conf.d"
-		mkdir -p "${TEMP_DIR}/apt/var/lib/apt/partial"
+		mkdir -p "${TEMP_DIR}/apt/auth.conf.d"
+		mkdir -p "${TEMP_DIR}/apt/sources.list.d"
 		mkdir -p "${TEMP_DIR}/apt/var/cache/apt/archives/partial"
+		mkdir -p "${TEMP_DIR}/apt/var/lib/apt/partial"
 		mkdir -p "${TEMP_DIR}/apt/var/lib/dpkg"
 		mkdir -p "${TEMP_DIR}/usr/share/keyrings"
 		cp /var/lib/dpkg/status "${TEMP_DIR}/apt/var/lib/dpkg/status"
+		if sudo test -f /etc/apt/auth.conf.d/saunafs.conf; then
+			sudo cp /etc/apt/auth.conf.d/saunafs.conf "${TEMP_DIR}/apt/auth.conf.d/saunafs.conf"
+		fi
+		sudo chown -R "${USER}:${USER}" "${TEMP_DIR}/apt"
 		cat >"${TEMP_DIR}/apt/apt.conf" <<END
-Dir::State "${TEMP_DIR}/apt/var/lib/apt";
-Dir::State::status "${TEMP_DIR}/apt/var/lib/dpkg/status";
-Dir::Etc::SourceList "${TEMP_DIR}/apt/saunafs.list";
 Dir::Cache "${TEMP_DIR}/apt/var/cache/apt";
 Dir::Etc::Parts "${TEMP_DIR}/apt/apt.conf.d";
+Dir::Etc::netrc "${TEMP_DIR}/apt/auth.conf";
+Dir::Etc::netrcparts "${TEMP_DIR}/apt/auth.conf.d";
+Dir::Etc::SourceList "${TEMP_DIR}/apt/saunafs.list";
+Dir::Etc::SourceParts "${TEMP_DIR}/apt/sources.list.d";
+Dir::State "${TEMP_DIR}/apt/var/lib/apt";
+Dir::State::status "${TEMP_DIR}/apt/var/lib/dpkg/status";
 END
 		local destdir="${TEMP_DIR}/apt/var/cache/apt/archives"
 		echo "deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-${distro_id}-${release}/ ${codename} main" >"${TEMP_DIR}/apt/saunafs.list"
@@ -115,7 +124,7 @@ test_saunafsXX_executables() {
 
 saunafsXX_chunkserver_daemon() {
 	# shellcheck disable=SC2154
-	"${SAUNAFSXX_DIR}/sbin/sfschunkserver" -c "${saunafs_info_[chunkserver${1_cfg}]}" "${2}" | cat
+	"${SAUNAFSXX_DIR}/sbin/sfschunkserver" -c "${saunafs_info_["chunkserver${1}_cfg"]}" "${2}" | cat
 	return "${PIPESTATUS[0]}"
 }
 
