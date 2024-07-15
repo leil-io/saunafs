@@ -182,14 +182,9 @@ update_cmake_file() {
 	local newVersion="${1}"
 	local cmakeFile="${2}"
 
+	## Look for a line like 'set(DEFAULT_MIN_VERSION "X.Y.Z"' with optional single or double quote
+	## surrounding the version, and replace the version.
 	sed -i -E 's/(set[(]DEFAULT_MIN_VERSION (["'\'']?))[^"'\'']*(\2)/\1'"${newVersion}"'\3/' "${cmakeFile}"
-}
-
-update_test_file() {
-	local newVersion="${1}"
-	local testFile="${2}"
-
-	sed -i -E 's/(SAUNAFSXX_TAG=(["'\'']?))[^"'\'']*(\2)/\1'"${newVersion}"'\3/' "${testFile}"
 }
 
 process_release() {
@@ -203,8 +198,7 @@ process_release() {
 	update_changelog_file "${newVersion}" "${RELEASE_URGENCY}" "${CHANGELOG_FILE}" <<< "${changelogWithCommits}"
 	update_news_file "${newVersion}" "${NEWS_FILE}" <<< "${changelogWithCommits}"
 	update_cmake_file "${newVersion}" "CMakeLists.txt"
-	update_test_file "${newVersion}" "tests/tools/saunafsXX.sh"
-	git add "${CHANGELOG_FILE}" "${NEWS_FILE}" "CMakeLists.txt" "tests/tools/saunafsXX.sh"
+	git add "${CHANGELOG_FILE}" "${NEWS_FILE}" "CMakeLists.txt"
 	git commit -m "chore: Changelog for ${newVersionTag}"
 
 	local newBranch="release/${newVersionTag}"
