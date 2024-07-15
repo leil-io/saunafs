@@ -775,19 +775,19 @@ int fs_connect(bool verbose) {
 		std::fill(gInitParams.password_digest.begin(), gInitParams.password_digest.end(), 0);
 	}
 	if (verbose) {
-		fprintf(stderr,"sfsmaster accepted connection with parameters: ");
+		fprintf(stdout,"sfsmaster accepted connection with parameters: ");
 		j=0;
 		for (i=0 ; i<8 ; i++) {
 			if (sesflags&(1<<i)) {
-				fprintf(stderr,"%s%s",j?",":"",sesflagposstrtab[i]);
+				fprintf(stdout,"%s%s",j?",":"",sesflagposstrtab[i]);
 				j=1;
 			} else if (sesflagnegstrtab[i]) {
-				fprintf(stderr,"%s%s",j?",":"",sesflagnegstrtab[i]);
+				fprintf(stdout,"%s%s",j?",":"",sesflagnegstrtab[i]);
 				j=1;
 			}
 		}
 		if (j==0) {
-			fprintf(stderr,"-");
+			fprintf(stdout,"-");
 		}
 		if (!gInitParams.meta) {
 #ifndef _WIN32
