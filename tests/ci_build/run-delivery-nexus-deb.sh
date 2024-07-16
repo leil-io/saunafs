@@ -18,7 +18,6 @@ declare nexus_auth="$(echo ${nexus_username}:${nexus_password})"
 
 
 declare source_dir="${1:-}"
-[ -d "${source_dir}" ] || die "Source directory '${source_dir}' does not exist"
 
 declare files=$(find "${source_dir}" -type f -name '*.deb')
 
