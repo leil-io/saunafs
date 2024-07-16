@@ -57,6 +57,7 @@
 #include "master/filesystem.h"
 #include "master/get_servers_for_new_chunk.h"
 #include "master/goal_cache.h"
+#include "metrics/metrics.h"
 #include "protocol/SFSCommunication.h"
 
 #ifdef METARESTORE
@@ -623,6 +624,7 @@ struct loop_info {
 static loop_info chunksinfo = {{0,0,0,0,0},{0,0,0,0,0},0};
 static uint32_t chunksinfo_loopstart=0,chunksinfo_loopend=0;
 
+// DEPRECATED: Use prometheus metrics instead
 static uint32_t stats_deletions=0;
 static uint32_t stats_replications=0;
 
@@ -1966,6 +1968,7 @@ bool ChunkWorker::tryReplication(Chunk *c, ChunkPartType part_to_recover,
 		                                   part_to_recover, all_servers,
 		                                   all_parts);
 		stats_replications++;
+		metrics::Counter::increment(metrics::master::CHUNK_REPLICATE);
 		c->needverincrease = 1;
 		return true;
 	}
@@ -1984,6 +1987,7 @@ void ChunkWorker::deleteInvalidChunkParts(Chunk *c) {
 				}
 				part.state = ChunkPart::DEL;
 				stats_deletions++;
+				metrics::Counter::increment(metrics::master::CHUNK_DELETE);
 				matocsserv_send_deletechunk(part.server(), c->chunkid, 0, part.type);
 				inforec_.done.del_invalid++;
 				deleteDone_++;
@@ -2004,6 +2008,7 @@ void ChunkWorker::deleteAllChunkParts(Chunk *c) {
 				c->deleteCopy(part);
 				c->needverincrease = 1;
 				stats_deletions++;
+				metrics::Counter::increment(metrics::master::CHUNK_DELETE);
 				matocsserv_send_deletechunk(part.server(), c->chunkid, c->version,
 				                            part.type);
 				inforec_.done.del_unused++;
@@ -2183,6 +2188,7 @@ bool ChunkWorker::removeUnneededChunkPart(Chunk *c, Goal::Slice::Type slice_type
 		c->deleteCopy(*candidate);
 		c->needverincrease = 1;
 		stats_deletions++;
+		metrics::Counter::increment(metrics::master::CHUNK_DELETE);
 		matocsserv_send_deletechunk(candidate->server(), c->chunkid, 0, candidate->type);
 
 		int overgoal_copies = calc.countPartsToMove(slice_type, slice_part).second;
