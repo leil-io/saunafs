@@ -9,7 +9,6 @@ timeout_set 120 minutes
 # - GOAL (e.g. 2, ec21, ec32)
 # - CHUNKSERVERS_GOAL_COVER (compatible with GOAL, e.g. goal 2 -> 2, ec32 -> 5)
 # - CHUNKSERVERS_REDUNDANT (how many we turn off, e.g. GOAL ec32 -> 2, ec21 -> 1)
-# - LEGACY_CHUNK_FORMAT ("1" when old chunk format, "0" otherwise)
 CHUNKSERVERS_GOAL_COVER=$(goal_to_part_count ${GOAL})
 CHUNKSERVERS_REDUNDANT=$(redundant_parts ${GOAL})
 CHUNKSERVERS_MINIMUM=$((CHUNKSERVERS_GOAL_COVER - ${CHUNKSERVERS_REDUNDANT}))
@@ -17,12 +16,9 @@ REPLICATION_SPEED="5000000" # Bytes per second
 
 source test_utils/upgrade.sh
 
-export SAFS_MOUNT_COMMAND="sfsmount"
-
 CHUNKSERVERS=$CHUNKSERVERS_GOAL_COVER
 	START_WITH_LEGACY_SAUNAFS=YES \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
-	CHUNKSERVER_EXTRA_CONFIG="CREATE_NEW_CHUNKS_IN_LEGACY_FORMAT = $LEGACY_CHUNK_FORMAT" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1|OPERATIONS_DELAY_INIT = 0" \
 	setup_local_empty_saunafs info
 
