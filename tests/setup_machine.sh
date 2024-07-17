@@ -267,7 +267,7 @@ fi
 # Add VIRTUAL_ENV to /etc/environment if it's not there
 sed '\@VIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@!s@$@\nVIRTUAL_ENV="'"${VIRTUAL_ENV}"'"@' -zi /etc/environment
 python3 -m venv "${VIRTUAL_ENV}"
-"${VIRTUAL_ENV}/bin/python3" -m pip install install "${python_packages[@]}"
+"${VIRTUAL_ENV}/bin/python3" -m pip install "${python_packages[@]}"
 
 echo ; echo 'Add group fuse'
 groupadd -f fuse
