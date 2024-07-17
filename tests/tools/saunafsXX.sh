@@ -8,7 +8,10 @@
 SAUNAFSXX_TAG="4.1.0"
 
 install_saunafsXX() {
-	rm -rf "${SAUNAFSXX_DIR}"
+	if [ "${SAUNAFSXX_DIR:?}" == "/" ]; then
+		test_fail "Cowardly refusing to perform potentially destructive operation on /"
+	fi
+	rm -rf "${SAUNAFSXX_DIR:?}"
 	mkdir -p "${SAUNAFSXX_DIR}"
 	local distro="$(lsb_release -si)"
 	case "${distro}" in
@@ -24,10 +27,9 @@ install_saunafsXX() {
 		mkdir -p "${TEMP_DIR}/apt/var/lib/dpkg"
 		mkdir -p "${TEMP_DIR}/usr/share/keyrings"
 		cp /var/lib/dpkg/status "${TEMP_DIR}/apt/var/lib/dpkg/status"
-		if sudo test -f /etc/apt/auth.conf.d/saunafs.conf; then
-			sudo cp /etc/apt/auth.conf.d/saunafs.conf "${TEMP_DIR}/apt/auth.conf.d/saunafs.conf"
+		if [ -f /tmp/saunafs-test-auth.conf ]; then
+			cp /tmp/saunafs-test-auth.conf "${TEMP_DIR}/apt/auth.conf.d/saunafs.conf"
 		fi
-		sudo chown -R "${USER}:${USER}" "${TEMP_DIR}/apt"
 		cat >"${TEMP_DIR}/apt/apt.conf" <<END
 Dir::Cache "${TEMP_DIR}/apt/var/cache/apt";
 Dir::Etc::Parts "${TEMP_DIR}/apt/apt.conf.d";
@@ -38,8 +40,10 @@ Dir::Etc::SourceParts "${TEMP_DIR}/apt/sources.list.d";
 Dir::State "${TEMP_DIR}/apt/var/lib/apt";
 Dir::State::status "${TEMP_DIR}/apt/var/lib/dpkg/status";
 END
+		curl -sSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xa80b96e2c79457d4" | \
+			gpg --dearmor -o "${TEMP_DIR}/apt/saunafs-archive-keyring.gpg"
 		local destdir="${TEMP_DIR}/apt/var/cache/apt/archives"
-		echo "deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-${distro_id}-${release}/ ${codename} main" >"${TEMP_DIR}/apt/saunafs.list"
+		echo "deb [arch=amd64 signed-by=${TEMP_DIR}/apt/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-${distro_id}-${release}/ ${codename} main" >"${TEMP_DIR}/apt/saunafs.list"
 		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get update
 		env APT_CONFIG="${TEMP_DIR}/apt/apt.conf" apt-get install --yes libyaml-cpp*
 		SAUNAFSXX_TAG_APT="4.1.0-20240509-152518-stable-main-a7cb5669"
