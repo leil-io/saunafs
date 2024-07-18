@@ -685,6 +685,7 @@ int matoclserv_load_sessions() {
 	uint32_t i,statsinfile;
 	int r;
 	FILE *fd;
+	std::string legacySessionSignature = std::string("MFS");
 
 	fd = fopen(kSessionsFilename, "r");
 	if (fd==NULL) {
@@ -700,19 +701,23 @@ int matoclserv_load_sessions() {
 		fclose(fd);
 		return -1;
 	}
-	if (memcmp(hdr,SFSSIGNATURE "S 1.5",8)==0) {
+	if (memcmp(hdr,SFSSIGNATURE "S 1.5",8)==0 ||
+	    memcmp(hdr, (legacySessionSignature + "S 1.5").c_str(), 8) == 0) {
 		mapalldata = 0;
 		goaltrashdata = 0;
 		statsinfile = 16;
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\001",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\001",8)==0 ||
+	           memcmp(hdr, (legacySessionSignature + "S \001\006\001").c_str(), 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		statsinfile = 16;
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\002",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\002",8)==0 ||
+	           memcmp(hdr, (legacySessionSignature + "S \001\006\002").c_str(), 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		statsinfile = 21;
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\003",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\003",8)==0 ||
+	           memcmp(hdr, (legacySessionSignature + "S \001\006\003").c_str(), 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		if (fread(hdr,2,1,fd)!=1) {
@@ -722,7 +727,8 @@ int matoclserv_load_sessions() {
 		}
 		ptr = hdr;
 		statsinfile = get16bit(&ptr);
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\004",8)==0) {
+	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\004",8)==0 ||
+	           memcmp(hdr, (legacySessionSignature + "S \001\006\004").c_str(), 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 1;
 		if (fread(hdr,2,1,fd)!=1) {
