@@ -92,9 +92,15 @@ uint64_t metadataGetVersion(const std::string& file) {
 	std::string signature = std::string(chkbuff, 8);
 	std::string sfsSignature = std::string(SFSSIGNATURE "M 2.9");
 	std::string sauSignature = std::string(SAUSIGNATURE "M 2.9");
+	std::string legacySignature = std::string("LIZM 2.9");
 
 	if (signature == sfsSignature || signature == sauSignature) {
 		memcpy(eofmark,"[SFS EOF MARKER]",16);
+	} else if (memcmp(chkbuff, legacySignature.data(), legacySignature.size()) == 0) {
+		safs_pretty_syslog(LOG_WARNING,
+		                   "Legacy metadata section header %s, was detected in the metadata file %s",
+		                   legacySignature.c_str(), file.c_str());
+		memcpy(eofmark,"[MFS EOF MARKER]",16);
 	} else {
 		close(fd);
 		throw MetadataCheckException("Bad EOF MARKER in the metadata file.");
