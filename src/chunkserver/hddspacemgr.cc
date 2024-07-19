@@ -394,6 +394,8 @@ void hddCheckDisks() {
 		}
 	}
 
+	gDiskManager->updateSpaceUsage();
+
 	disksUniqueLock.unlock();
 
 	if (changed) {
@@ -2536,6 +2538,7 @@ void hddReload(void) {
 	safs_pretty_syslog(LOG_NOTICE,"reloading hdd data ...");
 
 	try {
+		gDiskManager->reloadConfiguration();
 		gDiskManager->reloadDisksFromCfg();
 	} catch (const Exception& ex) {
 		safs_pretty_syslog(LOG_ERR, "%s", ex.what());
@@ -2635,6 +2638,7 @@ int hddInit() {
 	}
 
 	try {
+		gDiskManager->reloadConfiguration();
 		gDiskManager->reloadDisksFromCfg();
 	} catch (const Exception& ex) {
 		safs_pretty_syslog(LOG_ERR, "%s", ex.what());
