@@ -41,6 +41,9 @@ const char kMetadataFilename[] = METADATA_FILENAME_TEMPL;
 const char kMetadataTmpFilename[] = METADATA_FILENAME_TEMPL ".tmp";
 const char kMetadataEmergencyFilename[] = METADATA_FILENAME_TEMPL ".emergency";
 #undef METADATA_FILENAME_TEMPL
+#define METADATA_LEGACY_FILENAME_TEMPL "metadata.mfs"
+const char kMetadataLegacyFilename[] = METADATA_LEGACY_FILENAME_TEMPL;
+#undef METADATA_LEGACY_FILENAME_TEMPL
 #define METADATA_ML_FILENAME_TEMPL "metadata_ml.sfs"
 const char kMetadataMlFilename[] = METADATA_ML_FILENAME_TEMPL;
 const char kMetadataMlTmpFilename[] = METADATA_ML_FILENAME_TEMPL ".tmp";
@@ -96,7 +99,7 @@ uint64_t metadataGetVersion(const std::string& file) {
 
 	if (signature == sfsSignature || signature == sauSignature) {
 		memcpy(eofmark,"[SFS EOF MARKER]",16);
-	} else if (memcmp(chkbuff, legacySignature.data(), legacySignature.size()) == 0) {
+	} else if (signature == legacySignature) {
 		safs_pretty_syslog(LOG_WARNING,
 		                   "Legacy metadata section header %s, was detected in the metadata file %s",
 		                   legacySignature.c_str(), file.c_str());
