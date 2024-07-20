@@ -8,7 +8,7 @@ master_cfg+="|DISABLE_METADATA_CHECKSUM_VERIFICATION = 1"
 CHUNKSERVERS=1 \
 	MOUNTS=1 \
 	USE_RAMDISK="YES" \
-	MOUNT_0_EXTRA_CONFIG="sfscachemode=NEVER,sfsattrcacheto=0,sfsreportreservedperiod=1" \
+	MOUNT_0_EXTRA_CONFIG="mfscachemode=NEVER,mfsattrcacheto=0,mfsreportreservedperiod=1" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
 	MASTER_EXTRA_CONFIG="$master_cfg" \
 	AUTO_SHADOW_MASTER="NO" \

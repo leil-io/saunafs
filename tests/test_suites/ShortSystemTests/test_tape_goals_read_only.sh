@@ -5,7 +5,7 @@ test_end
 # Create an installation where the default goal (id=1) is "30 copies" and 20 servers
 USE_RAMDISK=YES \
 	CHUNKSERVERS=3 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	MASTER_CUSTOM_GOALS="1 default: _ _|2 tapegoal: _ _ _@" \
 	setup_local_empty_saunafs info
 

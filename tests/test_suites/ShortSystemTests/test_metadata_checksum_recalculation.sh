@@ -7,7 +7,7 @@ master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=DEBUG"
 
 CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="$master_cfg" \
 	DEBUG_LOG_FAIL_ON="master.fs.checksum.mismatch" \
 	setup_local_empty_saunafs info

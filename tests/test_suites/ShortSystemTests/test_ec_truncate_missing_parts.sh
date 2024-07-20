@@ -7,7 +7,7 @@ CHUNKSERVERS=10 \
 	`|12 ec41: \$ec(4,1)`
 	`|13 ec71: \$ec(7,1)`
 	`|14 ec91: \$ec(9,1)" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

@@ -6,7 +6,7 @@
 #
 CHUNKSERVERS=1 \
 	MOUNTS=2 \
-	MOUNT_EXTRA_CONFIG="sfsdirentrycacheto=2" \
+	MOUNT_EXTRA_CONFIG="mfsdirentrycacheto=2" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

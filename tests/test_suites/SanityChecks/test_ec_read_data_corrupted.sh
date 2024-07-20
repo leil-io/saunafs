@@ -2,7 +2,7 @@ timeout_set 45 seconds
 
 CHUNKSERVERS=4 \
 	DISK_PER_CHUNKSERVER=1 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

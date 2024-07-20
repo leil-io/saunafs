@@ -25,7 +25,7 @@ timeout_set 10 minutes
 assert_program_installed socat
 CHUNKSERVERS=4 \
 	MOUNTS=10 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

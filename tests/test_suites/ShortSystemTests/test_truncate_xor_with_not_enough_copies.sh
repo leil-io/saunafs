@@ -1,6 +1,6 @@
 CHUNKSERVERS=4 \
 	MASTER_EXTRA_CONFIG="OPERATIONS_DELAY_INIT = 100000" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER,sfsioretries=3" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER,mfsioretries=3" \
 	MASTER_CUSTOM_GOALS="10 ec31: \$ec(3,1)" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info

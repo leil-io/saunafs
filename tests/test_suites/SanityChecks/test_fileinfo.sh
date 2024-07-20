@@ -33,9 +33,8 @@ awkscript='
 	next
 }
 '
-
 CHUNKSERVERS=5 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	CHUNKSERVER_EXTRA_CONFIG="CREATE_NEW_CHUNKS_IN_MOOSEFS_FORMAT=0" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
@@ -46,7 +45,11 @@ files=()
 for goal in 1 2 3 xor2 xor3 ec32; do
 	file="file_goal_$goal"
 	touch "$file"
+	set -x
+	saunafs getgoal "$file"
 	saunafs setgoal "$goal" "$file"
+	ls -l 
+	set +x
 	dd if=/dev/zero of="$file" bs=1MiB count=5 seek=62 conv=notrunc
 	truncate -s 100M "$file" # Increases version of the second chunk
 	files+=("$file")

@@ -600,11 +600,11 @@ add_chunkserver_() {
 create_sfsmount_cfg_() {
 	local this_mount_cfg_variable="MOUNT_${1}_EXTRA_CONFIG"
 	local this_mount_exports_variable="MOUNT_${1}_EXTRA_EXPORTS"
-	echo "sfsmaster=$ip_address"
-	echo "sfsport=${saunafs_info_[matocl]}"
+	echo "mfsmaster=$ip_address"
+	echo "mfsport=${saunafs_info_[matocl]}"
 	if [[ ${!this_mount_exports_variable-} ]]; then
 		# we want custom exports options, so we need to identify with a password
-		echo "sfspassword=${1}"
+		echo "mfspassword=${1}"
 	fi
 	echo "${MOUNT_EXTRA_CONFIG-}" | tr '|' '\n'
 	echo "${!this_mount_cfg_variable-}" | tr '|' '\n'

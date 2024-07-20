@@ -1,6 +1,6 @@
 USE_RAMDISK="YES" \
 	MASTER_EXTRA_CONFIG="MAGIC_DEBUG_LOG=${TEMP_DIR}/reloads|LOG_FLUSH_ON=DEBUG" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 count_accesses() {

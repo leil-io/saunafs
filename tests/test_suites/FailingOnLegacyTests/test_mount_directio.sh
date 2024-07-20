@@ -6,8 +6,8 @@
 #
 MOUNTS=2 \
   USE_RAMDISK=YES \
-  MOUNT_0_EXTRA_CONFIG="sfsdirectio=0" \
-  MOUNT_1_EXTRA_CONFIG="sfsdirectio=1" \
+  MOUNT_0_EXTRA_CONFIG="mfsdirectio=0" \
+  MOUNT_1_EXTRA_CONFIG="mfsdirectio=1" \
   setup_local_empty_saunafs info
 
 expect_equals "false" "$(cat ${info[mount0]}/.saunafs_tweaks | grep -i directio | awk '{print $2}')"

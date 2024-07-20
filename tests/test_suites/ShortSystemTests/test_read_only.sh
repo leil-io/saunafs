@@ -4,7 +4,7 @@ assert_program_installed attr
 MOUNTS=2 \
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
-	MOUNT_1_EXTRA_EXPORTS="ro,sfscachemode=NEVER" \
+	MOUNT_1_EXTRA_EXPORTS="ro,mfscachemode=NEVER" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
 	setup_local_empty_saunafs info
 

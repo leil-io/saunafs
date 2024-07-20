@@ -5,7 +5,7 @@ MASTERSERVERS=$metaservers_nr \
 	USE_RAMDISK="YES" \
 	CHUNKSERVER_EXTRA_CONFIG="MASTER_RECONNECTION_DELAY = 1" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 # Start shadow masters

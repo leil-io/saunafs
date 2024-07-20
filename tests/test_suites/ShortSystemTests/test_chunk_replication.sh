@@ -16,7 +16,7 @@ get_list_of_chunks() {
 timeout_set "$test_timeout"
 CHUNKSERVERS=$number_of_chunkservers \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1`
 			`|CHUNKS_LOOP_MAX_CPU = 90`
 			`|CHUNKS_WRITE_REP_LIMIT = 10`

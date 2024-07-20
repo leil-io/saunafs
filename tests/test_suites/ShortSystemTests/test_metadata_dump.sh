@@ -6,7 +6,7 @@ master_extra_config+="|BACK_META_KEEP_PREVIOUS = 5"
 
 CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|enablefilelocks=1" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER|enablefilelocks=1" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
 	MASTER_EXTRA_CONFIG=$master_extra_config \
 	setup_local_empty_saunafs info

@@ -1,7 +1,7 @@
 CHUNKSERVERS=4 \
 	CHUNKSERVER_LABELS="0:cs0|1:cs1|2:cs2|3:cs3" \
 	MASTER_EXTRA_CONFIG="OPERATIONS_DELAY_INIT = 100000" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 
@@ -25,7 +25,7 @@ expect_awk_finds_no 'NF != 10' "$cslist"
 
 # There should be four entries: four connected servers
 expect_equals 4 $(wc -l <<< "$cslist")
-expect_equals 4 $(awk -v version="$SAUNAFS_VERSION" '$2 == version' <<< "$cslist" | wc -l)
+expect_equals 4 $(awk -v version="3.13.0" '$2 == version' <<< "$cslist" | wc -l)
 expect_equals "cs0 cs1 cs2 cs3" "$(awk '{print $10}' <<< "$cslist" | sort | xargs echo)"
 
 # Turn off one chunkserver and see what saunafs-admin prints now
@@ -38,7 +38,7 @@ expect_awk_finds_no 'NF != 10' "$cslist"
 # There should be four entries: one disconnected server and three still connected
 expect_equals 4 $(wc -l <<< "$cslist")
 expect_equals 1 $(awk '$2 == "-"' <<< "$cslist" | wc -l)
-expect_equals 3 $(awk -v version="$SAUNAFS_VERSION" '$2 == version' <<< "$cslist" | wc -l)
+expect_equals 3 $(awk -v version="3.13.0" '$2 == version' <<< "$cslist" | wc -l)
 expect_equals "- cs1 cs2 cs3" "$(awk '{print $10}' <<< "$cslist" | sort | xargs echo)"
 
 # We might have lost 1 or 2 chunks, so there should be 5 or 6 left

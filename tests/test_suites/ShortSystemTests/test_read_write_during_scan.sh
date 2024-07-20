@@ -6,7 +6,7 @@ USE_RAMDISK=YES \
 	MOUNTS=1
 	CHUNKSERVERS=3 \
 	DISK_PER_CHUNKSERVER=3 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|direct_io|DirectIO"
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER|direct_io|DirectIO"
 	setup_local_empty_saunafs info
 
 # Create a directory with many files on mountpoint

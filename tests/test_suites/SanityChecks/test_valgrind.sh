@@ -5,7 +5,7 @@ number_of_mounts=2
 CHUNKSERVERS=1 \
 	MOUNTS=${number_of_mounts} \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 mnt0dir1="${info[mount0]}/dir1"

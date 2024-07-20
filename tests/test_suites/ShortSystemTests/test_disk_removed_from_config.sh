@@ -3,7 +3,7 @@ timeout_set 1 minutes
 USE_RAMDISK=YES \
 	CHUNKSERVERS=1 \
 	DISK_PER_CHUNKSERVER=3 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 firstDisk=$(head -1 "${info[chunkserver0_hdd]}")

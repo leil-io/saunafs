@@ -6,7 +6,7 @@ CHUNKSERVERS=0 \
 	MASTERSERVERS=2 \
 	USE_RAMDISK="YES" \
 	MASTER_EXTRA_CONFIG="${master_cfg}" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	AUTO_SHADOW_MASTER="YES" \
 	setup_local_empty_saunafs info
 

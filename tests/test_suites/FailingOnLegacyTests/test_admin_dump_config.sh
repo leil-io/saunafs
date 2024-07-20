@@ -3,7 +3,7 @@ chunkservers=5
 mounts=4
 # Values to search for
 master_config_value="NO_ATIME = 0"
-mount_config_value=sfscachemode=NEVER
+mount_config_value=mfscachemode=NEVER
 chunk_config_value="READ_AHEAD_KB = 1024"
 metalogger_config_value="BACK_LOGS = 50"
 

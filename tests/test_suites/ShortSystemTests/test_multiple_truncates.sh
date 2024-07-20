@@ -1,7 +1,7 @@
 timeout_set 3 minutes
 CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"

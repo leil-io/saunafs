@@ -3,7 +3,7 @@ USE_RAMDISK=YES \
 	CHUNKSERVERS=9 \
 	CHUNKSERVER_LABELS="0,1,2:sr1|3,4,5:sr2|6,7,8:sr3" \
 	MASTER_CUSTOM_GOALS="10 three_serverrooms: sr1 sr2 sr3" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 # Create many files, each should have at least one copy in each server room

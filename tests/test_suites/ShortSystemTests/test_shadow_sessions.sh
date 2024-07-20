@@ -5,7 +5,7 @@ MOUNTS=2 \
 	MASTERSERVERS=2 \
 	CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	MOUNT_0_EXTRA_EXPORTS="ro,allcanchangequota" \
 	MOUNT_1_EXTRA_EXPORTS="rw,alldirs,allcanchangequota,maxtrashtime=1234567,mapall=saunafstest_6:saunafstest_4" \
 	setup_local_empty_saunafs info

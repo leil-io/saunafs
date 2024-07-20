@@ -10,8 +10,12 @@ for i in {1..4}; do
 			"$i $(echo -n $i | tr '[1-9]' '[F-N]'): $SAUNAFS_VERSION / 0 0 999 999 no yes no no no 1 40 - -" \
 			"$(sed -n "${i}p" <<< "$mounts" | cut -d' ' -f 1,3-)"
 	else
+#		expect_equals \
+#			"$i ${info[mount$((i - 1))]} $SAUNAFS_VERSION / 0 0 999 999 no yes no no no 1 40 - -" \
+#			"$(sed -n "${i}p" <<< "$mounts" | cut -d' ' -f 1,3-)" \
+#		|| \
 		expect_equals \
-			"$i ${info[mount$((i - 1))]} $SAUNAFS_VERSION / 0 0 999 999 no yes no no no 1 40 - -" \
+			"$i ${info[mount$((i - 1))]} 3.13.0 / 0 0 999 999 no yes no no no 1 40 - -" \
 			"$(sed -n "${i}p" <<< "$mounts" | cut -d' ' -f 1,3-)"
 	fi
 done

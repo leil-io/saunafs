@@ -3,7 +3,7 @@ timeout_set 2 minutes
 USE_RAMDISK=YES \
 	CHUNKSERVERS=5 \
 	MASTER_EXTRA_CONFIG="REDUNDANCY_LEVEL = 4" \
-	MOUNT_EXTRA_CONFIG="sfsioretries=3"
+	MOUNT_EXTRA_CONFIG="mfsioretries=3"
 	setup_local_empty_saunafs info
 
 saunafs_chunkserver_daemon 0 stop

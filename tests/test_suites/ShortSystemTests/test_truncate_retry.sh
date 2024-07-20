@@ -3,7 +3,7 @@ timeout_set '45 seconds'
 # 6 retries means the truncate can wait up to 12.6s (0.2 + 0.4 + 0.8 + 1.6 + 3.2 + 6.4)
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|sfsioretries=6" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER|mfsioretries=6" \
 	setup_local_empty_saunafs info
 
 cd ${info[mount0]}

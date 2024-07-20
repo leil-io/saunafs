@@ -2,7 +2,7 @@ CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
 	MOUNTS=5 \
 	CHUNKSERVER_EXTRA_CONFIG="MASTER_TIMEOUT = 2" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|sfschunkserverwriteto=500" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER|mfschunkserverwriteto=500" \
 	setup_local_empty_saunafs info
 
 # Create 5 files containing some garbage

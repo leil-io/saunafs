@@ -3,7 +3,7 @@ timeout_set 1 minute
 percent=63
 cache=149 # megabytes
 CHUNKSERVERS=1 \
-	MOUNT_EXTRA_CONFIG="sfscacheperinodepercentage=$percent | sfswritecachesize=$cache" \
+	MOUNT_EXTRA_CONFIG="mfscacheperinodepercentage=$percent | mfswritecachesize=$cache" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

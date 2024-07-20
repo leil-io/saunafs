@@ -1,7 +1,7 @@
 CHUNKSERVERS=2 \
 	CHUNKSERVER_LABELS="0:A" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	MASTER_CUSTOM_GOALS="5 AA: A A|6 A_: A _|7 A__: A _ _|8 BB: B B|`
 			`9 B_: B _|10 BB_: B B _|11 AB: A B|12 AB_: A B _|`
 			`13 AA_: A A _|14 B__: B _ _" \

@@ -1,7 +1,7 @@
 CHUNKSERVERS=4 \
 	USE_RAMDISK=YES \
 	MOUNTS=2 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 # This test uses 2 mounts. We will use mount 0 to write files and mount 1 to query

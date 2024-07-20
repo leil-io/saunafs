@@ -23,7 +23,7 @@ CHUNKSERVERS=15 \
 			`|ACCEPTABLE_DIFFERENCE = 10.0`
 			`|DISABLE_CHUNKS_DEL = 1" \
 	MASTER_CUSTOM_GOALS="5 ec4_1: \$ec(4,1)|6 ec5_4: \$ec(5,4)" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

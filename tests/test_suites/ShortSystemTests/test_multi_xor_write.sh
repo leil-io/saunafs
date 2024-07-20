@@ -22,7 +22,7 @@ CHUNKSERVERS=8 \
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|ACCEPTABLE_DIFFERENCE = 10.0`
 			`|DISABLE_CHUNKS_DEL = 1" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 

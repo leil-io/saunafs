@@ -3,8 +3,8 @@ MOUNTS=2 \
 	CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
 	SFSEXPORTS_META_EXTRA_OPTIONS="nonrootmeta" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
-	MOUNT_1_EXTRA_CONFIG="sfsmeta" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
+	MOUNT_1_EXTRA_CONFIG="mfsmeta" \
 	setup_local_empty_saunafs info
 
 stat_basic_info() {

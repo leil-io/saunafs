@@ -3,7 +3,7 @@ timeout_set 3 minutes
 CHUNKSERVERS=1 \
 	MOUNTS=2 \
 	USE_RAMDISK="YES" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota,ignoregid" \
 	MASTER_EXTRA_CONFIG="METADATA_DUMP_PERIOD_SECONDS = 0|AUTO_RECOVERY = 1" \
 	setup_local_empty_saunafs info
@@ -12,7 +12,7 @@ CHUNKSERVERS=1 \
 mkdir -p "${info[mount0]}/some/subfolder"
 chmod 1777 "${info[mount0]}/some/subfolder"
 saunafs_mount_unmount 1
-echo "sfssubfolder=some/subfolder" >> "${info[mount1_cfg]}"
+echo "mfssubfolder=some/subfolder" >> "${info[mount1_cfg]}"
 saunafs_mount_start 1
 
 # Remember version of the metadata file. We expect it not to change when generating data.

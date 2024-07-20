@@ -1,7 +1,7 @@
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
 	AUTO_SHADOW_MASTER="NO" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	MOUNT_EXTRA_CONFIG="mfscachemode=NEVER" \
 	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
