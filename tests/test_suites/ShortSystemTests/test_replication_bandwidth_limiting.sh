@@ -26,14 +26,14 @@ file_size_kb=$((5 * 1024)) # test assumes that this is less or equal to chunk si
 chunks_count=11
 FILE_SIZE=${file_size_kb}K file-generate $(seq 1 $chunks_count)
 
-assert_equals $chunks_count $(find_chunkserver_metadata_chunks 0 | wc -l)
+assert_equals $chunks_count $(find_chunkserver_chunks 0 | wc -l)
 
 health_ok=$(chunks_health)
 saunafs_chunkserver_daemon 0 stop
 
-find_chunkserver_metadata_chunks 0 | xargs -d'\n' rm -f
-assert_equals 0 $(find_chunkserver_metadata_chunks 0 | wc -l)
-assert_equals $chunks_count $(find_chunkserver_metadata_chunks 1 | wc -l)
+find_chunkserver_chunks 0 | xargs -d'\n' rm -f
+assert_equals 0 $(find_chunkserver_chunks 0 | wc -l)
+assert_equals $chunks_count $(find_chunkserver_chunks 1 | wc -l)
 
 saunafs_chunkserver_daemon 0 start
 

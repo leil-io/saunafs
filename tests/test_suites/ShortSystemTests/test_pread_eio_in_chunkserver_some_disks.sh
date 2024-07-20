@@ -37,8 +37,8 @@ chunks=$(saunafs_admin_master_no_password info | awk '{print $13}')
 assert_equals 60 $chunks
 assert_equals 90 $(saunafs_admin_master_no_password info | awk '{print $14}')
 
-assert_less_than 30 "$(find_chunkserver_metadata_chunks 0 | wc -l)"
-assert_less_than 30 "$(find_chunkserver_metadata_chunks 1 | wc -l)"
+assert_less_than 30 "$(find_chunkserver_chunks 0 | wc -l)"
+assert_less_than 30 "$(find_chunkserver_chunks 1 | wc -l)"
 
 # Restart the first chunkserver preloading pread with EIO-throwing version
 LD_PRELOAD="${SAUNAFS_INSTALL_FULL_LIBDIR}/libchunk_operations_eio.so" \
@@ -61,7 +61,7 @@ assert_equals 6 "$(wc -l <<< "$list")"
 assert_awk_finds_no '(/EIO/ && $4 != "yes") || (!/EIO/ && $4 == "yes")' "$list"
 
 # Remove files with goal 1 and all their chunks
-for file in $(find_chunkserver_metadata_chunks 0 | grep -v EIO); do
+for file in $(find_chunkserver_chunks 0 | grep -v EIO); do
 	chunkid=$(cut -d'/' -f6 <<< "$file" | cut -d'_' -f2)
 	if saunafs fileinfo goal1/* | grep "$chunkid"; then
 		rm $file
@@ -70,4 +70,4 @@ done
 rm -r goal1
 
 # Verify if all chunks will be eventually replicated to the working disk on CS0
-assert_eventually_prints 30 'find_chunkserver_metadata_chunks 0 | grep -v EIO | wc -l'
+assert_eventually_prints 30 'find_chunkserver_chunks 0 | grep -v EIO | wc -l'

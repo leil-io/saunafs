@@ -17,11 +17,11 @@ cd ${info[mount0]}
 mkdir dir
 saunafs setgoal 2 dir
 echo 'aaaaaaaa' > dir/file
-assert_equals 1 $(find_chunkserver_metadata_chunks 0 | wc -l)
-assert_equals 1 $(find_chunkserver_metadata_chunks 1 | wc -l)
+assert_equals 1 $(find_chunkserver_chunks 0 | wc -l)
+assert_equals 1 $(find_chunkserver_chunks 1 | wc -l)
 
 # Remove chunk from chunkserver 0
-chunk=$(find_chunkserver_metadata_chunks 0 -name "chunk_0000000000000001_00000001.???")
+chunk=$(find_chunkserver_chunks 0 -name "chunk_0000000000000001_00000001.???")
 assert_success rm "$chunk"
 
 # Truncate file (this will generate INCVERSION change) and remember the metadata

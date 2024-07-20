@@ -24,7 +24,7 @@ FILE_SIZE=1K file-generate "${info[mount0]}"/file{1..20}
 assert_equals 20 $(saunafs checkfile "${info[mount0]}"/* | grep 'with 2 copies: *1' | wc -l)
 
 # Stop the chunkserver labeled "ssd" and expect all files to have a chunk in only one copy.
-assert_equals 20 $(find_chunkserver_metadata_chunks 0 | wc -l)
+assert_equals 20 $(find_chunkserver_chunks 0 | wc -l)
 saunafs_chunkserver_daemon 0 stop
 saunafs_wait_for_ready_chunkservers 1
 assert_equals 20 $(saunafs checkfile "${info[mount0]}"/* | grep 'with 1 copy: *1' | wc -l)
@@ -35,18 +35,18 @@ saunafs_wait_for_ready_chunkservers 2
 assert_eventually_prints 20 'saunafs checkfile "${info[mount0]}"/* | grep "with 2 copies: *1" | wc -l'
 
 # Remove all chunks from the chunkserver "ssd" and bring it back to life.
-find_chunkserver_metadata_chunks 0 | xargs -d'\n' rm -f
-assert_equals 0 $(find_chunkserver_metadata_chunks 0 | wc -l)
+find_chunkserver_chunks 0 | xargs -d'\n' rm -f
+assert_equals 0 $(find_chunkserver_chunks 0 | wc -l)
 saunafs_chunkserver_daemon 0 start
 saunafs_wait_for_ready_chunkservers 3
 
 # Expect one copy of each chunk to migrate to the "ssd" server.
-assert_eventually_prints 20 'find_chunkserver_metadata_chunks 0 | wc -l'
+assert_eventually_prints 20 'find_chunkserver_chunks 0 | wc -l'
 
 # No chunks should be deleted until we have two "ssd" servers. So let's add one.
-assert_eventually_prints 60 'find_all_metadata_chunks | wc -l'
+assert_eventually_prints 60 'find_all_chunks | wc -l'
 saunafs_chunkserver_daemon 1 start
 saunafs_wait_for_ready_chunkservers 4
-assert_eventually_prints 20 'find_chunkserver_metadata_chunks 1 | wc -l'
-assert_eventually_prints 20 'find_chunkserver_metadata_chunks 0 | wc -l'
-assert_eventually_prints 40 'find_all_metadata_chunks | wc -l'
+assert_eventually_prints 20 'find_chunkserver_chunks 1 | wc -l'
+assert_eventually_prints 20 'find_chunkserver_chunks 0 | wc -l'
+assert_eventually_prints 40 'find_all_chunks | wc -l'

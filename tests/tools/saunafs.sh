@@ -785,8 +785,8 @@ get_data_path() {
 # print absolute paths of all chunk files on selected server, one per line
 find_chunkserver_chunks() {
 	local chunkserver_number=$1
-	local chunk_metadata_pattern="chunk*${chunk_metadata_extension}"
-	local chunk_data_pattern="chunk*${chunk_data_extension}"
+	local chunk_metadata_pattern="chunk_*"
+	local chunk_data_pattern="chunk_*lkjlkjlkjlkj"
 	shift
 	local hdds=$(sed -e 's/*//' -e 's/zonefs://' -e 's/|//' \
 		${saunafs_info_[chunkserver${chunkserver_number}_hdd]})
@@ -827,11 +827,12 @@ find_all_chunks() {
 
 # print absolute paths of all metadata chunk files on all servers used in test, one per line
 find_all_metadata_chunks() {
-	local count=${saunafs_info_[chunkserver_count]}
-	local chunkserver
-	for ((chunkserver = 0; chunkserver < count; ++chunkserver)); do
-		find_chunkserver_metadata_chunks $chunkserver "$@"
-	done
+#	local count=${saunafs_info_[chunkserver_count]}
+#	local chunkserver
+#	for ((chunkserver = 0; chunkserver < count; ++chunkserver)); do
+#		find_chunkserver_metadata_chunks $chunkserver "$@"
+#	done
+find_all_chunks "$@"
 }
 
 # A useful shortcut for saunafs-admin

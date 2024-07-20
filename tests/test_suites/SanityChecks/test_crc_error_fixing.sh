@@ -22,7 +22,7 @@ FILE_SIZE=1234567 file-generate file
 assert_equals 4 $(saunafs fileinfo file | grep -c copy)
 
 # Locate part 1 of its chunk and remember correct content of the area to be damaged
-chunk=$(find_all_chunks -name "*xor_1_*.dat")
+chunk=$(find_all_chunks -name "*xor_1_*")
 assert_equals 1 $(wc -l <<< "$chunk")
 correct_data=$(get_damaged_area "$chunk")
 

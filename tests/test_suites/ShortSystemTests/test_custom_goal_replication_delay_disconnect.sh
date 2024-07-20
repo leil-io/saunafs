@@ -43,7 +43,7 @@ saunafs_chunkserver_daemon 1 start
 saunafs_wait_for_ready_chunkservers 3
 
 # Replication should start immediately
-assert_eventually_prints 20 'find_chunkserver_metadata_chunks 1 | wc -l' "4 seconds"
+assert_eventually_prints 20 'find_chunkserver_chunks 1 | wc -l' "4 seconds"
 
 # Replication loop is no longer atomic, so we need some time to ensure
 # that chunk loop tested all chunks.

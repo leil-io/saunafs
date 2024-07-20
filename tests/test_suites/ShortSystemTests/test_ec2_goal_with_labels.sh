@@ -7,14 +7,14 @@ timeout_set 2 minutes
 # '6 ec2' -- 6 ec2 chunks (each is different)
 chunks_state() {
 	{
-		find_all_metadata_chunks | grep -o chunk_.* | grep -o chunk_00000 | sed -e 's/.*/standard/'
-		find_all_metadata_chunks | grep -o chunk_.* | sort -u | grep -o '_of_[2-9]_1' | sed -e 's/_of_/ec2_/'
+		find_all_chunks | grep -o chunk_.* | grep -o chunk_00000 | sed -e 's/.*/standard/'
+		find_all_chunks | grep -o chunk_.* | sort -u | grep -o '_of_[2-9]_1' | sed -e 's/_of_/ec2_/'
 	} | sort | uniq -c | tr '\n' ' ' | trim_hard
 }
 
 count_chunks_on_chunkservers() {
 	for i in $@; do
-		find_chunkserver_metadata_chunks $i
+		find_chunkserver_chunks $i
 	done | wc -l
 }
 

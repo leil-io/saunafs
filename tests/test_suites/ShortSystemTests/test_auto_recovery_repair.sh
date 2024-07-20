@@ -15,13 +15,13 @@ FILE_SIZE=$(( 4 * SAUNAFS_CHUNK_SIZE )) file-generate dir/file
 
 wait_if_windows
 
-assert_equals 4 $(find_chunkserver_metadata_chunks 0 | wc -l)
-assert_equals 4 $(find_chunkserver_metadata_chunks 1 | wc -l)
-assert_equals 4 $(find_chunkserver_metadata_chunks 2 | wc -l)
+assert_equals 4 $(find_chunkserver_chunks 0 | wc -l)
+assert_equals 4 $(find_chunkserver_chunks 1 | wc -l)
+assert_equals 4 $(find_chunkserver_chunks 2 | wc -l)
 
 # Stop chunkserver0, and remove third chunk from it.
 saunafs_chunkserver_daemon 0 stop
-chunk=$(find_chunkserver_metadata_chunks 0 -name "chunk_0000000000000003_00000001.???")
+chunk=$(find_chunkserver_chunks 0 -name "chunk_0000000000000003_00000001.???")
 assert_success rm "$chunk"
 
 # Update first and second chunk of the file, this will change it's version to 2 on CS 1 and 2.
@@ -30,14 +30,14 @@ dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 wait_if_windows
 
 for chunk in 1 2; do
-	assert_equals 1 $(find_chunkserver_metadata_chunks 0 -name "chunk_000000000000000${chunk}_00000001.???" | wc -l)
-	assert_equals 1 $(find_chunkserver_metadata_chunks 1 -name "chunk_000000000000000${chunk}_00000002.???" | wc -l)
-	assert_equals 1 $(find_chunkserver_metadata_chunks 2 -name "chunk_000000000000000${chunk}_00000002.???" | wc -l)
+	assert_equals 1 $(find_chunkserver_chunks 0 -name "chunk_000000000000000${chunk}_00000001.???" | wc -l)
+	assert_equals 1 $(find_chunkserver_chunks 1 -name "chunk_000000000000000${chunk}_00000002.???" | wc -l)
+	assert_equals 1 $(find_chunkserver_chunks 2 -name "chunk_000000000000000${chunk}_00000002.???" | wc -l)
 done
 
 # Stop chunkserver 1 and remove third chunk from it.
 saunafs_chunkserver_daemon 1 stop
-chunk=$(find_chunkserver_metadata_chunks 1 -name "chunk_0000000000000003_00000001.???")
+chunk=$(find_chunkserver_chunks 1 -name "chunk_0000000000000003_00000001.???")
 assert_success rm "$chunk"
 
 # Update first and second chunk of the file, this will change it's version to 3 on CS 2.
@@ -46,13 +46,13 @@ dd if=/dev/zero of=dir/file conv=notrunc bs=32KiB count=$((2*1024 + 10))
 wait_if_windows
 
 for chunk in 1 2; do
-	assert_equals 1 $(find_chunkserver_metadata_chunks 0 -name "chunk_000000000000000${chunk}_00000001.???" | wc -l)
-	assert_equals 1 $(find_chunkserver_metadata_chunks 1 -name "chunk_000000000000000${chunk}_00000002.???" | wc -l)
-	assert_equals 1 $(find_chunkserver_metadata_chunks 2 -name "chunk_000000000000000${chunk}_00000003.???" | wc -l)
+	assert_equals 1 $(find_chunkserver_chunks 0 -name "chunk_000000000000000${chunk}_00000001.???" | wc -l)
+	assert_equals 1 $(find_chunkserver_chunks 1 -name "chunk_000000000000000${chunk}_00000002.???" | wc -l)
+	assert_equals 1 $(find_chunkserver_chunks 2 -name "chunk_000000000000000${chunk}_00000003.???" | wc -l)
 done
 
 # Remove second chunk from chunkserver 1.
-chunk=$(find_chunkserver_metadata_chunks 1 -name "chunk_0000000000000002_00000002.???")
+chunk=$(find_chunkserver_chunks 1 -name "chunk_0000000000000002_00000002.???")
 assert_success rm "$chunk"
 
 # Stop chunkserver 2, turn on chunkservers 0 and 1 again. File should have three chunks lost.
