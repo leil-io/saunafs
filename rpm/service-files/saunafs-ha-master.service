@@ -1,6 +1,6 @@
 [Unit]
 Description=SaunaFS master server daemon
-After=syslog.target network.target
+After=syslog.target network-online.target network.target
 PartOf=saunafs-uraft.service
 
 [Service]
