@@ -253,20 +253,19 @@ class judy_map {
 	              "judy_map doesn't support types with size larger than size of Word_t");
 
 public:
-	typedef T1 key_type;
-	typedef T2 mapped_type;
-	typedef std::pair<key_type, mapped_type> value_type;
+	using key_type = T1;
+	using mapped_type = T2;
+	using value_type = std::pair<key_type, mapped_type>;
 
-	typedef detail::judy_pair<T1, T2> reference;
-	typedef detail::judy_pair<T1, const T2> const_reference;
+	using reference = detail::judy_pair<T1, T2>;
+	using const_reference = detail::judy_pair<T1, const T2>;
 
-	typedef Word_t index_type;
-	typedef Word_t size_type;
+	using index_type = Word_t;
+	using size_type = Word_t;
 
-	typedef detail::judy_iterator<T1, T2, false> iterator;
-	typedef detail::judy_iterator<T1, T2, true> const_iterator;
+	using iterator = detail::judy_iterator<T1, T2, false>;
+	using const_iterator = detail::judy_iterator<T1, T2, true>;
 
-public:
 	judy_map() : data_() {
 	}
 

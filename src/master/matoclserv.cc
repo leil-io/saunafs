@@ -121,12 +121,6 @@ typedef struct chunklist {
 	struct chunklist *next;
 } chunklist;
 
-// opened files
-typedef struct filelist {
-	uint32_t inode;
-	struct filelist *next;
-} filelist;
-
 struct session {
 	typedef GenericLruCache<uint32_t, FsContext::GroupsContainer, 1024> GroupCache;
 
@@ -1965,17 +1959,13 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 		i++;
 	}
 
-	while (inode>0) {
+	while (length != 0) {
 		if (fs_acquire(context, inode, eptr->sesdata->sessionid) == SAUNAFS_STATUS_OK) {
 			openFiles.push_back(inode);
 			i++;
 		}
-		if (length) {
-			length--;
-			inode = get32bit(&ptr);
-		} else {
-			inode=0;
-		}
+		length--;
+		inode = get32bit(&ptr);
 	}
 
 	openFiles.erase(i, openFiles.end());

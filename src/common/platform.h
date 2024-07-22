@@ -73,7 +73,7 @@ inline unsigned long long stoull(const std::string& s, std::size_t* pos = 0, int
 #endif /* #ifndef SAUNAFS_HAVE_STD_STOULL */
 
 #if defined(SAUNAFS_HAVE_JUDY) && (__WORDSIZE == 64 || _WIN64 || __x86_64__)
-#  define SAUNAFS_HAVE_64BIT_JUDY
+#  undef SAUNAFS_HAVE_64BIT_JUDY
 #endif
 
 // thread_local hack for old GCC
