@@ -83,6 +83,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfschunkservertotalreadto=%d", chunkservertotalreadto, 0),
 	SFS_OPT("cacheexpirationtime=%d", cacheexpirationtime, 0),
 	SFS_OPT("readaheadmaxwindowsize=%d", readaheadmaxwindowsize, 4096),
+	SFS_OPT("readcachemaxsize=%d", readcachemaxsize, 16384),
 	SFS_OPT("readworkers=%d", readworkers, 1),
 	SFS_OPT("maxreadaheadrequests=%d", maxreadaheadrequests, 0),
 	SFS_OPT("sfsprefetchxorstripes", prefetchxorstripes, 1),
@@ -154,6 +155,8 @@ void usage(const char *progname) {
 				"of a xor chunk\n"
 "    -o bandwidthoveruse=N       define ratio of allowed bandwidth overuse "
 				"when fetching data (default: %.2f)\n"
+"    -o readcachemaxsize=MB      define the maximum cache memory size "
+				"for reading operations in mebibytes (default: %u)\n"
 "\n"
 "Write related options:\n"
 "    -o sfschunkserverwriteto=MSEC  set chunkserver response timeout during "
@@ -239,6 +242,7 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultChunkserverReadTo,
 		SaunaClient::FsInitParams::kDefaultChunkserverTotalReadTo,
 		SaunaClient::FsInitParams::kDefaultBandwidthOveruse,
+		SaunaClient::FsInitParams::kDefaultReadCacheMaxSize,
 		SaunaClient::FsInitParams::kDefaultChunkserverWriteTo,
 		SaunaClient::FsInitParams::kDefaultWriteCacheSize,
 		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,

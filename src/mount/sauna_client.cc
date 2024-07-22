@@ -3490,6 +3490,7 @@ void fs_init(FsInitParams &params) {
 			params.total_read_timeout_ms,
 			params.cache_expiration_time_ms,
 			params.readahead_max_window_size_kB,
+			params.read_cache_max_size_mB,
 			params.read_workers,
 			params.max_readahead_requests,
 			params.prefetch_xor_stripes,
