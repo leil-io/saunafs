@@ -1,7 +1,7 @@
 [Unit]
 Description=SaunaFS uraft high availability daemon
 Requires=saunafs-ha-master.service
-After=network.target
+After=network-online.target network.target
 After=saunafs-ha-master.service
 
 [Service]
