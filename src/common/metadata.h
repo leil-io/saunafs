@@ -31,6 +31,7 @@
 
 extern const char kMetadataFilename[];
 extern const char kMetadataTmpFilename[];
+extern const char kMetadataLegacyFilename[];
 extern const char kMetadataMlFilename[];
 extern const char kMetadataMlTmpFilename[];
 extern const char kMetadataEmergencyFilename[];

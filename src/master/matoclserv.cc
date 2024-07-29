@@ -674,6 +674,7 @@ void matoclserv_store_sessions() {
 	}
 }
 
+#define MFSSIGNATURE "MFS"
 int matoclserv_load_sessions() {
 	session *asesdata;
 	uint32_t ileng;
@@ -700,19 +701,23 @@ int matoclserv_load_sessions() {
 		fclose(fd);
 		return -1;
 	}
-	if (memcmp(hdr,SFSSIGNATURE "S 1.5",8)==0) {
+	if (memcmp(hdr, SFSSIGNATURE "S 1.5", 8) == 0 ||
+	    memcmp(hdr, MFSSIGNATURE "S 1.5", 8) == 0) {
 		mapalldata = 0;
 		goaltrashdata = 0;
 		statsinfile = 16;
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\001",8)==0) {
+	} else if (memcmp(hdr, SFSSIGNATURE "S \001\006\001", 8) == 0 ||
+	           memcmp(hdr, MFSSIGNATURE "S \001\006\001", 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		statsinfile = 16;
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\002",8)==0) {
+	} else if (memcmp(hdr, SFSSIGNATURE "S \001\006\002", 8) == 0 ||
+	           memcmp(hdr, MFSSIGNATURE "S \001\006\002", 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		statsinfile = 21;
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\003",8)==0) {
+	} else if (memcmp(hdr, SFSSIGNATURE "S \001\006\003", 8) == 0 ||
+	           memcmp(hdr, MFSSIGNATURE "S \001\006\003", 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 0;
 		if (fread(hdr,2,1,fd)!=1) {
@@ -722,7 +727,8 @@ int matoclserv_load_sessions() {
 		}
 		ptr = hdr;
 		statsinfile = get16bit(&ptr);
-	} else if (memcmp(hdr,SFSSIGNATURE "S \001\006\004",8)==0) {
+	} else if (memcmp(hdr, SFSSIGNATURE "S \001\006\004", 8) == 0 ||
+	           memcmp(hdr, MFSSIGNATURE "S \001\006\004", 8) == 0) {
 		mapalldata = 1;
 		goaltrashdata = 1;
 		if (fread(hdr,2,1,fd)!=1) {
@@ -815,6 +821,7 @@ int matoclserv_load_sessions() {
 	fclose(fd);
 	return 1;
 }
+#undef MFSSIGNATURE
 
 int matoclserv_insert_openfile(session* cr,uint32_t inode) {
 	filelist *ofptr,**ofpptr;
