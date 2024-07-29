@@ -233,6 +233,7 @@ uint8_t get_session_flags() { return session_flags; }
 bool isMasterDisconnected() { return gIsDisconnectedFromMaster.load(); }
 
 #define LOCAL_USERS_THRESHOLD 0x30000
+#define IIS_USER 17
 static int32_t mounting_uid = USE_LOCAL_ID;
 static int32_t mounting_gid = USE_LOCAL_ID;
 uint32_t winfsp_uid = 0;
@@ -242,13 +243,13 @@ std::mutex winfsp_context_mutex;
 void update_last_winfsp_context(const uint32_t uid, const uint32_t gid) {
 	std::lock_guard<std::mutex> winfsp_context_lock(winfsp_context_mutex);
 
-	if (uid > LOCAL_USERS_THRESHOLD) {
+	if (uid > LOCAL_USERS_THRESHOLD || uid == IIS_USER) {
 		if (debug_mode && winfsp_uid != uid) {
 			safs::log_debug("set WinFSP user id to {}", uid);
 		}
 		winfsp_uid = uid;
 	}
-	if (gid > LOCAL_USERS_THRESHOLD) {
+	if (gid > LOCAL_USERS_THRESHOLD || gid == IIS_USER) {
 		if (debug_mode && winfsp_gid != gid) {
 			safs::log_debug("set WinFSP group id to {}", uid);
 		}
@@ -267,12 +268,12 @@ void convert_winfsp_context_to_master_context(uint32_t &uid, uint32_t &gid) {
 }
 
 void patch_uid_gid_fields(stat32 &st) {
-	if (((st.st_uid ==
-	      (mounting_uid == USE_LOCAL_ID ? winfsp_uid : mounting_uid)) ||
-	     (st.st_mode & S_IWOTH) ||
-	     (st.st_gid ==
-	          (mounting_gid == USE_LOCAL_ID ? winfsp_gid : mounting_gid) &&
-	      (st.st_mode & S_IWGRP)))) {
+	if ((st.st_uid ==
+	     (mounting_uid == USE_LOCAL_ID ? winfsp_uid : mounting_uid)) ||
+	    (st.st_mode & S_IWOTH) ||
+	    (st.st_gid ==
+	         (mounting_gid == USE_LOCAL_ID ? winfsp_gid : mounting_gid) &&
+	     (st.st_mode & S_IWGRP))) {
 		st.st_uid = winfsp_uid;
 		st.st_gid = winfsp_gid;
 	}
