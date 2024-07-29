@@ -1011,8 +1011,11 @@ static const std::vector<MetadataSection> kMetadataSections = {
 bool isEndOfMetadata(const uint8_t *sectionPtr) {
 	static constexpr std::string_view kMetadataTrailer("[" SFSSIGNATURE
 	                                                   " EOF MARKER]");
-	return memcmp(sectionPtr, kMetadataTrailer.data(),
-	              ::kMetadataSectionHeaderSize) == kOpSuccess;
+	static constexpr std::string_view kMetadataLegacyTrailer("[MFS EOF MARKER]");
+	return ((memcmp(sectionPtr, kMetadataTrailer.data(),
+	              ::kMetadataSectionHeaderSize) == kOpSuccess) ||
+	        (memcmp(sectionPtr, kMetadataLegacyTrailer.data(),
+	              ::kMetadataSectionHeaderSize) == kOpSuccess));
 }
 
 
@@ -1329,6 +1332,7 @@ bool isNewMetadataFile([[maybe_unused]]const uint8_t *headerPtr) {
 bool checkMetadataSignature(const std::shared_ptr<MemoryMappedFile> &metadataFile) {
 	static constexpr std::string_view kMetadataHeaderNewV2_9(SFSSIGNATURE "M 2.9");
 	static constexpr std::string_view kMetadataHeaderOldV2_9(SAUSIGNATURE "M 2.9");
+	static constexpr std::string_view kMetadataHeaderLegacy("LIZM 2.9");
 	static constexpr uint8_t kMetadataHeaderSize = 8;
 	size_t kMetadataHeaderOffset{0};
 	uint8_t *headerPtr;
@@ -1343,7 +1347,8 @@ bool checkMetadataSignature(const std::shared_ptr<MemoryMappedFile> &metadataFil
 		return false;
 	}
 	if ((memcmp(headerPtr, kMetadataHeaderNewV2_9.data(), kMetadataHeaderSize) != kOpSuccess) &&
-	    (memcmp(headerPtr, kMetadataHeaderOldV2_9.data(), kMetadataHeaderSize) != kOpSuccess)) {
+	    (memcmp(headerPtr, kMetadataHeaderOldV2_9.data(), kMetadataHeaderSize) != kOpSuccess) &&
+	    (memcmp(headerPtr, kMetadataHeaderLegacy.data(), kMetadataHeaderSize) != kOpSuccess)) {
 		throw MetadataConsistencyException("wrong metadata header version");
 	}
 	return true;
