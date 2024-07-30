@@ -29,6 +29,7 @@
 #include "admin/list_chunkservers_command.h"
 #include "admin/list_defective_files_command.h"
 #include "admin/list_disks_command.h"
+#include "admin/list_disk_groups_command.h"
 #include "admin/list_goals_command.h"
 #include "admin/list_metadataservers_command.h"
 #include "admin/list_mounts_command.h"
@@ -58,6 +59,7 @@ int main(int argc, const char** argv) {
 			new ListChunkserversCommand(),
 			new ListDefectiveFilesCommand(),
 			new ListDisksCommand(),
+			new ListDiskGroupsCommand(),
 			new ListGoalsCommand(),
 			new ListMountsCommand(),
 			new ListMetadataserversCommand(),

@@ -69,4 +69,8 @@ public:
 	/// Update the space usage of the disks.
 	/// No need to update the space usage here for this implementation.
 	void updateSpaceUsage() override {};
+
+	/// Gets the disk groups information.
+	/// Not supported by the default disk manager.
+	std::string getDiskGroupsInfo() override { return "Not supported"; }
 };
