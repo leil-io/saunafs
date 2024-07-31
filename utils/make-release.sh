@@ -40,7 +40,7 @@ create_release_branch() {
 }
 
 get_changelog() {
-	git log "${1}..${2}" --oneline --pretty='format:%h %s'
+	git log "${1}..${2}" --oneline --no-merges --pretty='format:%h %s'
 }
 
 get_latest_version_from_tags() {
@@ -78,7 +78,7 @@ get_changes_type() {
 				;;
 		esac
 
-		if git log "${commit} "-1 --pretty='%b' | tr '\n' ' ' | grep -q 'BREAKING CHANGE: '; then
+		if git log "${commit}" -1 --pretty='%b' | tr '\n' ' ' | grep -q 'BREAKING CHANGE: '; then
 			isMajor=1
 			break
 		fi
