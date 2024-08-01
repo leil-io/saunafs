@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -226,6 +227,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	int mounting_uid;
 	int mounting_gid;
+	std::unordered_set<uint32_t> allowed_users;
 #endif
 
 	bool ignore_flush;
