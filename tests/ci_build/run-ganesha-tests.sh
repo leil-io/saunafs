@@ -27,4 +27,5 @@ echo ": \${SAUNAFS_ROOT:=${SAUNAFS_ROOT}}" | sudo tee -a /etc/saunafs_tests.conf
 sudo ln -sf ${SAUNAFS_ROOT}/lib/ganesha/libfsalsaunafs.so /usr/lib/ganesha/libfsalsaunafs.so
 sudo mkdir -p /usr/lib/x86_64-linux-gnu/ganesha
 sudo ln -sf ${SAUNAFS_ROOT}/lib/ganesha/libfsalsaunafs.so /usr/lib/x86_64-linux-gnu/ganesha/libfsalsaunafs.so
-sudo "${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes --gtest_filter="${test_filter}" --gtest_output=xml:"${TEST_OUTPUT_DIR}/ganesha_test_results.xml"
+export SFS_TEST_WORKSPACE="${WORKSPACE}"
+sudo --preserve-env=SFS_TEST_WORKSPACE "${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes --gtest_filter="${test_filter}" --gtest_output=xml:"${TEST_OUTPUT_DIR}/ganesha_test_results.xml"

@@ -74,8 +74,13 @@ const ::testing::Environment* gBashEnvironment = ::testing::AddGlobalTestEnviron
 class BashTestingSuite : public testing::Test {
 protected:
 	void run_test_case(std::string suite, std::string testCase) {
-		std::string runScript = TO_STRING(TEST_DATA_PATH) "/run-test.sh";
-		std::string testFile = TO_STRING(TEST_DATA_PATH) "/test_suites/" + suite + "/" + testCase + ".sh";
+		std::string testDataPath = TO_STRING(TEST_DATA_PATH);
+		std::string workspace = std::getenv("SFS_TEST_WORKSPACE");
+		if (!workspace.empty()) {
+			testDataPath = workspace + "/tests";
+		}
+		std::string runScript = testDataPath + "/run-test.sh";
+		std::string testFile = testDataPath + "/test_suites/" + suite + "/" + testCase + ".sh";
 		std::string errorFile = testErrFilePath();
 		std::string environment = "ERROR_FILE=" + errorFile;
 		environment += " TEST_SUITE_NAME=" + suite;
