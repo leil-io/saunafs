@@ -22,14 +22,14 @@ print_missing_config() {
 
 load_config() {
 	log_info "Loading config"
-	if [ -f ${SAUNAFS_MASTER_CONFIG} ] ; then
+	if [ -f ${SAUNAFS_MASTER_CONFIG} ]; then
 		. <(sed "s/\ *=\ */=/g" ${SAUNAFS_MASTER_CONFIG} | grep "ADMIN_PASSWORD")
 		. <(sed "s/\ *=\ */=/g" ${SAUNAFS_MASTER_CONFIG} | grep "DATA_PATH")
 	else
 		print_missing_config ${SAUNAFS_MASTER_CONFIG} "@MASTER_EXAMPLES_SUBDIR@/sfsmaster.cfg"
 	fi
 
-	if [ -f ${SAUNAFS_URAFT_CONFIG} ] ; then
+	if [ -f ${SAUNAFS_URAFT_CONFIG} ]; then
 		. <(sed "s/\ *=\ */=/g" ${SAUNAFS_URAFT_CONFIG})
 	else
 		print_missing_config ${SAUNAFS_URAFT_CONFIG} "@URAFT_EXAMPLES_SUBDIR@/sauanfs_uraft.cfg"
@@ -56,13 +56,13 @@ load_config() {
 
 	SAUNAFS_DATA_DIR=${DATA_PATH:="@DATA_PATH@"}
 
-	if [[ $ipaddr == "" || $netmask == "" || $iface == "" ]] ; then
+	if [[ $ipaddr == "" || $netmask == "" || $iface == "" ]]; then
 		log_err "Configuration file ${SAUNAFS_URAFT_CONFIG} does not contain valid network information."
 		log_info "See example @URAFT_EXAMPLES_SUBDIR@/saunafs-uraft.cfg file for reference."
 		exit ${SAUNAFS_URAFT_ERROR}
 	fi
 
-	if [[ ! ${ADMIN_PASSWORD} ]] ; then
+	if [[ ! ${ADMIN_PASSWORD} ]]; then
 		log_err "SaunaFS admin password must be set in order to authenticate to master server."
 		log_info "See example @SFSMASTER_EXAMPLES_SUBDIR@/sfsmaster.cfg file for reference."
 		exit ${SAUNAFS_URAFT_ERROR}
@@ -71,45 +71,45 @@ load_config() {
 }
 
 log_info() {
-    if [[ $SAUNAFS_LOG_LEVEL = "warning" || $SAUNAFS_LOG_LEVEL = "warn" || $SAUNAFS_LOG_LEVEL == "err" || $SAUNAFS_LOG_LEVEL == "error" ]]; then
-        return
-    fi
+	if [[ $SAUNAFS_LOG_LEVEL = "warning" || $SAUNAFS_LOG_LEVEL = "warn" || $SAUNAFS_LOG_LEVEL == "err" || $SAUNAFS_LOG_LEVEL == "error" ]]; then
+		return
+	fi
 	logger
-        --priority user.info \
-        --stderr \
-        --tag saunafs-uraft-helper \
-        -- "${@}"
+	--priority user.info \
+		--stderr \
+		--tag saunafs-uraft-helper \
+		-- "${@}"
 }
 
 log_warn() {
-    if [[ $SAUNAFS_LOG_LEVEL = "err" || $SAUNAFS_LOG_LEVEL = "error" ]]; then
-        return
-    fi
+	if [[ $SAUNAFS_LOG_LEVEL = "err" || $SAUNAFS_LOG_LEVEL = "error" ]]; then
+		return
+	fi
 	logger
-        --priority user.warning \
-        --stderr \
-        --tag saunafs-uraft-helper \
-        -- "${@}"
+	--priority user.warning \
+		--stderr \
+		--tag saunafs-uraft-helper \
+		-- "${@}"
 }
 
 log_err() {
 	logger
-        --priority user.err \
-        --stderr \
-        --tag saunafs-uraft-helper \
-        -- "${@}"
+	--priority user.err \
+		--stderr \
+		--tag saunafs-uraft-helper \
+		-- "${@}"
 }
 
 log_debug() {
-    # Check for trace log level instead of debug
-    if [[ $SAUNAFS_LOG_LEVEL != "trace" ]]; then
-        return
-    fi
+	# Check for trace log level instead of debug
+	if [[ $SAUNAFS_LOG_LEVEL != "trace" ]]; then
+		return
+	fi
 	logger
-        --priority user.debug \
-        --stderr \
-        --tag saunafs-uraft-helper \
-        -- "${@}"
+	--priority user.debug \
+		--stderr \
+		--tag saunafs-uraft-helper \
+		-- "${@}"
 }
 
 saunafs_master() {
@@ -117,26 +117,26 @@ saunafs_master() {
 }
 
 saunafs_admin() {
-    log_debug "Running saunafs-admin with command: saunafs-admin ${*}"
+	log_debug "Running saunafs-admin with command: saunafs-admin ${*}"
 	saunafs-admin "$@"
 }
 
 get_metadata_version_from_file() {
-    log_info "Getting metadata version from ${SAUNAFS_DATA_DIR}/metadata.sfs file"
-	local version=$(@SBIN_PATH@/sfsmetarestore -g -d "${SAUNAFS_DATA_DIR}" | grep -v warn 2> /dev/null)
+	log_info "Getting metadata version from ${SAUNAFS_DATA_DIR}/metadata.sfs file"
+	local version=$(@SBIN_PATH@/sfsmetarestore -g -d "${SAUNAFS_DATA_DIR}" | grep -v warn 2>/dev/null)
 	if [[ $? == 0 && ${version} =~ ^[0-9]+$ ]]; then
-        log_info "Metadata version: ${version}"
+		log_info "Metadata version: ${version}"
 		echo -n "${version}"
 	else
-        log_warn "Could not get metadata version, or metadata is 0"
+		log_warn "Could not get metadata version, or metadata is 0"
 		echo -n 0
 	fi
 }
 
 saunafs_promote() {
-    log_info "Promoting this node to master"
-	saunafs_metadata_version 2> /dev/null
-	if [[ ${metadata_location} == "disk" ]] ; then
+	log_info "Promoting this node to master"
+	saunafs_metadata_version 2>/dev/null
+	if [[ ${metadata_location} == "disk" ]]; then
 		log_info "Metadata is on disk instead of RAM"
 		saunafs_master stop
 		unlink "${METADATA_LOCK}"
@@ -146,11 +146,11 @@ saunafs_promote() {
 			exit ${SAUNAFS_URAFT_ERROR}
 		fi
 	else
-		echo -n "${ADMIN_PASSWORD}" | \
+		echo -n "${ADMIN_PASSWORD}" |
 			saunafs_admin promote-shadow "${matocl_host}" ${matocl_port}
 	fi
 	saunafs_assign_ip
-    log_info "Node successfully promoted to master"
+	log_info "Node successfully promoted to master"
 }
 
 saunafs_demote() {
@@ -158,28 +158,28 @@ saunafs_demote() {
 	saunafs_drop_ip
 	# restart shadow
 	saunafs_master -o initial-personality=shadow restart
-    log_info "Node successfully demoted to shadow"
+	log_info "Node successfully demoted to shadow"
 }
 
 saunafs_quick_stop() {
-    log_warn "Stopping node without saving metadata"
-    load_config
-	echo -n "${ADMIN_PASSWORD}" | \
-			saunafs_admin stop-master-without-saving-metadata "${matocl_host}" ${matocl_port}
-}
+	log_warn "Stopping node without saving metadata"
+	load_config
+	echo -n "${ADMIN_PASSWORD}" |
+		saunafs_admin stop-master-without-saving-metadata "${matocl_host}" ${matocl_port}
+	}
 
 saunafs_metadata_version() {
 	# metadata-version can take arguments or read config file
-	if [[ $# == 3 ]] ; then
+	if [[ $# == 3 ]]; then
 		matocl_host=${2}
 		matocl_port=${3}
 	else
-        log_info "Reading config file to get node host and client port"
+		log_info "Reading config file to get node host and client port"
 		load_config
 	fi
-    log_info "Reading metadata version from host: ${matocl_host}:${matocl_port}"
+	log_info "Reading metadata version from host: ${matocl_host}:${matocl_port}"
 	local admin_result=$(saunafs_admin metadataserver-status --porcelain "${matocl_host}" "$matocl_port")
-	if [[ $? != 0 ]] ; then
+	if [[ $? != 0 ]]; then
 		log_err "Failed to query SaunaFS master status from saunafs-admin"
 		return $SAUNAFS_URAFT_ERROR
 	fi
@@ -189,14 +189,14 @@ saunafs_metadata_version() {
 	case "${personality}/${connection}" in
 		master/running)
 			metadata_location="ram"
-            log_info "Metadata version in RAM: ${metadata_version_in_ram}"
+			log_info "Metadata version in RAM: ${metadata_version_in_ram}"
 			echo -n ${metadata_version_in_ram}
 			return ${SAUNAFS_URAFT_OK}
-		;;
-		shadow/connected|shadow/disconnected)
-			if (( metadata_version_in_ram > 0 )) ; then
+			;;
+		shadow/connected | shadow/disconnected)
+			if ((metadata_version_in_ram > 0)); then
 				metadata_location="ram"
-                log_info "Metadata version in RAM: ${metadata_version_in_ram}"
+				log_info "Metadata version in RAM: ${metadata_version_in_ram}"
 				echo -n ${metadata_version_in_ram}
 				return ${SAUNAFS_URAFT_OK}
 			else
@@ -204,15 +204,15 @@ saunafs_metadata_version() {
 				# Failing to read version from file results in metadata version 0,
 				# which means that no metadata is available.
 				metadata_location="disk"
-                log_info "Metadata version on disk: ${metadata_version_on_disk}"
+				log_info "Metadata version on disk: ${metadata_version_on_disk}"
 				echo -n ${metadata_version_on_disk}
 				return ${SAUNAFS_URAFT_OK}
 			fi
-		;;
+			;;
 		*)
 			log_warn "Unexpected output from saunafs-admin: ${admin_result}"
 			return ${SAUNAFS_URAFT_OK}
-		;;
+			;;
 	esac
 }
 
@@ -242,7 +242,7 @@ saunafs_is_floating_ip_present() {
 
 saunafs_isalive() {
 	saunafs_master isalive
-	if [[ $? == 0 ]] ; then
+	if [[ $? == 0 ]]; then
 		echo -n alive
 	else
 		echo -n dead
@@ -299,5 +299,4 @@ case "$1" in
 	dead)              saunafs_dead;;
 	is-floating-ip-alive) saunafs_is_floating_ip_present;;
 	*)                 print_help;;
-
 esac
