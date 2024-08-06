@@ -521,14 +521,9 @@ int masterconn_initconnect(masterconn *eptr) {
 		}
 		eptr->bindip = bip;
 		if (tcpresolve(MasterHost,MasterPort,&mip,&mport,0)>=0) {
-			if ((mip&0xFF000000)!=0x7F000000) {
 				eptr->masterip = mip;
 				eptr->masterport = mport;
 				eptr->masteraddrvalid = 1;
-			} else {
-				safs_pretty_syslog(LOG_WARNING,"master connection module: localhost (%u.%u.%u.%u) can't be used for connecting with master (use ip address of network controller)",(mip>>24)&0xFF,(mip>>16)&0xFF,(mip>>8)&0xFF,mip&0xFF);
-				return -1;
-			}
 		} else {
 			safs_pretty_syslog(LOG_WARNING,"master connection module: can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
 			return -1;
@@ -804,14 +799,10 @@ void masterconn_reload(void) {
 			eptr->mode = KILL;
 		}
 		if (tcpresolve(MasterHost,MasterPort,&mip,&mport,0)>=0) {
-			if ((mip&0xFF000000)!=0x7F000000) {
-				if (eptr->masterip!=mip || eptr->masterport!=mport) {
-					eptr->masterip = mip;
-					eptr->masterport = mport;
-					eptr->mode = KILL;
-				}
-			} else {
-				safs_pretty_syslog(LOG_WARNING,"master connection module: localhost (%u.%u.%u.%u) can't be used for connecting with master (use ip address of network controller)",(mip>>24)&0xFF,(mip>>16)&0xFF,(mip>>8)&0xFF,mip&0xFF);
+			if (eptr->masterip != mip || eptr->masterport != mport) {
+				eptr->masterip = mip;
+				eptr->masterport = mport;
+				eptr->mode = KILL;
 			}
 		} else {
 			safs_pretty_syslog(LOG_WARNING,"master connection module: can't resolve master host/port (%s:%s)",MasterHost,MasterPort);

@@ -19,10 +19,14 @@
  */
 
 #include "common/platform.h"
+
 #include "common/cfg.h"
 
-#include <map>
 #include <cinttypes>
+#include <cmath>
+#include <cstdint>
+#include <map>
+#include <unordered_map>
 #include <yaml-cpp/yaml.h>
 
 #include "common/massert.h"
@@ -179,6 +183,82 @@ std::string cfg_yaml_list(std::string service_name,
 	start_yaml_emitter(service_name, config);
 	cfg_emitter_add_parameters(config, services, true);
 	return end_yaml_emitter(config);
+}
+
+std::string trimSpaces(const std::string& str)
+{
+    auto start = str.begin();
+    while (start != str.end() && (std::isspace(*start) != 0)) {
+        start++;
+    }
+
+    auto end = str.rbegin();
+    while (end != str.rend() && (std::isspace(*end) != 0)) {
+        end++;
+    }
+
+    return std::string(start, end.base());
+}
+
+int64_t cfg_parse_size(const std::string &str) {
+	static const std::unordered_map<std::string, double> units{
+	    {"b", 1.0},
+	    // base 10
+	    {"k", 1e3},
+	    {"kb", 1e3},
+	    {"m", 1e6},
+	    {"mb", 1e6},
+	    {"g", 1e9},
+	    {"gb", 1e9},
+	    {"t", 1e12},
+	    {"tb", 1e12},
+	    {"p", 1e15},
+	    {"pb", 1e15},
+	    {"e", 1e18},
+	    {"eb", 1e18},
+	    // base 2
+	    {"ki", 1024.0},
+	    {"kib", 1024.0},
+	    {"mi", 1048576.0},
+	    {"mib", 1048576.0},
+	    {"gi", 1073741824.0},
+	    {"gib", 1073741824.0},
+	    {"ti", 1099511627776.0},
+	    {"tib", 1099511627776.0},
+	    {"pi", 1125899906842624.0},
+	    {"pib", 1125899906842624.0},
+	    {"ei", 1152921504606846976.0},
+	    {"eib", 1152921504606846976.0}};
+
+	static constexpr double kMaxValue = 18446744073709551615.0;
+
+	auto cleanStr = trimSpaces(str);
+	size_t numberEndPosition = 0;
+	double value = kInvalidConversion;
+
+	try {
+		value = std::stod(cleanStr, &numberEndPosition);
+	} catch (const std::invalid_argument &e) { return kInvalidConversion; }
+
+	if (numberEndPosition < cleanStr.size()) {
+		// Remove leading and trailing spaces
+		std::string unit = trimSpaces(cleanStr.substr(numberEndPosition));
+
+		// Convert to lowercase to be case-insensitive
+		std::transform(
+		    unit.begin(), unit.end(), unit.begin(),
+		    [](unsigned char character) { return std::tolower(character); });
+
+		if (units.contains(unit)) {
+			value *= units.at(unit);
+		} else {
+			return kInvalidConversion;
+		}
+	}
+
+	if (value > kMaxValue) { return kInvalidConversion; }
+
+	return static_cast<int64_t>(std::round(value));
 }
 
 #define STR_TO_int(x) return strtol(x,NULL,0)

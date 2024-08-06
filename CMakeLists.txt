@@ -48,6 +48,7 @@ option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                     
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
 option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                         ON)
 option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"             ON)
+option(ENABLE_PROMETHEUS        "Enable prometheus metrics"                              ON)
 
 # If enabled (default), the file compile_commands.json is generated in the build
 # directory. Tools like clangd and vscode use this file for proper analysis.
@@ -188,7 +189,7 @@ endif()
 project(saunafs)
 
 if(NOT PACKAGE_VERSION)
-  set(DEFAULT_MIN_VERSION "4.3.0")
+  set(DEFAULT_MIN_VERSION "4.4.0")
   execute_process(COMMAND "git" "rev-parse" "--short" "HEAD"
     OUTPUT_VARIABLE GIT_SHA1_SHORT RESULT_VARIABLE GIT_SHA1_SHORT_RETURN_VALUE
     OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -332,6 +333,15 @@ set(CHARTS_CSV_CHARTID_BASE 90000)
 # Internal capability required by some FSALs
 set(GSH_CAN_HOST_LOCAL_FS ${ENABLE_NFS_GANESHA})
 
+if (ENABLE_PROMETHEUS AND NOT PROMETHEUS_CPP_ENABLE_PULL)
+    message(STATUS "Prometheus C++ Client Library: Enabled but not found")
+elseif(ENABLE_PROMETHEUS)
+    add_definitions(-DHAVE_PROMETHEUS)
+    message(STATUS "Prometheus C++ Client Library: Enabled")
+else()
+    message(STATUS "Prometheus C++ Client Library: Disabled")
+endif()
+
 # Create config.h file
 configure_file(config.h.in config.h)
 include_directories(${CMAKE_BINARY_DIR}) # Here we have generated config.h
@@ -363,6 +373,7 @@ add_subdirectory(external)
 add_subdirectory(src/admin)
 add_subdirectory(src/errors)
 add_subdirectory(src/slogger)
+add_subdirectory(src/metrics)
 add_subdirectory(src/common)
 add_subdirectory(src/protocol)
 add_subdirectory(src/mount)

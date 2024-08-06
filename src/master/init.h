@@ -20,8 +20,11 @@
 
 #include "common/platform.h"
 
+#include <sys/syslog.h>
 #include <vector>
 
+#include "common/cfg.h"
+#include "common/event_loop.h"
 #include "common/random.h"
 #include "common/run_tab.h"
 #include "master/chartsdata.h"
@@ -35,6 +38,19 @@
 #include "master/matomlserv.h"
 #include "master/personality.h"
 #include "master/topology.h"
+#include "metrics/metrics.h"
+
+inline int prometheus_init() {
+	if (cfg_getuint8("ENABLE_PROMETHEUS", 0) != 1) {
+		safs::log_info(
+		    "Prometheus disabled, no Prometheus metrics will be "
+		    "gathered");
+		return 0;
+	}
+	metrics::init(cfg_getstr("PROMETHEUS_HOST", "0.0.0.0:9499"));
+	eventloop_destructregister(metrics::destroy);
+	return 0;
+}
 
 /// Functions to call before normal startup
 inline const std::vector<RunTab> earlyRunTabs = {
@@ -42,6 +58,7 @@ inline const std::vector<RunTab> earlyRunTabs = {
 
 /// Functions to call during normal startup
 inline const std::vector<RunTab> runTabs = {
+    RunTab{prometheus_init, "prometheus module"},
     // has to be first
     RunTab{hstorage_init, "name storage"},
     // has to be second

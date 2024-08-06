@@ -3,10 +3,10 @@
 #include <sys/statvfs.h>
 
 #include "chunkserver-common/chunk_interface.h"
+#include "chunkserver-common/cmr_chunk.h"
 #include "chunkserver-common/global_shared_resources.h"
 #include "chunkserver-common/hdd_stats.h"
 #include "chunkserver-common/subfolder.h"
-#include "chunkserver/cmr_chunk.h"
 #include "common/crc.h"
 #include "errors/saunafs_error_codes.h"
 #include "devtools/TracePrinter.h"

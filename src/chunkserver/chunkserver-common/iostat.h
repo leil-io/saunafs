@@ -23,6 +23,8 @@
    (C) 1998-2016 by Sebastien GODARD (sysstat <at> orange.fr)
  */
 
+#pragma once
+
 #include "common/platform.h"
 
 #include <cassert>
