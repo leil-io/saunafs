@@ -1,3 +1,24 @@
+saunafs (4.4.0) stable; urgency=medium
+  * ci(.github): Add check for Conventional Commits (#131)
+  * feat(metrics): Add initial prometheus support (#98)
+  * fix(deploy): Allow to pass a file as an argument
+  * test: Remove Ganesha test for master failover
+  * tests: Add Ganesha test for master failover (#138)
+  * feat(chunkserver): Extend getDiskForNewChunk (#137)
+  * fix(build): Fix cmake syntax warning (#134)
+  * feat(tests): Allow custom sfshdd content in tests (#132)
+  * ci: Add prometheus dependencies
+  * feat(master): Allow localhost connections to master
+  * fix(mount): Fix help display format (#125)
+  * feat(chunkserver): Relocate hddDisksReinit (#130)
+  * feat(common): Improve the hddSizeParse function (#129)
+  * test: Add function to stop hanging ganesha daemon (#127)
+  * build(deps): Bump requests from 2.31.0 to 2.32.2 in /tests/dispatcher/client (#149)
+  * ci: Delegate tests to a separate job
+  * tidy(INSTALL.md): Remove links
+
+ -- SaunaFS Team <contact@saunafs.com>  Wed, 31 Jul 2024 16:34:07 +0000
+
 saunafs (4.3.0) stable; urgency=medium
   * cgi: Add png version of logo (#124)
   * tidy(tests): Disable test_chunk_rebalancing (#123)
