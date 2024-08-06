@@ -224,11 +224,5 @@ main() {
 main "${@}"
 
 # TODO: Create a PR to merge the release branch into the main branch
-# TODO: Add a script to react on the merge, and:
-# 1. git cherry-pick "${newVersionTag}" from dev
-# 2. git push origin dev (beware of the branch protection)
-# 3. create the release tag
-# 4. create the release
-# 4.1. Add the changelog to the release
-# 5. create the latest tag
-# 6. Use a GPT API to imrove the changelog
+# TODO: React on the merge status of the PR
+# TODO: Use a GPT API to improve the changelog
