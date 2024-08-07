@@ -178,7 +178,7 @@ if parse_true "${DOCKER_ENABLE_PULL_CACHE_IMAGE}"; then
 	build_extra_args+=(--cache-from "${DOCKER_INTERNAL_REGISTRY}/${DOCKER_IMAGE}:${latest_tag}")
 fi
 
-run docker buildx build --load --progress=plain \
+run docker buildx build --pull --load --progress=plain \
 	--build-arg GROUP_ID="${DOCKER_IMAGE_GROUP_ID}" \
 	--build-arg USER_ID="${DOCKER_IMAGE_USER_ID}" \
 	--build-arg USERNAME="${DOCKER_IMAGE_USERNAME}" \
