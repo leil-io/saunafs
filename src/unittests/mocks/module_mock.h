@@ -66,7 +66,7 @@ public:
 	bool waitForSignal(std::chrono::duration<Rep, Period> timeout);
 
 	/*
-	 * Starts a tread which manages the network communication with this mock
+	 * Starts a thread which manages the network communication with this mock
 	 */
 	void init();
 

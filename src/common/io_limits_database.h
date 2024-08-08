@@ -52,7 +52,7 @@ class IoLimitsDatabase {
 public:
 	typedef std::string GroupId;
 
-	// An exception that is thrown if a user requestes an assignment for a group
+	// An exception that is thrown if a user requests an assignment for a group
 	// that cannot be served
 	SAUNAFS_CREATE_EXCEPTION_CLASS_MSG(InvalidGroupIdException, Exception,
 			"invalid group id");

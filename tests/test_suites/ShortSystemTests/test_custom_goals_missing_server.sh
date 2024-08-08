@@ -27,7 +27,7 @@ for goal in g{2..3}_{1..8}; do
 	saunafs setgoal "$goal" "$file"
 	FILE_SIZE=1K file-generate "$file"
 
-	# Now verify if the file has exactly the requied number of copies of its chunk
+	# Now verify if the file has exactly the required number of copies of its chunk
 	fileinfo=$(saunafs fileinfo "$file")
 	expected_copies=${goal:1:1}
 	actual_copies=$(echo "$fileinfo" | grep copy | wc -l)
