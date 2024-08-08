@@ -60,7 +60,7 @@ struct SaunaFSModule SaunaFS = {
                  .acl_support = 0,
 #endif
                  .cansettime = true,
-                 .homogenous = true,
+                 .homogenous = true,  // pragma: codespell-ignore
                  .supported_attrs = SAUNAFS_SUPPORTED_ATTRS,
                  .maxread = (uint64_t)FSAL_MAXIOSIZE,
                  .maxwrite = (uint64_t)FSAL_MAXIOSIZE,
