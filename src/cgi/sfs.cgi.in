@@ -1214,7 +1214,7 @@ if "CH" in sectionset:
         out.append("""<br/>""")
         add_repl_del_state(out, "replicat", replication)
         out.append("""<br/>""")
-        add_repl_del_state(out, "delet", deletion)
+        add_repl_del_state(out, "delet", deletion)  # pragma: codespell-ignore
         print("\n".join(out))
     except Exception:
         print("""<table class="FR" cellspacing="0" summary="Exception">""")

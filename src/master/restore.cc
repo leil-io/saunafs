@@ -835,7 +835,7 @@ int restore_line(const char* filename, uint64_t lv, const char* line) {
 				status = do_append(filename,lv,ts,ptr+6);
 			} else if (strncmp(ptr,"ACQUIRE",7)==0) {
 				status = do_acquire(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"AQUIRE",6)==0) {
+			} else if (strncmp(ptr,"AQUIRE",6)==0) { // pragma: codespell-ignore
 				status = do_acquire(filename,lv,ts,ptr+6);
 			}
 			break;
