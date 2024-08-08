@@ -3,5 +3,5 @@
 skip = .git*,*.pdf,*.svg,*.css,.codespellrc,external
 check-hidden = true
 # Words with mixed casing
-ignore-regex = \b[A-Z]*[a-z]+[A-Z][A-Za-z]*\b
+ignore-regex = \b[A-Z]*[a-z]+[A-Z][A-Za-z]*\b|/mnt/[a-z0-9]+|.*\bcodespell-ignore\b.*
 ignore-words-list = oce,nd,inout,thid
