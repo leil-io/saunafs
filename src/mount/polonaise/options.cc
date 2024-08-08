@@ -127,7 +127,7 @@ void parse_command_line(int argc, char** argv, Setup& setup) {
 				"size of direntry cache in number of elements")
 			("entry-cache-timeout",
 				po::value<double>(&setup.entry_cache_timeout)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultEntryCacheTimeout),
-				"timeout for enty cache")
+				"timeout for entry cache")
 			("attr-cache-timeout",
 				po::value<double>(&setup.attr_cache_timeout)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultAttrCacheTimeout),
 				"timeout for attribute cache")
