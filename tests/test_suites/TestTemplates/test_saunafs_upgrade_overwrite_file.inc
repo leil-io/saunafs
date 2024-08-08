@@ -12,14 +12,11 @@ timeout_set 120 minutes
 # - SAFS_MOUNT_COMMAND_AFTER_UPGRADE (mount command to use after
 #                                     upgrade to current SaunaFS version was done)
 
-export SAFS_MOUNT_COMMAND="sfsmount"
-
 source test_utils/upgrade.sh
 
 CHUNKSERVERS=3
 START_WITH_LEGACY_SAUNAFS=YES \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
-	CHUNKSERVER_EXTRA_CONFIG="CREATE_NEW_CHUNKS_IN_LEGACY_FORMAT = $LEGACY_CHUNK_FORMAT" \
 	MASTER_EXTRA_CONFIG="CHUNKS_LOOP_MIN_TIME = 1|OPERATIONS_DELAY_INIT = 0" \
 	setup_local_empty_saunafs info
 
