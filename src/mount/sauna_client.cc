@@ -233,6 +233,7 @@ uint8_t get_session_flags() { return session_flags; }
 bool isMasterDisconnected() { return gIsDisconnectedFromMaster.load(); }
 
 #define LOCAL_USERS_THRESHOLD 0x30000
+std::unordered_set<uint32_t> allowed_users;
 static int32_t mounting_uid = USE_LOCAL_ID;
 static int32_t mounting_gid = USE_LOCAL_ID;
 uint32_t winfsp_uid = 0;
@@ -242,13 +243,13 @@ std::mutex winfsp_context_mutex;
 void update_last_winfsp_context(const uint32_t uid, const uint32_t gid) {
 	std::lock_guard<std::mutex> winfsp_context_lock(winfsp_context_mutex);
 
-	if (uid > LOCAL_USERS_THRESHOLD) {
+	if (uid > LOCAL_USERS_THRESHOLD || allowed_users.contains(uid)) {
 		if (debug_mode && winfsp_uid != uid) {
 			safs::log_debug("set WinFSP user id to {}", uid);
 		}
 		winfsp_uid = uid;
 	}
-	if (gid > LOCAL_USERS_THRESHOLD) {
+	if (gid > LOCAL_USERS_THRESHOLD || allowed_users.contains(gid)) {
 		if (debug_mode && winfsp_gid != gid) {
 			safs::log_debug("set WinFSP group id to {}", uid);
 		}
@@ -267,12 +268,12 @@ void convert_winfsp_context_to_master_context(uint32_t &uid, uint32_t &gid) {
 }
 
 void patch_uid_gid_fields(stat32 &st) {
-	if (((st.st_uid ==
-	      (mounting_uid == USE_LOCAL_ID ? winfsp_uid : mounting_uid)) ||
-	     (st.st_mode & S_IWOTH) ||
-	     (st.st_gid ==
-	          (mounting_gid == USE_LOCAL_ID ? winfsp_gid : mounting_gid) &&
-	      (st.st_mode & S_IWGRP)))) {
+	if ((st.st_uid ==
+	     (mounting_uid == USE_LOCAL_ID ? winfsp_uid : mounting_uid)) ||
+	    (st.st_mode & S_IWOTH) ||
+	    (st.st_gid ==
+	         (mounting_gid == USE_LOCAL_ID ? winfsp_gid : mounting_gid) &&
+	     (st.st_mode & S_IWGRP))) {
 		st.st_uid = winfsp_uid;
 		st.st_gid = winfsp_gid;
 	}
@@ -3391,13 +3392,14 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 		SugidClearMode sugid_clear_mode_, bool use_rwlock_,
 		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io
 #ifdef _WIN32
-		, int mounting_uid_, int mounting_gid_
+		, int mounting_uid_, int mounting_gid_, std::unordered_set<uint32_t> &allowed_users_
 #endif
 		, bool ignore_flush_
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
+	allowed_users = allowed_users_;
 #endif
 	ignore_flush = ignore_flush_;
 	debug_mode = debug_mode_;
@@ -3493,7 +3495,7 @@ void fs_init(FsInitParams &params) {
 		params.sugid_clear_mode, params.use_rw_lock,
 		params.acl_cache_timeout, params.acl_cache_size, params.direct_io
 #ifdef _WIN32
-		, params.mounting_uid, params.mounting_gid
+		, params.mounting_uid, params.mounting_gid, params.allowed_users
 #endif
 		, params.ignore_flush
 		);
