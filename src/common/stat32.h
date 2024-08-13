@@ -48,5 +48,6 @@ struct stat32 {
     uint32_t st_atime;
     uint32_t st_mtime;
     uint32_t st_ctime;
+    uint32_t st_birthtime;
 };
 #endif
