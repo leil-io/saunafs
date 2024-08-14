@@ -189,6 +189,12 @@ void hddSerializeAllDiskInfosV2(uint8_t *buff) {
 	gDisksMutex.unlock();  //Locked by hddGetSerializedSizeOfAllDiskInfosV2
 }
 
+std::string hddGetDiskGroups() {
+	TRACETHIS();
+
+	return gDiskManager->getDiskGroupsInfo();
+}
+
 void hddDiskInfoRotateStats() {
 	TRACETHIS();
 

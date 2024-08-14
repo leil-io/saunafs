@@ -887,6 +887,22 @@ void worker_hdd_list_v2(csserventry *eptr, const uint8_t *data,
 	hddSerializeAllDiskInfosV2(ptr); // unlock
 }
 
+void worker_list_disk_groups(csserventry *eptr,
+                             [[maybe_unused]] const uint8_t *data,
+                             [[maybe_unused]] uint32_t length) {
+	TRACETHIS();
+
+	std::string diskGroups = hddGetDiskGroups();
+
+	// 4 bytes for the size of the string + 1 byte for the null character
+	static constexpr uint8_t kSerializedSizePlusNullChar = 5;
+
+	uint8_t *ptr = worker_create_attached_packet(
+	    eptr, CSTOCL_ADMIN_LIST_DISK_GROUPS,
+	    diskGroups.size() + kSerializedSizePlusNullChar);
+	serialize(&ptr, diskGroups);
+}
+
 void worker_chart(csserventry *eptr, const uint8_t *data, uint32_t length) {
 	TRACETHIS();
 	uint32_t chartid;
@@ -1021,6 +1037,9 @@ void worker_gotpacket(csserventry *eptr, uint32_t type, const uint8_t *data, uin
 			break;
 		case CLTOCS_HDD_LIST_V2:
 			worker_hdd_list_v2(eptr, data, length);
+			break;
+		case CLTOCS_ADMIN_LIST_DISK_GROUPS:
+			worker_list_disk_groups(eptr, data, length);
 			break;
 		case CLTOAN_CHART:
 			worker_chart(eptr, data, length);

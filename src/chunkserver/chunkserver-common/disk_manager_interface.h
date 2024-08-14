@@ -57,4 +57,7 @@ public:
 
 	/// Update the space usage of the disks.
 	virtual void updateSpaceUsage() = 0;
+
+	/// Gets the disk groups information in YAML format
+	virtual std::string getDiskGroupsInfo() = 0;
 };
