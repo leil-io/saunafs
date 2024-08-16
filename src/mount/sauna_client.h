@@ -87,14 +87,13 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 	static constexpr bool     kDefaultIgnoreFlush = false;
 #ifdef _WIN32
-	static constexpr unsigned kDefaultWriteCacheSize = 50;
 	static constexpr unsigned kDefaultCleanAcquiredFilesPeriod = 0;
 	static constexpr unsigned kDefaultCleanAcquiredFilesTimeout = 0;
 	static constexpr int      kDefaultEnableStatusUpdaterThread = 0;
 	static constexpr bool     kDefaultIgnoreUtimensUpdate = false;
-#else
-	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
+	static constexpr unsigned kDefaultWriteCacheSize = 128;
+
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
 	static constexpr unsigned kDefaultWriteWorkers = 10;
 	static constexpr unsigned kDefaultWriteWindowSize = 15;
