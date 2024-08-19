@@ -56,11 +56,24 @@ unwrap_generators() {
 stop_ganesha() {
 	# umount all hanging SaunaFS mounts
 	for mount in $(mount | grep /tmp/SaunaFS | awk '{print $3}'); do
-		sudo umount -l $mount
+		sudo umount -l $mount || echo "Failed to umount $mount"
 	done
 
-	# kill ganesha daemon
-	sudo pkill -9 ganesha.nfsd
+	# Check if ganesha daemon is running and kill it
+	if pgrep ganesha.nfsd > /dev/null; then
+		sudo pkill -9 ganesha.nfsd
+		sleep 0.5
+	fi
+
+	# Check if ganesha daemon is still running
+	if pgrep ganesha.nfsd > /dev/null; then
+		# Start a new ganesha daemon to remove the hanging one
+		sudo /usr/bin/ganesha.nfsd -L /var/log/ganesha.log
+		sleep 2
+
+		# Kill the newly started ganesha daemon to avoid conflicts with tests
+		sudo pkill -9 ganesha.nfsd
+	fi
 }
 
 stop_tests() {
