@@ -1,0 +1,80 @@
+name: Build and run tests
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  build:
+    name: Build 24.04 image on Ubuntu
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and export
+        uses: docker/build-push-action@v6
+        with:
+          file: tests/sfstests/Dockerfile.ci
+          tags: saunafs-test:latest
+          outputs: type=docker,dest=/tmp/saunafs-test.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: saunafs-test
+          path: /tmp/saunafs-test.tar
+
+  run-tests:
+      # ubuntu-24.04 is 4 cores
+      runs-on: ubuntu-24.04
+      needs: build
+      steps:
+        - uses: actions/checkout@v3
+        - name: Download artifact
+          uses: actions/download-artifact@v4
+          with:
+            name: saunafs-test
+            path: /tmp
+
+        - name: Load image
+          working-directory: ./tests/sfstests
+          run: |
+            docker load --input /tmp/saunafs-test.tar
+
+        - name: Setup go toolchain
+          uses: actions/setup-go@v5
+          with:
+            go-version: '>=1.22.2'
+
+        - name: Build sfstests
+          working-directory: ./tests/sfstests
+          run: |
+              go install
+
+        - name: Run Sanity checks
+          run: |
+              sfstests --workers 3 --delete  # Leave one core for OS
+
+        - name: Run short tests
+          run: |
+              sfstests --workers 3 --suite ShortSystemTests --delete
+
+        # - name: Run long tests
+        #   run: |
+        #       sfstests --suite LongSystemTests --workers 8 --delete
+
+        # - name: Run build tests
+        #   run: |
+        #       sfstests --suite BuildTests --workers 1 --multiplier 2 --delete
+
+        # - name: Run brute force chunk tests
+        #   run: |
+        #       sfstests --suite BruteForceChunks --workers 14 --delete
+
+        # - name: Run Read/Write faulty chunkserver tests
+        #   run: |
+        #       sfstests --suite WriteReadFaultyChunkservers --workers 3 --delete
