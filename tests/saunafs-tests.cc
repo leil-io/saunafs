@@ -75,9 +75,9 @@ class BashTestingSuite : public testing::Test {
 protected:
 	void run_test_case(std::string suite, std::string testCase) {
 		std::string testDataPath = TO_STRING(TEST_DATA_PATH);
-		std::string workspace = std::getenv("SFS_TEST_WORKSPACE");
-		if (!workspace.empty()) {
-			testDataPath = workspace + "/tests";
+		char* workspace = std::getenv("SFS_TEST_WORKSPACE");
+		if (workspace != nullptr) {
+			testDataPath = std::string(workspace) + "/tests";
 		}
 		std::string runScript = testDataPath + "/run-test.sh";
 		std::string testFile = testDataPath + "/test_suites/" + suite + "/" + testCase + ".sh";
