@@ -304,3 +304,31 @@ IDisk *DefaultDiskManager::getDiskForNewChunk(
 
 	return bestDisk;
 }
+
+IDisk *DefaultDiskManager::getDiskForGC() {
+	TRACETHIS();
+	IDisk *bestDisk = DiskNotFound;
+
+	std::lock_guard disksLockGuard(gDisksMutex);
+
+	if (gDisks.empty()) {
+		return DiskNotFound;
+	}
+
+	auto diskCount = gDisks.size();
+
+	for (size_t i = 0; i < diskCount; ++i) {
+		size_t index = (nextDiskIndexForGC_ + i) % diskCount;
+		const auto &disk = gDisks[index];
+
+		if (!disk->isZonedDevice() || !disk->isSelectableForNewChunk()) {
+			continue;
+		}
+
+		bestDisk = disk.get();
+		nextDiskIndexForGC_ = (index + 1) % diskCount;
+		break;
+	}
+
+	return bestDisk;
+}

@@ -73,4 +73,11 @@ public:
 	/// Gets the disk groups information.
 	/// Not supported by the default disk manager.
 	std::string getDiskGroupsInfo() override { return "Not supported"; }
+
+	/// Selects the disk to use for GC.
+	IDisk *getDiskForGC() override;
+
+private:
+	/// Next disk index for GC. Helps in the round-robin strategy.
+	uint32_t nextDiskIndexForGC_ = 0;
 };

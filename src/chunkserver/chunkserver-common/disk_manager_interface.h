@@ -60,4 +60,8 @@ public:
 
 	/// Gets the disk groups information in YAML format
 	virtual std::string getDiskGroupsInfo() = 0;
+
+	/// Selects the disk to use for Garbage Collection (GC).
+	/// Could return DiskNotFound if the disks does not need GC.
+	virtual IDisk *getDiskForGC() = 0;
 };
