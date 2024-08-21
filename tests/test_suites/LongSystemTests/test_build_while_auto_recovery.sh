@@ -31,4 +31,4 @@ saunafs setgoal -r 2 saunafs
 mkdir saunafs/build
 cd saunafs/build
 assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
-assert_success make -j${PARALLEL_JOBS} install
+assert_success nice -n 10 ionice -c 3 make -j${PARALLEL_JOBS} install

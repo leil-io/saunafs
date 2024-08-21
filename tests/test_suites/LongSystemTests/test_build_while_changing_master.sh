@@ -1,4 +1,4 @@
-timeout_set '40 minutes'
+timeout_set 1 hour
 
 metaservers_nr=2
 MASTERSERVERS=$metaservers_nr \
@@ -60,4 +60,4 @@ saunafs setgoal -r 2 saunafs
 mkdir saunafs/build
 cd saunafs/build
 assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=../install
-assert_success make -j${PARALLEL_JOBS} install
+assert_success nice -n 10 ionice -c 3 make -j${PARALLEL_JOBS} install

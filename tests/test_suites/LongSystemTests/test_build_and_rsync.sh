@@ -14,7 +14,7 @@ test_worker() {
 	mkdir saunafs/build
 	cd saunafs/build
 	assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=../install
-	assert_success make -j${PARALLEL_JOBS} install
+	assert_success nice -n 19 ionice -c 3 make -j${PARALLEL_JOBS} install
 	cd ../..
 	assertlocal_success rsync -a saunafs/ copy_saunafs
 	find saunafs -type f | while read file; do

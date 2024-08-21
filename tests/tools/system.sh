@@ -25,5 +25,5 @@ get_nproc_clamped_between() {
 	local minimum=$1
 	local maximum=$2
 	local procs_num=$(nproc)
-	echo $(( (procs_num < minimum) ? minimum : (maximum < procs_num) ? maximum : procs_num ))
+	echo $(( (procs_num < minimum) ? procs_num : (maximum < procs_num) ? maximum : procs_num ))
 }

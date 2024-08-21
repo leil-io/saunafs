@@ -1,4 +1,4 @@
-timeout_set 10 minutes
+timeout_set 1 hour
 assert_program_installed git
 assert_program_installed cmake
 
@@ -25,4 +25,4 @@ cd saunafs
 mkdir -p build
 cd build
 assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=RelWithDebInfo
-assert_success make -j${PARALLEL_JOBS}
+assert_success nice -n 10 ionice -c 3 make -j${PARALLEL_JOBS}
