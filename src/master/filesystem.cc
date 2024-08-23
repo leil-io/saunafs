@@ -45,6 +45,7 @@
 #include <fstream>
 
 FilesystemMetadata* gMetadata = nullptr;
+bool gAvoidLoadingChunks = false;
 
 #ifndef METARESTORE
 
@@ -324,6 +325,7 @@ static void fs_read_goal_config_file() {
 
 static void fs_read_config_file() {
 	gAutoRecovery = cfg_getint32("AUTO_RECOVERY", 0) == 1;
+	gAvoidLoadingChunks = cfg_getint32("AVOID_LOADING_CHUNKS", 0) == 1;
 	gDisableChecksumVerification = cfg_getint32("DISABLE_METADATA_CHECKSUM_VERIFICATION", 0) != 0;
 	gMagicAutoFileRepair = cfg_getint32("MAGIC_AUTO_FILE_REPAIR", 0) == 1;
 	gAtimeDisabled = cfg_getint32("NO_ATIME", 0) == 1;

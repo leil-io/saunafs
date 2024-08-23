@@ -2654,6 +2654,11 @@ void chunk_dump(void) {
 #endif
 
 bool chunksLoadFromFile(MetadataLoader::Options options) {
+	if (gAvoidLoadingChunks) {
+		safs_pretty_syslog(LOG_INFO, "[AntuanTrace]: Avoiding loading Chunk "
+		                   "session from Metadata");
+		return true;
+	}
 	const uint8_t *ptr = options.metadataFile->seek(options.offset);
 	gChunksMetadata->nextchunkid = get64bit(&ptr);
 	options.offset = options.metadataFile->offset(ptr);

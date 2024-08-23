@@ -546,6 +546,7 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 	static const int8_t kError = -1;
 	static const int8_t kSuccess = 0;
 	static const int8_t kLastNode = 1;
+	static constexpr uint64_t kMockChunkId = 1;
 	uint8_t type;
 	FSNode *node;
 	const uint8_t *pSrc = metadataFile->seek(sectionOffset);
@@ -608,12 +609,18 @@ int8_t fs_parseNode(const std::shared_ptr<MemoryMappedFile> & metadataFile, size
 		index = 0;
 		while (chunkAmount > kChunkSize) {
 			for (uint32_t i = 0; i < kChunkSize; i++) {
-				nodeFile->chunks[index++] = get64bit(&pSrc);
+				nodeFile->chunks[index++] = gAvoidLoadingChunks ?
+				                            ((get64bit(&pSrc) &
+				                            kMockChunkId) | kMockChunkId) :
+				                            get64bit(&pSrc);
 			}
 			chunkAmount -= kChunkSize;
 		}
 		for (uint32_t i = 0; i < chunkAmount; i++) {
-			nodeFile->chunks[index++] = get64bit(&pSrc);
+			nodeFile->chunks[index++] = gAvoidLoadingChunks ?
+			                            ((get64bit(&pSrc) &
+			                            kMockChunkId) | kMockChunkId) :
+			                            get64bit(&pSrc);
 		}
 		while (sessionIds) {
 			uint32_t sessionId = get32bit(&pSrc);
