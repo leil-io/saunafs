@@ -14,6 +14,13 @@ inline IndexedResourcePool<OpenChunk> gOpenChunks;
 /// chunks to be tested.
 inline std::mutex gTestsMutex;
 
+/// Maximum frequency for chunk testing in milliseconds.
+constexpr uint32_t kMaxTestFreqMs = 1000U;
+
+/// Frequency for chunk testing in milliseconds.
+/// Can be changed via the configuration file (HDD_TEST_FREQ).
+inline std::atomic<unsigned> gHDDTestFreq_ms(10 * 1000);
+
 /// Global unordered_map of all chunks stored in this chunkserver.
 inline ChunkMap gChunksMap;
 

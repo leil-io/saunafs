@@ -64,4 +64,10 @@ public:
 	/// Selects the disk to use for Garbage Collection (GC).
 	/// Could return DiskNotFound if the disks does not need GC.
 	virtual IDisk *getDiskForGC() = 0;
+
+	/// Selects the disk to use for a chunk test.
+	virtual IChunk *getChunkToTest(uint32_t &elapsedTimeMs) = 0;
+
+	/// Resets the helper disk iterator for tests.
+	virtual void resetDiskIteratorForTests() = 0;
 };
