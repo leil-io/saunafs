@@ -12,6 +12,7 @@ CHUNKSERVERS=3 \
 MINIMUM_PARALLEL_JOBS=5
 MAXIMUM_PARALLEL_JOBS=16
 PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
+EFFECTIVE_JOBS=$(get_nicer_effective_jobs ${PARALLEL_JOBS})
 
 master_kill_loop() {
 	while true; do
@@ -31,4 +32,4 @@ saunafs setgoal -r 2 saunafs
 mkdir saunafs/build
 cd saunafs/build
 assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
-assert_success make -j${PARALLEL_JOBS} install
+assert_success make -j${EFFECTIVE_JOBS} install

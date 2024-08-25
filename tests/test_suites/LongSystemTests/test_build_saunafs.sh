@@ -10,6 +10,7 @@ CHUNKSERVERS=8 \
 MINIMUM_PARALLEL_JOBS=4
 MAXIMUM_PARALLEL_JOBS=16
 PARALLEL_JOBS=$(get_nproc_clamped_between ${MINIMUM_PARALLEL_JOBS} ${MAXIMUM_PARALLEL_JOBS})
+EFFECTIVE_JOBS=$(get_nicer_effective_jobs ${PARALLEL_JOBS})
 
 cd ${info[mount0]}
 
@@ -25,4 +26,4 @@ cd saunafs
 mkdir -p build
 cd build
 assert_success cmake .. -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=RelWithDebInfo
-assert_success make -j${PARALLEL_JOBS}
+assert_success make -j${EFFECTIVE_JOBS}

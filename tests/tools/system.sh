@@ -27,3 +27,15 @@ get_nproc_clamped_between() {
 	local procs_num=$(nproc)
 	echo $(( (procs_num < minimum) ? minimum : (maximum < procs_num) ? maximum : procs_num ))
 }
+
+# Reserves one core for other tasks
+get_nicer_effective_jobs() {
+	local original_jobs=${1}
+	local procs_num=$(nproc)
+
+	if [ "${procs_num}" -eq "${original_jobs}" ]; then
+		echo $((procs_num - 1))
+	else
+		echo "${original_jobs}"
+	fi
+}
