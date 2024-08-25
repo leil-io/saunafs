@@ -5,7 +5,7 @@ MASTERSERVERS=$metaservers_nr \
 	CHUNKSERVERS=2 \
 	CHUNKSERVER_EXTRA_CONFIG="MASTER_RECONNECTION_DELAY = 1" \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0|sfsdirentrycacheto=0" \
 	MASTER_EXTRA_CONFIG="MAGIC_AUTO_FILE_REPAIR = 1" \
 	setup_local_empty_saunafs info
 
@@ -21,7 +21,7 @@ master_kill_loop() {
 	# Start shadow masters
 	for ((shadow_id=1 ; shadow_id<metaservers_nr; ++shadow_id)); do
 		saunafs_master_n $shadow_id start
-		assert_eventually "saunafs_shadow_synchronized $shadow_id"
+		assert_eventually "saunafs_shadow_synchronized $shadow_id" "30 seconds"
 	done
 
 	loop_nr=0
@@ -35,7 +35,7 @@ master_kill_loop() {
 		loop_nr=$((loop_nr + 1))
 
 		# Kill the previous master
-		assert_eventually "saunafs_shadow_synchronized $new_master_id"
+		assert_eventually "saunafs_shadow_synchronized $new_master_id" "30 seconds"
 		saunafs_stop_master_without_saving_metadata
 		saunafs_make_conf_for_shadow $prev_master_id
 
@@ -46,7 +46,7 @@ master_kill_loop() {
 		# Demote previous master to shadow
 		saunafs_make_conf_for_shadow $prev_master_id
 		saunafs_master_n $prev_master_id start
-		assert_eventually "saunafs_shadow_synchronized $prev_master_id"
+		assert_eventually "saunafs_shadow_synchronized $prev_master_id" "30 seconds"
 
 		saunafs_wait_for_all_ready_chunkservers
 	done

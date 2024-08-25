@@ -3,7 +3,7 @@ assert_program_installed git
 assert_program_installed cmake
 
 CHUNKSERVERS=8 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0" \
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|cacheexpirationtime=0|sfsdirentrycacheto=0" \
 	CHUNKSERVER_EXTRA_CONFIG="READ_AHEAD_KB = 1024|MAX_READ_BEHIND_KB = 2048"
 	setup_local_empty_saunafs info
 
