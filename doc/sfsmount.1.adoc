@@ -192,7 +192,7 @@ new session is created without password.
 Specify number of retries before I/O error is returned (default: 30).
 
 *-o sfsreportreservedperiod=*'N'::
-Specify interval of reporting reserved inodes in seconds (default: 60).
+Specify interval for reporting reserved inodes in seconds (default: 30).
 
 *-o sfsiolimits=*'PATH'::
 Specify local I/O limiting configuration file (default: no I/O limiting).

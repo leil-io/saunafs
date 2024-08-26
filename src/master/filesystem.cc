@@ -348,6 +348,7 @@ static void fs_read_config_file() {
 		safs_pretty_syslog(LOG_WARNING, "REPLICATIONS_DELAY_INIT and REPLICATION_DELAY_DISCONNECT"
 		" entries are deprecated. Use OPERATIONS_DELAY_INIT and OPERATIONS_DELAY_DISCONNECT instead.");
 	}
+	gEmptyReservedFilesPeriod = cfg_getuint32("EMPTY_RESERVED_FILES_PERIOD_MSECONDS", 0);
 
 	chunk_invalidate_goal_cache();
 	fs_read_goal_config_file(); // may throw
