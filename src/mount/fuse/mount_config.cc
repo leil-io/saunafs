@@ -340,12 +340,14 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 	}
 	gCustomCfg = 1;
 	while (fgets(lbuff, N - 1, fd)) {
+		// Skip a comment line
 		if (lbuff[0] == '#' || lbuff[0] == ';')
 			continue;
 
 		lbuff[N - 1] = 0;
 		gCfgString += lbuff;
 
+		// Go to the end of the cfg file line
 		for (p = lbuff; *p; p++) {
 			if (*p == '\r' || *p == '\n') {
 				*p = 0;
@@ -355,6 +357,7 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 
 		p--;
 
+		// Skip last blank spaces in the line
 		while (p >= lbuff && (*p == ' ' || *p == '\t')) {
 			*p = 0;
 			p--;
@@ -362,18 +365,25 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 
 		p = lbuff;
 
+		// Skip first blank spaces in the line
 		while (*p == ' ' || *p == '\t') {
 			p++;
 		}
 
 		if (*p) {
 			if (*p == '-') {
-				fuse_opt_add_arg(outargs,p);
-			} else if (*p == '/') {
+				// "-o opt1=val1,opt2=val2,..." or "-D S"-like formats
+				if (p[1] != ' ' && p[1] != 0 && p[2] == ' ') {
+					fuse_opt_add_arg(outargs, std::string(p, p + 2).c_str());
+					fuse_opt_add_arg(outargs, p + 3);
+				} else { // "-oopt1=val1,opt2=val2,..." format
+					fuse_opt_add_arg(outargs, p);
+				}
+			} else if (*p == '/') { // default mountpoint
 				if (gDefaultMountpoint)
 					free(gDefaultMountpoint);
 				gDefaultMountpoint = strdup(p);
-			} else {
+			} else { // "opt1=val1,opt2=val2,..." format
 				fuse_opt_add_arg(outargs,"-o");
 				fuse_opt_add_arg(outargs,p);
 			}

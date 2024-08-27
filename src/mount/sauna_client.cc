@@ -82,6 +82,10 @@
 
 namespace SaunaClient {
 
+#ifdef _WIN32
+#define SAUNAFS_HAVE_STRUCT_STAT_ST_BIRTHTIME
+#endif
+
 #define MAX_FILE_SIZE (int64_t)(SFS_MAX_FILE_SIZE)
 
 #define PKGVERSION \
@@ -562,9 +566,15 @@ void attr_to_stat(uint32_t inode, const Attributes &attr, struct stat *stbuf) {
 	stbuf->st_gid = attrgid;
 	stbuf->st_atime = attratime;
 	stbuf->st_mtime = attrmtime;
+#ifdef _WIN32
+	// WinFSP understands this field as "Change Time"
+	stbuf->st_ctime = attrmtime;
+#else
 	stbuf->st_ctime = attrctime;
+#endif
 #ifdef SAUNAFS_HAVE_STRUCT_STAT_ST_BIRTHTIME
-	stbuf->st_birthtime = attrctime;        // for future use
+	// Used for Windows create time
+	stbuf->st_birthtime = attrctime;
 #endif
 	stbuf->st_nlink = attrnlink;
 }

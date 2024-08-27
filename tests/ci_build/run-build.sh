@@ -32,7 +32,7 @@ declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 [ -n "${1:-}" ] || usage
 declare build_type="${1}"
 declare build_dir
-declare do_install=true
+declare -a make_extra_args=()
 shift
 case "${build_type,,}" in
 	debug)
@@ -45,6 +45,7 @@ case "${build_type,,}" in
 			-DENABLE_WERROR=ON
 		)
 		build_dir="${WORKSPACE}/build/saunafs-debug"
+		make_extra_args+=( 'install' )
 		;;
 	coverage)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -56,6 +57,7 @@ case "${build_type,,}" in
 			-DENABLE_WERROR=OFF
 		)
 		build_dir="${WORKSPACE}/build/saunafs-coverage"
+		make_extra_args+=( 'install' )
 		;;
 	test)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -67,6 +69,7 @@ case "${build_type,,}" in
 			-DENABLE_WERROR=ON
 		)
 		build_dir="${WORKSPACE}/build/saunafs"
+		make_extra_args+=( 'install' )
 		;;
 	release)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -78,7 +81,6 @@ case "${build_type,,}" in
 			-DENABLE_WERROR=OFF
 		)
 		build_dir="${WORKSPACE}/build/saunafs-release"
-		do_install=false
 		;;
 	*) die "Unsupported build type: ${build_type}"
 		;;
@@ -95,10 +97,7 @@ cmake -B "${build_dir}" \
 	"${CMAKE_SAUNAFS_ARGUMENTS[@]}" \
 	"${EXTRA_ARGUMENTS[@]}" "${WORKSPACE}"
 
-nice make -C "${build_dir}" -j "$(nproc)"
-if [ "${do_install}" = true ]; then
-	nice make -C "${build_dir}" install
-fi
+nice make -C "${build_dir}" -j "$(nproc)" "${make_extra_args[@]}"
 
 if [ -f "${build_dir}/CPackConfig.cmake" ]; then
 	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"

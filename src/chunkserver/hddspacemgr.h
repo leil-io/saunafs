@@ -41,6 +41,8 @@ void hddGetNewChunks(std::vector<ChunkWithVersionAndType>& chunks,
 uint32_t hddGetSerializedSizeOfAllDiskInfosV2();
 void hddSerializeAllDiskInfosV2(uint8_t *buff);
 
+std::string hddGetDiskGroups();
+
 const std::size_t kChunkBulkSize = 1000;
 using BulkFunction = std::function<void(std::vector<ChunkWithVersionAndType>&)>;
 /// Executes the callback for each bulk of at most \p kChunkBulkSize chunks.

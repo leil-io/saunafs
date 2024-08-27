@@ -597,6 +597,31 @@ add_chunkserver_() {
 	saunafs_info_[chunkserver${chunkserver_id}_hdd]=$hdd_cfg
 }
 
+function validate_and_append_fuse_options() {
+	local prefix=$1
+	local mount_cmd=$2
+	local this_fuse_options_variable="FUSE_${prefix}_EXTRA_CONFIG"
+	local fuse_options=""
+
+	for fuse_option in $(echo ${FUSE_EXTRA_CONFIG-} | tr '|' '\n'); do
+		fuse_option_name=$(echo $fuse_option | cut -f1 -d'=' |
+			tr '[:upper:]' '[:lower:]')
+		${mount_cmd} --help |& grep " -o ${fuse_option_name}[ =]" >/dev/null ||
+			test_fail "Your libfuse doesn't support $fuse_option_name flag"
+		fuse_options+="-o $fuse_option "
+	done
+
+	for fuse_option in $(echo ${!this_fuse_options_variable-} | tr '|' '\n'); do
+		fuse_option_name=$(echo $fuse_option | cut -f1 -d'=' |
+			tr '[:upper:]' '[:lower:]')
+		${mount_cmd} --help |& grep " -o ${fuse_option_name}[ =]" >/dev/null ||
+			test_fail "Your libfuse doesn't support $fuse_option_name flag"
+		fuse_options+="-o $fuse_option "
+	done
+
+	echo $fuse_options
+}
+
 create_sfsmount_cfg_() {
 	local this_mount_cfg_variable="MOUNT_${1}_EXTRA_CONFIG"
 	local this_mount_exports_variable="MOUNT_${1}_EXTRA_EXPORTS"
@@ -616,7 +641,9 @@ windows_do_mount_() {
 	local mount_dir=$3
 	local user_id=$4
 	local group_id=$5
-	sfsmount3.exe -c ${mount_cfg} -D ${drive}: --uid $user_id --gid $group_id &
+	local mount_id=$6
+	local fuse_options=$(validate_and_append_fuse_options "${mount_id}" "sfsmount3.exe")
+	sfsmount3.exe -c ${mount_cfg} -D ${drive}: --uid $user_id --gid $group_id ${fuse_options} &
 	disown $!
 
 	local counter=0
@@ -657,13 +684,7 @@ configure_mount_() {
 	local mount_cmd=$2
 	local mount_cfg=${saunafs_info_[mount${mount_id}_cfg]}
 	local mount_dir=${saunafs_info_[mount${mount_id}]}
-	local fuse_options=""
-	for fuse_option in $(echo ${FUSE_EXTRA_CONFIG-} | tr '|' '\n'); do
-		fuse_option_name=$(echo $fuse_option | cut -f1 -d'=')
-		${mount_cmd} --help |& grep " -o ${fuse_option_name}[ =]" >/dev/null ||
-			test_fail "Your libfuse doesn't support $fuse_option_name flag"
-		fuse_options+="-o $fuse_option "
-	done
+	local fuse_options=$(validate_and_append_fuse_options "${mount_id}" "${mount_cmd}")
 	local call="${command_prefix} ${mount_cmd} -c ${mount_cfg} ${mount_dir} ${fuse_options}"
 	saunafs_info_[mntcall${mount_id}]=$call
 	saunafs_info_[mnt${mount_id}_command]=${mount_cmd}
@@ -679,7 +700,7 @@ windows_prepare_mount_() {
 	local group_id=$3
 	create_sfsmount_cfg_ ${mount_id} > "$mount_cfg"
 
-	local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir} $user_id $group_id"
+	local mount_call="windows_do_mount_ $mount_cfg ${mount_big_dir_letter} ${mount_dir} $user_id $group_id ${mount_id}"
 	local umount_call="windows_do_umount_ ${mount_big_dir_letter} ${mount_dir}"
 
 	if [ ! -d "$mount_dir" ]; then
