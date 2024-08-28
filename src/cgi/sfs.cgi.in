@@ -1652,7 +1652,8 @@ if "HD" in sectionset:
                             wtime = usecwritemax
                             fsynctime = usecfsyncmax
                         if HDorder == 1 or HDorder == 0:
-                            sf = (ip1, ip2, ip3, ip4, port, data[1:plen + 1])
+                            sf = (ip1, ip2, ip3, ip4, port, entry[1:plen + 1]
+                                  .decode('utf-8'))
                         elif HDorder == 2:
                             sf = chunkscnt
                         elif HDorder == 3:
