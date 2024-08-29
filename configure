@@ -21,6 +21,7 @@ rm -f CMakeCache.txt
 
 cmake .. \
 	-DCMAKE_BUILD_TYPE=Release \
+	-DENABLE_DISTCC=ON \
 	-DENABLE_TESTS=NO \
 	-DCMAKE_INSTALL_PREFIX=/ \
 	-DENABLE_DOCS=$doc \

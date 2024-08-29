@@ -70,6 +70,7 @@ common_packages=(
 	dbench
 	debhelper
 	devscripts
+	distcc
 	fakeroot
 	fio
 	fuse3
@@ -165,6 +166,7 @@ dnf_packages=(
 	boost-iostreams
 	boost-program-options
 	boost-system
+	distcc-server
 	dnf-utils
 	fmt-devel
 	fuse3-devel
