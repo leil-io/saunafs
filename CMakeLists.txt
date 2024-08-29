@@ -47,6 +47,7 @@ option(USE_LEGACY_READ_MESSAGES "Enable sending old type of messages by mount"  
 option(ENABLE_NFS_GANESHA       "Enable nfs-ganesha plugin"                              OFF)
 option(ENABLE_CCACHE            "Enable ccache during compilation"                       ON)
 option(ENABLE_DISTCC            "Enable distcc during compilation"                       OFF)
+option(ENABLE_FAST_LINKER       "Enable non-default object linker on compilation"        ON)
 option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                         ON)
 option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"             ON)
 option(ENABLE_PROMETHEUS        "Enable prometheus metrics"                              ON)
@@ -54,6 +55,23 @@ option(ENABLE_PROMETHEUS        "Enable prometheus metrics"                     
 # If enabled (default), the file compile_commands.json is generated in the build
 # directory. Tools like clangd and vscode use this file for proper analysis.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ${ENABLE_COMPILE_COMMANDS})
+
+if(ENABLE_FAST_LINKER)
+    # Try to use faster linker if available
+    # (https://www.phoronix.com/news/Mold-Linker-2024-Performance)
+    list(APPEND LD_OPTIONS mold lld gold)
+    list(APPEND LD_OPTIONS mold)
+    foreach(LINKER ${LD_OPTIONS})
+        find_program(${LINKER}_FOUND ${LINKER})
+        if(${LINKER}_FOUND)
+            message(STATUS "${LINKER} found")
+            set(CMAKE_EXE_LINKER_FLAGS "${DCMAKE_EXE_LINKER_FLAGS} -fuse-ld=${LINKER}")
+            set(CMAKE_SHARED_LINKER_FLAGS "${DCMAKE_SHARED_LINKER_FLAGS} -fuse-ld=${LINKER}")
+            message(STATUS "Using ${LINKER} linker")
+            break()
+        endif()
+    endforeach()
+endif()
 
 find_program(CCACHE_FOUND ccache)
 message(STATUS "ENABLE_CCACHE: ${ENABLE_CCACHE}")

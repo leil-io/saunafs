@@ -79,7 +79,9 @@ common_packages=(
 	gnupg2
 	kmod
 	lcov
+	lld
 	make
+	mold
 	nfs4-acl-tools
 	pkg-config
 	pylint
