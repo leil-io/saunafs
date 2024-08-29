@@ -1,23 +1,32 @@
 #!/usr/bin/env bash
 set -eux -o pipefail
-PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
-WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
-die() { echo "Error: $*" >&2; exit 1; }
-warn() { echo "Warning: $*" >&2; }
+declare -r project_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")/../..")"
 
 usage() {
-	cat <<-EOT
-	Builds saunafs with different configurations
+	cat <<EOT
+Builds saunafs with different configurations
 
-	Usage: run-build.sh [OPTION]
+Usage: $0 <build-type> [pack] [extra-cmake-arguments]
 
-	Options:
-	  coverage   Build with parameters for coverage report
-	  test       Build for test
-	  release    Build with no debug info
-	EOT
-	exit 1
+Supported build types:
+  debug: Debug build with tests and code coverage
+  coverage: Debug build with tests and code coverage
+  test: RelWithDebInfo build with tests
+  release: RelWithDebInfo build without tests
+
+If 'pack' is specified, the build artifacts will be packaged.
+
+Extra CMake arguments can be passed after the build type.
+
+EOT
 }
+
+die() { echo "Error: $*" >&2; usage; exit 1; }
+warn() { echo "Warning: $*" >&2; }
+
+is_truthy() { grep -Eqi '^(true|yes|on|1|enable[d]?)$' <<<"${1:-}"; }
+
+: "${WORKSPACE:="${project_dir}"}"
 
 declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 	-G 'Unix Makefiles'
@@ -31,9 +40,15 @@ declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 
 [ -n "${1:-}" ] || usage
 declare build_type="${1}"
+shift
+declare pack=false
+if [ -n "${1:-}" ] && [ "${1}" = 'pack' ]; then
+	shift
+	pack=true
+fi
+
 declare build_dir
 declare -a make_extra_args=()
-shift
 case "${build_type,,}" in
 	debug)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -103,6 +118,9 @@ cmake -B "${build_dir}" \
 
 nice make -C "${build_dir}" -j "$(nproc)" "${make_extra_args[@]}"
 
+if ! is_truthy "${pack}"; then
+	exit 0
+fi
 if [ -f "${build_dir}/CPackConfig.cmake" ]; then
 	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"
 else
