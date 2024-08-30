@@ -253,6 +253,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	params.debug_mode = gMountOptions.debug;
 	params.direct_io = gMountOptions.directio;
 	params.ignore_flush = gMountOptions.ignoreflush;
+	params.ignore_getxattr = gMountOptions.ignoregetxattr;
 
 	if (!gMountOptions.meta) {
 		SaunaClient::fs_init(params);

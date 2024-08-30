@@ -93,6 +93,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
 	SFS_OPT("sfsignoreflush", ignoreflush, 1),
+	SFS_OPT("sfsignoregetxattr=%d", ignoregetxattr, 1),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
 	SFS_OPT("nonempty", nonemptymount, 1),
@@ -171,6 +172,9 @@ void usage(const char *progname) {
 "    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
 				"behavior by replying SUCCESS to it immediately. Targets fast "
 				"creation of small files, but may cause data loss during crashes.\n"
+"    -o sfsignoregetxattr=0|1    ignore getxattr by returning empty XattrReply "
+				"to simulate correct response immediately, without requesting "
+				"any extended attribute info to master server (default: %d)\n"
 "\n"
 "Other options:\n"
 "    -m   --meta                 equivalent to '-o sfsmeta'\n"
@@ -248,6 +252,7 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,
 		SaunaClient::FsInitParams::kDefaultWriteWorkers,
 		SaunaClient::FsInitParams::kDefaultWriteWindowSize,
+		SaunaClient::FsInitParams::kDefaultIgnoreGetXAttr,
 		SaunaClient::FsInitParams::kDefaultUseRwLock,
 		SaunaClient::FsInitParams::kDefaultMkdirCopySgid,
 		sugidClearModeString(SaunaClient::FsInitParams::kDefaultSugidClearMode),

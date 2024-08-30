@@ -216,6 +216,7 @@ static unsigned gDirEntryCacheMaxSize = 100000;
 static int debug_mode = 0;
 static int usedircache = 1;
 static bool ignore_flush = false;
+static bool ignore_getxattr = false;
 static int keep_cache = 0;
 static double direntry_cache_timeout = 0.1;
 static double entry_cache_timeout = 0.0;
@@ -2542,6 +2543,7 @@ public:
 
 	uint8_t getxattr(Context& ctx, Inode ino, const char *name,
 		uint32_t nleng, int mode, uint32_t& valueLength, std::vector<uint8_t>& value) override {
+		
 		const uint8_t *buff;
 		uint8_t status;
 		RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, ctx,
@@ -2976,6 +2978,9 @@ void setxattr(Context &ctx, Inode ino, const char *name, const char *value,
 }
 
 XattrReply getxattr(Context &ctx, Inode ino, const char *name, size_t size, uint32_t position) {
+	if (ignore_getxattr) {
+		return XattrReply{0, {}};
+	}
 	uint32_t nleng;
 	int status;
 	uint8_t mode;
@@ -3404,7 +3409,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 #ifdef _WIN32
 		, int mounting_uid_, int mounting_gid_, std::unordered_set<uint32_t> &allowed_users_
 #endif
-		, bool ignore_flush_
+		, bool ignore_flush_, bool ignore_getxattr_
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
@@ -3412,6 +3417,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 	allowed_users = allowed_users_;
 #endif
 	ignore_flush = ignore_flush_;
+	ignore_getxattr = ignore_getxattr_;
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
 	direntry_cache_timeout = direntry_cache_timeout_;
@@ -3508,7 +3514,7 @@ void fs_init(FsInitParams &params) {
 #ifdef _WIN32
 		, params.mounting_uid, params.mounting_gid, params.allowed_users
 #endif
-		, params.ignore_flush
+		, params.ignore_flush, params.ignore_getxattr
 		);
 }
 

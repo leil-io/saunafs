@@ -81,6 +81,7 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 	static constexpr bool     kDefaultIgnoreFlush = false;
+	static constexpr bool     kDefaultIgnoreGetXAttr = false;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 #else
@@ -149,7 +150,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), ignore_getxattr(kDefaultIgnoreGetXAttr), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -182,7 +183,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), ignore_getxattr(kDefaultIgnoreGetXAttr), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
 	std::string bind_host;
@@ -235,6 +236,7 @@ struct FsInitParams {
 #endif
 
 	bool ignore_flush;
+	bool ignore_getxattr;
 	bool verbose;
 	bool direct_io;
 

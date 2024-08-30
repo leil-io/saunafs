@@ -221,6 +221,10 @@ Advanced: use with caution. Ignore flush usual behavior by replying SUCCESS to i
 immediately. Targets fast creation of small files, but may cause data loss
 during crashes when allegedly flushed data is still being processed.
 
+*-o sfsignoregetxattr=0|1*::
+Ignore getxattr by returning empty XattrReply to simulate correct response
+immediately, without requesting any extended attribute info to master server.
+
 *-o sfsdirectio=*'0|1'::
 Whether to use FUSE DirectIO. This may improve performance when reading large
 files under certain conditions.

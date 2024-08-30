@@ -115,6 +115,7 @@ struct sfsopts_ {
 	int nonemptymount;
 	bool directio;
 	int ignoreflush;
+	int ignoregetxattr;
 
 	sfsopts_()
 		: masterhost(NULL),
@@ -171,7 +172,8 @@ struct sfsopts_ {
 		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
 		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
 		directio(SaunaClient::FsInitParams::kDirectIO),
-		ignoreflush(SaunaClient::FsInitParams::kDefaultIgnoreFlush)
+		ignoreflush(SaunaClient::FsInitParams::kDefaultIgnoreFlush),
+		ignoregetxattr(SaunaClient::FsInitParams::kDefaultIgnoreGetXAttr)
 	{ }
 };
 
