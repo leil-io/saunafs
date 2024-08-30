@@ -230,6 +230,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	params.total_read_timeout_ms = gMountOptions.chunkservertotalreadto;
 	params.cache_expiration_time_ms = gMountOptions.cacheexpirationtime;
 	params.readahead_max_window_size_kB = gMountOptions.readaheadmaxwindowsize;
+	params.read_cache_max_size_mB = gMountOptions.readcachemaxsize,
 	params.read_workers = gMountOptions.readworkers;
 	params.max_readahead_requests = gMountOptions.maxreadaheadrequests;
 	params.prefetch_xor_stripes = gMountOptions.prefetchxorstripes;

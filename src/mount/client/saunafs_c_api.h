@@ -56,6 +56,7 @@ typedef struct sau_init_params {
 	unsigned total_read_timeout_ms;
 	unsigned cache_expiration_time_ms;
 	unsigned readahead_max_window_size_kB;
+	unsigned read_cache_max_size_mB;
 	bool prefetch_xor_stripes;
 	double bandwidth_overuse;
 
