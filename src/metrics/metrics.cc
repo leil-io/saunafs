@@ -105,7 +105,7 @@ void Counter::increment(master::Counters key, double n) {
 	// Safe as all values are constructed at specific keys, however a check
 	// needs to be made whether the actual counter initialized or not (for
 	// whatever reason)
-	auto counter = prom_metrics.master.master_counters[key]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+	auto counter = prometheus_metrics.master.master_counters[key]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 	if (counter.counter_ != nullptr) { counter.counter_->Increment(n); }
 }
 
@@ -114,7 +114,7 @@ void prometheus_loop(const std::stop_token& stop, const char* host) {
 		// create an http server
 		prometheus::Exposer exposer{host};
 
-		exposer.RegisterCollectable(prom_metrics.get_registry());
+		exposer.RegisterCollectable(prometheus_metrics.get_registry());
 		safs::log_info("started prometheus server");
 
 		while (!stop.stop_requested()) {
