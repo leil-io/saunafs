@@ -99,7 +99,7 @@ private:
 	// Registry
 	std::shared_ptr<prometheus::Registry> registry;
 };
-PrometheusMetrics prom_metrics;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+PrometheusMetrics prometheus_metrics;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 void Counter::increment(master::Counters key, double n) {
 	// Safe as all values are constructed at specific keys, however a check
