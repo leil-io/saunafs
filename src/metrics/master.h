@@ -27,7 +27,6 @@
 namespace metrics::master {
 
 struct Master {
-public:
 	Master() = default;
 	Master(std::shared_ptr<prometheus::Registry>& registry);
 
