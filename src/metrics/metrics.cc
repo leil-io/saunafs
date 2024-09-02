@@ -75,7 +75,7 @@ void init(const char* /* unused */) {
 }
 #else
 
-prometheus::Family<prometheus::Counter> &setup_family(
+CounterFamily &setup_family(
     const char *name, const char *help,
     std::shared_ptr<prometheus::Registry> &registry) {
 	return prometheus::BuildCounter().Name(name).Help(help).Register(*registry);

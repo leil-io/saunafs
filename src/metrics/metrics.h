@@ -27,6 +27,9 @@
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
 #include <prometheus/family.h>
+
+using CounterFamily = prometheus::Family<prometheus::Counter>;
+
 #endif
 
 namespace metrics {
@@ -68,7 +71,7 @@ public:
 #ifdef HAVE_PROMETHEUS
 	Counter() : counter_(nullptr) {};
 	Counter(const prometheus::Labels &labels,
-	        prometheus::Family<prometheus::Counter> *family)
+	        CounterFamily *family)
 	    : counter_(&family->Add(labels)) {};
 
 	static void increment(master::Counters key, double n = 1);
