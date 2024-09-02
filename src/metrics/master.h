@@ -32,10 +32,10 @@ public:
 	Master(std::shared_ptr<prometheus::Registry>& registry);
 
 	// Metric(s)
-	prometheus::Family<prometheus::Counter> *packet_client_counter{nullptr};
-	prometheus::Family<prometheus::Counter> *byte_client_counter{nullptr};
-	prometheus::Family<prometheus::Counter> *filesystem_counter{nullptr};
-	prometheus::Family<prometheus::Counter> *chunk_counter{nullptr};
+	CounterFamily *packet_client_counter{nullptr};
+	CounterFamily *byte_client_counter{nullptr};
+	CounterFamily *filesystem_counter{nullptr};
+	CounterFamily *chunk_counter{nullptr};
 
 	// Master Counters
 	std::array<Counter, Counters::KEY_END + 1> master_counters;
