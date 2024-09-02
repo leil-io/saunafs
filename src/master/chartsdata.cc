@@ -19,7 +19,7 @@
  */
 
 
-/* DEPRECATED: Use src/metrics instead */
+/* DEPRECATED (master/chartsdata.h): Use src/metrics instead */
 
 #include "common/platform.h"
 #include "master/chartsdata.h"
