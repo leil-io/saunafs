@@ -17,6 +17,20 @@
    along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+// This library provides a means of manipulating prometheus metrics safely and
+// efficently.
+// The two key restraints in the design are:
+// 1. Prefer compile time costs/safety over initialization time costs/safety,
+// and avoid runtime costs except in accessing the metrics themselves (but
+// minimize them).
+// 2. Do not allow dynamic dimensional data on runtime (i.e, calling Add after
+// initialization)
+//
+// This should allow placing metric gathering functions pretty much everywhere,
+// without worry for performance impact. To do this, it uses a lookup table
+// using enums instead of a map. See master.cc and master.h for an example
+// implementation for adding new metrics.
+
 #ifdef HAVE_PROMETHEUS
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
@@ -37,21 +51,6 @@
 #include "metrics/master.h"
 #include "slogger/slogger.h"
 
-// Quick summary on the current implementation from 17/07/24
-//
-// This library provides a means of manipulating prometheus metrics safely and
-// efficently.
-// The two key restraints in the design are:
-// 1. Prefer compile time costs/safety over initialization time costs/safety,
-// and avoid runtime costs except in accessing the metrics themselves (but
-// minimize them).
-// 2. Do not allow dynamic dimensional data on runtime (i.e, calling Add after
-// initialization)
-//
-// This should allow placing metric gathering functions pretty much everywhere,
-// without worry for performance impact. To do this, it uses a lookup table
-// using enums instead of a map. See master.cc and master.h for an example
-// implementation for adding new metrics.
 
 constexpr auto THREAD_SLEEP_TIME_MS = 100;
 
