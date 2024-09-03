@@ -157,7 +157,10 @@ operation in milliseconds (default: 2000).
 
 *-o cacheexpirationtime=*'MSEC'::
 Set timeout for read cache entries to be considered valid in milliseconds. 0
-disables cache (default: 0).
+disables cache (default: 0). Due to a bug, this can sometimes result in invalid
+data being returned if reading the mount point from multiple processes/threads
+and it's not disabled. Verify data being sent using a checksum if using this
+feature.
 
 *-o readaheadmaxwindowsize=*'KB'::
 Set max value of readahead window per single descriptor in kibibytes (default: 16384).
