@@ -185,6 +185,8 @@ update_cmake_file() {
 
 process_release() {
 	local commitToRelease="${1}"
+	local rc_version="${2:-1}"
+	local rc_tag="rc${rc_version}"
 	local changelogWithCommits="$(get_changelog latest "${commitToRelease}")"
 	local changesType="$(get_changes_type <<< "${changelogWithCommits}")"
 	local currentVersion="$(get_latest_version_from_tags)"
@@ -201,8 +203,10 @@ process_release() {
 	git branch -M "${newBranch}" # rename the current branch
 	git push -u origin "${newBranch}"
 
-	git tag -a "${newVersionTag}-rc1" -m "Release candidate 1 for ${newVersionTag}" # create a release candidate tag
-	git push origin "${newVersionTag}-rc1"
+	# create a release candidate tag
+	git tag -a "${newVersionTag}-${rc_tag}" -m "Release candidate ${rc_version} for ${newVersionTag}"
+	git push origin "${newVersionTag}-${rc_tag}"
+
 
 	git switch "${DEVELOP_BRANCH}"
 	git branch -D "${newBranch}"
@@ -240,7 +244,8 @@ main() {
 	check_tools
 	local commitToRelease="${1:-"$(get_release_commit)"}"
 	create_release_branch "${commitToRelease}"
-	process_release "${commitToRelease}"
+	local rc=1
+	process_release "${commitToRelease}" "${rc}"
 }
 
 main "${@}"
