@@ -39,8 +39,16 @@ create_release_branch() {
 	git switch -c "${RELEASE_BRANCH}" "${1}"
 }
 
+is_input_tty() {
+	[ -t 0 ]
+}
+
 get_changelog() {
-	git log "${1}..${2}" --oneline --no-merges --pretty='format:%h %s'
+	if is_input_tty; then
+		git log "${1}..${2}" --oneline --no-merges --pretty='format:%h %s' | vipe
+	else
+		git log "${1}..${2}" --oneline --no-merges --pretty='format:%h %s'
+	fi
 }
 
 get_latest_version_from_tags() {
@@ -212,10 +220,36 @@ process_release() {
 	git branch -D "${newBranch}"
 }
 
+
+check_tool() {
+	local tool="${1}"
+	local package="${2:-${tool}}"
+	type -P "${tool}" > /dev/null || {
+		error "Tool '${tool}' is required, available in package '${package}'"
+		return 1
+	}
+}
+
+check_tools() {
+	local found=true
+	check_tool "awk" "gawk" || found=false
+	check_tool "git" || found=false
+	check_tool "grep" || found=false
+	check_tool "sed" || found=false
+	check_tool "vi" "vim" || found=false
+	if is_input_tty; then
+		check_tool "vipe" "moreutils" || found=false
+	fi
+	if ! is_truthy "${found}"; then
+		die "Please install the required tools"
+	fi
+}
+
 ## Main
 ## Usage: make-release.sh [commitToRelease]
 ## If commitToRelease is not provided, it will look for the latest commit in the last 2 weeks
 main() {
+	check_tools
 	local commitToRelease="${1:-"$(get_release_commit)"}"
 	create_release_branch "${commitToRelease}"
 	process_release "${commitToRelease}"
