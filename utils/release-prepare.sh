@@ -7,6 +7,7 @@ set -eux -o pipefail
 : "${DEVELOP_BRANCH:="dev"}"
 : "${RELEASE_WAIT:="2 weeks"}"
 : "${RELEASE_URGENCY:="medium"}"
+: "${NO_PUSH:=false}"
 
 msg() { echo "[$(date -u +'%Y-%m-%d %H:%M:%S')] ${*}"; }
 stderr() { msg "${*}" >&2; }
@@ -201,12 +202,16 @@ process_release() {
 
 	local newBranch="release/${newVersionTag}"
 	git branch -M "${newBranch}" # rename the current branch
+
+	if is_truthy "${NO_PUSH}"; then
+		return 0
+	fi
+
 	git push -u origin "${newBranch}"
 
 	# create a release candidate tag
 	git tag -a "${newVersionTag}-${rc_tag}" -m "Release candidate ${rc_version} for ${newVersionTag}"
 	git push origin "${newVersionTag}-${rc_tag}"
-
 
 	git switch "${DEVELOP_BRANCH}"
 	git branch -D "${newBranch}"
