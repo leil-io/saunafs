@@ -1,4 +1,15 @@
 saunafs (4.5.0) stable; urgency=medium
+  * fix(mount): Set default cacheExpirationTime to 0 (#180)
+  * feat(mount): Add readcachemaxsize option (#145)
+  * feat(master): Add empty reserved files option (#176)
+  * fix(mount): Fix random case option parsing (#135)
+  * feat(chunkserver): Add IDiskManager::getDiskForGC (#169)
+  * test: Improve `stop_ganesha()` function (#168)
+  * fix(ci): Modify timeout from env (#165)
+  * ci: Fix tests behavior (#172)
+  * fix(uraft): Fix missing floating ip address
+  * fix(mount): Fix create time (Windows) (#167)
+  * feat(admin): Add list-disk-groups command (#155)
   * ci: Abort previous concurrent tests
   * ci: Update de base docker image on build
   * fix(tests): Fix typo in setup-machine script
@@ -12,7 +23,7 @@ saunafs (4.5.0) stable; urgency=medium
   * fix: Allow legacy sessions download
   * fix: Allow legacy metadata download
 
- -- SaunaFS Team <contact@saunafs.com>  Mon, 12 Aug 2024 15:11:39 +0000
+ -- SaunaFS Team <contact@saunafs.com>  Thu, 05 Sep 2024 14:23:04 +0000
 
 saunafs (4.4.0) stable; urgency=medium
   * ci(.github): Add check for Conventional Commits (#131)

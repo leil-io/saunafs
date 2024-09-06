@@ -1,6 +1,17 @@
 This file lists noteworthy changes in SaunaFS.
 
- * SaunaFS (4.5.0) (2024-08-12)
+ * SaunaFS (4.5.0) (2024-09-05)
+ - fix(mount): Set default cacheExpirationTime to 0 (#180)
+ - feat(mount): Add readcachemaxsize option (#145)
+ - feat(master): Add empty reserved files option (#176)
+ - fix(mount): Fix random case option parsing (#135)
+ - feat(chunkserver): Add IDiskManager::getDiskForGC (#169)
+ - test: Improve `stop_ganesha()` function (#168)
+ - fix(ci): Modify timeout from env (#165)
+ - ci: Fix tests behavior (#172)
+ - fix(uraft): Fix missing floating ip address
+ - fix(mount): Fix create time (Windows) (#167)
+ - feat(admin): Add list-disk-groups command (#155)
  - ci: Abort previous concurrent tests
  - ci: Update de base docker image on build
  - fix(tests): Fix typo in setup-machine script
