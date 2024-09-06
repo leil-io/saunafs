@@ -5,7 +5,6 @@ set -eux -o pipefail
 : "${NEWS_FILE:="NEWS"}"
 : "${RELEASE_BRANCH:="release"}"
 : "${DEVELOP_BRANCH:="dev"}"
-: "${RELEASE_WAIT:="2 weeks"}"
 : "${RELEASE_URGENCY:="medium"}"
 : "${NO_PUSH:=false}"
 
@@ -21,7 +20,7 @@ get_release_commit() {
 		git switch "${DEVELOP_BRANCH}"
 		git pull
 	} > /dev/null 2>&1 || die "Failed to switch to the develop branch"
-	git log --before "${RELEASE_WAIT}" --oneline | head -n1 | awk '{print $1}'
+	git log --oneline | head -n1 | awk '{print $1}'
 }
 
 create_release_branch() {
