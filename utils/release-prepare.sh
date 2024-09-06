@@ -8,23 +8,11 @@ set -eux -o pipefail
 : "${RELEASE_WAIT:="2 weeks"}"
 : "${RELEASE_URGENCY:="medium"}"
 
-die() {
-	echo "Error: ${*}" >&2
-	exit 1
-}
-
-is_truthy() {
-	local -r value="${1:-}"
-	[ -n "${value}" ] || return 1
-	case "${value,,}" in
-		1 | true | yes | y | on | enabled)
-			return 0
-			;;
-		*)
-			return 1
-			;;
-	esac
-}
+msg() { echo "[$(date -u +'%Y-%m-%d %H:%M:%S')] ${*}"; }
+stderr() { msg "${*}" >&2; }
+error() { stderr "Error: ${*}"; }
+die() { error "${*}"; exit 1; }
+is_truthy() { grep -q -Ei '^(1|true|t|yes|y|on|ok|enabled?)$' <<< "${1:-}"; }
 
 get_release_commit() {
 	{
