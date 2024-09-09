@@ -1751,3 +1751,11 @@ enum class SugidClearMode {
 // 0x0259
 #define CSTOCL_HDD_LIST_V2 (PROTO_BASE+601)
 // N*[ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 bytesread:64 usecread:64 usecreadmax:64 byteswriten:64 usecwrite:64 usecwritemax:64]
+
+// 0x025D
+#define CLTOCS_ADMIN_LIST_DISK_GROUPS (PROTO_BASE + 602)
+/// -
+
+// 0x025E
+#define CSTOCL_ADMIN_LIST_DISK_GROUPS (PROTO_BASE + 603)
+/// config:STDSTRING

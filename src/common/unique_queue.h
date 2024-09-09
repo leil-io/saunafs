@@ -56,6 +56,12 @@ public:
 			return element;
 		}
 	}
+
+	size_t size() {
+		std::lock_guard lock(mutex_);
+		return queue_.size();
+	}
+
 private:
 	typedef std::set<T> Set;
 	typedef std::queue<typename Set::iterator> Queue;

@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -70,8 +71,9 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultChunkserverReadTo = 2000;
 	static constexpr unsigned kDefaultChunkserverWaveReadTo = 500;
 	static constexpr unsigned kDefaultChunkserverTotalReadTo = 2000;
-	static constexpr unsigned kDefaultCacheExpirationTime = 1000;
+	static constexpr unsigned kDefaultCacheExpirationTime = 0;
 	static constexpr unsigned kDefaultReadaheadMaxWindowSize = 65536;
+	static constexpr unsigned kDefaultReadCacheMaxSize = 16384;
 	static constexpr unsigned kDefaultReadWorkers = 30;
 	static constexpr unsigned kDefaultMaxReadaheadRequests = 5;
 	static constexpr bool     kDefaultPrefetchXorStripes = false;
@@ -128,6 +130,7 @@ struct FsInitParams {
 	             total_read_timeout_ms(kDefaultChunkserverTotalReadTo),
 	             cache_expiration_time_ms(kDefaultCacheExpirationTime),
 	             readahead_max_window_size_kB(kDefaultReadaheadMaxWindowSize),
+				 read_cache_max_size_mB(kDefaultReadCacheMaxSize),
 	             read_workers(kDefaultReadWorkers),
 	             max_readahead_requests(kDefaultMaxReadaheadRequests),
 	             prefetch_xor_stripes(kDefaultPrefetchXorStripes),
@@ -160,6 +163,7 @@ struct FsInitParams {
 	             total_read_timeout_ms(kDefaultChunkserverTotalReadTo),
 	             cache_expiration_time_ms(kDefaultCacheExpirationTime),
 	             readahead_max_window_size_kB(kDefaultReadaheadMaxWindowSize),
+				 read_cache_max_size_mB(kDefaultReadCacheMaxSize),
 	             read_workers(kDefaultReadWorkers),
 	             max_readahead_requests(kDefaultMaxReadaheadRequests),
 	             prefetch_xor_stripes(kDefaultPrefetchXorStripes),
@@ -199,6 +203,7 @@ struct FsInitParams {
 	unsigned total_read_timeout_ms;
 	unsigned cache_expiration_time_ms;
 	unsigned readahead_max_window_size_kB;
+	unsigned read_cache_max_size_mB;
 	unsigned read_workers;
 	unsigned max_readahead_requests;
 	bool prefetch_xor_stripes;
@@ -226,6 +231,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	int mounting_uid;
 	int mounting_gid;
+	std::unordered_set<uint32_t> allowed_users;
 #endif
 
 	bool ignore_flush;

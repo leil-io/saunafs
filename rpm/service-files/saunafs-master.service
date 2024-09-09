@@ -1,7 +1,7 @@
 [Unit]
 Description=SaunaFS master server daemon
 Documentation=man:sfsmaster
-After=network.target
+After=network-online.target network.target
 
 [Service]
 Type=forking

@@ -216,9 +216,28 @@ int fs_loadall(void) {
 	changelogsMigrateFrom_1_6_29("changelog");
 	if (fs::exists(kMetadataTmpFilename)) {
 		throw MetadataFsConsistencyException(
-				"temporary metadata file (" + std::string(kMetadataTmpFilename) + ") exists, metadata directory is in dirty state");
+		    "temporary metadata file (" + std::string(kMetadataTmpFilename) + ") exists,"
+		    " metadata directory is in dirty state");
 	}
-	if ((metadataserver::isMaster()) && !fs::exists(kMetadataFilename)) {
+	std::string metadataFile;
+	bool metadataFileExists = fs::exists(kMetadataFilename);
+	bool legacyMetadataFileExists = fs::exists(kMetadataLegacyFilename);
+	if (metadataFileExists) {
+		metadataFile = kMetadataFilename;
+	}
+	if(metadataFileExists && legacyMetadataFileExists) {
+		metadataFile = kMetadataFilename;
+		safs_pretty_syslog(LOG_WARNING, "There are two metadata files in the data path: %s and %s."
+		                   " Please remove the legacy one (%s) to avoid damage to your storage.",
+		                   kMetadataFilename, kMetadataLegacyFilename, kMetadataLegacyFilename);
+	}
+	if (!metadataFileExists && legacyMetadataFileExists) {
+		metadataFile = kMetadataLegacyFilename;
+		safs_pretty_syslog(LOG_WARNING, "Only Legacy metadata file %s found and will be loaded instead."
+		                   " You should delete legacy metadata %s on next restart after new metadata %s is created ",
+		                   metadataFile.c_str(), kMetadataLegacyFilename, kMetadataFilename);
+	}
+	if (metadataserver::isMaster() && !metadataFileExists && !legacyMetadataFileExists) {
 		fs_unlock();
 		std::string currentPath = fs::getCurrentWorkingDirectoryNoThrow();
 		throw FilesystemException("can't open metadata file "+ currentPath + "/" + kMetadataFilename
@@ -229,7 +248,7 @@ int fs_loadall(void) {
 
 	{
 		auto scopedTimer = util::ScopedTimer("metadata load time");
-		fs_loadall(kMetadataFilename, 0);
+		fs_loadall(metadataFile, 0);
 	}
 
 	bool autoRecovery = fs_can_do_auto_recovery();
@@ -329,6 +348,7 @@ static void fs_read_config_file() {
 		safs_pretty_syslog(LOG_WARNING, "REPLICATIONS_DELAY_INIT and REPLICATION_DELAY_DISCONNECT"
 		" entries are deprecated. Use OPERATIONS_DELAY_INIT and OPERATIONS_DELAY_DISCONNECT instead.");
 	}
+	gEmptyReservedFilesPeriod = cfg_getuint32("EMPTY_RESERVED_FILES_PERIOD_MSECONDS", 0);
 
 	chunk_invalidate_goal_cache();
 	fs_read_goal_config_file(); // may throw

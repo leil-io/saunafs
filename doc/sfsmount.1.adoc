@@ -157,10 +157,16 @@ operation in milliseconds (default: 2000).
 
 *-o cacheexpirationtime=*'MSEC'::
 Set timeout for read cache entries to be considered valid in milliseconds. 0
-disables cache (default: 0).
+disables cache (default: 0). Due to a bug, this can sometimes result in invalid
+data being returned if reading the mount point from multiple processes/threads
+and it's not disabled. Verify data being sent using a checksum if using this
+feature.
 
 *-o readaheadmaxwindowsize=*'KB'::
 Set max value of readahead window per single descriptor in kibibytes (default: 16384).
+
+*-o readcachemaxsize=*'MB'::
+Set max value of read cache size in mebibytes (default: 16384).
 
 *-o readworkers=*'N'::
 Define number of read workers (default: 30).
@@ -192,7 +198,7 @@ new session is created without password.
 Specify number of retries before I/O error is returned (default: 30).
 
 *-o sfsreportreservedperiod=*'N'::
-Specify interval of reporting reserved inodes in seconds (default: 60).
+Specify interval for reporting reserved inodes in seconds (default: 30).
 
 *-o sfsiolimits=*'PATH'::
 Specify local I/O limiting configuration file (default: no I/O limiting).

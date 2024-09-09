@@ -3,7 +3,7 @@ set -eux -o pipefail
 PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
 WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
 die() { echo "Error: $*" >&2; exit 1; }
-test_extra_args=()
+declare -a test_extra_args=()
 if [ -n "${1:-}" ]; then
 	test_extra_args+=("--gtest_filter=${1}")
 	shift 1
@@ -27,10 +27,12 @@ export TERM=xterm
 killall -9 saunafs-tests || true
 mkdir -m 777 -p "${TEST_OUTPUT_DIR}"
 rm -rf "${TEST_OUTPUT_DIR:?}"/* || true
-rm -rf /mnt/ramdisk/* || true
+sudo rm -rf /mnt/ramdisk/* || true
 [ -f "${SAUNAFS_ROOT}/bin/saunafs-tests" ] || \
 	die "${SAUNAFS_ROOT}/bin/saunafs-tests" not found, did you build the project?
 export PATH="${SAUNAFS_ROOT}/bin:${PATH}"
 sudo sed -E -i '\,.*:\s+\$\{SAUNAFS_ROOT\s*:=.*,d' /etc/saunafs_tests.conf || true
 echo ": \${SAUNAFS_ROOT:=${SAUNAFS_ROOT}}" | sudo tee -a /etc/saunafs_tests.conf >/dev/null || true
-sudo "${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes --gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml" "${test_extra_args[@]}"
+sudo --preserve-env=SAUNAFS_TEST_TIMEOUT_MULTIPLIER \
+"${SAUNAFS_ROOT}/bin/saunafs-tests" --gtest_color=yes \
+--gtest_output=xml:"${TEST_OUTPUT_DIR}/sanity_test_results.xml" "${test_extra_args[@]}"

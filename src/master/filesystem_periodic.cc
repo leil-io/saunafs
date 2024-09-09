@@ -586,11 +586,48 @@ uint8_t fs_apply_emptytrash_deprecated(uint32_t ts, uint32_t freeinodes, uint32_
 	return SAUNAFS_STATUS_OK;
 }
 
+#ifndef METARESTORE
+static void fs_do_emptyreserved(uint32_t ts) {
+	SignalLoopWatchdog watchdog;
+
+	auto it = gMetadata->reserved.begin();
+	watchdog.start();
+	while (it != gMetadata->reserved.end()) {
+		FSNodeFile *node = fsnodes_id_to_node_verify<FSNodeFile>((*it).first);
+
+		if (!node) {
+			gMetadata->reserved.erase(it);
+			it = gMetadata->reserved.begin();
+			continue;
+		}
+
+		assert(node->type == FSNode::kReserved);
+
+		uint32_t node_id = node->id;
+		fsnodes_purge(ts, node);
+
+		// Purge operation should be performed anyway
+		fs_changelog(ts, "PURGE(%" PRIu32 ")", node_id);
+
+		it = gMetadata->reserved.begin();
+
+		if (watchdog.expired()) {
+			break;
+		}
+	}
+}
+#endif
+
 uint8_t fs_apply_emptyreserved_deprecated(uint32_t /*ts*/,uint32_t /*freeinodes*/) {
 	return SAUNAFS_STATUS_OK;
 }
 
 #ifndef METARESTORE
+void fs_periodic_emptyreserved(void) {
+	uint32_t ts = eventloop_time();
+	fs_do_emptyreserved(ts);
+}
+
 void fs_read_periodic_config_file() {
 	gFileTestLoopTime = cfg_get_minmaxvalue<uint32_t>("FILE_TEST_LOOP_MIN_TIME", 3600, FILETESTSMINLOOPTIME, FILETESTSMAXLOOPTIME);
 }
@@ -601,5 +638,6 @@ void fs_periodic_master_init() {
 	eventloop_eachloopregister(fs_background_task_manager_work);
 	eventloop_eachloopregister(fs_background_file_test);
 	eventloop_timeregister_ms(100, fs_periodic_emptytrash);
+	eventloop_timeregister_ms(gEmptyReservedFilesPeriod, fs_periodic_emptyreserved);
 }
 #endif

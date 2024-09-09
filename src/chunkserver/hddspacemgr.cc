@@ -189,6 +189,12 @@ void hddSerializeAllDiskInfosV2(uint8_t *buff) {
 	gDisksMutex.unlock();  //Locked by hddGetSerializedSizeOfAllDiskInfosV2
 }
 
+std::string hddGetDiskGroups() {
+	TRACETHIS();
+
+	return gDiskManager->getDiskGroupsInfo();
+}
+
 void hddDiskInfoRotateStats() {
 	TRACETHIS();
 
@@ -393,6 +399,8 @@ void hddCheckDisks() {
 			break;
 		}
 	}
+
+	gDiskManager->updateSpaceUsage();
 
 	disksUniqueLock.unlock();
 
@@ -2536,6 +2544,7 @@ void hddReload(void) {
 	safs_pretty_syslog(LOG_NOTICE,"reloading hdd data ...");
 
 	try {
+		gDiskManager->reloadConfiguration();
 		gDiskManager->reloadDisksFromCfg();
 	} catch (const Exception& ex) {
 		safs_pretty_syslog(LOG_ERR, "%s", ex.what());
@@ -2635,6 +2644,7 @@ int hddInit() {
 	}
 
 	try {
+		gDiskManager->reloadConfiguration();
 		gDiskManager->reloadDisksFromCfg();
 	} catch (const Exception& ex) {
 		safs_pretty_syslog(LOG_ERR, "%s", ex.what());

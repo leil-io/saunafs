@@ -47,6 +47,7 @@
 #include "mount/mastercomm.h"
 #include "mount/readahead_adviser.h"
 #include "mount/readdata_cache.h"
+#include "mount/memory_info.h"
 #include "mount/tweaks.h"
 #include "protocol/SFSCommunication.h"
 
@@ -56,6 +57,49 @@
 #define EMPTY_REQUEST nullptr
 
 inline std::condition_variable readOperationsAvailable;
+inline int kMaxReadCacheRequestRetries = 10;
+
+std::unique_ptr<IMemoryInfo> createMemoryInfo() {
+    std::unique_ptr<IMemoryInfo> gMemoryInfo;
+    #ifdef _WIN32
+        gMemoryInfo = std::make_unique<WindowsMemoryInfo>();
+    #elif __linux__
+        gMemoryInfo = std::make_unique<LinuxMemoryInfo>();
+    #endif
+    return gMemoryInfo;
+}
+std::unique_ptr<IMemoryInfo> gMemoryInfo = createMemoryInfo();
+
+bool readShouldWaitForSystemMemory(size_t bytesToReadLeft) {
+	std::lock_guard lock(gUsedReadCacheMemoryMutex);
+	uint64_t avalaibleSystemMemory = gMemoryInfo->getAvailableMemory();
+	uint64_t virtualReadCacheAvailableMemory =
+		gReadCacheMaxSize.load() - gUsedReadCacheMemory;
+	return bytesToReadLeft > virtualReadCacheAvailableMemory ||
+			bytesToReadLeft > avalaibleSystemMemory;
+}
+
+void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
+	std::lock_guard lock(gUsedReadCacheMemoryMutex);
+	gUsedReadCacheMemory += bytesToReadLeft;
+}
+
+uint32_t getBytesToBeReadFromCS(uint32_t index, uint32_t offset, uint32_t size,
+                                const uint64_t fileLength) {
+	uint64_t offsetInFile = static_cast<uint64_t>(index) * SFSCHUNKSIZE + offset;
+	uint32_t availableSize = size;  // requested data may lie beyond end of file
+	if (offsetInFile >= fileLength) {
+		// read request entirely beyond EOF, can't read anything
+		availableSize = 0;
+	} else if (offsetInFile + availableSize > fileLength) {
+		// read request partially beyond EOF, truncate request to EOF
+		availableSize = fileLength - offsetInFile;
+	}
+	if (availableSize == 0) {
+		return 0;
+	}
+	return availableSize;
+}
 
 RequestConditionVariablePair
 ReadaheadRequests::append(ReadaheadRequestPtr readaheadRequestPtr) {
@@ -257,8 +301,8 @@ void ReadaheadOperationsManager::addExtraRequests_(
 			continue;
 		}
 
-		ReadCache::Entry *entry =
-		    rrec->cache.forceInsert(maximumRequestedOffset, satisfyingSize);
+		ReadCache::Entry *entry = rrec->cache.forceInsert(
+		    maximumRequestedOffset, satisfyingSize);
 
 		// we are not going to use the return value from the addRequest_ call
 		RequestConditionVariablePair _ = addRequest_(rrec, entry);
@@ -275,6 +319,7 @@ inline ChunkConnectorUsingPool gChunkConnector(gReadConnectionPool);
 inline ReadaheadOperationsManager gReadaheadOperationsManager;
 inline std::mutex gMutex;
 inline std::mutex gReadaheadOperationsManagerMutex;
+inline std::mutex gReadCacheMemoryMutex;
 inline ReadRecords gActiveReadRecords;
 inline pthread_t delayedOpsThread;
 inline std::vector<pthread_t> readOpsThreads;
@@ -453,6 +498,7 @@ void read_data_init(uint32_t retries,
 		uint32_t chunkserverTotalReadTimeout_ms,
 		uint32_t cache_expiration_time_ms,
 		uint32_t readahead_max_window_size_kB,
+		uint32_t read_chache_max_size_mB,
 		uint32_t read_workers,
 		uint32_t max_readahead_requests,
 		bool prefetchXorStripes,
@@ -469,6 +515,8 @@ void read_data_init(uint32_t retries,
 	gChunkserverTotalReadTimeout_ms = chunkserverTotalReadTimeout_ms;
 	gCacheExpirationTime_ms = cache_expiration_time_ms;
 	gReadaheadMaxWindowSize = readahead_max_window_size_kB * 1024;
+	gReadCacheMaxSize.store(std::min<uint64_t>(
+	    read_chache_max_size_mB * (1024LL * 1024LL), gMemoryInfo->getTotalMemory()));
 	gReadWorkers = read_workers;
 	gMaxReadaheadRequests = max_readahead_requests;
 	gPrefetchXorStripes = prefetchXorStripes;
@@ -490,6 +538,7 @@ void read_data_init(uint32_t retries,
 	gTweaks.registerVariable("ReadTotalTimeout", gChunkserverTotalReadTimeout_ms);
 	gTweaks.registerVariable("CacheExpirationTime", gCacheExpirationTime_ms);
 	gTweaks.registerVariable("ReadaheadMaxWindowSize", gReadaheadMaxWindowSize);
+	gTweaks.registerVariable("ReadCacheMaxSize", gReadCacheMaxSize);
 	gTweaks.registerVariable("MaxReadaheadRequests", gMaxReadaheadRequests);
 	gTweaks.registerVariable("ReadChunkPrepare", ChunkReader::preparations);
 	gTweaks.registerVariable("ReqExecutedTotal", ReadPlanExecutor::executions_total_);
@@ -513,6 +562,7 @@ void read_data_term(void) {
 	}
 
 	clear_active_read_records();
+	gMemoryInfo.reset();
 }
 
 void read_inode_ops(uint32_t inode) { // attributes of inode have been changed - force reconnect and clear cache
@@ -583,6 +633,17 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			if (size_in_chunk > bytes_to_read) {
 				size_in_chunk = bytes_to_read;
 			}
+
+			uint32_t read_cache_bytes_to_reserve =
+				getBytesToBeReadFromCS(reader.index(), offset_in_chunk,
+										size_in_chunk, reader.fileLength());
+			std::unique_lock lock(gReadCacheMemoryMutex);
+			if (readShouldWaitForSystemMemory(read_cache_bytes_to_reserve)) {
+				throw RecoverableReadException(
+				    "Not enough read cache memory available for reading");
+			}
+			increaseUsedReadCacheMemory(read_cache_bytes_to_reserve);
+			lock.unlock();
 			uint32_t bytes_read_from_chunk = reader.readData(
 					read_buffer, offset_in_chunk, size_in_chunk,
 					gChunkserverConnectTimeout_ms, gChunkserverWaveReadTimeout_ms,
@@ -649,6 +710,7 @@ int read_data(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 			ChunkReader reader(gChunkConnector, rrec->locator,
 			                   gBandwidthOveruse);
 			uint64_t bytesRead = 0;
+
 			int errorCode = read_to_buffer(rrec,
 			                               requestOffset,
 			                               bytesToReadLeft,

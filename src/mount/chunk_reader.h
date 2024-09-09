@@ -71,6 +71,9 @@ public:
 	uint32_t version() const {
 		return location_->version;
 	}
+	uint64_t fileLength() const {
+		return location_->fileLength;
+	}
 
 	/// Counter for the .saunafs_tweaks file.
 	static std::atomic<uint64_t> preparations;

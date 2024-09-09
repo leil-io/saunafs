@@ -83,6 +83,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfschunkservertotalreadto=%d", chunkservertotalreadto, 0),
 	SFS_OPT("cacheexpirationtime=%d", cacheexpirationtime, 0),
 	SFS_OPT("readaheadmaxwindowsize=%d", readaheadmaxwindowsize, 4096),
+	SFS_OPT("readcachemaxsize=%d", readcachemaxsize, 16384),
 	SFS_OPT("readworkers=%d", readworkers, 1),
 	SFS_OPT("maxreadaheadrequests=%d", maxreadaheadrequests, 0),
 	SFS_OPT("sfsprefetchxorstripes", prefetchxorstripes, 1),
@@ -154,6 +155,8 @@ void usage(const char *progname) {
 				"of a xor chunk\n"
 "    -o bandwidthoveruse=N       define ratio of allowed bandwidth overuse "
 				"when fetching data (default: %.2f)\n"
+"    -o readcachemaxsize=MB      define the maximum cache memory size "
+				"for reading operations in mebibytes (default: %u)\n"
 "\n"
 "Write related options:\n"
 "    -o sfschunkserverwriteto=MSEC  set chunkserver response timeout during "
@@ -239,6 +242,7 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultChunkserverReadTo,
 		SaunaClient::FsInitParams::kDefaultChunkserverTotalReadTo,
 		SaunaClient::FsInitParams::kDefaultBandwidthOveruse,
+		SaunaClient::FsInitParams::kDefaultReadCacheMaxSize,
 		SaunaClient::FsInitParams::kDefaultChunkserverWriteTo,
 		SaunaClient::FsInitParams::kDefaultWriteCacheSize,
 		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,
@@ -340,12 +344,14 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 	}
 	gCustomCfg = 1;
 	while (fgets(lbuff, N - 1, fd)) {
+		// Skip a comment line
 		if (lbuff[0] == '#' || lbuff[0] == ';')
 			continue;
 
 		lbuff[N - 1] = 0;
 		gCfgString += lbuff;
 
+		// Go to the end of the cfg file line
 		for (p = lbuff; *p; p++) {
 			if (*p == '\r' || *p == '\n') {
 				*p = 0;
@@ -355,6 +361,7 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 
 		p--;
 
+		// Skip last blank spaces in the line
 		while (p >= lbuff && (*p == ' ' || *p == '\t')) {
 			*p = 0;
 			p--;
@@ -362,18 +369,25 @@ void sfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *
 
 		p = lbuff;
 
+		// Skip first blank spaces in the line
 		while (*p == ' ' || *p == '\t') {
 			p++;
 		}
 
 		if (*p) {
 			if (*p == '-') {
-				fuse_opt_add_arg(outargs,p);
-			} else if (*p == '/') {
+				// "-o opt1=val1,opt2=val2,..." or "-D S"-like formats
+				if (p[1] != ' ' && p[1] != 0 && p[2] == ' ') {
+					fuse_opt_add_arg(outargs, std::string(p, p + 2).c_str());
+					fuse_opt_add_arg(outargs, p + 3);
+				} else { // "-oopt1=val1,opt2=val2,..." format
+					fuse_opt_add_arg(outargs, p);
+				}
+			} else if (*p == '/') { // default mountpoint
 				if (gDefaultMountpoint)
 					free(gDefaultMountpoint);
 				gDefaultMountpoint = strdup(p);
-			} else {
+			} else { // "opt1=val1,opt2=val2,..." format
 				fuse_opt_add_arg(outargs,"-o");
 				fuse_opt_add_arg(outargs,p);
 			}

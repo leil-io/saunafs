@@ -38,6 +38,9 @@
 
 #define MISSING_OFFSET_PTR nullptr
 
+inline std::mutex gUsedReadCacheMemoryMutex;
+inline uint64_t gUsedReadCacheMemory;
+
 class ReadCache {
 public:
 	typedef uint64_t Offset;
@@ -286,7 +289,7 @@ public:
 	 * \return cache query result
 	 */
 	void query(Offset offset, Size size, ReadCache::Result &result,
-	           bool insertPending = true) {
+			bool insertPending = true) {
 		collectGarbage();
 
 		auto it = entries_.upper_bound(offset, Entry::OffsetComp());
@@ -403,15 +406,23 @@ protected:
 			reserved_entries_.push_back(*e);
 		} else {
 			assert(e->refcount == 0);
+			std::unique_lock lock(gUsedReadCacheMemoryMutex);
+			gUsedReadCacheMemory -= e->buffer.size();
+			lock.unlock();
 			delete e;
 		}
 		return ret;
 	}
 
 	void clearReserved(unsigned count) {
+		std::unique_lock<std::mutex> lock(gUsedReadCacheMemoryMutex,
+		                                  std::defer_lock);
 		while (!reserved_entries_.empty() && count-- > 0) {
 			Entry *e = std::addressof(reserved_entries_.front());
 			if (e->refcount == 0) {
+				lock.lock();
+				gUsedReadCacheMemory -= e->buffer.size();
+				lock.unlock();
 				reserved_entries_.pop_front();
 				delete e;
 			} else {

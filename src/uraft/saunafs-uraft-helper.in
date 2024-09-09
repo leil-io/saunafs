@@ -155,6 +155,11 @@ saunafs_isalive() {
 	saunafs_master isalive
 	if [[ $? == 0 ]] ; then
 		echo -n alive
+		if ! ip addr | grep -w -q "${URAFT_FLOATING_IP}"; then
+			log "floating ip address ${URAFT_FLOATING_IP} was lost, adding it again..."
+			load_config
+			saunafs_assign_ip
+		fi
 	else
 		echo -n dead
 	fi

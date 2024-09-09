@@ -8,6 +8,7 @@ pipeline {
         ansiColor("xterm")
         parallelsAlwaysFailFast()
         preserveStashes(buildCount: 2)
+        disableConcurrentBuilds(abortPrevious: true)
     }
     stages {
         stage('Build Images') {

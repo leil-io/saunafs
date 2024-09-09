@@ -34,6 +34,7 @@
 inline std::atomic<uint32_t> gReadaheadMaxWindowSize;
 inline std::atomic<uint32_t> gCacheExpirationTime_ms;
 inline std::atomic<uint32_t> gMaxReadaheadRequests;
+inline std::atomic<uint64_t> gReadCacheMaxSize;
 
 enum class ReadaheadRequestState {
 	kInqueued,
@@ -337,6 +338,7 @@ void read_data_init(uint32_t retries, uint32_t chunkserverRoundTripTime_ms,
                     uint32_t chunkserverTotalReadTimeout_ms,
                     uint32_t cache_expiration_time_ms,
                     uint32_t readahead_max_window_size_kB,
+					uint32_t read_cache_max_size_mB,
                     uint32_t read_workers, uint32_t max_readahead_requests,
                     bool prefetchXorStripes, double bandwidth_overuse);
 void read_data_term();

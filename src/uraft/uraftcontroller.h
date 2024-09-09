@@ -30,6 +30,7 @@ public:
 		int         promote_timeout;          //!< Time after which we kill promote script. //
 		int         demote_timeout;           //!< Time after which we kill demote script. //
 		int         dead_handler_timeout;     //!< Time after which we kill dead script. //
+		std::string floating_ip;        //!< Floating IP addresss used by uraft. //
 	};
 
 public:

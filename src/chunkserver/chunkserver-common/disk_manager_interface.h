@@ -44,6 +44,9 @@ public:
 	/// Virtual destructor needed for correct polymorphism
 	virtual ~IDiskManager() = default;
 
+	/// Reload the configuration from the configuration file.
+	virtual void reloadConfiguration() = 0;
+
 	/// Reload the disks from the configuration and populates the gDisks vector.
 	virtual void reloadDisksFromCfg() = 0;
 
@@ -51,4 +54,14 @@ public:
 	/// different strategies.
 	virtual IDisk *getDiskForNewChunk(
 	    [[maybe_unused]] const ChunkPartType &chunkType) = 0;
+
+	/// Update the space usage of the disks.
+	virtual void updateSpaceUsage() = 0;
+
+	/// Gets the disk groups information in YAML format
+	virtual std::string getDiskGroupsInfo() = 0;
+
+	/// Selects the disk to use for Garbage Collection (GC).
+	/// Could return DiskNotFound if the disks does not need GC.
+	virtual IDisk *getDiskForGC() = 0;
 };

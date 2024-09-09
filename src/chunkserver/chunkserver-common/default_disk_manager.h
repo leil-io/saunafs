@@ -47,6 +47,11 @@ public:
 	/// Virtual destructor needed for correct polymorphism
 	virtual ~DefaultDiskManager() = default;
 
+	/// Reload the configuration from the configuration file.
+	/// No need to reload the configuration so far for this implementation.
+	void reloadConfiguration() override {};
+
+	/// Parse a configuration line for a disk.
 	virtual int parseCfgLine(std::string hddCfgLine);
 
 	/// Reload the disks from the configuration and populates the gDisks vector.
@@ -60,4 +65,19 @@ public:
 	 */
 	IDisk *getDiskForNewChunk(
 	    [[maybe_unused]] const ChunkPartType &chunkType) override;
+
+	/// Update the space usage of the disks.
+	/// No need to update the space usage here for this implementation.
+	void updateSpaceUsage() override {};
+
+	/// Gets the disk groups information.
+	/// Not supported by the default disk manager.
+	std::string getDiskGroupsInfo() override { return "Not supported"; }
+
+	/// Selects the disk to use for GC.
+	IDisk *getDiskForGC() override;
+
+private:
+	/// Next disk index for GC. Helps in the round-robin strategy.
+	uint32_t nextDiskIndexForGC_ = 0;
 };
