@@ -2,11 +2,16 @@ timeout_set 2 minutes
 
 # Create an installation with 3 chunkservers, 3 disks each.
 # All disks in CS 0 will fail during the test.
+if is_windows_system; then
+    MOUNT_EXTRA_CONFIG="sfscachemode=NEVER"
+else
+    MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|sfsdirectio=1"
+fi
+
 USE_RAMDISK=YES \
-	MOUNTS=1
+	MOUNTS=1 \
 	CHUNKSERVERS=3 \
-	DISK_PER_CHUNKSERVER=3 \
-	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|sfsdirectio=1"
+	DISK_PER_CHUNKSERVER=3
 	setup_local_empty_saunafs info
 
 # Create a directory with many files on mountpoint
