@@ -25,6 +25,11 @@ get_checksum() {
 	sha256sum $1 | awk '{ print $1 }'
 }
 
+# Function to get the checksum of a given file, using direct I/O
+get_checksum_with_direct_io() {
+	dd if="$1" iflag=direct bs=1M 2>/dev/null | sha256sum | awk '{ print $1 }'
+}
+
 mkdir -p "${TEMP_DIR}/mnt/ganesha"
 
 # Create PID file for Ganesha
@@ -44,8 +49,8 @@ NFS_KRB5 {
 	Active_krb5=false;
 }
 NFSV4 {
-	Grace_Period = 5;
-	Lease_Lifetime = 5;
+	Grace_Period = 10;
+	Lease_Lifetime = 10;
 }
 EXPORT {
 	Attr_Expiration_Time = 0;
@@ -58,7 +63,7 @@ EXPORT {
 		hostname = localhost;
 		port = ${saunafs_info_[matocl]};
 		# How often to retry to connect
-		io_retries = 5;
+		io_retries = 30;
 		cache_expiration_time_ms = 2500;
 	}
 	Protocols = 4;
@@ -68,13 +73,13 @@ EXPORT {
 }
 EOF
 
+# Create a file for testing with checksum
+head -c 3G /dev/urandom | tee "${TEMP_DIR}/test_file" > /dev/null
+
 sudo /usr/bin/ganesha.nfsd -f "${info[mount0]}/ganesha.conf"
 assert_eventually 'showmount -e localhost'
 
 sudo mount -vvvv localhost:/ "${TEMP_DIR}/mnt/ganesha"
-
-# Create a file for testing with checksum
-head -c 3G /dev/random | tee "${TEMP_DIR}/test_file" > /dev/null
 
 # Restart master server after 15 seconds
 (
@@ -83,29 +88,14 @@ head -c 3G /dev/random | tee "${TEMP_DIR}/test_file" > /dev/null
 ) &
 
 # Wait for Grace period so NFS Ganesha server will be ready
-sleep 5
+sleep 10
 
-# Try to copy the file after master restart
-while true; do
-	cp "${TEMP_DIR}/test_file" "$TEMP_DIR/mnt/ganesha/test_file" && break
-	echo "Unable to copy test_file through NFS, retrying in 5 seconds..."
-	sleep 5
-done
+# Copy the file after master restart
+cp "${TEMP_DIR}/test_file" "$TEMP_DIR/mnt/ganesha/test_file"
 
 # Get checksums
 checksum1=$(get_checksum "${TEMP_DIR}/test_file")
-
-# To get the checksum of the file from NFS could require several retries in case
-# NFS mount will not be available after restarting master server
-while true; do
-	checksum2=$(get_checksum "${TEMP_DIR}/mnt/ganesha/test_file")
-	if [ "${checksum2}" != "" ]; then
-		break
-	fi
-	echo "Unable to get checksums through NFS, retrying in 5 seconds..."
-	sleep 5
-done
-
+checksum2=$(get_checksum_with_direct_io "${TEMP_DIR}/mnt/ganesha/test_file")
 checksum3=$(get_checksum "${info[mount0]}/test_file")
 
 # Print checksums
