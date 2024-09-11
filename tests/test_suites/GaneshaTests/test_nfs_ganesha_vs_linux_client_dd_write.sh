@@ -11,7 +11,7 @@
 # with dd tool.
 #
 
-timeout_set 45 seconds
+timeout_set 2 minutes
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
@@ -28,15 +28,7 @@ test_error_cleanup() {
 mkdir -p ${TEMP_DIR}/mnt/ganesha
 mkdir -p ${info[mount0]}/linux
 
-# Create PID file for Ganesha
-PID_FILE=/var/run/ganesha/ganesha.pid
-if [ ! -f ${PID_FILE} ]; then
-	echo "ganesha.pid doesn't exists, creating it...";
-	sudo mkdir -p /var/run/ganesha;
-	sudo touch ${PID_FILE};
-else
-	echo "ganesha.pid already exists";
-fi
+create_ganesha_pid_file
 
 cd ${info[mount0]}
 
@@ -75,7 +67,7 @@ EOF
 
 sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
 
-assert_eventually 'showmount -e localhost'
+check_rpc_service
 sudo mount -vvvv localhost:/ $TEMP_DIR/mnt/ganesha
 
 echo ""
