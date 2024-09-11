@@ -66,7 +66,7 @@ stop_ganesha() {
 	fi
 
 	# Check if ganesha daemon is still running
-	if pgrep ganesha.nfsd > /dev/null; then
+	if ps aux | grep [g]anesha > /dev/null; then
 		# Start a new ganesha daemon to remove the hanging one
 		sudo /usr/bin/ganesha.nfsd -L /var/log/ganesha.log
 		sleep 2
