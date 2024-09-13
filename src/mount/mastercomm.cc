@@ -720,7 +720,15 @@ int fs_connect(bool verbose) {
 	rptr = regbuff;
 	if (i==1) {
 		if (verbose) {
-			fprintf(stderr,"sfsmaster register error: %s\n",saunafs_error_string(rptr[0]));
+			if (rptr[0] == SAUNAFS_ERROR_ENOENT) {
+				fprintf(stderr,
+				        "sfsmaster register error: Cannot access \'%s\': %s\n",
+				        gInitParams.subfolder.c_str(),
+				        saunafs_error_string(rptr[0]));
+			} else {
+				fprintf(stderr, "sfsmaster register error: %s\n",
+				        saunafs_error_string(rptr[0]));
+			}
 		} else {
 			safs_pretty_syslog(LOG_WARNING,"sfsmaster register error: %s",saunafs_error_string(rptr[0]));
 		}
