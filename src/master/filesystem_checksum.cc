@@ -35,6 +35,7 @@ static uint64_t fsnodes_checksum(FSNode *node, bool full_update = false) {
 		return 0;
 	}
 	uint64_t seed = 0x4660fe60565ba616;  // random number
+	uint64_t lowerCaseSeed = 0x4660fe60565ba616;  // random number for lower case
 	hashCombine(seed, node->type, node->id, node->goal, node->mode, node->uid, node->gid,
 	            node->atime, node->mtime, node->ctime, node->trashtime);
 	switch (node->type) {
@@ -44,8 +45,19 @@ static uint64_t fsnodes_checksum(FSNode *node, bool full_update = false) {
 			for(const auto &entry : *static_cast<FSNodeDirectory*>(node)) {
 				static_cast<FSNodeDirectory*>(node)->entries_hash ^= entry.first.hash();
 			}
+
+			// Case insensitive
+			if (static_cast<FSNodeDirectory *>(node)->case_insensitive) {
+				static_cast<FSNodeDirectory *>(node)->lowerCaseEntriesHash = 0;
+				for (const auto &entry :
+				     static_cast<FSNodeDirectory *>(node)->lowerCaseEntries) {
+					static_cast<FSNodeDirectory *>(node)
+					    ->lowerCaseEntriesHash ^= entry.first.hash();
+				}
+			}
 		}
 		hashCombine(seed, static_cast<const FSNodeDirectory*>(node)->entries_hash);
+		hashCombine(lowerCaseSeed, static_cast<const FSNodeDirectory*>(node)->lowerCaseEntriesHash);
 		break;
 	case FSNode::kSocket:
 	case FSNode::kFifo:

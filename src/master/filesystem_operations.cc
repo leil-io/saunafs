@@ -446,7 +446,10 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 	if (fsnodes_namecheck(name) < 0) {
 		return SAUNAFS_ERROR_EINVAL;
 	}
-	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
+
+	auto parentNode = static_cast<FSNodeDirectory *>(wd);
+	parentNode->case_insensitive = context.sesflags() & SESFLAG_CASEINSENSITIVE;
+	FSNode *child = fsnodes_lookup(parentNode, name);
 	if (!child) {
 		return SAUNAFS_ERROR_ENOENT;
 	}
