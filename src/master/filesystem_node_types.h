@@ -210,14 +210,20 @@ struct FSNodeDirectory : public FSNode {
 	typedef EntriesContainer::const_iterator const_iterator;
 
 	EntriesContainer entries; /*!< Directory entries (entry: name + pointer to child node). */
+	EntriesContainer
+	    lowerCaseEntries; /*!< Directory entries with lowe case name (entry:
+	                         name + pointer to child node). */
+	bool case_insensitive = false;
 	statsrecord stats; /*!< Directory statistics (including subdirectories). */
 	uint32_t nlink; /*!< Number of directories linking to this directory. */
 	uint16_t entries_hash;
+	uint16_t lowerCaseEntriesHash;
 
 	FSNodeDirectory() : FSNode(kDirectory) {
 		memset(&stats, 0, sizeof(stats));
 		nlink = 2;
 		entries_hash = 0;
+		lowerCaseEntriesHash = 0;
 	}
 
 	~FSNodeDirectory() {
@@ -232,18 +238,58 @@ struct FSNodeDirectory : public FSNode {
 	 */
 	iterator find(const HString& name) {
 		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
-
-		auto it = entries.lower_bound(hstorage::Handle(name_hash << hstorage::Handle::kHashShift));
-		for (; it != entries.end(); ++it) {
-			if (((*it).first.data() >> hstorage::Handle::kHashShift) != name_hash) {
-				break;
+		
+		if (case_insensitive) {
+			HString lowerCaseNameHandle = HString::hstringToLowerCase(name);
+			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
+			auto lowerCaseIt =
+			    lowerCaseEntries.lower_bound(hstorage::Handle(
+			        name_hash << hstorage::Handle::kHashShift));
+			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
+				if (((*lowerCaseIt).first.data() >>
+				     hstorage::Handle::kHashShift) != name_hash) {
+					break;
+				}
+				if ((*lowerCaseIt).first == lowerCaseNameHandle) {
+					auto it = find((*lowerCaseIt).second);
+					return it;
+				}
 			}
-			if ((*it).first == name) {
-				return it;
+		} else {
+			auto it = entries.lower_bound(
+			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift));
+			for (; it != entries.end(); ++it) {
+				if (((*it).first.data() >> hstorage::Handle::kHashShift) !=
+				    name_hash) {
+					break;
+				}
+				if ((*it).first == name) { return it; }
 			}
 		}
 
 		return entries.end();
+	}
+
+	iterator find_lowercase_container(const HString &name) {
+		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
+
+		if (case_insensitive) {
+			HString lowerCaseNameHandle = HString::hstringToLowerCase(name);
+			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(
+			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift));
+			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
+				if (((*lowerCaseIt).first.data() >>
+				     hstorage::Handle::kHashShift) != name_hash) {
+					break;
+				}
+				if ((*lowerCaseIt).first == lowerCaseNameHandle) {
+					return lowerCaseIt;
+				}
+			}
+		}
+
+		return lowerCaseEntries.end();
 	}
 
 	/*! \brief Find directory entry with given node.

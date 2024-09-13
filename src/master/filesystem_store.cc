@@ -413,6 +413,12 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 		auto it = parent->entries.insert({hstorage::Handle(name), child}).first;
 		parent->entries_hash ^= (*it).first.hash();
 
+		if (parent->case_insensitive) {
+			HString lowerCaseName = HString::hstringToLowerCase(HString(name));
+			auto it = parent->lowerCaseEntries.insert({hstorage::Handle(std::string(lowerCaseName.c_str())), child}).first;
+			parent->lowerCaseEntriesHash ^= (*it).first.hash();
+		}
+
 		child->parent.push_back(parent->id);
 		if (child->type == FSNode::kDirectory) {
 			parent->nlink++;

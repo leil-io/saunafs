@@ -490,6 +490,13 @@ void fsnodes_remove_edge(uint32_t ts, FSNodeDirectory *parent, const HString &na
 	if (dir_it != parent->end()) {
 		parent->entries.erase(dir_it);
 		parent->entries_hash ^= name.hash();
+
+		if (parent->case_insensitive) {
+			auto lowerCaseIt = parent->find_lowercase_container(name);
+			parent->lowerCaseEntries.erase(lowerCaseIt);
+			HString lowerCaseName = HString::hstringToLowerCase(name);
+			parent->lowerCaseEntriesHash ^= lowerCaseName.hash();
+		}
 	}
 
 	statsrecord sr;
@@ -516,6 +523,13 @@ void fsnodes_remove_edge(uint32_t ts, FSNodeDirectory *parent, const HString &na
 void fsnodes_link(uint32_t ts, FSNodeDirectory *parent, FSNode *child, const HString &name) {
 	parent->entries.insert({hstorage::Handle(name), child});
 	parent->entries_hash ^= name.hash();
+
+	if (parent->case_insensitive) {
+		HString lowerCaseName = HString::hstringToLowerCase(name);
+		parent->lowerCaseEntries.insert(
+		    {hstorage::Handle(std::string(lowerCaseName.c_str())), child});
+		parent->lowerCaseEntriesHash ^= lowerCaseName.hash();
+	}
 
 	child->parent.push_back(parent->id);
 

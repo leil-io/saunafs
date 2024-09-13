@@ -701,6 +701,12 @@ static int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 				o=1;
 			}
 			break;
+		case 'c':
+			if (strcmp(p,"caseinsensitive")==0) {
+				arec->sesflags |= SESFLAG_CASEINSENSITIVE;
+				o=1;
+			}
+			break;
 		case 'd':
 			if (strcmp(p,"dynamicip")==0) {
 				arec->sesflags |= SESFLAG_DYNAMICIP;
