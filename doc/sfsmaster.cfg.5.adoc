@@ -243,6 +243,11 @@ EC goals to land in the chunkservers with higher percentage of available space.
 Could cause parities landing always in the same chunkservers if the cluster is
 not well balanced. (default: 1)
 
+*POLL_TIMEOUT_MS*:: Maximum amount of time in milliseconds that the polling
+operation will wait for events. The value is applied for the polling in the
+events loop. Smaller values could reduce latency at the cost of CPU usage
+(default: 50)
+
 *ENABLE_PROMETHEUS*:: Whether to enable Prometheus support and metric
 collection. Note that this requires compiling with Prometheus support. Set to
 either 1 to enable, or 0 to disable (default is 0)

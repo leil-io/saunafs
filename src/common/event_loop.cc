@@ -81,6 +81,13 @@ static EntryList gWantExitEntries;
 static EntryList gReloadEntries;
 static EntryList gEachLoopEntries;
 
+void eventloop_load_poll_timeout() {
+	gPollTimeout = static_cast<int>(
+	    cfg_get_minvalue<uint32_t>("POLL_TIMEOUT_MS", kDefaultPollTimeout, 0));
+
+	safs_pretty_syslog(LOG_NOTICE, "poll timeout set to %d ms", gPollTimeout);
+}
+
 void eventloop_make_next_poll_nonblocking() {
 	nextPollNonblocking = true;
 }
@@ -222,15 +229,18 @@ void eventloop_run() {
 	std::vector<pollfd> pdesc;
 	int i;
 
+	eventloop_load_poll_timeout();
+
 	while (gExitingStatus != ExitingStatus::kDoExit) {
 		pdesc.clear();
 		for (auto &pollit: gPollEntries) {
 			pollit.desc(pdesc);
 		}
 #if defined(_WIN32)
-		i = tcppoll(pdesc, nextPollNonblocking ? 0 : 50);
+		i = tcppoll(pdesc, nextPollNonblocking ? 0 : gPollTimeout);
 #else
-		i = poll(pdesc.data(),pdesc.size(), nextPollNonblocking ? 0 : 50);
+		i = poll(pdesc.data(), pdesc.size(),
+		         nextPollNonblocking ? 0 : gPollTimeout);
 #endif
 		nextPollNonblocking = false;
 		eventloop_updatetime();

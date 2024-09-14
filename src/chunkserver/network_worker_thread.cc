@@ -1562,7 +1562,7 @@ void NetworkWorkerThread::operator()() {
 
 	while (!doTerminate) {
 		preparePollFds();
-		int i = poll(pdesc.data(), pdesc.size(), 50);
+		int i = poll(pdesc.data(), pdesc.size(), gPollTimeout);
 		if (i < 0) {
 			if (errno == EAGAIN) {
 				safs_pretty_syslog(LOG_WARNING, "poll returned EAGAIN");

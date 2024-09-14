@@ -47,6 +47,11 @@ enum class ExitingStatus {
 extern ExitingStatus gExitingStatus;
 extern bool gReloadRequested;
 
+constexpr int kDefaultPollTimeout = 50;
+inline int gPollTimeout = kDefaultPollTimeout;
+
+void eventloop_load_poll_timeout();
+
 void eventloop_destructregister (void (*fun)(void));
 void eventloop_canexitregister (int (*fun)(void));
 void eventloop_wantexitregister (void (*fun)(void));
