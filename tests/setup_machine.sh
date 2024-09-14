@@ -359,6 +359,7 @@ if [ ! -f /etc/sudoers.d/saunafstest ] || ! grep -q '# Ganesha' /etc/sudoers.d/s
 		saunafstest ALL = NOPASSWD: /tmp/SaunaFS-autotests/mnt/sfs0/bin/ganesha.nfsd
 		saunafstest ALL = NOPASSWD: /usr/bin/ganesha.nfsd
 		saunafstest ALL = NOPASSWD: /usr/bin/pkill -9 ganesha.nfsd
+		saunafstest ALL = NOPASSWD: /usr/bin/pkill -HUP rpcbind
 		saunafstest ALL = NOPASSWD: /usr/bin/mkdir -p /var/run/ganesha
 		saunafstest ALL = NOPASSWD: /usr/bin/touch /var/run/ganesha/ganesha.pid
 		saunafstest ALL = NOPASSWD: /usr/bin/mount, /usr/bin/umount
