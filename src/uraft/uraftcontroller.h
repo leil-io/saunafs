@@ -23,19 +23,18 @@ public:
 	struct Options : uRaftStatus::Options {
 		std::string local_master_server;      //!< Local SaunaFS master server address. //
 		int         local_master_port;        //!< Local SaunaFS master server matocl port. //
-		int         elector_mode;             //!< Enable elector mode. //
+		bool        elector_mode;             //!< Enable elector mode. //
 		int         check_node_status_period; //!< How often we check master server status. //
 		int         check_cmd_status_period;  //!< How often we check script status. //
 		int         getversion_timeout;       //!< Time after which we kill get version script. //
 		int         promote_timeout;          //!< Time after which we kill promote script. //
 		int         demote_timeout;           //!< Time after which we kill demote script. //
 		int         dead_handler_timeout;     //!< Time after which we kill dead script. //
-		std::string floating_ip;        //!< Floating IP addresss used by uraft. //
-	};
+		std::string floating_ip;              //!< Floating IP addresss used by uraft. //
+		bool        no_ip_handling;           //!< Do not add/drop IP addresses. //
+};
 
-public:
 	uRaftController(boost::asio::io_service &);
-	virtual ~uRaftController();
 
 	//! Initialize data.
 	void init();
@@ -44,30 +43,30 @@ public:
 	void set_options(const Options &opt);
 
 	//! called by uRaft when node is becoming leader.
-	virtual void     nodePromote();
+	void     nodePromote() override;
 
 	//! called by uRaft when node is not longer a leader.
-	virtual void     nodeDemote();
+	void     nodeDemote() override;
 
 	//! called by uRaft when it needs to know metadata version.
-	virtual uint64_t nodeGetVersion();
+	uint64_t nodeGetVersion() override;
 
 	//! called by uRaft with new leader id.
-	virtual void     nodeLeader(int id);
+	void     nodeLeader(int id) override;
 
 protected:
 	void  checkCommandStatus(const boost::system::error_code &error);
 	void  checkNodeStatus(const boost::system::error_code &error);
 
 	bool  runSlowCommand(const std::string &cmd);
-	bool  checkSlowCommand(int &status);
+	bool  checkSlowCommand(int &status) const;
 	bool  stopSlowCommand();
 	void  setSlowCommandTimeout(int timeout);
 
 	bool  runCommand(const std::vector<std::string> &cmd, std::string &result, int timeout);
-	int   readString(int fd, std::string &result, int timeout);
+	static int   readString(int fileDescriptor, std::string &result, int timeout);
 
-protected:
+private:
 	boost::asio::deadline_timer check_cmd_status_timer_,check_node_status_timer_;
 	boost::asio::deadline_timer cmd_timeout_timer_;
 	pid_t                       command_pid_;
