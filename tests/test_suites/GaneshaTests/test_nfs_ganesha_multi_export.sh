@@ -7,7 +7,7 @@
 # The path for the Ganesha daemon should match the installation folder inside the test.
 #
 
-timeout_set 45 seconds
+timeout_set 2 minutes
 
 CHUNKSERVERS=5 \
 	USE_RAMDISK=YES \
@@ -28,15 +28,7 @@ cd ${info[mount0]}
 mkdir $TEMP_DIR/mnt/nfs{1,2,97,99}
 mkdir ganesha
 
-# Create PID file for Ganesha
-PID_FILE=/var/run/ganesha/ganesha.pid
-if [ ! -f ${PID_FILE} ]; then
-	echo "ganesha.pid doesn't exists, creating it...";
-	sudo mkdir -p /var/run/ganesha;
-	sudo touch ${PID_FILE};
-else
-	echo "ganesha.pid already exists";
-fi
+create_ganesha_pid_file
 
 cat <<EOF > ${info[mount0]}/ganesha.conf
 EXPORT
@@ -110,7 +102,8 @@ touch ${info[mount0]}/export1/test1
 touch ${info[mount0]}/export2/test2
 
 sudo /usr/bin/ganesha.nfsd -f ${info[mount0]}/ganesha.conf
-assert_eventually 'showmount -e localhost'
+
+check_rpc_service
 
 for x in 1 2 99; do
 	sudo mount -o v4.1 localhost:/e${x} ${TEMP_DIR}/mnt/nfs${x}
