@@ -230,6 +230,7 @@ struct DelayedQueueEntry {
 } // anonymous namespace
 
 static std::atomic<uint32_t> maxretries;
+static std::atomic<uint32_t> gWaveTimeout;
 static std::mutex gMutex;
 
 static std::mutex fcbcondMutex;
@@ -734,7 +735,7 @@ void ChunkJobWriter::processDataChain(ChunkWriter& writer) {
 		}
 
 		// Let's sleep a bit shorter if we can't be woken up by the pipe to reduce the latency
-		writer.processOperations(chunkData_->isDataChainPipeValid() ? 50 : 10);
+		writer.processOperations(gWaveTimeout);
 	}
 }
 
@@ -805,7 +806,8 @@ void* write_worker(void*) {
 
 /* API | globalLock: INITIALIZED,UNLOCKED */
 void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
-		uint32_t writewindowsize, uint32_t chunkserverTimeout_ms, uint32_t cachePerInodePercentage) {
+                     uint32_t writewindowsize, uint32_t chunkserverTimeout_ms,
+                     uint32_t cachePerInodePercentage, uint32_t waveTimeout) {
 	uint64_t cachebytecount = uint64_t(cachesize) * 1024 * 1024;
 	uint64_t cacheblockcount = (cachebytecount / SFSBLOCKSIZE);
 	pthread_attr_t thattr;
@@ -814,6 +816,7 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 	gWriteWindowSize = writewindowsize;
 	gChunkserverTimeout_ms = chunkserverTimeout_ms;
 	maxretries = retries;
+	gWaveTimeout = waveTimeout;
 	if (cacheblockcount < 10) {
 		cacheblockcount = 10;
 	}
@@ -833,6 +836,7 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 	pthread_attr_destroy(&thattr);
 
 	gTweaks.registerVariable("WriteMaxRetries", maxretries);
+	gTweaks.registerVariable("WriteWaveTimeout", gWaveTimeout);
 }
 
 void write_data_term(void) {
