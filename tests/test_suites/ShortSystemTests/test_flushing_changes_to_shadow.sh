@@ -6,13 +6,13 @@ assert_program_installed socat
 # and pauses the traffic when file $TEMP_DIR/gogo does not exist
 start_proxy() {
 	local ip=$(get_ip_addr)
-	local limiter_script="socat stdio tcp\:$ip\:$2\,rcvbuf=1024\,sndbuf=1024 | `
+	local limiter_script="socat stdio tcp\:$ip\:$2\,rcvbuf=2048\,sndbuf=2048 | `
 			`while true; do `
 				`if test -e \"$TEMP_DIR/gogo\"; then `
-					`dd bs=1024 count=1 2>/dev/null; else sleep 0.1; `
+					`dd bs=2048 count=1 2>/dev/null; else sleep 0.1; `
 				`fi; `
 			`done"
-	( socat "tcp-listen:$1,reuseaddr,rcvbuf=1024,sndbuf=1024" "system:${limiter_script}" & )
+	( socat "tcp-listen:$1,reuseaddr,rcvbuf=2048,sndbuf=2048" "system:${limiter_script}" & )
 }
 
 CHUNKSERVERS=1 \
@@ -34,15 +34,19 @@ sed -i -e "s/^MASTER_PORT.*/MASTER_PORT = $proxy_port/" "${info[master1_cfg]}"
 # Start shadow master and wait until it synchronizes
 assert_success saunafs_master_n 1 start
 assert_eventually "saunafs_shadow_synchronized 1"
+echo 'Shadow synced'
 
 # Pause traffic from master to shadow and generate enough changes to make write() to socket block
 rm "$TEMP_DIR/gogo"
+echo 'gogo removed'
 mkdir "${info[mount0]}"/directory_with_name_long_enough_to_generate_a_big_changelog_entry{1..4000}
 
 # Send SIGTERM to the master server and 10 seconds later resume the traffic
 begin_ts=$(timestamp)
-( sleep 10; touch "$TEMP_DIR/gogo"; ) &
+( sleep 10; touch "$TEMP_DIR/gogo"; echo 'gogo added' ) &
+echo 'Stopping master'
 assert_success saunafs_master_daemon stop
+echo 'Master stopped'
 end_ts=$(timestamp)
 
 # The traffic was paused for 10 seconds, let's check if we didn't succeed too soon
@@ -50,4 +54,5 @@ duration=$((end_ts - begin_ts))
 assert_less_or_equal 10 $duration
 
 # Let all the buffers be flushed and verify if all the changelogs were transferred
+echo 'Verifiying all buffers flushed and correct'
 assert_eventually_equals 'get_changes "$m" | tail' 'get_changes "$s" | tail'
