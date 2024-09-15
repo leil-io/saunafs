@@ -1,6 +1,6 @@
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
-	CHUNKSERVER_EXTRA_CONFIG="MASTER_TIMEOUT = 0.5" \
+	CHUNKSERVER_EXTRA_CONFIG="MASTER_TIMEOUT = 10" \
 	setup_local_empty_saunafs info
 
 saunafs_wait_for_all_ready_chunkservers
@@ -11,7 +11,7 @@ assert_equals 1 $(saunafs_ready_chunkservers_count)
 pid=$(saunafs_chunkserver_daemon 0 test 2>&1 | sed 's/.*pid: //')
 kill -STOP $pid
 assert_equals 1 $(saunafs_ready_chunkservers_count)
-sleep 0.3
+sleep 6
 assert_equals 1 $(saunafs_ready_chunkservers_count)
-sleep 0.2
+sleep 4
 assert_equals 0 $(saunafs_ready_chunkservers_count)
