@@ -1,5 +1,13 @@
 This file lists noteworthy changes in SaunaFS.
 
+ * SaunaFS (4.5.1) (2024-09-16)
+ - Fix critical issue with uraft assigning floating IP address to all nodes.
+   Note that this fix reverts the previous fix for lost IP addresses after
+   network restart.
+ - test: Improve Ganesha test for master failover (#187)
+ - feat(tests): Add RPC service recovery function (#189)
+
+
  * SaunaFS (4.5.0) (2024-09-05)
  - fix(mount): Set default cacheExpirationTime to 0 (#180)
  - feat(mount): Add readcachemaxsize option (#145)
