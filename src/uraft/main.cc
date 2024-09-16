@@ -48,8 +48,7 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 	("URAFT_DEMOTE_TIMEOUT", po::value<int>()->default_value(1000000000), "demote timeout (ms)")
 	("URAFT_DEAD_HANDLER_TIMEOUT", po::value<int>()->default_value(1000000000), "metadata server dead handler timeout (ms)")
 	("URAFT_CHECK_CMD_PERIOD", po::value<int>()->default_value(100), "check command status period(ms)")
-	("URAFT_STATUS_PORT", po::value<int>()->default_value(9428), "node status port")
-	("URAFT_FLOATING_IP", po::value<std::string>(), "uraft floating ip address");
+	("URAFT_STATUS_PORT", po::value<int>()->default_value(9428), "node status port");
 
 	po::options_description cmdline_options;
 	cmdline_options.add(generic).add(config).add(hidden);
@@ -111,9 +110,6 @@ void parseOptions(int argc, char **argv, uRaftController::Options &opt, bool &ma
 	opt.local_master_server       = vm["LOCAL_MASTER_ADDRESS"].as<std::string>();
 	opt.local_master_port         = vm["LOCAL_MASTER_MATOCL_PORT"].as<int>();
 	opt.check_cmd_status_period   = vm["URAFT_CHECK_CMD_PERIOD"].as<int>();
-	if (opt.elector_mode == 0) {
-		opt.floating_ip           = vm["URAFT_FLOATING_IP"].as<std::string>();
-	}
 	make_daemon                   = vm["start-daemon"].as<bool>();
 
 	if (vm.count("id")) {
@@ -222,11 +218,6 @@ int main(int argc, char **argv) {
 	if (make_daemon && !daemonize()) {
 		syslog(LOG_ERR, "Unable to switch to daemon mode");
 		return EXIT_FAILURE;
-	}
-
-	if (!opt.floating_ip.empty()) {
-		syslog(LOG_INFO, "Setting URAFT_FLOATING_IP to %s", opt.floating_ip.c_str());
-		setenv("URAFT_FLOATING_IP", opt.floating_ip.c_str(), 0);
 	}
 
 	boost::asio::io_service  io_service;
