@@ -1,3 +1,13 @@
+saunafs (4.5.1) stable; urgency=high
+  * Fix critical issue with uraft assigning floating IP address to all nodes.
+   Note that this fix reverts the previous fix for lost IP addresses after
+   network restart.
+   Fix critical issue with uraft assigning floating IP address to all nodes.
+  * test: Improve Ganesha test for master failover (#187)
+  * feat(tests): Add RPC service recovery function (#189)
+
+ -- SaunaFS Team <contact@saunafs.com>  Mon, 16 Sep 2024 14:39:59 +0300
+
 saunafs (4.5.0) stable; urgency=medium
   * fix(mount): Set default cacheExpirationTime to 0 (#180)
   * feat(mount): Add readcachemaxsize option (#145)
