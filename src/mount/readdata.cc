@@ -243,15 +243,21 @@ bool ReadaheadOperationsManager::request(
 	uint64_t bytesToReadLeft = round_up_to_blocksize(
 	    remainingSize - (requestOffset - maximumRequestedOffset));
 
-	auto requestConditionVariablePair = addRequest_(rrec, result.back());
-
-	waitingCVPtr = requestConditionVariablePair.cvPtr;
-	requestPtr = requestConditionVariablePair.requestPtr;
+	// Let's check if we very recently finished the request we've been waiting
+	// for
+	if (!result.back()->done) {
+		rcvpPtr = addRequest_(rrec, result.back());
+	}
 
 	addExtraRequests_(rrec, offset, recommendedSize,
 	                  requestOffset + bytesToReadLeft);
 
-	return true;
+	bool mustWait = false;
+	for (auto const &entry : result.entries) {
+		mustWait |= !(entry->done);
+	}
+
+	return mustWait;
 }
 
 Request ReadaheadOperationsManager::nextRequest() {
