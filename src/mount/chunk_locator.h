@@ -74,7 +74,7 @@ private:
 	uint32_t inode_;
 	uint32_t index_;
 
-	std::shared_ptr<const ChunkLocationInfo> cache_;
+	std::shared_ptr<const ChunkLocationInfo> cache_ = nullptr;
 	std::mutex mutex_;
 };
 

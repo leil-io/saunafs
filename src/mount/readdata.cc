@@ -57,6 +57,7 @@
 #define EMPTY_REQUEST nullptr
 
 inline std::condition_variable readOperationsAvailable;
+inline std::mutex gReadaheadRequestsContainerMutex;
 inline int kMaxReadCacheRequestRetries = 10;
 
 std::unique_ptr<IMemoryInfo> createMemoryInfo() {
@@ -101,9 +102,10 @@ uint32_t getBytesToBeReadFromCS(uint32_t index, uint32_t offset, uint32_t size,
 	return availableSize;
 }
 
-RequestConditionVariablePair
-ReadaheadRequests::append(ReadaheadRequestPtr readaheadRequestPtr) {
-	return pendingRequests_.emplace_back(readaheadRequestPtr);
+RequestConditionVariablePair *ReadaheadRequests::append(
+    ReadaheadRequestPtr readaheadRequestPtr) {
+	pendingRequests_.emplace_back(readaheadRequestPtr);
+	return &pendingRequests_.back();
 }
 
 void ReadaheadRequests::tryNotify() {
@@ -139,7 +141,7 @@ void ReadaheadRequests::clearAndNotify(const ReadaheadRequestPtr &reqPtr) {
 
 uint64_t ReadaheadRequests::continuousOffsetRequested(
     uint64_t offset, uint64_t endOffset, ReadCache::Result &result,
-    ConditionVariablePtr &waitingCVPtr, ReadaheadRequestPtr &requestPtr) {
+    RequestConditionVariablePair *&rcvpPtr) {
 	if (pendingRequests_.empty()) {
 		return offset;
 	}
@@ -158,8 +160,7 @@ uint64_t ReadaheadRequests::continuousOffsetRequested(
 		// offset
 		it--;
 		offset = endOffset;
-		waitingCVPtr = it->cvPtr;
-		requestPtr = it->requestPtr;
+		rcvpPtr = &(*it);
 	}
 	return offset;
 }
@@ -187,12 +188,10 @@ void ReadaheadRequests::discardAllPendingRequests() {
 	pendingRequests_.clear();
 }
 
-bool ReadaheadOperationsManager::request(ReadRecord *rrec, off_t fuseOffset,
-                                         size_t fuseSize, uint64_t offset,
-                                         uint32_t size,
-                                         ReadCache::Result &result,
-                                         ConditionVariablePtr &waitingCVPtr,
-                                         ReadaheadRequestPtr &requestPtr) {
+bool ReadaheadOperationsManager::request(
+    ReadRecord *rrec, off_t fuseOffset, size_t fuseSize, uint64_t offset,
+    uint32_t size, ReadCache::Result &result,
+    RequestConditionVariablePair *&rcvpPtr) {
 	bool isSequential = true;
 	// Feed the adviser with original FUSE offset and size (before alignment)
 	rrec->readahead_adviser.feed(fuseOffset, fuseSize, isSequential);
@@ -220,7 +219,7 @@ bool ReadaheadOperationsManager::request(ReadRecord *rrec, off_t fuseOffset,
 	// check if this data is already in process
 	uint64_t maximumRequestedOffset =
 	    rrec->readaheadRequests.continuousOffsetRequested(
-	        cachedOffset, offset + size, result, waitingCVPtr, requestPtr);
+	        cachedOffset, offset + size, result, rcvpPtr);
 
 	if (maximumRequestedOffset == offset + size) {
 		// this query can be directly served after succeeding at some
@@ -262,20 +261,23 @@ Request ReadaheadOperationsManager::nextRequest() {
 }
 
 void ReadaheadOperationsManager::putTerminateRequest() {
+	std::unique_lock requestsLock(gReadaheadRequestsContainerMutex);
 	readaheadRequestContainer_.push(
 	    std::make_pair(EMPTY_REQUEST, EMPTY_REQUEST));
 	readOperationsAvailable.notify_one();
 }
 
-RequestConditionVariablePair
-ReadaheadOperationsManager::addRequest_(ReadRecord *rrec,
-                                        ReadCache::Entry *entry) {
+RequestConditionVariablePair *ReadaheadOperationsManager::addRequest_(
+    ReadRecord *rrec, ReadCache::Entry *entry) {
 	ReadaheadRequestPtr readaheadRequestPtr =
 	    ReadaheadRequestPtr(new ReadaheadRequestEntry(entry));
+	std::unique_lock requestsLock(gReadaheadRequestsContainerMutex);
 	readaheadRequestContainer_.push(std::make_pair(rrec, readaheadRequestPtr));
+	rrec->requestsNotDone++;
 	entry->acquire();
 
 	readOperationsAvailable.notify_one();
+	requestsLock.unlock();
 
 	return rrec->readaheadRequests.append(readaheadRequestPtr);
 }
@@ -285,7 +287,7 @@ void ReadaheadOperationsManager::addExtraRequests_(
     uint64_t maximumRequestedOffset) {
 	if (!rrec->readaheadRequests.empty()) {
 		maximumRequestedOffset = rrec->readaheadRequests.lastPendingRequest()
-		                             .requestPtr->endOffset();
+		                             ->requestPtr->endOffset();
 	}
 
 	uint64_t throughputWindow = rrec->readahead_adviser.throughputWindow();
@@ -305,7 +307,7 @@ void ReadaheadOperationsManager::addExtraRequests_(
 		    maximumRequestedOffset, satisfyingSize);
 
 		// we are not going to use the return value from the addRequest_ call
-		RequestConditionVariablePair _ = addRequest_(rrec, entry);
+		addRequest_(rrec, entry);
 
 		maximumRequestedOffset += satisfyingSize;
 	}
@@ -318,8 +320,8 @@ inline ConnectionPool gReadConnectionPool;
 inline ChunkConnectorUsingPool gChunkConnector(gReadConnectionPool);
 inline ReadaheadOperationsManager gReadaheadOperationsManager;
 inline std::mutex gMutex;
-inline std::mutex gReadaheadOperationsManagerMutex;
 inline std::mutex gReadCacheMemoryMutex;
+
 inline ReadRecords gActiveReadRecords;
 inline pthread_t delayedOpsThread;
 inline std::vector<pthread_t> readOpsThreads;
@@ -358,8 +360,7 @@ bool read_data_get_prefetchxorstripes() {
 	return gPrefetchXorStripes;
 }
 
-inline void clear_active_read_records()
-{
+inline void clear_active_read_records() {
 	std::unique_lock lock(gMutex);
 
 	for (ReadRecords::value_type& readRecord : gActiveReadRecords) {
@@ -386,11 +387,16 @@ void* read_data_delayed_ops(void *arg) {
 				++(readRecordIt->second->refreshCounter);
 			}
 
-			if (readRecordIt->second->expired &&
-			    readRecordIt->second->requestsInProcess == 0 &&
-			    readRecordIt->second->readaheadRequests.empty()) {
-				delete readRecordIt->second;
-				readRecordIt = gActiveReadRecords.erase(readRecordIt);
+			if (readRecordIt->second->expired) {
+				assert(readRecordIt->second->readaheadRequests.empty());
+				if (readRecordIt->second->requestsNotDone == 0) {
+					// If there are no requests inqueued/in process then delete the ReadRecord
+					delete readRecordIt->second;
+					readRecordIt = gActiveReadRecords.erase(readRecordIt);
+				} else {
+					// Otherwise just try to clear the cache
+					readRecordIt->second->cache.clear();
+				}
 			} else {
 				++readRecordIt;
 			}
@@ -408,14 +414,15 @@ void* read_worker(void *arg) {
 	pthread_setname_np(pthread_self(), threadName.c_str());
 
 	for (;;) {
-		std::unique_lock operationsLock(gReadaheadOperationsManagerMutex);
+		std::unique_lock requestsLock(gReadaheadRequestsContainerMutex);
 		if (gReadaheadOperationsManager.empty()) {
-			readOperationsAvailable.wait(operationsLock, [] {
+			readOperationsAvailable.wait(requestsLock, [] {
 				return !gReadaheadOperationsManager.empty();
 			});
 		}
 
 		auto [readRecord, request] = gReadaheadOperationsManager.nextRequest();
+		requestsLock.unlock();
 
 		if (!request) {
 			return EMPTY_REQUEST;
@@ -426,26 +433,24 @@ void* read_worker(void *arg) {
 		// request no longer valid or no longer needed
 		if (request->error_code != SAUNAFS_STATUS_OK
 		    || request->state == ReadaheadRequestState::kDiscarded) {
+			readRecord->requestsNotDone--;
+			std::unique_lock entryLock(*entry->mutexPtr);
 			entry->release();
 			entry->done = true;
 			entry->requested_size = 0;
 			continue;
 		}
 
-		ChunkReader reader(gChunkConnector, readRecord->locator,
-		                   gBandwidthOveruse);
+		std::unique_lock entryLock(*entry->mutexPtr);
+		ChunkReader reader(gChunkConnector, gBandwidthOveruse);
 		request->state = ReadaheadRequestState::kProcessing;
-		readRecord->requestsInProcess++;
-		operationsLock.unlock();
 
 		uint64_t bytes_read = 0;
 		int error_code = read_to_buffer(readRecord, request->request_offset(),
 		                                request->bytes_to_read_left(),
 		                                entry->buffer, &bytes_read, reader);
 
-		operationsLock.lock();
 		entry->release();
-		entry->done = true;
 		entry->reset_timer();
 
 		if (error_code != SAUNAFS_STATUS_OK
@@ -453,22 +458,31 @@ void* read_worker(void *arg) {
 			// discard any leftover bytes from incorrect read
 			entry->buffer.clear();
 			entry->requested_size = 0;
+			entry->done = true;
+			entryLock.unlock();
 
 			// clear the list of read requests for this inode and notify waiting
 			// threads of this error
 			if (request->error_code == SAUNAFS_STATUS_OK) {
 				request->error_code = error_code;
+				std::unique_lock inodeLock(readRecord->mutex);
 				readRecord->readaheadRequests.clearAndNotify(request);
 			}
 
-			readRecord->requestsInProcess--;
+			readRecord->requestsNotDone--;
 			continue;
 		}
 
 		entry->requested_size = entry->buffer.size();
+		entry->done = true;
+		entryLock.unlock();
+
 		request->state = ReadaheadRequestState::kFinished;
+		readRecord->requestsNotDone--;
+
+		std::unique_lock inodeLock(readRecord->mutex);
 		readRecord->readaheadRequests.tryNotify();
-		readRecord->requestsInProcess--;
+		request = nullptr;
 	}
 
 	return EMPTY_REQUEST;
@@ -484,11 +498,12 @@ ReadRecord *read_data_new(uint32_t inode) {
 }
 
 void read_data_end(ReadRecord *rrec) {
-	std::unique_lock lock(gMutex);
+	std::unique_lock gLock(gMutex);
 	rrec->expired = true;
-	lock.unlock();
-	std::unique_lock managerLock(gReadaheadOperationsManagerMutex);
+
+	std::unique_lock inodeLock(rrec->mutex);
 	rrec->readaheadRequests.discardAllPendingRequests();
+	inodeLock.unlock();
 }
 
 void read_data_init(uint32_t retries,
@@ -695,20 +710,20 @@ int read_data(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 	if (gCacheExpirationTime_ms == 0
 	    || !rrec->readahead_adviser.shouldUseReadahead()) {
 		// no cache case
+		std::unique_lock inodeLock(rrec->mutex);
 		rrec->readahead_adviser.feed(fuseOffset, fuseSize);
 
-		rrec->cache.query(offset, size, result, true);
+		auto insertedEntry = rrec->cache.query(offset, size, result, true);
+		inodeLock.unlock();
 
-		uint64_t endOffset = result.back()->done ? result.endOffset()
-		                                         : result.remainingOffset();
-
-		if (result.frontOffset() > offset || offset + size > endOffset) {
+		if (insertedEntry != nullptr) {
+			std::unique_lock entryLock(*insertedEntry->mutexPtr);
 			uint64_t requestOffset = result.remainingOffset();
 			uint64_t bytesToReadLeft = round_up_to_blocksize(
 			    size - (requestOffset - offset));
 
-			ChunkReader reader(gChunkConnector, rrec->locator,
-			                   gBandwidthOveruse);
+			ChunkReader reader(gChunkConnector, gBandwidthOveruse);
+
 			uint64_t bytesRead = 0;
 
 			int errorCode = read_to_buffer(rrec,
@@ -726,23 +741,25 @@ int read_data(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 		}
 	} else {
 		// use the read operations manager to process the request
-		ConditionVariablePtr waitingCVPtr;
-		ReadaheadRequestPtr requestPtr;
+		RequestConditionVariablePair *rcvpPtr = nullptr;
 
-		std::unique_lock lock(gReadaheadOperationsManagerMutex);
+		std::unique_lock inodeLock(rrec->mutex);
 		bool mustWait = gReadaheadOperationsManager.request(
-		    rrec, fuseOffset, fuseSize, offset, size, result, waitingCVPtr,
-		    requestPtr);
+		    rrec, fuseOffset, fuseSize, offset, size, result, rcvpPtr);
 
 		if (mustWait) {
-			waitingCVPtr->wait(lock);
+			assert(rcvpPtr != nullptr);
+
+			auto requestPtr = rcvpPtr->requestPtr;
+			auto waitingCVPtr = rcvpPtr->cvPtr;
+
+			waitingCVPtr->wait(inodeLock);
 
 			int error_code = requestPtr->error_code;
 			if (error_code != SAUNAFS_STATUS_OK) {
 				return error_code;
 			}
 		}
-		lock.unlock();
 	}
 
 	ret = std::move(result);

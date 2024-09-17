@@ -40,7 +40,7 @@
 
 class ChunkReader {
 public:
-	ChunkReader(ChunkConnector& connector, ReadChunkLocator& _locator, double bandwidth_overuse);
+	ChunkReader(ChunkConnector& connector, double bandwidth_overuse);
 
 	/**
 	 * Uses a locator to locate the chunk and chooses chunkservers to read from.
@@ -80,7 +80,7 @@ public:
 
 private:
 	ChunkConnector& connector_;
-	ReadChunkLocator *locator_;
+	std::unique_ptr<ReadChunkLocator> locator_;
 	uint32_t inode_;
 	uint32_t index_;
 	std::shared_ptr<const ChunkLocationInfo> location_;

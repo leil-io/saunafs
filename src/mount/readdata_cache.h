@@ -40,6 +40,7 @@
 
 inline std::mutex gUsedReadCacheMemoryMutex;
 inline uint64_t gUsedReadCacheMemory;
+using MutexSharedPtr = std::shared_ptr<std::mutex>;
 
 class ReadCache {
 public:
@@ -56,6 +57,7 @@ public:
 		boost::intrusive::set_member_hook<> set_member_hook;
 		boost::intrusive::list_member_hook<> lru_member_hook;
 		boost::intrusive::list_member_hook<> reserved_member_hook;
+		MutexSharedPtr mutexPtr = std::make_shared<std::mutex>();
 
 		struct OffsetComp {
 			bool operator()(Offset offset, const Entry &entry) const {
@@ -71,7 +73,8 @@ public:
 			return offset < other.offset;
 		}
 
-		bool expired(uint32_t expiration_time) const {
+		bool expired(uint32_t expiration_time) {
+			std::unique_lock lock(*mutexPtr);
 			return timer.elapsed_ms() >= expiration_time;
 		}
 
@@ -84,6 +87,7 @@ public:
 		}
 
 		void acquire() {
+			std::unique_lock lock(*mutexPtr);
 			timer.reset();
 			refcount++;
 		}
@@ -288,8 +292,8 @@ public:
 	 *
 	 * \return cache query result
 	 */
-	void query(Offset offset, Size size, ReadCache::Result &result,
-			bool insertPending = true) {
+	Entry *query(Offset offset, Size size, ReadCache::Result &result,
+	             bool insertPending = true) {
 		collectGarbage();
 
 		auto it = entries_.upper_bound(offset, Entry::OffsetComp());
@@ -337,7 +341,9 @@ public:
 			}
 			auto inserted = insert(it, offset, bytes_left);
 			result.add(*inserted);
+			return &(*inserted);
 		}
+		return nullptr;
 	}
 
 	Entry *forceInsert(Offset offset, Size size) {
@@ -409,7 +415,10 @@ protected:
 			std::unique_lock lock(gUsedReadCacheMemoryMutex);
 			gUsedReadCacheMemory -= e->buffer.size();
 			lock.unlock();
+			auto mutexPtr = e->mutexPtr;
+			std::unique_lock entryLock(*mutexPtr);
 			delete e;
+			entryLock.unlock();
 		}
 		return ret;
 	}
@@ -424,7 +433,10 @@ protected:
 				gUsedReadCacheMemory -= e->buffer.size();
 				lock.unlock();
 				reserved_entries_.pop_front();
+				auto mutexPtr = e->mutexPtr;
+				std::unique_lock entryLock(*mutexPtr);
 				delete e;
+				entryLock.unlock();
 			} else {
 				assert(e->refcount >= 0);
 				reserved_entries_.splice(reserved_entries_.end(), reserved_entries_,
