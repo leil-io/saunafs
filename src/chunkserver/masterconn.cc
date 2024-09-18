@@ -41,7 +41,7 @@
 #include "chunkserver/bgjobs.h"
 #include "chunkserver/hddspacemgr.h"
 #include "chunkserver/network_main_thread.h"
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
 #include "common/goal.h"
