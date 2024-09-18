@@ -24,7 +24,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/event_loop.h"
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_DEFECTIVENODESMAP)
 #  include "common/judy_map.h"

@@ -32,7 +32,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/exceptions.h"

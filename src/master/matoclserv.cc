@@ -40,7 +40,7 @@
 #include <fstream>
 #include <memory>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/charts.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
