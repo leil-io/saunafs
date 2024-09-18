@@ -146,6 +146,16 @@ the operation is considered failed and is immediately aborted (default: 1000)
 replication. After this timeout, next wave of read requests is sent to other
 chunkservers (default: 500)
 
+*LOG_LEVEL*:: Setup logging. Uses the environment variable SAUNAFS_LOG_LEVEL or
+config value LOG_LEVEL to determine logging level. Valid log levels are
+- 'trace'
+- 'debug'
+- 'info'
+- 'warn' or 'warning'
+- 'err' or 'error'
+- 'crit' or 'critical'
+- 'off'
+
 == REPORTING BUGS
 
 Report bugs to the Github repository <https://github.com/leil/saunafs> as an

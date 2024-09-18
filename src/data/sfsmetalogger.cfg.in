@@ -49,3 +49,15 @@
 ## Timeout (in seconds) for master connections.
 ## (Default: 60)
 # MASTER_TIMEOUT = 60
+
+## Setup logging. Uses the environment variable SAUNAFS_LOG_LEVEL or config
+## value LOG_LEVEL to determine logging level.
+## Valid log levels are
+## 'trace'
+## 'debug'
+## 'info'
+## 'warn' or 'warning'
+## 'err' or 'error'
+## 'crit' or 'critical'
+## 'off'
+# LOG_LEVEL = info

@@ -20,6 +20,7 @@
 
 #include "common/platform.h"
 #include "slogger/slogger.h"
+#include "config/cfg.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -27,10 +28,10 @@
 #include <unistd.h>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <cassert>
+#include <cstdlib>
 #include <string>
 #include <expected>
 
-#include "common/cfg.h"
 #include "errors/sfserr.h"
 
 static safs::log_level::LogLevel log_level_from_syslog(int priority) {
@@ -72,6 +73,54 @@ safs::log_level_from_string(const std::string &level) {
 		return safs::log_level::off;
 	}
 	return std::unexpected<std::string>("Invalid log level: " + level);
+}
+
+void safs::setup_logs() {
+	std::string flush_on_str = cfg_getstring("LOG_FLUSH_ON", "CRITICAL");
+	int priority = LOG_CRIT;
+	if (flush_on_str == "ERROR") {
+		priority = LOG_ERR;
+	} else if (flush_on_str == "WARNING") {
+		priority = LOG_WARNING;
+	} else if (flush_on_str == "INFO") {
+		priority = LOG_INFO;
+	} else if (flush_on_str == "DEBUG") {
+		priority = LOG_DEBUG;
+	}
+	// Clear all logs first, to make sure we have a clean setup
+	safs::drop_all_logs();
+
+	// Defaults first
+	safs::add_log_syslog();
+	safs::log_level::LogLevel level = safs::log_level::info;
+
+	std::string log_level_str;
+	auto *log_level_c = std::getenv("SAUNAFS_LOG_LEVEL");
+	if (log_level_c == nullptr) {
+		log_level_str = cfg_getstring("LOG_LEVEL", "info");
+	} else {
+		log_level_str = std::string(log_level_c);
+	}
+
+	auto result = safs::log_level_from_string(log_level_str);
+	if (result) {
+		level = result.value();
+	}
+	safs::add_log_stderr(level);
+	if (!result) {
+		safs::log_err("{}", result.error());
+		safs::log_info("Using default log level of '{}'", log_level_to_string(level));
+	}
+
+	for (std::string suffix : {"", "_A", "_B", "_C"}) {
+		std::string configEntryName = "MAGIC_DEBUG_LOG" + suffix;
+		std::string value = cfg_get(configEntryName.c_str(), "");
+		if (value.empty()) {
+			continue;
+		}
+		safs_add_log_file(value.c_str(), LOG_DEBUG, 16*1024*1024, 8);
+	}
+	safs_set_log_flush_on(priority);
 }
 
 std::string safs::log_level_to_string(safs::log_level::LogLevel level) {

@@ -255,6 +255,16 @@ either 1 to enable, or 0 to disable (default is 0)
 *PROMETHEUS_HOST*:: Host address where Prometheus metric data can be collected,
 must be in the format of HOST:PORT (default 0.0.0.0:9499)
 
+*LOG_LEVEL*:: Setup logging. Uses the environment variable SAUNAFS_LOG_LEVEL or
+config value LOG_LEVEL to determine logging level. Valid log levels are
+- 'trace'
+- 'debug'
+- 'info'
+- 'warn' or 'warning'
+- 'err' or 'error'
+- 'crit' or 'critical'
+- 'off'
+
 == NOTES
 
 Chunks in master are tested in loop. Speed (or frequency) is regulated by two

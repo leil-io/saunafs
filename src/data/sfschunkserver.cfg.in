@@ -175,3 +175,15 @@
 ## [ADVANCED] Timeout for single wave in replication. After this timeout, next wave
 ## of read requests is sent to other chunkservers.
 # REPLICATION_WAVE_TIMEOUT_MS = 500
+
+## Setup logging. Uses the environment variable SAUNAFS_LOG_LEVEL or config
+## value LOG_LEVEL to determine logging level.
+## Valid log levels are
+## 'trace'
+## 'debug'
+## 'info'
+## 'warn' or 'warning'
+## 'err' or 'error'
+## 'crit' or 'critical'
+## 'off'
+# LOG_LEVEL = info
