@@ -22,7 +22,7 @@
 #include "master/chunkserver_db.h"
 #include "common/platform.h"
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/integer_sequence.h"
 #include "common/saunafs_version.h"
 #include "master/matocsserv.h"

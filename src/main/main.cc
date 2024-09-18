@@ -45,7 +45,7 @@
 #include <list>
 #include <memory>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/cwrap.h"
 #include "common/exceptions.h"
@@ -192,36 +192,6 @@ const std::string& set_syslog_ident() {
 	return logIdent;
 }
 
-static void main_configure_debug_log() {
-	std::string flush_on_str = cfg_getstring("LOG_FLUSH_ON", "CRITICAL");
-	int priority = LOG_CRIT;
-	if (flush_on_str == "ERROR") {
-		priority = LOG_ERR;
-	} else if (flush_on_str == "WARNING") {
-		priority = LOG_WARNING;
-	} else if (flush_on_str == "INFO") {
-		priority = LOG_INFO;
-	} else if (flush_on_str == "DEBUG") {
-		priority = LOG_DEBUG;
-	}
-	safs::drop_all_logs();
-	safs::add_log_syslog();
-	if (gRunAsDaemon) {
-		safs::add_log_stderr(safs::log_level::warn);
-	} else {
-		safs::add_log_stderr(safs::log_level::debug);
-	}
-	for (std::string suffix : {"", "_A", "_B", "_C"}) {
-		std::string configEntryName = "MAGIC_DEBUG_LOG" + suffix;
-		std::string value = cfg_get(configEntryName.c_str(), "");
-		if (value.empty()) {
-			continue;
-		}
-		safs_add_log_file(value.c_str(), LOG_DEBUG, 16*1024*1024, 8);
-	}
-	safs_set_log_flush_on(priority);
-}
-
 void main_reload() {
 	// Reload SYSLOG_IDENT
 	safs_pretty_syslog(LOG_NOTICE, "Changing SYSLOG_IDENT to %s",
@@ -229,7 +199,7 @@ void main_reload() {
 	set_syslog_ident();
 
 	// Reload MAGIC_DEBUG_LOG
-	main_configure_debug_log();
+	safs::setup_logs();
 	safs_silent_syslog(LOG_DEBUG, "main.reload");
 }
 
@@ -914,10 +884,11 @@ int main(int argc,char **argv) {
 				"configuration)",
 				cfgfile.c_str());
 	} else if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
-		safs_pretty_syslog(LOG_INFO, "configuration file %s loaded", cfgfile.c_str());
+		// Setup logs before first log
+		safs::setup_logs();
+		safs::log_info("Configuration file {} loaded", cfgfile);
 	}
 
-	main_configure_debug_log();
 
 	if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
 		if (!open_pam_session()) {

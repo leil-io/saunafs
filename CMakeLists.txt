@@ -371,6 +371,7 @@ endif()
 
 add_subdirectory(external)
 add_subdirectory(src/admin)
+add_subdirectory(src/config)
 add_subdirectory(src/errors)
 add_subdirectory(src/slogger)
 add_subdirectory(src/metrics)
