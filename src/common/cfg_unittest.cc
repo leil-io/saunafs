@@ -20,7 +20,7 @@
 
 #include <gtest/gtest.h>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 
 TEST(CfgTests, CfgParseSize) {
 	// Bytes

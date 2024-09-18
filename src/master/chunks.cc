@@ -62,7 +62,7 @@
 #ifdef METARESTORE
 #  include <time.h>
 #else
-#  include "common/cfg.h"
+#  include "config/cfg.h"
 #  include "common/main.h"
 #  include "common/random.h"
 #  include "master/matoclserv.h"
