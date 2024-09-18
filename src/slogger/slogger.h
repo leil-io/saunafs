@@ -108,6 +108,18 @@ std::expected<log_level::LogLevel, std::string> log_level_from_string(const std:
 // safs::log_level::LogLevel
 std::string log_level_to_string(log_level::LogLevel level);
 
+// Setup logging. Uses the environment variable SAUNAFS_LOG_LEVEL or config
+// value LOG_LEVEL to determine logging level.
+// Valid log levels are
+// 'trace'
+// 'debug'
+// 'info'
+// 'warn' or 'warning'
+// 'err' or 'error'
+// 'crit' or 'critical'
+// 'off'
+void setup_logs();
+
 } // namespace safs
 
 // NOTICE(sarna) Old interface, don't use unless extern-C is needed
