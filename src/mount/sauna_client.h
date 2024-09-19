@@ -92,6 +92,7 @@ struct FsInitParams {
 	static constexpr int      kDefaultEnableStatusUpdaterThread = 0;
 	static constexpr bool     kDefaultIgnoreUtimensUpdate = false;
 #endif
+	static constexpr bool     kDefaultUseOldWriteAlgorithm = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 128;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultWriteWaveTo = 10;
@@ -166,9 +167,9 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO)
-	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
-				 {	
+	             use_old_write_algorithm(kDefaultUseOldWriteAlgorithm),
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO),
+	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) {	
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -206,9 +207,10 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) 
+	             use_old_write_algorithm(kDefaultUseOldWriteAlgorithm),
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO),
 #ifndef _WIN32
-	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
+	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
 #endif 
 				 {
 	}
@@ -267,6 +269,7 @@ struct FsInitParams {
 	unsigned ignore_utimens_update;
 #endif
 
+	bool use_old_write_algorithm;
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;
