@@ -77,21 +77,22 @@ safs::log_level_from_string(const std::string &level) {
 
 void safs::setup_logs() {
 	std::string flush_on_str = cfg_getstring("LOG_FLUSH_ON", "CRITICAL");
-	int priority = LOG_CRIT;
+	safs::log_level::LogLevel priority = safs::log_level::critical;
 	if (flush_on_str == "ERROR") {
-		priority = LOG_ERR;
+		priority = safs::log_level::err;
 	} else if (flush_on_str == "WARNING") {
-		priority = LOG_WARNING;
+		priority = safs::log_level::warn;
 	} else if (flush_on_str == "INFO") {
-		priority = LOG_INFO;
+		priority = safs::log_level::info;
 	} else if (flush_on_str == "DEBUG") {
-		priority = LOG_DEBUG;
+		priority = safs::log_level::debug;
+	} else if (flush_on_str == "TRACE") {
+		priority = safs::log_level::trace;
 	}
 	// Clear all logs first, to make sure we have a clean setup
 	safs::drop_all_logs();
 
 	// Defaults first
-	safs::add_log_syslog();
 	safs::log_level::LogLevel level = safs::log_level::info;
 
 	std::string log_level_str;
@@ -107,6 +108,7 @@ void safs::setup_logs() {
 		level = result.value();
 	}
 	safs::add_log_stderr(level);
+	safs::add_log_syslog(level);
 	if (!result) {
 		safs::log_err("{}", result.error());
 		safs::log_info("Using default log level of '{}'", log_level_to_string(level));
@@ -118,9 +120,9 @@ void safs::setup_logs() {
 		if (value.empty()) {
 			continue;
 		}
-		safs_add_log_file(value.c_str(), LOG_DEBUG, 16*1024*1024, 8);
+		add_log_file(value.c_str(), safs::log_level::trace, 16*1024*1024, 8);
 	}
-	safs_set_log_flush_on(priority);
+	safs::set_log_flush_on(priority);
 }
 
 std::string safs::log_level_to_string(safs::log_level::LogLevel level) {
@@ -148,20 +150,12 @@ bool safs_add_log_file(const char *path, int priority, int max_file_size, int ma
 	return safs::add_log_file(path, log_level_from_syslog(priority), max_file_size, max_file_count);
 }
 
-void safs_set_log_flush_on(int priority) {
-	return safs::set_log_flush_on(log_level_from_syslog(priority));
-}
-
 void safs_drop_all_logs() {
 	return safs::drop_all_logs();
 }
 
 bool safs_add_log_stderr(int priority) {
 	return safs::add_log_stderr(log_level_from_syslog(priority));
-}
-
-bool safs_add_log_syslog() {
-	return safs::add_log_syslog();
 }
 
 bool safs::add_log_file(const char *path, log_level::LogLevel level, int max_file_size, int max_file_count) {
@@ -188,10 +182,11 @@ void safs::drop_all_logs() {
 	spdlog::drop_all();
 }
 
-bool safs::add_log_syslog() {
+bool safs::add_log_syslog(log_level::LogLevel level) {
 #ifndef _WIN32
 	try {
-		spdlog::syslog_logger_mt("syslog");
+		LoggerPtr logger = spdlog::syslog_logger_mt("syslog");
+		logger->set_level((spdlog::level::level_enum)level);
 		return true;
 	} catch (const spdlog::spdlog_ex &e) {
 		safs_pretty_syslog(LOG_ERR, "Adding syslog log failed: %s", e.what());

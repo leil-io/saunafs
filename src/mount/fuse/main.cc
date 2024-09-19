@@ -44,6 +44,7 @@
 #include "mount/symlinkcache.h"
 #include "mount/writedata.h"
 #include "protocol/SFSCommunication.h"
+#include "slogger/slogger.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
@@ -182,7 +183,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY, LOG_USER);
 #endif
 	}
-	safs::add_log_syslog();
+	safs::add_log_syslog(safs::log_level::info);
 	if (!foreground)
 		safs::add_log_stderr(safs::log_level::debug);
 
