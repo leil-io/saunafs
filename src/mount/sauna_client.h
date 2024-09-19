@@ -81,6 +81,7 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 	static constexpr bool     kDefaultIgnoreFlush = false;
+	static constexpr bool     kDefaultUseOldWriteAlgorithm = false;
 	static constexpr unsigned kDefaultWriteCacheSize = 128;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultWriteWaveTo = 10;
@@ -151,6 +152,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
+	             use_old_write_algorithm(kDefaultUseOldWriteAlgorithm),
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
@@ -185,6 +187,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
+	             use_old_write_algorithm(kDefaultUseOldWriteAlgorithm),
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
@@ -238,6 +241,7 @@ struct FsInitParams {
 	std::unordered_set<uint32_t> allowed_users;
 #endif
 
+	bool use_old_write_algorithm;
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;

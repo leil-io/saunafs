@@ -93,6 +93,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("bandwidthoveruse=%lf", bandwidthoveruse, 1),
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
+	SFS_OPT("sfsuseoldwritealgorithm", useoldwritealgorithm, 1),
 	SFS_OPT("sfsignoreflush", ignoreflush, 1),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
@@ -171,6 +172,7 @@ void usage(const char *progname) {
 "    -o sfswriteworkers=N        define number of write workers (default: %u)\n"
 "    -o sfswritewindowsize=N     define write window size (in blocks) for "
 				"each chunk (default: %u)\n"
+"    -o sfsuseoldwritealgorithm  use legacy write algorithm.\n"
 "    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
 				"behavior by replying SUCCESS to it immediately. Targets fast "
 				"creation of small files, but may cause data loss during crashes.\n"
