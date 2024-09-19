@@ -216,6 +216,10 @@ Equivalent to *--nostdopts* (*-n*) option for use in fstab.
 *-o nonempty*::
 Equivalent to *--nonempty* option for use in fstab.
 
+*-o sfsuseoldwritealgorithm*::
+Use legacy write algorithm. Though new algorithm is faster in most cases, old
+algorithm may prove useful in some scenarios.
+
 *-o sfsignoreflush*::
 Advanced: use with caution. Ignore flush usual behavior by replying SUCCESS to it
 immediately. Targets fast creation of small files, but may cause data loss
