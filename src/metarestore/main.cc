@@ -201,7 +201,7 @@ int main(int argc,char **argv) {
 	hstorage::Storage::reset(new hstorage::MemStorage());
 
 	prepareEnvironment();
-	safs::add_log_syslog();
+	safs::add_log_syslog(safs::log_level::info);
 	safs::add_log_stderr(safs::log_level::info);
 
 	while ((ch = getopt(argc, argv, "gfck:vm:o:d:abB:xih:z#?")) != -1) {
