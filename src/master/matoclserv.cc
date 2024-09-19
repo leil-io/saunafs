@@ -2251,6 +2251,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const 
 	if (status == SAUNAFS_STATUS_OK) {
 		serializer->serializeFuseTruncate(reply, type, messageId, attr);
 	} else {
+		safs::log_debug("matoclserv_fuse_truncate: Failed to truncate: {} (code {})", saunafs_error_string(status));
 		serializer->serializeFuseTruncate(reply, type, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
