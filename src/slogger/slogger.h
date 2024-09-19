@@ -28,6 +28,7 @@
 
 #ifndef _WIN32
 #define SPDLOG_ENABLE_SYSLOG
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #endif
 #include "common/small_vector.h"
 #include "spdlog/spdlog.h"
@@ -97,7 +98,7 @@ void log_critical(const FormatType &format, Args&&... args) {
 bool add_log_file(const char *path, log_level::LogLevel level, int max_file_size, int max_file_count);
 void set_log_flush_on(log_level::LogLevel level);
 void drop_all_logs();
-bool add_log_syslog();
+bool add_log_syslog(safs::log_level::LogLevel level);
 bool add_log_stderr(log_level::LogLevel level);
 
 // Returns the appropriate log level from the level string, or an error message
@@ -126,15 +127,10 @@ void setup_logs();
 extern "C" {
 
 /// Adds custom logging file
-bool safs_add_log_file(const char *path, int priority, int max_file_size, int max_file_count);
-
-/// Sets which level triggers immediate log flush (default: CRITICAL)
-void safs_set_log_flush_on(int priority);
+bool add_log_file(const char *path, int priority, int max_file_size, int max_file_count);
 
 /// Removes all log files
 void safs_drop_all_logs();
-
-bool safs_add_log_syslog();
 
 bool safs_add_log_stderr(int priority);
 

@@ -3,9 +3,10 @@ assert_program_installed nfs4_setfacl nfs4_getfacl
 assert_program_installed setfacl getfacl
 
 master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
-master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/syslog|LOG_FLUSH_ON=DEBUG"
+master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/syslog|LOG_FLUSH_ON=TRACE"
 touch "$TEMP_DIR/syslog"
 
+export SAUNAFS_LOG_LEVEL=trace
 CHUNKSERVERS=0 \
 USE_RAMDISK="YES" \
 ADMIN_PASSWORD="password" \
