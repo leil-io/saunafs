@@ -1,0 +1,48 @@
+name: Run Ganesha Tests
+
+on:
+  push:
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  run-ganesha-tests:
+    runs-on: ubuntu-24.04
+
+    env:
+      SAUNAFS_TEST_TIMEOUT_MULTIPLIER: 2
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install nfs-ganesha v4.3 from Ubuntu repository
+      run: |
+        sudo apt update
+        sudo apt install -y nfs-common nfs-ganesha nfs-ganesha-vfs
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install SaunaFS dependencies
+      run: |
+        sudo mkdir /mnt/hd{b,c,d}
+        cd $GITHUB_WORKSPACE/tests
+        sudo ./setup_machine.sh setup /mnt/hdb /mnt/hdc /mnt/hdd
+
+    - name: Activate virtual environment and build SaunaFS
+      run: |
+        source /var/lib/saunafs_setup_machine_venv/bin/activate
+        cd $GITHUB_WORKSPACE/tests/ci_build
+        ./run-build.sh test
+
+    - name: Run GaneshaTests suite
+      run: |
+        sudo chmod o+xr /home/runner/
+        sudo chown saunafstest:saunafstest /mnt/saunafstest_loop_*
+        sudo chown saunafstest:saunafstest /mnt/hd{b,c,d}
+        chmod +x $GITHUB_WORKSPACE/tests/ci_build/run-ganesha-tests.sh
+        $GITHUB_WORKSPACE/tests/ci_build/run-ganesha-tests.sh
