@@ -1,4 +1,4 @@
-name: Run Ganesha Tests
+name: Run Unit and Ganesha Tests
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
       - '*'
 
 jobs:
-  run-ganesha-tests:
+  Run-Unit-Tests-and-Ganesha:
     runs-on: ubuntu-24.04
 
     env:
@@ -27,7 +27,7 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Install SaunaFS dependencies
+    - name: Install SaunaFS dependencies and setup environment
       run: |
         sudo mkdir /mnt/hd{b,c,d}
         cd $GITHUB_WORKSPACE/tests
@@ -39,7 +39,12 @@ jobs:
         cd $GITHUB_WORKSPACE/tests/ci_build
         ./run-build.sh test
 
-    - name: Run GaneshaTests suite
+    - name: Run Unit Tests suite
+      run: |
+        chmod +x $GITHUB_WORKSPACE/tests/ci_build/run-unit-tests.sh
+        $GITHUB_WORKSPACE/tests/ci_build/run-unit-tests.sh
+
+    - name: Run Ganesha suite
       run: |
         sudo chmod o+xr /home/runner/
         sudo chown saunafstest:saunafstest /mnt/saunafstest_loop_*
