@@ -580,12 +580,15 @@ void InodeChunkWriter::processDataChain(ChunkWriter& writer) {
 			can_expect_next_block = haveAnyBlockInCurrentChunk(lock);
 		}
 
+		Glock lock(gMutex);
 		writer.setChunkSizeInBlocks(
 		    std::min(inodeData_->maxfleng - chunkIndex_ * SFSCHUNKSIZE,
 		             (uint64_t)SFSCHUNKSIZE));
+		lock.unlock();
 		if (writer.startNewOperations(can_expect_next_block) > 0) {
-			Glock lock(gMutex);
+			lock.lock();
 			inodeData_->lastWriteToChunkservers.reset();
+			lock.unlock();
 		}
 		if (writer.getPendingOperationsCount() == 0) {
 			return;

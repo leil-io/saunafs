@@ -48,7 +48,7 @@ enum class ReadaheadRequestState {
 // and final error code of the request.
 struct ReadaheadRequestEntry {
 	ReadCache::Entry *entry;
-	ReadaheadRequestState state;
+	std::atomic<ReadaheadRequestState> state;
 	int error_code;
 
 	ReadaheadRequestEntry(
@@ -57,14 +57,17 @@ struct ReadaheadRequestEntry {
 	    int _error_code = SAUNAFS_STATUS_OK)
 	    : entry(_entry), state(_state), error_code(_error_code) {}
 
+	// no locks required
 	inline uint64_t request_offset() const {
 		return entry->offset;
 	}
 
+	// no locks required
 	inline uint64_t bytes_to_read_left() const {
 		return entry->requested_size;
 	}
 
+	// no locks required
 	inline uint64_t endOffset() const {
 		return request_offset() + bytes_to_read_left();
 	}
@@ -81,12 +84,14 @@ struct RequestConditionVariablePair {
 	ConditionVariablePtr cvPtr;
 
 	RequestConditionVariablePair(ReadaheadRequestPtr _requestPtr)
-	    : requestPtr(_requestPtr), cvPtr(new std::condition_variable()) {}
+	    : requestPtr(_requestPtr),
+	      cvPtr(new std::condition_variable()) {}
 
 	RequestConditionVariablePair(ReadaheadRequestPtr _requestPtr,
 	                             ConditionVariablePtr _cvPtr)
 	    : requestPtr(_requestPtr), cvPtr(_cvPtr) {}
 
+	// inodeLock: LOCKED
 	void notify() {
 		cvPtr->notify_all();
 	}
@@ -101,14 +106,18 @@ struct ReadaheadRequests {
 	 * Considering the constructor of ```RequestConditionVariablePair``` used it
 	 * also creates the new conditional variable for this request.
 	 *
+	 * inodeLock: LOCKED
+	 *
 	 * \param readaheadRequestPtr The pointer to the request to append.
 	 * \return A copy to the appended instance to the underlying container.
 	 */
-	RequestConditionVariablePair
-	append(ReadaheadRequestPtr readaheadRequestPtr);
+	RequestConditionVariablePair *append(
+	    ReadaheadRequestPtr readaheadRequestPtr);
 
 	/** \brief Notify the waiting threads for ALL the first already finished
 	 * requests. Remove those requests from the underlying container.
+	 *
+	 * inodeLock: LOCKED
 	 */
 	void tryNotify();
 
@@ -121,23 +130,28 @@ struct ReadaheadRequests {
 	 * requerying this value will be satisfied, and the request to wait for is
 	 * already scheduled and is returned.
 	 *
+	 * inodeLock: LOCKED
+	 *
 	 * \param offset The starting offset of the query.
 	 * \param endOffset The cap of the finishing request of the query.
 	 * \param result The ```Result``` instance to insert all the already
 	 * scheduled requests that form the continuous interval.
-	 * \param waitingCVPtr If the finishing offset is greater than or equal to
+	 * \param rcvpPtr: Contains the following
+	 *
+	 * waitingCVPtr: If the finishing offset is greater than or equal to
 	 * the endOffset, the conditional variable of the last request is returned
 	 * here.
-	 * \param requestPtr If the finishing offset is greater than or equal
+	 *
+	 * requestPtr: If the finishing offset is greater than or equal
 	 * to the endOffset, a pointer to the last request entry is returned here.
+	 *
 	 * \return The finishing offset of continuous interval of data (from the
 	 * given ```offset```) that can be resolved if the scheduled readahead
 	 * operations succeed.
 	 */
 	uint64_t continuousOffsetRequested(uint64_t offset, uint64_t endOffset,
 	                                   ReadCache::Result &result,
-	                                   ConditionVariablePtr &waitingCVPtr,
-	                                   ReadaheadRequestPtr &requestPtr);
+	                                   RequestConditionVariablePair *&rcvpPtr);
 
 	inline bool empty() const {
 		return pendingRequests_.empty();
@@ -147,13 +161,17 @@ struct ReadaheadRequests {
 		return pendingRequests_.size();
 	}
 
-	inline RequestConditionVariablePair lastPendingRequest() const {
-		return pendingRequests_.back();
+	inline const RequestConditionVariablePair *lastPendingRequest() const {
+		assert(!pendingRequests_.empty());
+		auto it = pendingRequests_.rbegin();
+		return &(*it);
 	}
 
 	/** \brief Given a non-successfully finishing request, propagate the error
 	 * to ALL the following requests, notifying threads waiting for these
 	 * requests and remove those following requests.
+	 *
+	 * inodeLock: LOCKED
 	 *
 	 * \param reqPtr The pointer to a non-successfully finishing request.
 	 */
@@ -164,6 +182,8 @@ struct ReadaheadRequests {
 
 	/** \brief Discard all pending requests. Change ALL inqueued request status
 	 * to discarded and clears the underlying container.
+	 *
+	 * inodeLock: LOCKED
 	 */
 	void discardAllPendingRequests();
 
@@ -183,14 +203,14 @@ private:
 // returning data already requested from its inner cache and improving
 // sequential reads with the readahead mechanism.
 struct ReadRecord {
-	ReadCache cache;
-	ReadaheadAdviser readahead_adviser;
-	ReadChunkLocator locator;
+	ReadCache cache; // inodeLock
+	ReadaheadAdviser readahead_adviser; // inodeLock
 	uint32_t inode;
-	ReadaheadRequests readaheadRequests;
+	std::mutex mutex;
+	ReadaheadRequests readaheadRequests; // inodeLock
 	std::atomic<uint8_t> refreshCounter = 0;
-	std::atomic<uint16_t> requestsInProcess = 0;
-	bool expired = false;                        // gMutex
+	std::atomic<uint16_t> requestsNotDone = 0;
+	bool expired = false; //gMutex
 
 	ReadRecord(uint32_t inode)
 	    : cache(gCacheExpirationTime_ms),
@@ -211,7 +231,7 @@ struct ReadRecord {
 	}
 
 private:
-	uint32_t suggestedReadaheadReqs_ = 0;
+	std::atomic<uint32_t> suggestedReadaheadReqs_ = 0;
 };
 
 using Request = std::pair<ReadRecord *, ReadaheadRequestPtr>;
@@ -224,43 +244,51 @@ class ReadaheadOperationsManager {
 public:
 	/**
 	 * \brief Request some data from the given inode.
-	 * 
+	 *
 	 * Using the provided data, this function:
-	 * - searches in cache for the requested data, if present then returns it 
+	 * - searches in cache for the requested data, if present then returns it
 	 * directly.
-	 * - if the request could be satisfied after the completion of some of the 
-	 * already scheduled ```ReadaheadRequests``` of the given inode, then 
+	 * - if the request could be satisfied after the completion of some of the
+	 * already scheduled ```ReadaheadRequests``` of the given inode, then
 	 * returns the request to wait for.
 	 * - if both of the previous conditions are not met, then schedule a specific
 	 * request and return it.
-	 * 
-	 * \note It uses the provided ```Result``` instance to insert the entries that 
-	 * would be finally used to satisfy the system request. After waiting for the 
-	 * notification of the returned ```ConditionVariablePtr``` the ```Result``` 
+	 *
+	 * inodeLock: LOCKED
+	 *
+	 * \note It uses the provided ```Result``` instance to insert the entries that
+	 * would be finally used to satisfy the system request. After waiting for the
+	 * notification of the returned ```ConditionVariablePtr``` the ```Result```
 	 * instance returned must contain the data to satisfy the system request.
-	 * 
-	 * \param rrec The pointer to the read data of the given inode. 
+	 *
+	 * \param rrec The pointer to the read data of the given inode.
 	 * \param fuseOffset Real starting offset of the system request.
 	 * \param fuseSize Real size of the system request.
 	 * \param offset Starting offset of the system request after aligning it to
 	 * block size.
 	 * \param size Size of the system request after aligning it to block size.
-	 * \param result Container of the final entries that will satisfy the given 
+	 * \param result Container of the final entries that will satisfy the given
 	 * system request.
-	 * \param waitingCVPtr Pointer to the ```conditional_variable``` to notify the
+	 * \param rcvpPtr Contains the following:
+	 *
+	 * waitingCVPtr: Pointer to the ```conditional_variable``` to notify the
 	 * related request is already finished. If not necessary to wait, this value
 	 * is not set.
-	 * \param requestPtr Pointer to the readahead request the system request is 
+	 *
+	 * requestPtr: Pointer to the readahead request the system request is
 	 * waiting for. If not necessary to wait, this value is not set.
-	 * \return Whether the required data is not already in cache and it is 
+	 *
+	 * \return Whether the required data is not already in cache and it is
 	 * necessary to wait for a scheduled request to finish.
 	 */
 	bool request(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 	             uint64_t offset, uint32_t size, ReadCache::Result &result,
-	             ConditionVariablePtr &waitingCVPtr,
-	             ReadaheadRequestPtr &requestPtr);
+	             RequestConditionVariablePair *&rcvpPtr);
 
-	/** \brief Check if the underlying container of scheduled requests is empty. */
+	/** \brief Check if the underlying container of scheduled requests is empty.
+	 *
+	 * requestsLock: LOCKED
+	*/
 	inline bool empty() const {
 		return readaheadRequestContainer_.empty();
 	}
@@ -268,45 +296,54 @@ public:
 	/** \brief Return next scheduled request and remove it from the underlying
 	 * container.
 	 *
+	 * requestsLock: LOCKED
+	 *
 	 * \returns The next scheduled request.
 	 */
 	Request nextRequest();
 
-	/** \brief Insert a request signaling one read worker thread to stop. */
+	/** \brief Insert a request signaling one read worker thread to stop.
+	 *
+	 * requestsLock: UNLOCKED
+	*/
 	void putTerminateRequest();
 
 private:
 	/**
-	 * \brief Add a readahead request to the underlying container and to the 
+	 * \brief Add a readahead request to the underlying container and to the
 	 * provided ```ReadRecord```'s ```ReadaheadRequests``` member.
-	 * 
+	 *
+	 * inodeLock: LOCKED
+	 *
 	 * \param rrec The related ```ReadRecord```.
-	 * \param entry Pointer to the ```Entry``` in the read cache of the given 
+	 * \param entry Pointer to the ```Entry``` in the read cache of the given
 	 * ```ReadRecord```.
-	 * \return ```RequestConditionVariablePair``` - A pair of pointers to the 
+	 * \return ```RequestConditionVariablePair``` - A pair of pointers to the
 	 * request inserted and the ```std::conditional_variable``` to wait for.
 	 */
-	RequestConditionVariablePair addRequest_(ReadRecord *rrec,
-	                                         ReadCache::Entry *entry);
+	RequestConditionVariablePair *addRequest_(ReadRecord *rrec,
+	                                          ReadCache::Entry *entry);
 
 	/**
 	 * \brief Add extra requests to increase the cached data from a given offset.
-	 * 
+	 *
 	 * This increase is bounded by:
 	 * - the number readahead requests should not be higher than the suggested
 	 * readahead requests for the ```ReadRecord```.
-	 * - should not add more requests if the total readahead exceeds 
+	 * - should not add more requests if the total readahead exceeds
 	 * ```gMaxReadaheadRequests```*```satisfying_size```.
-	 * - should not add more requests if the total readahead exceeds the 
+	 * - should not add more requests if the total readahead exceeds the
 	 * throughput estimation done the ```ReadaheadAdviser```.
-	 * 
+	 *
+	 * inodeLock: LOCKED
+	 *
 	 * \param rrec The related ```ReadRecord```.
 	 * \param currentOffset Offset of the last system request.
 	 * \param satisfyingSize Size satisfying both system request size and
 	 * ```ReadaheadAdviser``` suggestion.
 	 * \param maximumRequestedOffset If the ```ReadRecord``` contains some
-	 * scheduled requests, this value is ignored and only takes into account last 
-	 * scheduled request. If not, this value provides the starting offset to 
+	 * scheduled requests, this value is ignored and only takes into account last
+	 * scheduled request. If not, this value provides the starting offset to
 	 * add the extra requests.
 	 */
 	void addExtraRequests_(ReadRecord *rrec, uint64_t currentOffset,

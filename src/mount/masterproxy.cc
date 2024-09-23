@@ -35,7 +35,7 @@
 
 static int lsock = -1;
 static pthread_t proxythread;
-static uint8_t terminate;
+static std::atomic<uint8_t> terminate;
 
 static uint32_t proxyhost;
 static uint16_t proxyport;

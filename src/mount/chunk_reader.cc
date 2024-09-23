@@ -28,9 +28,9 @@
 #include "common/time_utils.h"
 #include "mount/global_chunkserver_stats.h"
 
-ChunkReader::ChunkReader(ChunkConnector& connector, ReadChunkLocator& _locator, double bandwidth_overuse)
+ChunkReader::ChunkReader(ChunkConnector& connector, double bandwidth_overuse)
 		: connector_(connector),
-		  locator_(&_locator),
+		  locator_(std::make_unique<ReadChunkLocator>()),
 		  inode_(0),
 		  index_(0),
 		  planner_(bandwidth_overuse),

@@ -71,7 +71,7 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultChunkserverReadTo = 2000;
 	static constexpr unsigned kDefaultChunkserverWaveReadTo = 500;
 	static constexpr unsigned kDefaultChunkserverTotalReadTo = 2000;
-	static constexpr unsigned kDefaultCacheExpirationTime = 0;
+	static constexpr unsigned kDefaultCacheExpirationTime = 1000;
 	static constexpr unsigned kDefaultReadaheadMaxWindowSize = 65536;
 	static constexpr unsigned kDefaultReadCacheMaxSize = 16384;
 	static constexpr unsigned kDefaultReadWorkers = 30;
