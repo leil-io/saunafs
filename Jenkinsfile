@@ -2,6 +2,7 @@ pipeline {
     agent { label 'ubuntu-2404' }
     options {
         skipStagesAfterUnstable()
+        disableConcurrentBuilds abortPrevious: true
     }
     tools { go '1.22.2' }
     stages {
