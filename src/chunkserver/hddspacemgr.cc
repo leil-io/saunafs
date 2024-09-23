@@ -99,8 +99,6 @@
 constexpr int kErrorLimit = 2;
 constexpr int kLastErrorTime = 60;
 
-static std::atomic<unsigned> gHDDTestFreq_ms(10 * 1000);
-
 inline std::atomic_bool gCheckCrcWhenReading{true};
 
 /// Value of HDD_ADVISE_NO_CACHE from config
@@ -2101,20 +2099,17 @@ void hddTesterThread() {
 
 	pthread_setname_np(pthread_self(), "testerThread");
 
-	IChunk *chunk;
-	uint64_t chunkId;
-	uint32_t version;
+	IChunk *chunk = ChunkNotFound;
+	uint64_t chunkId = 0;
+	uint32_t version = 0;
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
-	uint32_t cnt = 0;
-	uint64_t startMicroSecs, endMicroSecs;
-
-	auto disksIt = gDisks.begin();
-	auto previousDiskIt = disksIt;
+	uint32_t elapsedTimeMs = 0;
+	uint64_t startMicroSecs = 0;
+	uint64_t endMicroSecs = 0;
 
 	while (!gTerminate) {
 		startMicroSecs = getMicroSecsTime();
-		chunkId = 0;
-		version = 0;
+		chunk = ChunkNotFound;
 
 		{
 			std::scoped_lock lock(gDisksMutex, gChunksMapMutex, gTestsMutex);
@@ -2122,66 +2117,41 @@ void hddTesterThread() {
 			bool testerResetExpected = true;
 			if (gResetTester.compare_exchange_strong(testerResetExpected,
 			                                         false)) {
-				disksIt = gDisks.begin();
-				cnt = 0;
+				gDiskManager->resetDiskIteratorForTests();
+				elapsedTimeMs = 0;
 			}
 
-			cnt += std::min(gHDDTestFreq_ms.load(), 1000U);
+			chunk = gDiskManager->getChunkToTest(elapsedTimeMs);
 
-			if (cnt < gHDDTestFreq_ms || gDiskActions == 0 ||
-			    disksIt == gDisks.end()) {
-				chunkId = 0;
-			} else {
-				cnt = 0;
-				previousDiskIt = disksIt;
-
-				if (gDisks.size()) {
-					do {
-						++disksIt;
-						if (disksIt == gDisks.end()) {
-							disksIt = gDisks.begin();
-						}
-					} while (
-					    ((*disksIt)->isDamaged() ||
-					     (*disksIt)->isMarkedForDeletion() ||
-					     (*disksIt)->wasRemovedFromConfig() ||
-					     (*disksIt)->scanState() != IDisk::ScanState::kWorking) &&
-					    previousDiskIt != disksIt);
-				}
-
-				if (previousDiskIt == disksIt
-				    && ((*disksIt)->isDamaged()
-				        || (*disksIt)->isMarkedForDeletion()
-				        || (*disksIt)->wasRemovedFromConfig()
-				        || (*disksIt)->scanState()
-				               != IDisk::ScanState::kWorking)) {
-					chunkId = 0;
-				} else {
-					chunk = (*disksIt)->chunks().chunkToTest();
-
-					if (chunk && chunk->state() == ChunkState::Available) {
-						chunkId = chunk->id();
-						version = chunk->version();
-						chunkType = chunk->type();
-					}
-				}
+			if (chunk != ChunkNotFound) {
+				chunkId = chunk->id();
+				version = chunk->version();
+				chunkType = chunk->type();
 			}
 		}
 
-		if (chunkId > 0 && hddInternalTestChunk(chunkId, version, chunkType) !=
-		                       SAUNAFS_STATUS_OK) {
-			hddReportDamagedChunk(chunkId, chunkType);
+		if (chunk != ChunkNotFound) {
+			if (hddInternalTestChunk(chunkId, version, chunkType) !=
+			    SAUNAFS_STATUS_OK) {
+				hddReportDamagedChunk(chunkId, chunkType);
+			} else {
+				safs_pretty_syslog(LOG_DEBUG,
+				                   "Tester: chunk: %lu, v: %u, type: %s, file: "
+				                   "%s: tested (OK)",
+				                   chunkId, version,
+				                   chunkType.toString().c_str(),
+				                   chunk->dataFilename().c_str());
+			}
 		}
 
 		endMicroSecs = getMicroSecsTime();
 
 		if (endMicroSecs > startMicroSecs) {
-			unsigned usToSleep = 1000 * std::min(gHDDTestFreq_ms.load(), 1000U);
+			unsigned usToSleep =
+			    1000 * std::min(gHDDTestFreq_ms.load(), kMaxTestFreqMs);
 			endMicroSecs -= startMicroSecs;
 
-			if (endMicroSecs < usToSleep) {
-				usleep(usToSleep - endMicroSecs);
-			}
+			if (endMicroSecs < usToSleep) { usleep(usToSleep - endMicroSecs); }
 		}
 	}
 }

@@ -21,6 +21,7 @@
 #include "common/platform.h"
 
 #include "chunkserver-common/disk_manager_interface.h"
+#include "chunkserver-common/global_shared_resources.h"
 
 /**
  * \brief Default implementation of the disk manager interface.
@@ -77,7 +78,20 @@ public:
 	/// Selects the disk to use for GC.
 	IDisk *getDiskForGC() override;
 
+	/// Selects next chunk to test.
+	IChunk *getChunkToTest(uint32_t &elapsedTimeMs) override;
+
+	/// Reset the disk iterators used for tests.
+	/// Usually when gResetTester changes or after a reload.
+	void resetDiskIteratorForTests() override;
+
 private:
 	/// Next disk index for GC. Helps in the round-robin strategy.
 	uint32_t nextDiskIndexForGC_ = 0;
+
+	// Iterators used to select the disks for chunk testing.
+	using DisksIterator = std::vector<std::unique_ptr<IDisk>>::iterator;
+
+	DisksIterator diskItForTests_ = gDisks.begin();
+	DisksIterator previousDiskItForTests_ = gDisks.begin();
 };

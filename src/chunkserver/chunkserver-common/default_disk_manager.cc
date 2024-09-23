@@ -332,3 +332,51 @@ IDisk *DefaultDiskManager::getDiskForGC() {
 
 	return bestDisk;
 }
+
+IChunk *DefaultDiskManager::getChunkToTest(uint32_t &elapsedTimeMs) {
+	IChunk *chunk = ChunkNotFound;
+
+	elapsedTimeMs += std::min(gHDDTestFreq_ms.load(), kMaxTestFreqMs);
+
+	if (elapsedTimeMs < gHDDTestFreq_ms || gDiskActions == 0 ||
+	    diskItForTests_ == gDisks.end()) {
+		return ChunkNotFound;
+	}
+
+	elapsedTimeMs = 0;
+	previousDiskItForTests_ = diskItForTests_;
+
+	if (!gDisks.empty()) {
+		do {
+			++diskItForTests_;
+			if (diskItForTests_ == gDisks.end()) {
+				diskItForTests_ = gDisks.begin();
+			}
+		} while (
+		    ((*diskItForTests_)->isDamaged() ||
+		     (*diskItForTests_)->isMarkedForDeletion() ||
+		     (*diskItForTests_)->wasRemovedFromConfig() ||
+		     (*diskItForTests_)->scanState() != IDisk::ScanState::kWorking) &&
+		    previousDiskItForTests_ != diskItForTests_);
+	}
+
+	if (previousDiskItForTests_ == diskItForTests_ &&
+	    ((*diskItForTests_)->isDamaged() ||
+	     (*diskItForTests_)->isMarkedForDeletion() ||
+	     (*diskItForTests_)->wasRemovedFromConfig() ||
+	     (*diskItForTests_)->scanState() != IDisk::ScanState::kWorking)) {
+		return ChunkNotFound;
+	}
+
+	chunk = (*diskItForTests_)->chunks().chunkToTest();
+
+	if (chunk != ChunkNotFound && chunk->state() == ChunkState::Available) {
+		return chunk;
+	}
+
+	return ChunkNotFound;
+}
+
+void DefaultDiskManager::resetDiskIteratorForTests() {
+	diskItForTests_ = gDisks.begin();
+}
