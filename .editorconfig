@@ -11,7 +11,7 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 
 # Tab indentation for shell scripts, Dockerfiles and Makefiles
-[{*.{bash,sh},Dockerfile,Dockerfile.*,Makefile,*.mk}]
+[{*.{bash,sh},Dockerfile,Dockerfile.*,Makefile,*.mk,*.in}]
 indent_style = tab
 # Unsupported in some editors
 keep_padding = true

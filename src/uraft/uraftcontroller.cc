@@ -29,7 +29,7 @@ uRaftController::uRaftController(boost::asio::io_service &ios)
 
 	opt_.check_node_status_period = 250;
 	opt_.check_cmd_status_period  = 100;
-	opt_.getversion_timeout       = 50;
+	opt_.getversion_timeout       = 200;
 	opt_.promote_timeout          = 1000000;
 	opt_.demote_timeout           = 1000000;
 	opt_.dead_handler_timeout     = 1000000;
@@ -189,7 +189,7 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 
 	if (command_type_ == kCmdNone) {
 		if (runCommand(params, result, opt_.getversion_timeout)) {
-			if (result == "alive" || result == "dead") {
+			if (result == "alive" || result == "dead" || result == "non-floating") {
 				is_alive = result == "alive";
 			} else {
 				syslog(LOG_ERR, "Invalid metadata server status.");
@@ -198,7 +198,10 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 			syslog(LOG_WARNING, "Isalive timeout.");
 		}
 
-		if (is_alive != node_alive_) {
+		if (result == "non-floating") {
+			syslog(LOG_ERR, "Metadata server lost floating IP");
+			demoteLeader();
+		} else if (is_alive != node_alive_) {
 			if (is_alive) {
 				syslog(LOG_NOTICE, "Metadata server is alive");
 				set_block_promotion(false);
