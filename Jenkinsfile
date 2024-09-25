@@ -2,6 +2,8 @@ pipeline {
     agent { label 'ubuntu-2404' }
     options {
         skipStagesAfterUnstable()
+        // TODO: Add more lenient rules for dev
+        buildDiscarder(logRotator(artifactDaysToKeepStr: "7", artifactNumToKeepStr: "2"))
     }
     tools { go '1.22.2' }
     stages {
