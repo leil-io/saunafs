@@ -41,6 +41,7 @@
 #define TCPENOTSUP ENOTSUP
 #define TCPEINVAL EINVAL
 #define TCPETIMEDOUT ETIMEDOUT
+#define TCPNORESPONSE EIO
 #endif
 
 #include <vector>

@@ -671,10 +671,12 @@ int fs_connect(bool verbose) {
 		return -1;
 	}
 	if (tcptoread(fd,regbuff,8,1000)!=8) {
+		int tcplasterr = tcpgetlasterror();
+		const auto* errorMessage = (tcplasterr != 0) ? strerr(tcplasterr) : strerr(TCPNORESPONSE);
 		if (verbose) {
-			fprintf(stderr,"error receiving data from sfsmaster: %s\n",strerr(tcpgetlasterror()));
+			fprintf(stderr,"error receiving data from sfsmaster: %s\n", errorMessage);
 		} else {
-			safs_pretty_syslog(LOG_WARNING,"error receiving data from sfsmaster: %s",strerr(tcpgetlasterror()));
+			safs_pretty_syslog(LOG_WARNING,"error receiving data from sfsmaster: %s", errorMessage);
 		}
 		tcpclose(fd);
 		fd=-1;
