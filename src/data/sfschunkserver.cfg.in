@@ -50,13 +50,6 @@
 ## (Default: 9422)
 # CSSERV_LISTEN_PORT = 9422
 
-# NR_OF_NETWORK_WORKERS = 1
-# NR_OF_HDD_WORKERS_PER_NETWORK_WORKER = 2
-# BGJOBSCNT_PER_NETWORK_WORKER = 1000
-
-# READ_AHEAD_KB = 0
-# MAX_READ_BEHIND_KB = 0
-
 ## Name of volume configuration file.
 ## (Default: @ETC_PATH@/sfshdd.cfg)
 # HDD_CONF_FILENAME = @ETC_PATH@/sfshdd.cfg
@@ -109,13 +102,17 @@
 ## Number of threads which handle (in a round-robin manner) connections
 ## with clients; these threads are responsible for reading from
 ## sockets and coping data from internal buffers to sockets.
-## (Default: 1)
-# NR_OF_NETWORK_WORKERS = 1
+## (Default: 2)
+# NR_OF_NETWORK_WORKERS = 2
 
 ## Number of threads that each network worker may use to do disk operations
 ## like opening chunks, reading or writing them
-## (Default: 20)
-# NR_OF_HDD_WORKERS_PER_NETWORK_WORKER = 20
+## (Default: 16)
+# NR_OF_HDD_WORKERS_PER_NETWORK_WORKER = 16
+
+## Maximum number of jobs that each network worker may use for disk operations.
+## (Default: 1000)
+# BGJOBSCNT_PER_NETWORK_WORKER = 1000
 
 ## additional number of kilobytes which should be passed to
 ## posix_fadvise(POSIX_FADV_WILLNEED) before reading data from a chunk

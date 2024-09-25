@@ -105,12 +105,11 @@ void replicationBandwidthLimitReload() {
 void mainNetworkThreadReload(void) {
 	TRACETHIS();
 
-	cfg_warning_on_value_change(
-			"NR_OF_NETWORK_WORKERS", gNrOfNetworkWorkers);
-	cfg_warning_on_value_change(
-			"NR_OF_HDD_WORKERS_PER_NETWORK_WORKER", gNrOfHddWorkersPerNetworkWorker);
-	cfg_warning_on_value_change(
-			"BGJOBSCNT_PER_NETWORK_WORKER", gBgjobsCountPerNetworkWorker);
+	cfg_warning_on_value_change("NR_OF_NETWORK_WORKERS", gNrOfNetworkWorkers);
+	cfg_warning_on_value_change("NR_OF_HDD_WORKERS_PER_NETWORK_WORKER",
+	                            gNrOfHddWorkersPerNetworkWorker);
+	cfg_warning_on_value_change("BGJOBSCNT_PER_NETWORK_WORKER",
+	                            gBgjobsCountPerNetworkWorker);
 
 	try {
 		replicationBandwidthLimitReload();
@@ -228,11 +227,15 @@ int mainNetworkThreadInit(void) {
 	ListenHost = cfg_getstr("CSSERV_LISTEN_HOST", "*");
 	ListenPort = cfg_getstr("CSSERV_LISTEN_PORT", "9422");
 
-	gNrOfNetworkWorkers = cfg_get_minvalue<uint32_t>("NR_OF_NETWORK_WORKERS", 1, 1);
+	gNrOfNetworkWorkers = cfg_get_minvalue<uint32_t>(
+	    "NR_OF_NETWORK_WORKERS",
+	    NetworkWorkerThread::kDefaultNumberOfNetworkWorkers, 1);
 	gNrOfHddWorkersPerNetworkWorker = cfg_get_minvalue<uint32_t>(
-			"NR_OF_HDD_WORKERS_PER_NETWORK_WORKER", 2, 1);
+	    "NR_OF_HDD_WORKERS_PER_NETWORK_WORKER",
+	    NetworkWorkerThread::kDefaultNumberOfHddWorkersPerNetworkWorker, 1);
 	gBgjobsCountPerNetworkWorker = cfg_get_minvalue<uint32_t>(
-			"BGJOBSCNT_PER_NETWORK_WORKER", 1000, 10);
+	    "BGJOBSCNT_PER_NETWORK_WORKER",
+	    NetworkWorkerThread::kDefaultMaxBackgroundJobsPerNetworkWorker, 10);
 
 	gHDDReadAhead.setReadAhead_kB(
 			cfg_get_maxvalue<uint32_t>("READ_AHEAD_KB", 0, SFSCHUNKSIZE / 1024));
