@@ -60,7 +60,7 @@ void sau_set_default_init_params(struct sau_init_params *params,
 	params->total_read_timeout_ms = SaunaClient::FsInitParams::kDefaultChunkserverTotalReadTo;
 	params->cache_expiration_time_ms = SaunaClient::FsInitParams::kDefaultCacheExpirationTime;
 	params->readahead_max_window_size_kB = SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize;
-	params->read_cache_max_size_mB = SaunaClient::FsInitParams::kDefaultReadCacheMaxSize;
+	params->read_cache_max_size_percentage = SaunaClient::FsInitParams::kDefaultReadCacheMaxSizePercentage;
 	params->prefetch_xor_stripes = SaunaClient::FsInitParams::kDefaultPrefetchXorStripes;
 	params->bandwidth_overuse = SaunaClient::FsInitParams::kDefaultBandwidthOveruse;
 

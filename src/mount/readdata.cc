@@ -61,13 +61,13 @@ inline std::mutex gReadaheadRequestsContainerMutex;
 inline int kMaxReadCacheRequestRetries = 10;
 
 std::unique_ptr<IMemoryInfo> createMemoryInfo() {
-    std::unique_ptr<IMemoryInfo> gMemoryInfo;
+    std::unique_ptr<IMemoryInfo> memoryInfo;
     #ifdef _WIN32
-        gMemoryInfo = std::make_unique<WindowsMemoryInfo>();
+        memoryInfo = std::make_unique<WindowsMemoryInfo>();
     #elif __linux__
-        gMemoryInfo = std::make_unique<LinuxMemoryInfo>();
+        memoryInfo = std::make_unique<LinuxMemoryInfo>();
     #endif
-    return gMemoryInfo;
+    return memoryInfo;
 }
 std::unique_ptr<IMemoryInfo> gMemoryInfo = createMemoryInfo();
 
@@ -519,7 +519,7 @@ void read_data_init(uint32_t retries,
 		uint32_t chunkserverTotalReadTimeout_ms,
 		uint32_t cache_expiration_time_ms,
 		uint32_t readahead_max_window_size_kB,
-		uint32_t read_chache_max_size_mB,
+		uint32_t read_chache_max_size_percentage,
 		uint32_t read_workers,
 		uint32_t max_readahead_requests,
 		bool prefetchXorStripes,
@@ -536,8 +536,8 @@ void read_data_init(uint32_t retries,
 	gChunkserverTotalReadTimeout_ms = chunkserverTotalReadTimeout_ms;
 	gCacheExpirationTime_ms = cache_expiration_time_ms;
 	gReadaheadMaxWindowSize = readahead_max_window_size_kB * 1024;
-	gReadCacheMaxSize.store(std::min<uint64_t>(
-	    read_chache_max_size_mB * (1024LL * 1024LL), gMemoryInfo->getTotalMemory()));
+	gReadCacheMaxSize.store((read_chache_max_size_percentage * 0.01) *
+	                        gMemoryInfo->getTotalMemory());
 	gReadWorkers = read_workers;
 	gMaxReadaheadRequests = max_readahead_requests;
 	gPrefetchXorStripes = prefetchXorStripes;

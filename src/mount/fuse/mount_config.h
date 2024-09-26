@@ -106,7 +106,7 @@ struct sfsopts_ {
 	int chunkserverwriteto;
 	int cacheexpirationtime;
 	int readaheadmaxwindowsize;
-	int readcachemaxsize;
+	int readcachemaxsizepercentage;
 	unsigned readworkers;
 	unsigned maxreadaheadrequests;
 	int prefetchxorstripes;
@@ -163,7 +163,7 @@ struct sfsopts_ {
 		chunkserverwriteto(SaunaClient::FsInitParams::kDefaultChunkserverWriteTo),
 		cacheexpirationtime(SaunaClient::FsInitParams::kDefaultCacheExpirationTime),
 		readaheadmaxwindowsize(SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize),
-		readcachemaxsize(SaunaClient::FsInitParams::kDefaultReadCacheMaxSize),
+		readcachemaxsizepercentage(SaunaClient::FsInitParams::kDefaultReadCacheMaxSizePercentage),
 		readworkers(SaunaClient::FsInitParams::kDefaultReadWorkers),
 		maxreadaheadrequests(SaunaClient::FsInitParams::kDefaultMaxReadaheadRequests),
 		prefetchxorstripes(SaunaClient::FsInitParams::kDefaultPrefetchXorStripes),
