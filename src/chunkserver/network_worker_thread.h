@@ -168,7 +168,7 @@ struct csserventry {
 
 class NetworkWorkerThread {
 public:
-	static constexpr uint32_t kDefaultNumberOfNetworkWorkers = 2;
+	static constexpr uint32_t kDefaultNumberOfNetworkWorkers = 4;
 	static constexpr uint32_t kDefaultNumberOfHddWorkersPerNetworkWorker = 16;
 	static constexpr uint32_t kDefaultMaxBackgroundJobsPerNetworkWorker = 1000;
 

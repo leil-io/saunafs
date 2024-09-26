@@ -96,7 +96,7 @@ from other chunkservers to this chunkserver in every second (by default
 undefined, i.e. no limits)
 
 *NR_OF_NETWORK_WORKERS*:: number of threads which handle (in a round-robin
-manner) connections with clients (default is 2); these threads are responsible
+manner) connections with clients (default is 4); these threads are responsible
 for reading from sockets and coping data from internal buffers to sockets
 
 *NR_OF_HDD_WORKERS_PER_NETWORK_WORKER*:: number of threads that each network

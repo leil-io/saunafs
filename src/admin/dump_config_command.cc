@@ -161,7 +161,7 @@ const static std::unordered_map<std::string, std::string> defaultOptionsCS = {
     {"HDD_PUNCH_HOLES", "0"},
     {"ENABLE_LOAD_FACTOR", "0"},
     {"REPLICATION_BANDWIDTH_LIMIT_KBPS", "0"},
-    {"NR_OF_NETWORK_WORKERS", "2"},
+    {"NR_OF_NETWORK_WORKERS", "4"},
     {"NR_OF_HDD_WORKERS_PER_NETWORK_WORKER", "16"},
     {"BGJOBSCNT_PER_NETWORK_WORKER", "1000"},
     {"MAX_READ_BEHIND_KB", "0"},
