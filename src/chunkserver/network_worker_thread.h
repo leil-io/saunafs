@@ -139,8 +139,6 @@ struct ChunkserverEntry {
 
 	LOG_AVG_TYPE readOperationTimer;
 
-	struct ChunkserverEntry *next;
-
 	ChunkserverEntry(int socket, void* workerJobPool)
 			: workerJobPool(workerJobPool),
 			  mode(HEADER),
@@ -170,8 +168,7 @@ struct ChunkserverEntry {
 			  chunkType(slice_traits::standard::ChunkPartType()),
 			  offset(0),
 			  size(0),
-			  messageSerializer(nullptr),
-			  next(nullptr) {
+			  messageSerializer(nullptr) {
 		inputpacket.bytesleft = 8;
 		inputpacket.startptr = hdrbuff;
 		inputpacket.packet = NULL;
