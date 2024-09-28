@@ -288,7 +288,7 @@ void worker_check_nextpacket(ChunkserverEntry *eptr);
 // common - delayed close
 void worker_delayed_close(uint8_t status, void *e) {
 	TRACETHIS();
-	ChunkserverEntry *eptr = (ChunkserverEntry*) e;
+	auto *eptr = static_cast<ChunkserverEntry*>(e);
 	if (eptr->wjobid > 0 && eptr->wjobwriteid == 0 && status == SAUNAFS_STATUS_OK) { // this was job_open
 		eptr->chunkisopen = 1;
 	} else if (eptr->rjobid > 0 && status == SAUNAFS_STATUS_OK) { //this could be job_open
@@ -307,7 +307,7 @@ void worker_read_continue(ChunkserverEntry *eptr);
 
 void worker_read_finished(uint8_t status, void *e) {
 	TRACETHIS();
-	ChunkserverEntry *eptr = (ChunkserverEntry*) e;
+	auto *eptr = static_cast<ChunkserverEntry*>(e);
 	eptr->rjobid = 0;
 	if (status == SAUNAFS_STATUS_OK) {
 		eptr->todocnt--;
@@ -523,7 +523,7 @@ void worker_prefetch(ChunkserverEntry *eptr, const uint8_t *data,
 
 void worker_write_finished(uint8_t status, void *e) {
 	TRACETHIS();
-	ChunkserverEntry *eptr = (ChunkserverEntry*) e;
+	auto *eptr = static_cast<ChunkserverEntry*>(e);
 	eptr->wjobid = 0;
 	sassert(eptr->messageSerializer != NULL);
 	if (status != SAUNAFS_STATUS_OK) {
@@ -813,7 +813,7 @@ void worker_write_end(ChunkserverEntry *eptr, const uint8_t *data,
 
 void worker_sau_get_chunk_blocks_finished_legacy(uint8_t status, void *extra) {
 	TRACETHIS();
-	ChunkserverEntry *eptr = (ChunkserverEntry*) extra;
+	auto *eptr = static_cast<ChunkserverEntry*>(extra);
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
 	cstocs::getChunkBlocksStatus::serialize(buffer, eptr->chunkid, eptr->version,
@@ -824,7 +824,7 @@ void worker_sau_get_chunk_blocks_finished_legacy(uint8_t status, void *extra) {
 
 void worker_sau_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	TRACETHIS();
-	ChunkserverEntry *eptr = (ChunkserverEntry*) extra;
+	auto *eptr = static_cast<ChunkserverEntry*>(extra);
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
 	cstocs::getChunkBlocksStatus::serialize(buffer, eptr->chunkid, eptr->version,
@@ -835,7 +835,7 @@ void worker_sau_get_chunk_blocks_finished(uint8_t status, void *extra) {
 
 void worker_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	TRACETHIS();
-	ChunkserverEntry *eptr = (ChunkserverEntry*) extra;
+	auto *eptr = static_cast<ChunkserverEntry*>(extra);
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
 	serializeLegacyPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS,
