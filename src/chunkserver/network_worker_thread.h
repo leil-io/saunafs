@@ -41,21 +41,6 @@ enum ChunkserverEntryMode {
 	HEADER, DATA
 };
 
-//entry.state
-enum ChunkserverEntryState {
-	IDLE,        // idle connection, new or used previously
-	READ,        // after CLTOCS_READ, but didn't send all of the CSTOCL_READ_(DATA|STAUS)
-	GET_BLOCK,   // after CSTOCS_GET_CHUNK_BLOCKS, but didn't send response
-	WRITELAST,   // connection ready for writing data; data is not forwarded to other chunkservers
-	CONNECTING,  // we are now connecting to other chunkserver to form a writing chain
-	WRITEINIT,   // we are sending packet forming a chain to the next chunkserver
-	WRITEFWD,    // connection ready for writing data; data will be forwarded to other chunkservers
-	WRITEFINISH, // write error occurred, will be closed after sending error status
-	CLOSE,       // close request, it will immediately be changed to CLOSEWAIT or CLOSED
-	CLOSEWAIT,   // waits for a worker to finish requested job, then will be closed
-	CLOSED       // ready to be deleted
-};
-
 struct packetstruct {
 	packetstruct *next;
 	uint8_t *startptr;
@@ -69,10 +54,42 @@ struct packetstruct {
 
 class MessageSerializer;
 
-struct csserventry {
+/**
+ * @brief Represents a single connection to a chunkserver.
+ *
+ * This struct manages the state and data associated with a connection to a
+ * chunkserver. It includes information about the connection's state, mode,
+ * sockets, and various buffers used for reading and writing data. It also
+ * maintains metadata for managing the connection's lifecycle and handling
+ * retries, timeouts, and partial writes.
+ *
+ * @details
+ * The `ChunkserverEntry` struct is used extensively within the
+ * `NetworkWorkerThread` to manage connections. It supports both reading and
+ * writing operations, including forwarding data to other chunkservers in a
+ * write chain. The struct also tracks job IDs and partially completed writes to
+ * ensure data consistency and proper error handling.
+ */
+struct ChunkserverEntry {
+	/// The possible connection states of a `ChunkserverEntry`.
+	enum class State : uint8_t {
+		Idle,        // idle connection, new or used previously
+		Read,        // after CLTOCS_READ, but didn't send all of the
+		             // CSTOCL_READ_(DATA|STAUS)
+		GetBlock,    // after CSTOCS_GET_CHUNK_BLOCKS, but didn't send response
+		WriteLast,   // ready for writing data; data not forwarded to other CSs
+		Connecting,  // connecting to other chunkserver to form a writing chain
+		WriteInit,   // sending packet forming a chain to the next chunkserver
+		WriteForward,  // ready for writing data; will be forwarded to other CSs
+		WriteFinish,   // write error, will be closed after sending error status
+		Close,         // close request, will change to CloseWait or Closed
+		CloseWait,  // waits for a worker to finish a job, then will be Closed
+		Closed      // ready to be deleted
+	};
+
 	void* workerJobPool; // Job pool assigned to a given network worker thread
 
-	uint8_t state;
+	ChunkserverEntry::State state = ChunkserverEntry::State::Idle;
 	uint8_t mode;
 	uint8_t fwdmode;
 
@@ -122,11 +139,10 @@ struct csserventry {
 
 	LOG_AVG_TYPE readOperationTimer;
 
-	struct csserventry *next;
+	struct ChunkserverEntry *next;
 
-	csserventry(int socket, void* workerJobPool)
+	ChunkserverEntry(int socket, void* workerJobPool)
 			: workerJobPool(workerJobPool),
-			  state(IDLE),
 			  mode(HEADER),
 			  fwdmode(HEADER),
 			  sock(socket),
@@ -161,9 +177,9 @@ struct csserventry {
 		inputpacket.packet = NULL;
 	}
 
-	csserventry(const csserventry&) = delete;
-	csserventry(csserventry&&) = default;
-	csserventry& operator=(const csserventry&) = delete;
+	ChunkserverEntry(const ChunkserverEntry&) = delete;
+	ChunkserverEntry(ChunkserverEntry&&) = default;
+	ChunkserverEntry& operator=(const ChunkserverEntry&) = delete;
 };
 
 class NetworkWorkerThread {
@@ -190,7 +206,7 @@ private:
 
 	std::atomic<bool> doTerminate;
 	std::mutex csservheadLock;
-	std::list<csserventry> csservEntries;
+	std::list<ChunkserverEntry> csservEntries;
 
 	void *bgJobPool_;
 	int bgJobPoolWakeUpFd_;
