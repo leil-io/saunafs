@@ -1133,12 +1133,13 @@ void worker_check_nextpacket(ChunkserverEntry *eptr) {
 	uint32_t type, size;
 	const uint8_t *ptr;
 	if (eptr->state == ChunkserverEntry::State::WriteForward) {
-		if (eptr->mode == DATA && eptr->inputpacket.bytesleft == 0 && eptr->fwdbytesleft == 0) {
+		if (eptr->mode == ChunkserverEntry::Mode::Data &&
+		    eptr->inputpacket.bytesleft == 0 && eptr->fwdbytesleft == 0) {
 			ptr = eptr->hdrbuff;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
-			eptr->mode = HEADER;
+			eptr->mode = ChunkserverEntry::Mode::Header;
 			eptr->inputpacket.bytesleft = 8;
 			eptr->inputpacket.startptr = eptr->hdrbuff;
 
@@ -1150,12 +1151,13 @@ void worker_check_nextpacket(ChunkserverEntry *eptr) {
 			eptr->inputpacket.packet = NULL;
 		}
 	} else {
-		if (eptr->mode == DATA && eptr->inputpacket.bytesleft == 0) {
+		if (eptr->mode == ChunkserverEntry::Mode::Data &&
+		    eptr->inputpacket.bytesleft == 0) {
 			ptr = eptr->hdrbuff;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
-			eptr->mode = HEADER;
+			eptr->mode = ChunkserverEntry::Mode::Header;
 			eptr->inputpacket.bytesleft = 8;
 			eptr->inputpacket.startptr = eptr->hdrbuff;
 
@@ -1187,7 +1189,7 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 	int32_t i;
 	uint32_t type, size;
 	const uint8_t *ptr;
-	if (eptr->fwdmode == HEADER) {
+	if (eptr->fwdMode == ChunkserverEntry::Mode::Header) {
 		i = read(eptr->fwdsock, eptr->fwdinputpacket.startptr,
 				eptr->fwdinputpacket.bytesleft);
 		if (i == 0) {
@@ -1220,9 +1222,9 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 			eptr->fwdinputpacket.startptr = eptr->fwdinputpacket.packet;
 		}
 		eptr->fwdinputpacket.bytesleft = size;
-		eptr->fwdmode = DATA;
+		eptr->fwdMode = ChunkserverEntry::Mode::Data;
 	}
-	if (eptr->fwdmode == DATA) {
+	if (eptr->fwdMode == ChunkserverEntry::Mode::Data) {
 		if (eptr->fwdinputpacket.bytesleft > 0) {
 			i = read(eptr->fwdsock, eptr->fwdinputpacket.startptr,
 					eptr->fwdinputpacket.bytesleft);
@@ -1248,7 +1250,7 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 		type = get32bit(&ptr);
 		size = get32bit(&ptr);
 
-		eptr->fwdmode = HEADER;
+		eptr->fwdMode = ChunkserverEntry::Mode::Header;
 		eptr->fwdinputpacket.bytesleft = 8;
 		eptr->fwdinputpacket.startptr = eptr->fwdhdrbuff;
 
@@ -1284,7 +1286,7 @@ void worker_fwdwrite(ChunkserverEntry *eptr) {
 	if (eptr->fwdbytesleft == 0) {
 		eptr->fwdinitpacket.clear();
 		eptr->fwdstartptr = NULL;
-		eptr->fwdmode = HEADER;
+		eptr->fwdMode = ChunkserverEntry::Mode::Header;
 		eptr->fwdinputpacket.bytesleft = 8;
 		eptr->fwdinputpacket.startptr = eptr->fwdhdrbuff;
 		eptr->fwdinputpacket.packet = NULL;
@@ -1295,7 +1297,7 @@ void worker_fwdwrite(ChunkserverEntry *eptr) {
 void worker_forward(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	int32_t i;
-	if (eptr->mode == HEADER) {
+	if (eptr->mode == ChunkserverEntry::Mode::Header) {
 		i = read(eptr->sock, eptr->inputpacket.startptr, eptr->inputpacket.bytesleft);
 		if (i == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
@@ -1343,7 +1345,7 @@ void worker_forward(ChunkserverEntry *eptr) {
 			eptr->fwdbytesleft = 8;
 			eptr->fwdstartptr = eptr->inputpacket.packet;
 		}
-		eptr->mode = DATA;
+		eptr->mode = ChunkserverEntry::Mode::Data;
 	}
 	if (eptr->inputpacket.bytesleft > 0) {
 		i = read(eptr->sock, eptr->inputpacket.startptr, eptr->inputpacket.bytesleft);
@@ -1392,7 +1394,7 @@ void worker_forward(ChunkserverEntry *eptr) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		eptr->mode = HEADER;
+		eptr->mode = ChunkserverEntry::Mode::Header;
 		eptr->inputpacket.bytesleft = 8;
 		eptr->inputpacket.startptr = eptr->hdrbuff;
 
@@ -1412,7 +1414,7 @@ void worker_read(ChunkserverEntry *eptr) {
 	uint32_t type, size;
 	const uint8_t *ptr;
 
-	if (eptr->mode == HEADER) {
+	if (eptr->mode == ChunkserverEntry::Mode::Header) {
 		sassert(eptr->inputpacket.startptr + eptr->inputpacket.bytesleft == eptr->hdrbuff + 8);
 		i = read(eptr->sock, eptr->inputpacket.startptr,
 				eptr->inputpacket.bytesleft);
@@ -1452,9 +1454,9 @@ void worker_read(ChunkserverEntry *eptr) {
 			eptr->inputpacket.startptr = eptr->inputpacket.packet;
 		}
 		eptr->inputpacket.bytesleft = size;
-		eptr->mode = DATA;
+		eptr->mode = ChunkserverEntry::Mode::Data;
 	}
-	if (eptr->mode == DATA) {
+	if (eptr->mode == ChunkserverEntry::Mode::Data) {
 		if (eptr->inputpacket.bytesleft > 0) {
 			i = read(eptr->sock, eptr->inputpacket.startptr,
 					eptr->inputpacket.bytesleft);
@@ -1482,7 +1484,7 @@ void worker_read(ChunkserverEntry *eptr) {
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
-			eptr->mode = HEADER;
+			eptr->mode = ChunkserverEntry::Mode::Header;
 			eptr->inputpacket.bytesleft = 8;
 			eptr->inputpacket.startptr = eptr->hdrbuff;
 

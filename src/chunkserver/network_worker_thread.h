@@ -23,6 +23,7 @@
 
 #include <inttypes.h>
 #include <atomic>
+#include <cstdint>
 #include <list>
 #include <mutex>
 #include <set>
@@ -35,11 +36,6 @@
 #include "common/slice_traits.h"
 #include "protocol/packet.h"
 #include "devtools/request_log.h"
-
-//entry.mode
-enum ChunkserverEntryMode {
-	HEADER, DATA
-};
 
 struct packetstruct {
 	packetstruct *next;
@@ -71,6 +67,12 @@ class MessageSerializer;
  * ensure data consistency and proper error handling.
  */
 struct ChunkserverEntry {
+	/// The possible modes of a `ChunkserverEntry`.
+	enum class Mode : uint8_t {
+		Header,  // reading packet header
+		Data     // reading packet data
+	};
+
 	/// The possible connection states of a `ChunkserverEntry`.
 	enum class State : uint8_t {
 		Idle,        // idle connection, new or used previously
@@ -90,8 +92,8 @@ struct ChunkserverEntry {
 	void* workerJobPool; // Job pool assigned to a given network worker thread
 
 	ChunkserverEntry::State state = ChunkserverEntry::State::Idle;
-	uint8_t mode;
-	uint8_t fwdmode;
+	ChunkserverEntry::Mode mode = ChunkserverEntry::Mode::Header;
+	ChunkserverEntry::Mode fwdMode = ChunkserverEntry::Mode::Header;
 
 	int sock;
 	int fwdsock; // forwarding socket for writing
@@ -141,8 +143,6 @@ struct ChunkserverEntry {
 
 	ChunkserverEntry(int socket, void* workerJobPool)
 			: workerJobPool(workerJobPool),
-			  mode(HEADER),
-			  fwdmode(HEADER),
 			  sock(socket),
 			  fwdsock(-1),
 			  connstart(0),
