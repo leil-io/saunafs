@@ -228,7 +228,7 @@ void worker_fwderror(ChunkserverEntry *eptr) {
 	uint8_t status = (eptr->state == ChunkserverEntry::State::Connecting
 	                      ? SAUNAFS_ERROR_CANTCONNECT
 	                      : SAUNAFS_ERROR_DISCONNECTED);
-	eptr->messageSerializer->serializeCstoclWriteStatus(buffer, eptr->chunkid,
+	eptr->messageSerializer->serializeCstoclWriteStatus(buffer, eptr->chunkId,
 	                                                    0, status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = ChunkserverEntry::State::WriteFinish;
@@ -240,40 +240,41 @@ int worker_initconnect(ChunkserverEntry *eptr) {
 	int status;
 	// TODO(msulikowski) If we want to use a ConnectionPool, this is the right place
 	// to get a connection from it
-	eptr->fwdsock = tcpsocket();
-	if (eptr->fwdsock < 0) {
+	eptr->fwdSocket = tcpsocket();
+	if (eptr->fwdSocket < 0) {
 		safs_pretty_errlog(LOG_WARNING, "create socket, error");
 		return -1;
 	}
-	if (tcpnonblock(eptr->fwdsock) < 0) {
+	if (tcpnonblock(eptr->fwdSocket) < 0) {
 		safs_pretty_errlog(LOG_WARNING, "set nonblock, error");
-		tcpclose(eptr->fwdsock);
-		eptr->fwdsock = -1;
+		tcpclose(eptr->fwdSocket);
+		eptr->fwdSocket = -1;
 		return -1;
 	}
-	status = tcpnumconnect(eptr->fwdsock, eptr->fwdServer.ip, eptr->fwdServer.port);
+	status = tcpnumconnect(eptr->fwdSocket, eptr->fwdServer.ip,
+	                       eptr->fwdServer.port);
 	if (status < 0) {
 		safs_pretty_errlog(LOG_WARNING, "connect failed, error");
-		tcpclose(eptr->fwdsock);
-		eptr->fwdsock = -1;
+		tcpclose(eptr->fwdSocket);
+		eptr->fwdSocket = -1;
 		return -1;
 	}
 	if (status == 0) { // connected immediately
-		tcpnodelay(eptr->fwdsock);
+		tcpnodelay(eptr->fwdSocket);
 		eptr->state = ChunkserverEntry::State::WriteInit;
 	} else {
 		eptr->state = ChunkserverEntry::State::Connecting;
-		eptr->connstart = eventloop_utime();
+		eptr->connectStartTimeUSec = eventloop_utime();
 	}
 	return 0;
 }
 
 void worker_retryconnect(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	tcpclose(eptr->fwdsock);
-	eptr->fwdsock = -1;
-	eptr->connretrycnt++;
-	if (eptr->connretrycnt < CONNECT_RETRIES) {
+	tcpclose(eptr->fwdSocket);
+	eptr->fwdSocket = -1;
+	eptr->connectRetryCounter++;
+	if (eptr->connectRetryCounter < CONNECT_RETRIES) {
 		if (worker_initconnect(eptr) < 0) {
 			worker_fwderror(eptr);
 			return;
@@ -290,14 +291,17 @@ void worker_check_nextpacket(ChunkserverEntry *eptr);
 void worker_delayed_close(uint8_t status, void *e) {
 	TRACETHIS();
 	auto *eptr = static_cast<ChunkserverEntry*>(e);
-	if (eptr->wjobid > 0 && eptr->wjobwriteid == 0 && status == SAUNAFS_STATUS_OK) { // this was job_open
-		eptr->chunkisopen = 1;
-	} else if (eptr->rjobid > 0 && status == SAUNAFS_STATUS_OK) { //this could be job_open
-		eptr->chunkisopen = 1;
+	if (eptr->writeJobId > 0 && eptr->writeJobWriteId == 0 &&
+	    status == SAUNAFS_STATUS_OK) {  // this was job_open
+		eptr->isChunkOpen = 1;
+	} else if (eptr->readJobId > 0 &&
+	           status == SAUNAFS_STATUS_OK) {  // this could be job_open
+		eptr->isChunkOpen = 1;
 	}
-	if (eptr->chunkisopen) {
-		job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkid, eptr->chunkType);
-		eptr->chunkisopen = 0;
+	if (eptr->isChunkOpen) {
+		job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkId,
+		          eptr->chunkType);
+		eptr->isChunkOpen = 0;
 	}
 	eptr->state = ChunkserverEntry::State::Closed;
 }
@@ -309,11 +313,11 @@ void worker_read_continue(ChunkserverEntry *eptr);
 void worker_read_finished(uint8_t status, void *e) {
 	TRACETHIS();
 	auto *eptr = static_cast<ChunkserverEntry*>(e);
-	eptr->rjobid = 0;
+	eptr->readJobId = 0;
 	if (status == SAUNAFS_STATUS_OK) {
-		eptr->todocnt--;
-		eptr->chunkisopen = 1;
-		if (eptr->todocnt == 0) {
+		eptr->todoReadCounter--;
+		eptr->isChunkOpen = 1;
+		if (eptr->todoReadCounter == 0) {
 			worker_read_continue(eptr);
 		}
 	} else {
@@ -322,12 +326,13 @@ void worker_read_finished(uint8_t status, void *e) {
 			eptr->readPacket = nullptr;
 		}
 		std::vector<uint8_t> buffer;
-		eptr->messageSerializer->serializeCstoclReadStatus(buffer, eptr->chunkid, status);
+		eptr->messageSerializer->serializeCstoclReadStatus(
+		    buffer, eptr->chunkId, status);
 		worker_create_attached_packet(eptr, buffer);
-		if (eptr->chunkisopen) {
-			job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkid,
+		if (eptr->isChunkOpen) {
+			job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkId,
 			          eptr->chunkType);
-			eptr->chunkisopen = 0;
+			eptr->isChunkOpen = 0;
 		}
 		// after sending status even if there was an error it's possible to
 		eptr->state = ChunkserverEntry::State::Idle;
@@ -338,8 +343,8 @@ void worker_read_finished(uint8_t status, void *e) {
 
 void worker_send_finished(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	eptr->todocnt--;
-	if (eptr->todocnt == 0) {
+	eptr->todoReadCounter--;
+	if (eptr->todoReadCounter == 0) {
 		worker_read_continue(eptr);
 	}
 }
@@ -350,16 +355,17 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 	if (eptr->readPacket) {
 		worker_attach_packet(eptr, eptr->readPacket);
 		eptr->readPacket = nullptr;
-		eptr->todocnt++;
+		eptr->todoReadCounter++;
 	}
 	if (eptr->size == 0) { // everything has been read
 		std::vector<uint8_t> buffer;
-		eptr->messageSerializer->serializeCstoclReadStatus(buffer, eptr->chunkid, SAUNAFS_STATUS_OK);
+		eptr->messageSerializer->serializeCstoclReadStatus(
+		    buffer, eptr->chunkId, SAUNAFS_STATUS_OK);
 		worker_create_attached_packet(eptr, buffer);
-		sassert(eptr->chunkisopen);
-		job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkid,
+		sassert(eptr->isChunkOpen);
+		job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkId,
 		          eptr->chunkType);
-		eptr->chunkisopen = 0;
+		eptr->isChunkOpen = 0;
 		// no error - do not disconnect - go direct to the IDLE state, ready for
 		// requests on the same connection
 		eptr->state = ChunkserverEntry::State::Idle;
@@ -372,8 +378,8 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 		const uint16_t totalRequestBlocks =
 				(totalRequestSize + thisPartOffset + SFSBLOCKSIZE - 1) / SFSBLOCKSIZE;
 		std::vector<uint8_t> readDataPrefix;
-		eptr->messageSerializer->serializePrefixOfCstoclReadData(readDataPrefix,
-				eptr->chunkid, eptr->offset, thisPartSize);
+		eptr->messageSerializer->serializePrefixOfCstoclReadData(
+		    readDataPrefix, eptr->chunkId, eptr->offset, thisPartSize);
 		PacketStruct *packet =
 		    worker_create_detached_packet_with_output_buffer(readDataPrefix);
 		if (packet == nullptr) {
@@ -383,7 +389,7 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 		eptr->readPacket = (void*)packet;
 		uint32_t readAheadBlocks = 0;
 		uint32_t maxReadBehindBlocks = 0;
-		if (!eptr->chunkisopen) {
+		if (!eptr->isChunkOpen) {
 			if (gHDDReadAhead.blocksToBeReadAhead() > 0) {
 				readAheadBlocks = totalRequestBlocks + gHDDReadAhead.blocksToBeReadAhead();
 			}
@@ -391,16 +397,16 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 			maxReadBehindBlocks = std::min(totalRequestBlocks,
 					gHDDReadAhead.maxBlocksToBeReadBehind());
 		}
-		eptr->rjobid = job_read(eptr->workerJobPool, worker_read_finished, eptr, eptr->chunkid,
-				eptr->version, eptr->chunkType, eptr->offset, thisPartSize,
-				maxReadBehindBlocks,
-				readAheadBlocks,
-				packet->outputBuffer.get(), !eptr->chunkisopen);
-		if (eptr->rjobid == 0) {
+		eptr->readJobId = job_read(
+		    eptr->workerJobPool, worker_read_finished, eptr, eptr->chunkId,
+		    eptr->chunkVersion, eptr->chunkType, eptr->offset, thisPartSize,
+		    maxReadBehindBlocks, readAheadBlocks, packet->outputBuffer.get(),
+		    !eptr->isChunkOpen);
+		if (eptr->readJobId == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		eptr->todocnt++;
+		eptr->todoReadCounter++;
 		eptr->offset += thisPartSize;
 		eptr->size -= thisPartSize;
 	}
@@ -430,16 +436,16 @@ void worker_read_init(ChunkserverEntry *eptr, const uint8_t *data,
 			deserializePacketVersionNoHeader(data, length, v);
 			if (v == cltocs::read::kECChunks) {
 				cltocs::read::deserialize(data, length,
-						eptr->chunkid,
-						eptr->version,
+						eptr->chunkId,
+						eptr->chunkVersion,
 						eptr->chunkType,
 						eptr->offset,
 						eptr->size);
 			} else {
 				legacy::ChunkPartType legacy_type;
 				cltocs::read::deserialize(data, length,
-						eptr->chunkid,
-						eptr->version,
+						eptr->chunkId,
+						eptr->chunkVersion,
 						legacy_type,
 						eptr->offset,
 						eptr->size);
@@ -447,8 +453,8 @@ void worker_read_init(ChunkserverEntry *eptr, const uint8_t *data,
 			}
 		} else {
 			deserializeAllLegacyPacketDataNoHeader(data, length,
-					eptr->chunkid,
-					eptr->version,
+					eptr->chunkId,
+					eptr->chunkVersion,
 					eptr->offset,
 					eptr->size);
 			eptr->chunkType = slice_traits::standard::ChunkPartType();
@@ -463,14 +469,14 @@ void worker_read_init(ChunkserverEntry *eptr, const uint8_t *data,
 	// Check if the request is valid
 	std::vector<uint8_t> instantResponseBuffer;
 	if (eptr->size == 0) {
-		eptr->messageSerializer->serializeCstoclReadStatus(instantResponseBuffer,
-				eptr->chunkid, SAUNAFS_STATUS_OK);
+		eptr->messageSerializer->serializeCstoclReadStatus(
+		    instantResponseBuffer, eptr->chunkId, SAUNAFS_STATUS_OK);
 	} else if (eptr->size > SFSCHUNKSIZE) {
-		eptr->messageSerializer->serializeCstoclReadStatus(instantResponseBuffer,
-				eptr->chunkid, SAUNAFS_ERROR_WRONGSIZE);
+		eptr->messageSerializer->serializeCstoclReadStatus(
+		    instantResponseBuffer, eptr->chunkId, SAUNAFS_ERROR_WRONGSIZE);
 	} else if (eptr->offset >= SFSCHUNKSIZE || eptr->offset + eptr->size > SFSCHUNKSIZE) {
-		eptr->messageSerializer->serializeCstoclReadStatus(instantResponseBuffer,
-				eptr->chunkid, SAUNAFS_ERROR_WRONGOFFSET);
+		eptr->messageSerializer->serializeCstoclReadStatus(
+		    instantResponseBuffer, eptr->chunkId, SAUNAFS_ERROR_WRONGOFFSET);
 	}
 	if (!instantResponseBuffer.empty()) {
 		worker_create_attached_packet(eptr, instantResponseBuffer);
@@ -479,8 +485,8 @@ void worker_read_init(ChunkserverEntry *eptr, const uint8_t *data,
 	// Process the request
 	stats_hlopr++;
 	eptr->state = ChunkserverEntry::State::Read;
-	eptr->todocnt = 0;
-	eptr->rjobid = 0;
+	eptr->todoReadCounter = 0;
+	eptr->readJobId = 0;
 	LOG_AVG_START0(eptr->readOperationTimer, "csserv_read");
 	worker_read_continue(eptr);
 }
@@ -493,16 +499,16 @@ void worker_prefetch(ChunkserverEntry *eptr, const uint8_t *data,
 		deserializePacketVersionNoHeader(data, length, v);
 		if (v == cltocs::prefetch::kECChunks) {
 			cltocs::prefetch::deserialize(data, length,
-				eptr->chunkid,
-				eptr->version,
+				eptr->chunkId,
+				eptr->chunkVersion,
 				eptr->chunkType,
 				eptr->offset,
 				eptr->size);
 		} else {
 			legacy::ChunkPartType legacy_type;
 			cltocs::prefetch::deserialize(data, length,
-				eptr->chunkid,
-				eptr->version,
+				eptr->chunkId,
+				eptr->chunkVersion,
 				legacy_type,
 				eptr->offset,
 				eptr->size);
@@ -519,8 +525,8 @@ void worker_prefetch(ChunkserverEntry *eptr, const uint8_t *data,
 	auto lastByte = eptr->offset + eptr->size - 1;
 	auto lastBlock = lastByte / SFSBLOCKSIZE;
 	auto nrOfBlocks = lastBlock - firstBlock + 1;
-	job_prefetch(eptr->workerJobPool, eptr->chunkid, eptr->version, eptr->chunkType,
-			firstBlock, nrOfBlocks);
+	job_prefetch(eptr->workerJobPool, eptr->chunkId, eptr->chunkVersion,
+	             eptr->chunkType, firstBlock, nrOfBlocks);
 }
 
 // bg writing
@@ -528,37 +534,38 @@ void worker_prefetch(ChunkserverEntry *eptr, const uint8_t *data,
 void worker_write_finished(uint8_t status, void *e) {
 	TRACETHIS();
 	auto *eptr = static_cast<ChunkserverEntry*>(e);
-	eptr->wjobid = 0;
+	eptr->writeJobId = 0;
 	sassert(eptr->messageSerializer != NULL);
 	if (status != SAUNAFS_STATUS_OK) {
 		std::vector<uint8_t> buffer;
-		eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
-				eptr->chunkid, eptr->wjobwriteid, status);
+		eptr->messageSerializer->serializeCstoclWriteStatus(
+		    buffer, eptr->chunkId, eptr->writeJobWriteId, status);
 		worker_create_attached_packet(eptr, buffer);
 		eptr->state = ChunkserverEntry::State::WriteFinish;
 		return;
 	}
-	if (eptr->wjobwriteid == 0) {
-		eptr->chunkisopen = 1;
+	if (eptr->writeJobWriteId == 0) {
+		eptr->isChunkOpen = 1;
 	}
 	if (eptr->state == ChunkserverEntry::State::WriteLast) {
 		std::vector<uint8_t> buffer;
-		eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
-				eptr->chunkid, eptr->wjobwriteid, status);
+		eptr->messageSerializer->serializeCstoclWriteStatus(
+		    buffer, eptr->chunkId, eptr->writeJobWriteId, status);
 		worker_create_attached_packet(eptr, buffer);
 	} else {
-		if (eptr->partiallyCompletedWrites.count(eptr->wjobwriteid) > 0) {
+		if (eptr->partiallyCompletedWrites.count(eptr->writeJobWriteId) > 0) {
 			// found - it means that it was added by status_receive, ie. next chunkserver from
 			// a chain finished writing before our worker
 			sassert(eptr->messageSerializer != NULL);
 			std::vector<uint8_t> buffer;
-			eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
-					eptr->chunkid, eptr->wjobwriteid, SAUNAFS_STATUS_OK);
+			eptr->messageSerializer->serializeCstoclWriteStatus(
+			    buffer, eptr->chunkId, eptr->writeJobWriteId,
+			    SAUNAFS_STATUS_OK);
 			worker_create_attached_packet(eptr, buffer);
-			eptr->partiallyCompletedWrites.erase(eptr->wjobwriteid);
+			eptr->partiallyCompletedWrites.erase(eptr->writeJobWriteId);
 		} else {
 			// not found - so add it
-			eptr->partiallyCompletedWrites.insert(eptr->wjobwriteid);
+			eptr->partiallyCompletedWrites.insert(eptr->writeJobWriteId);
 		}
 	}
 	worker_check_nextpacket(eptr);
@@ -602,12 +609,13 @@ void worker_write_init(ChunkserverEntry *eptr, const uint8_t *data,
 			deserializePacketVersionNoHeader(data, length, v);
 			if (v == cltocs::writeInit::kECChunks) {
 				cltocs::writeInit::deserialize(data, length,
-					eptr->chunkid, eptr->version, eptr->chunkType, chain);
+					eptr->chunkId, eptr->chunkVersion, eptr->chunkType, chain);
 			} else {
 				std::vector<NetworkAddress> legacy_chain;
 				legacy::ChunkPartType legacy_type;
-				cltocs::writeInit::deserialize(data, length,
-					eptr->chunkid, eptr->version, legacy_type, legacy_chain);
+				cltocs::writeInit::deserialize(data, length, eptr->chunkId,
+				                               eptr->chunkVersion, legacy_type,
+				                               legacy_chain);
 				eptr->chunkType = legacy_type;
 				for (const auto &address : legacy_chain) {
 					chain.push_back(ChunkTypeWithAddress(address, eptr->chunkType, kFirstXorVersion));
@@ -616,7 +624,7 @@ void worker_write_init(ChunkserverEntry *eptr, const uint8_t *data,
 		} else {
 			LegacyVector<NetworkAddress> legacyChain;
 			deserializeAllLegacyPacketDataNoHeader(data, length,
-				eptr->chunkid, eptr->version, legacyChain);
+				eptr->chunkId, eptr->chunkVersion, legacyChain);
 			for (const auto &address : legacyChain) {
 				chain.push_back(ChunkTypeWithAddress(address, slice_traits::standard::ChunkPartType(), kStdVersion));
 			}
@@ -634,15 +642,16 @@ void worker_write_init(ChunkserverEntry *eptr, const uint8_t *data,
 		eptr->fwdServer = chain[0].address;
 		uint32_t target_version = chain[0].chunkserver_version;
 		chain.erase(chain.begin());
-		serializeCltocsWriteInit(eptr->fwdinitpacket,
-				eptr->chunkid, eptr->version, eptr->chunkType, chain, target_version);
-		eptr->fwdstartptr = eptr->fwdinitpacket.data();
-		eptr->fwdbytesleft = eptr->fwdinitpacket.size();
-		eptr->connretrycnt = 0;
+		serializeCltocsWriteInit(eptr->fwdInitPacket, eptr->chunkId,
+		                         eptr->chunkVersion, eptr->chunkType, chain,
+		                         target_version);
+		eptr->fwdStartPtr = eptr->fwdInitPacket.data();
+		eptr->fwdBytesLeft = eptr->fwdInitPacket.size();
+		eptr->connectRetryCounter = 0;
 		if (worker_initconnect(eptr) < 0) {
 			std::vector<uint8_t> buffer;
-			eptr->messageSerializer->serializeCstoclWriteStatus(buffer,
-					eptr->chunkid, 0, SAUNAFS_ERROR_CANTCONNECT);
+			eptr->messageSerializer->serializeCstoclWriteStatus(
+			    buffer, eptr->chunkId, 0, SAUNAFS_ERROR_CANTCONNECT);
 			worker_create_attached_packet(eptr, buffer);
 			eptr->state = ChunkserverEntry::State::WriteFinish;
 			return;
@@ -651,9 +660,9 @@ void worker_write_init(ChunkserverEntry *eptr, const uint8_t *data,
 		eptr->state = ChunkserverEntry::State::WriteLast;
 	}
 	stats_hlopw++;
-	eptr->wjobwriteid = 0;
-	eptr->wjobid = job_open(eptr->workerJobPool, worker_write_finished, eptr, eptr->chunkid,
-			eptr->chunkType);
+	eptr->writeJobWriteId = 0;
+	eptr->writeJobId = job_open(eptr->workerJobPool, worker_write_finished,
+	                            eptr, eptr->chunkId, eptr->chunkType);
 }
 
 void worker_write_data(ChunkserverEntry *eptr, const uint8_t *data,
@@ -696,7 +705,7 @@ void worker_write_data(ChunkserverEntry *eptr, const uint8_t *data,
 	uint32_t dataSize = data + length - dataToWrite;
 	if (dataSize != size) {
 		status = SAUNAFS_ERROR_WRONGSIZE;
-	} else if (chunkId != eptr->chunkid) {
+	} else if (chunkId != eptr->chunkId) {
 		status = SAUNAFS_ERROR_WRONGCHUNKID;
 	}
 
@@ -711,10 +720,10 @@ void worker_write_data(ChunkserverEntry *eptr, const uint8_t *data,
 		worker_delete_preserved(eptr->writePacket);
 	}
 	eptr->writePacket = worker_preserve_inputpacket(eptr);
-	eptr->wjobwriteid = writeId;
-	eptr->wjobid = job_write(eptr->workerJobPool, worker_write_finished, eptr,
-			chunkId, eptr->version, eptr->chunkType,
-			blocknum, offset, size, crc, dataToWrite);
+	eptr->writeJobWriteId = writeId;
+	eptr->writeJobId = job_write(eptr->workerJobPool, worker_write_finished,
+	                             eptr, chunkId, eptr->chunkVersion, eptr->chunkType,
+	                             blocknum, offset, size, crc, dataToWrite);
 }
 
 void worker_write_status(ChunkserverEntry *eptr, const uint8_t *data,
@@ -746,7 +755,7 @@ void worker_write_status(ChunkserverEntry *eptr, const uint8_t *data,
 		return;
 	}
 
-	if (eptr->chunkid != chunkId) {
+	if (eptr->chunkId != chunkId) {
 		status = SAUNAFS_ERROR_WRONGCHUNKID;
 		writeId = 0;
 	}
@@ -782,14 +791,14 @@ void worker_write_end(ChunkserverEntry *eptr, const uint8_t *data,
 		eptr->state = ChunkserverEntry::State::WriteFinish;
 		return;
 	}
-	if (chunkId != eptr->chunkid) {
+	if (chunkId != eptr->chunkId) {
 		safs_pretty_syslog(LOG_NOTICE,"Received malformed WRITE_END message "
 				"(got chunkId=%016" PRIX64 ", expected %016" PRIX64 ")",
-				chunkId, eptr->chunkid);
+				chunkId, eptr->chunkId);
 		eptr->state = ChunkserverEntry::State::WriteFinish;
 		return;
 	}
-	if (eptr->wjobid > 0 || !eptr->partiallyCompletedWrites.empty() ||
+	if (eptr->writeJobId > 0 || !eptr->partiallyCompletedWrites.empty() ||
 	    eptr->outputHead != nullptr) {
 		/*
 		 * WRITE_END received too early:
@@ -803,15 +812,16 @@ void worker_write_end(ChunkserverEntry *eptr, const uint8_t *data,
 		eptr->state = ChunkserverEntry::State::WriteFinish;
 		return;
 	}
-	if (eptr->chunkisopen) {
-		job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkid, eptr->chunkType);
-		eptr->chunkisopen = 0;
+	if (eptr->isChunkOpen) {
+		job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkId,
+		          eptr->chunkType);
+		eptr->isChunkOpen = 0;
 	}
-	if (eptr->fwdsock > 0) {
+	if (eptr->fwdSocket > 0) {
 		// TODO(msulikowski) if we want to use a ConnectionPool, this the right place to put the
 		// connection to the pool.
-		tcpclose(eptr->fwdsock);
-		eptr->fwdsock = -1;
+		tcpclose(eptr->fwdSocket);
+		eptr->fwdSocket = -1;
 	}
 	eptr->state = ChunkserverEntry::State::Idle;
 }
@@ -821,8 +831,10 @@ void worker_sau_get_chunk_blocks_finished_legacy(uint8_t status, void *extra) {
 	auto *eptr = static_cast<ChunkserverEntry*>(extra);
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
-	cstocs::getChunkBlocksStatus::serialize(buffer, eptr->chunkid, eptr->version,
-		(legacy::ChunkPartType)eptr->chunkType, eptr->getBlocksJobResult, status);
+	cstocs::getChunkBlocksStatus::serialize(
+	    buffer, eptr->chunkId, eptr->chunkVersion,
+	    (legacy::ChunkPartType)eptr->chunkType, eptr->getBlocksJobResult,
+	    status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = ChunkserverEntry::State::Idle;
 }
@@ -832,8 +844,9 @@ void worker_sau_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	auto *eptr = static_cast<ChunkserverEntry*>(extra);
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
-	cstocs::getChunkBlocksStatus::serialize(buffer, eptr->chunkid, eptr->version,
-		eptr->chunkType, eptr->getBlocksJobResult, status);
+	cstocs::getChunkBlocksStatus::serialize(buffer, eptr->chunkId,
+	                                        eptr->chunkVersion, eptr->chunkType,
+	                                        eptr->getBlocksJobResult, status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = ChunkserverEntry::State::Idle;
 }
@@ -843,8 +856,8 @@ void worker_get_chunk_blocks_finished(uint8_t status, void *extra) {
 	auto *eptr = static_cast<ChunkserverEntry*>(extra);
 	eptr->getBlocksJobId = 0;
 	std::vector<uint8_t> buffer;
-	serializeLegacyPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS,
-			eptr->chunkid, eptr->version, eptr->getBlocksJobResult, status);
+	serializeLegacyPacket(buffer, CSTOCS_GET_CHUNK_BLOCKS_STATUS, eptr->chunkId,
+	                      eptr->chunkVersion, eptr->getBlocksJobResult, status);
 	worker_create_attached_packet(eptr, buffer);
 	eptr->state = ChunkserverEntry::State::Idle;
 }
@@ -854,33 +867,36 @@ void worker_sau_get_chunk_blocks(ChunkserverEntry *eptr, const uint8_t *data,
 	PacketVersion v;
 	deserializePacketVersionNoHeader(data, length, v);
 	if (v == cstocs::getChunkBlocks::kECChunks) {
-		cstocs::getChunkBlocks::deserialize(data, length,
-				eptr->chunkid, eptr->version, eptr->chunkType);
+		cstocs::getChunkBlocks::deserialize(
+		    data, length, eptr->chunkId, eptr->chunkVersion, eptr->chunkType);
 
 		eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
-			worker_sau_get_chunk_blocks_finished, eptr, eptr->chunkid, eptr->version,
+			worker_sau_get_chunk_blocks_finished, eptr, eptr->chunkId, eptr->chunkVersion,
 			eptr->chunkType, &(eptr->getBlocksJobResult));
 
 	} else {
 		legacy::ChunkPartType legacy_type;
-		cstocs::getChunkBlocks::deserialize(data, length,
-				eptr->chunkid, eptr->version, legacy_type);
+		cstocs::getChunkBlocks::deserialize(data, length, eptr->chunkId,
+		                                    eptr->chunkVersion, legacy_type);
 		eptr->chunkType = legacy_type;
 
-		eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
-			worker_sau_get_chunk_blocks_finished_legacy, eptr, eptr->chunkid, eptr->version,
-			eptr->chunkType, &(eptr->getBlocksJobResult));
+		eptr->getBlocksJobId = job_get_blocks(
+		    eptr->workerJobPool, worker_sau_get_chunk_blocks_finished_legacy,
+		    eptr, eptr->chunkId, eptr->chunkVersion, eptr->chunkType,
+		    &(eptr->getBlocksJobResult));
 	}
 	eptr->state = ChunkserverEntry::State::GetBlock;
 }
 
 void worker_get_chunk_blocks(ChunkserverEntry *eptr, const uint8_t *data,
 		uint32_t length) {
-	deserializeAllLegacyPacketDataNoHeader(data, length, eptr->chunkid, eptr->version);
+	deserializeAllLegacyPacketDataNoHeader(data, length, eptr->chunkId,
+	                                       eptr->chunkVersion);
 	eptr->chunkType = slice_traits::standard::ChunkPartType();
-	eptr->getBlocksJobId = job_get_blocks(eptr->workerJobPool,
-			worker_get_chunk_blocks_finished, eptr, eptr->chunkid, eptr->version,
-			eptr->chunkType, &(eptr->getBlocksJobResult));
+	eptr->getBlocksJobId =
+	    job_get_blocks(eptr->workerJobPool, worker_get_chunk_blocks_finished,
+	                   eptr, eptr->chunkId, eptr->chunkVersion, eptr->chunkType,
+	                   &(eptr->getBlocksJobResult));
 	eptr->state = ChunkserverEntry::State::GetBlock;
 }
 
@@ -998,22 +1014,26 @@ void worker_outputcheck(ChunkserverEntry *eptr) {
 
 void worker_close(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	if (eptr->rjobid > 0) {
-		job_pool_disable_job(eptr->workerJobPool, eptr->rjobid);
-		job_pool_change_callback(eptr->workerJobPool, eptr->rjobid, worker_delayed_close, eptr);
+	if (eptr->readJobId > 0) {
+		job_pool_disable_job(eptr->workerJobPool, eptr->readJobId);
+		job_pool_change_callback(eptr->workerJobPool, eptr->readJobId,
+		                         worker_delayed_close, eptr);
 		eptr->state = ChunkserverEntry::State::CloseWait;
-	} else if (eptr->wjobid > 0) {
-		job_pool_disable_job(eptr->workerJobPool, eptr->wjobid);
-		job_pool_change_callback(eptr->workerJobPool, eptr->wjobid, worker_delayed_close, eptr);
+	} else if (eptr->writeJobId > 0) {
+		job_pool_disable_job(eptr->workerJobPool, eptr->writeJobId);
+		job_pool_change_callback(eptr->workerJobPool, eptr->writeJobId,
+		                         worker_delayed_close, eptr);
 		eptr->state = ChunkserverEntry::State::CloseWait;
 	} else if (eptr->getBlocksJobId > 0) {
 		job_pool_disable_job(eptr->workerJobPool, eptr->getBlocksJobId);
-		job_pool_change_callback(eptr->workerJobPool, eptr->getBlocksJobId, worker_delayed_close, eptr);
+		job_pool_change_callback(eptr->workerJobPool, eptr->getBlocksJobId,
+		                         worker_delayed_close, eptr);
 		eptr->state = ChunkserverEntry::State::CloseWait;
 	} else {
-		if (eptr->chunkisopen) {
-			job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkid, eptr->chunkType);
-			eptr->chunkisopen = 0;
+		if (eptr->isChunkOpen) {
+			job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkId,
+			          eptr->chunkType);
+			eptr->isChunkOpen = 0;
 		}
 		eptr->state = ChunkserverEntry::State::Closed;
 	}
@@ -1139,14 +1159,14 @@ void worker_check_nextpacket(ChunkserverEntry *eptr) {
 	const uint8_t *ptr;
 	if (eptr->state == ChunkserverEntry::State::WriteForward) {
 		if (eptr->mode == ChunkserverEntry::Mode::Data &&
-		    eptr->inputPacket.bytesLeft == 0 && eptr->fwdbytesleft == 0) {
-			ptr = eptr->hdrbuff;
+		    eptr->inputPacket.bytesLeft == 0 && eptr->fwdBytesLeft == 0) {
+			ptr = eptr->headerBuffer;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
 			eptr->mode = ChunkserverEntry::Mode::Header;
 			eptr->inputPacket.bytesLeft = PacketHeader::kSize;
-			eptr->inputPacket.startPtr = eptr->hdrbuff;
+			eptr->inputPacket.startPtr = eptr->headerBuffer;
 
 			worker_gotpacket(eptr, type,
 			                 eptr->inputPacket.packet + PacketHeader::kSize,
@@ -1160,13 +1180,13 @@ void worker_check_nextpacket(ChunkserverEntry *eptr) {
 	} else {
 		if (eptr->mode == ChunkserverEntry::Mode::Data &&
 		    eptr->inputPacket.bytesLeft == 0) {
-			ptr = eptr->hdrbuff;
+			ptr = eptr->headerBuffer;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
 			eptr->mode = ChunkserverEntry::Mode::Header;
 			eptr->inputPacket.bytesLeft = PacketHeader::kSize;
-			eptr->inputPacket.startPtr = eptr->hdrbuff;
+			eptr->inputPacket.startPtr = eptr->headerBuffer;
 
 			worker_gotpacket(eptr, type, eptr->inputPacket.packet, size);
 
@@ -1181,13 +1201,13 @@ void worker_check_nextpacket(ChunkserverEntry *eptr) {
 void worker_fwdconnected(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	int status;
-	status = tcpgetstatus(eptr->fwdsock);
+	status = tcpgetstatus(eptr->fwdSocket);
 	if (status) {
 		safs_silent_errlog(LOG_WARNING, "connection failed, error");
 		worker_fwderror(eptr);
 		return;
 	}
-	tcpnodelay(eptr->fwdsock);
+	tcpnodelay(eptr->fwdSocket);
 	eptr->state = ChunkserverEntry::State::WriteInit;
 }
 
@@ -1197,7 +1217,7 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 	uint32_t type, size;
 	const uint8_t *ptr;
 	if (eptr->fwdMode == ChunkserverEntry::Mode::Header) {
-		i = read(eptr->fwdsock, eptr->fwdInputPacket.startPtr,
+		i = read(eptr->fwdSocket, eptr->fwdInputPacket.startPtr,
 		         eptr->fwdInputPacket.bytesLeft);
 		if (i == 0) {
 			worker_fwderror(eptr);
@@ -1216,7 +1236,7 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 		if (eptr->fwdInputPacket.bytesLeft > 0) {
 			return;
 		}
-		ptr = eptr->fwdhdrbuff + 4;
+		ptr = eptr->fwdHeaderBuffer + 4;
 		size = get32bit(&ptr);
 		if (size > MaxPacketSize) {
 			safs_pretty_syslog(LOG_WARNING,"(fwdread) packet too long (%" PRIu32 "/%u)",size,MaxPacketSize);
@@ -1233,7 +1253,7 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 	}
 	if (eptr->fwdMode == ChunkserverEntry::Mode::Data) {
 		if (eptr->fwdInputPacket.bytesLeft > 0) {
-			i = read(eptr->fwdsock, eptr->fwdInputPacket.startPtr,
+			i = read(eptr->fwdSocket, eptr->fwdInputPacket.startPtr,
 			         eptr->fwdInputPacket.bytesLeft);
 			if (i == 0) {
 				worker_fwderror(eptr);
@@ -1253,13 +1273,13 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 				return;
 			}
 		}
-		ptr = eptr->fwdhdrbuff;
+		ptr = eptr->fwdHeaderBuffer;
 		type = get32bit(&ptr);
 		size = get32bit(&ptr);
 
 		eptr->fwdMode = ChunkserverEntry::Mode::Header;
 		eptr->fwdInputPacket.bytesLeft = PacketHeader::kSize;
-		eptr->fwdInputPacket.startPtr = eptr->fwdhdrbuff;
+		eptr->fwdInputPacket.startPtr = eptr->fwdHeaderBuffer;
 
 		worker_gotpacket(eptr, type, eptr->fwdInputPacket.packet, size);
 
@@ -1273,8 +1293,8 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 void worker_fwdwrite(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	int32_t i;
-	if (eptr->fwdbytesleft > 0) {
-		i = write(eptr->fwdsock, eptr->fwdstartptr, eptr->fwdbytesleft);
+	if (eptr->fwdBytesLeft > 0) {
+		i = write(eptr->fwdSocket, eptr->fwdStartPtr, eptr->fwdBytesLeft);
 		if (i == 0) {
 			worker_fwderror(eptr);
 			return;
@@ -1287,15 +1307,15 @@ void worker_fwdwrite(ChunkserverEntry *eptr) {
 			return;
 		}
 		stats_bytesout += i;
-		eptr->fwdstartptr += i;
-		eptr->fwdbytesleft -= i;
+		eptr->fwdStartPtr += i;
+		eptr->fwdBytesLeft -= i;
 	}
-	if (eptr->fwdbytesleft == 0) {
-		eptr->fwdinitpacket.clear();
-		eptr->fwdstartptr = NULL;
+	if (eptr->fwdBytesLeft == 0) {
+		eptr->fwdInitPacket.clear();
+		eptr->fwdStartPtr = nullptr;
 		eptr->fwdMode = ChunkserverEntry::Mode::Header;
 		eptr->fwdInputPacket.bytesLeft = PacketHeader::kSize;
-		eptr->fwdInputPacket.startPtr = eptr->fwdhdrbuff;
+		eptr->fwdInputPacket.startPtr = eptr->fwdHeaderBuffer;
 		eptr->fwdInputPacket.packet = nullptr;
 		eptr->state = ChunkserverEntry::State::WriteForward;
 	}
@@ -1326,7 +1346,8 @@ void worker_forward(ChunkserverEntry *eptr) {
 		}
 		PacketHeader header;
 		try {
-			deserializePacketHeader(eptr->hdrbuff, sizeof(eptr->hdrbuff), header);
+			deserializePacketHeader(eptr->headerBuffer,
+			                        sizeof(eptr->headerBuffer), header);
 		} catch (IncorrectDeserializationException&) {
 			safs_pretty_syslog(LOG_WARNING, "(forward) Received malformed network packet");
 			eptr->state = ChunkserverEntry::State::Close;
@@ -1344,14 +1365,15 @@ void worker_forward(ChunkserverEntry *eptr) {
 		}
 		eptr->inputPacket.packet = static_cast<uint8_t*>(malloc(totalPacketLength));
 		passert(eptr->inputPacket.packet);
-		memcpy(eptr->inputPacket.packet, eptr->hdrbuff, PacketHeader::kSize);
+		memcpy(eptr->inputPacket.packet, eptr->headerBuffer,
+		       PacketHeader::kSize);
 		eptr->inputPacket.bytesLeft = header.length;
 		eptr->inputPacket.startPtr = eptr->inputPacket.packet + PacketHeader::kSize;
 		if (header.type == CLTOCS_WRITE_DATA
 				|| header.type == SAU_CLTOCS_WRITE_DATA
 				|| header.type == SAU_CLTOCS_WRITE_END) {
-			eptr->fwdbytesleft = 8;
-			eptr->fwdstartptr = eptr->inputPacket.packet;
+			eptr->fwdBytesLeft = PacketHeader::kSize;
+			eptr->fwdStartPtr = eptr->inputPacket.packet;
 		}
 		eptr->mode = ChunkserverEntry::Mode::Data;
 	}
@@ -1372,13 +1394,13 @@ void worker_forward(ChunkserverEntry *eptr) {
 		stats_bytesin += i;
 		eptr->inputPacket.startPtr += i;
 		eptr->inputPacket.bytesLeft -= i;
-		if (eptr->fwdstartptr != NULL) {
-			eptr->fwdbytesleft += i;
+		if (eptr->fwdStartPtr != nullptr) {
+			eptr->fwdBytesLeft += i;
 		}
 	}
-	if (eptr->fwdbytesleft > 0) {
-		sassert(eptr->fwdstartptr != NULL);
-		i = write(eptr->fwdsock, eptr->fwdstartptr, eptr->fwdbytesleft);
+	if (eptr->fwdBytesLeft > 0) {
+		sassert(eptr->fwdStartPtr != nullptr);
+		i = write(eptr->fwdSocket, eptr->fwdStartPtr, eptr->fwdBytesLeft);
 		if (i == 0) {
 			worker_fwderror(eptr);
 			return;
@@ -1391,14 +1413,15 @@ void worker_forward(ChunkserverEntry *eptr) {
 			return;
 		}
 		stats_bytesout += i;
-		eptr->fwdstartptr += i;
-		eptr->fwdbytesleft -= i;
+		eptr->fwdStartPtr += i;
+		eptr->fwdBytesLeft -= i;
 	}
-	if (eptr->inputPacket.bytesLeft == 0 && eptr->fwdbytesleft == 0 &&
-	    eptr->wjobid == 0) {
+	if (eptr->inputPacket.bytesLeft == 0 && eptr->fwdBytesLeft == 0 &&
+	    eptr->writeJobId == 0) {
 		PacketHeader header;
 		try {
-			deserializePacketHeader(eptr->hdrbuff, sizeof(eptr->hdrbuff), header);
+			deserializePacketHeader(eptr->headerBuffer,
+			                        sizeof(eptr->headerBuffer), header);
 		} catch (IncorrectDeserializationException&) {
 			safs_pretty_syslog(LOG_WARNING, "(forward) Received malformed network packet");
 			eptr->state = ChunkserverEntry::State::Close;
@@ -1406,7 +1429,7 @@ void worker_forward(ChunkserverEntry *eptr) {
 		}
 		eptr->mode = ChunkserverEntry::Mode::Header;
 		eptr->inputPacket.bytesLeft = PacketHeader::kSize;
-		eptr->inputPacket.startPtr = eptr->hdrbuff;
+		eptr->inputPacket.startPtr = eptr->headerBuffer;
 
 		uint8_t* packetData = eptr->inputPacket.packet + PacketHeader::kSize;
 		worker_gotpacket(eptr, header.type, packetData, header.length);
@@ -1414,7 +1437,7 @@ void worker_forward(ChunkserverEntry *eptr) {
 			free(eptr->inputPacket.packet);
 		}
 		eptr->inputPacket.packet = nullptr;
-		eptr->fwdstartptr = nullptr;
+		eptr->fwdStartPtr = nullptr;
 	}
 }
 
@@ -1426,7 +1449,7 @@ void worker_read(ChunkserverEntry *eptr) {
 
 	if (eptr->mode == ChunkserverEntry::Mode::Header) {
 		sassert(eptr->inputPacket.startPtr + eptr->inputPacket.bytesLeft ==
-		        eptr->hdrbuff + PacketHeader::kSize);
+		        eptr->headerBuffer + PacketHeader::kSize);
 		i = read(eptr->sock, eptr->inputPacket.startPtr,
 		         eptr->inputPacket.bytesLeft);
 		if (i == 0) {
@@ -1448,7 +1471,7 @@ void worker_read(ChunkserverEntry *eptr) {
 			return;
 		}
 
-		ptr = eptr->hdrbuff + 4;
+		ptr = eptr->headerBuffer + 4;
 		size = get32bit(&ptr);
 
 		if (size > 0) {
@@ -1490,14 +1513,14 @@ void worker_read(ChunkserverEntry *eptr) {
 				return;
 			}
 		}
-		if (eptr->wjobid == 0) {
-			ptr = eptr->hdrbuff;
+		if (eptr->writeJobId == 0) {
+			ptr = eptr->headerBuffer;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
 			eptr->mode = ChunkserverEntry::Mode::Header;
 			eptr->inputPacket.bytesLeft = PacketHeader::kSize;
-			eptr->inputPacket.startPtr = eptr->hdrbuff;
+			eptr->inputPacket.startPtr = eptr->headerBuffer;
 
 			worker_gotpacket(eptr, type, eptr->inputPacket.packet, size);
 
@@ -1613,12 +1636,12 @@ void NetworkWorkerThread::terminate() {
 	std::unique_lock lock(csservheadLock);
 	while (!csservEntries.empty()) {
 		auto& entry = csservEntries.back();
-		if (entry.chunkisopen) {
-			hddClose(entry.chunkid, entry.chunkType);
+		if (entry.isChunkOpen) {
+			hddClose(entry.chunkId, entry.chunkType);
 		}
 		tcpclose(entry.sock);
-		if (entry.fwdsock >= 0) {
-			tcpclose(entry.fwdsock);
+		if (entry.fwdSocket >= 0) {
+			tcpclose(entry.fwdSocket);
 		}
 		if (entry.inputPacket.packet) {
 			free(entry.inputPacket.packet);
@@ -1656,8 +1679,8 @@ void NetworkWorkerThread::preparePollFds() {
 
 	std::unique_lock lock(csservheadLock);
 	for (auto& entry : csservEntries) {
-		entry.pdescpos = -1;
-		entry.fwdpdescpos = -1;
+		entry.pDescPos = -1;
+		entry.fwdPDescPos = -1;
 		switch (entry.state) {
 			case ChunkserverEntry::State::Idle:
 			case ChunkserverEntry::State::Read:
@@ -1666,7 +1689,7 @@ void NetworkWorkerThread::preparePollFds() {
 				pdesc.emplace_back();
 				pdesc.back().fd = entry.sock;
 				pdesc.back().events = 0;
-				entry.pdescpos = pdesc.size() - 1;
+				entry.pDescPos = pdesc.size() - 1;
 				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
 				}
@@ -1676,31 +1699,31 @@ void NetworkWorkerThread::preparePollFds() {
 				break;
 			case ChunkserverEntry::State::Connecting:
 				pdesc.emplace_back();
-				pdesc.back().fd = entry.fwdsock;
+				pdesc.back().fd = entry.fwdSocket;
 				pdesc.back().events = POLLOUT;
-				entry.fwdpdescpos = pdesc.size() - 1;
+				entry.fwdPDescPos = pdesc.size() - 1;
 				break;
 			case ChunkserverEntry::State::WriteInit:
-				if (entry.fwdbytesleft > 0) {
+				if (entry.fwdBytesLeft > 0) {
 					pdesc.emplace_back();
-					pdesc.back().fd = entry.fwdsock;
+					pdesc.back().fd = entry.fwdSocket;
 					pdesc.back().events = POLLOUT;
-					entry.fwdpdescpos = pdesc.size() - 1;
+					entry.fwdPDescPos = pdesc.size() - 1;
 				}
 				break;
 			case ChunkserverEntry::State::WriteForward:
 				pdesc.emplace_back();
-				pdesc.back().fd = entry.fwdsock;
+				pdesc.back().fd = entry.fwdSocket;
 				pdesc.back().events = POLLIN;
-				entry.fwdpdescpos = pdesc.size() - 1;
-				if (entry.fwdbytesleft > 0) {
+				entry.fwdPDescPos = pdesc.size() - 1;
+				if (entry.fwdBytesLeft > 0) {
 					pdesc.back().events |= POLLOUT;
 				}
 
 				pdesc.emplace_back();
 				pdesc.back().fd = entry.sock;
 				pdesc.back().events = 0;
-				entry.pdescpos = pdesc.size() - 1;
+				entry.pDescPos = pdesc.size() - 1;
 				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
 				}
@@ -1713,7 +1736,7 @@ void NetworkWorkerThread::preparePollFds() {
 					pdesc.emplace_back();
 					pdesc.back().fd = entry.sock;
 					pdesc.back().events = POLLOUT;
-					entry.pdescpos = pdesc.size() - 1;
+					entry.pDescPos = pdesc.size() - 1;
 				}
 				break;
 			default:
@@ -1736,11 +1759,11 @@ void NetworkWorkerThread::servePoll() {
 	std::unique_lock lock(csservheadLock);
 	for (auto& entry : csservEntries) {
 		ChunkserverEntry* eptr = &entry;
-		if (entry.pdescpos >= 0
-				&& (pdesc[entry.pdescpos].revents & (POLLERR | POLLHUP))) {
+		if (entry.pDescPos >= 0
+				&& (pdesc[entry.pDescPos].revents & (POLLERR | POLLHUP))) {
 			entry.state = ChunkserverEntry::State::Close;
-		} else if (entry.fwdpdescpos >= 0
-				&& (pdesc[entry.fwdpdescpos].revents & (POLLERR | POLLHUP))) {
+		} else if (entry.fwdPDescPos >= 0
+				&& (pdesc[entry.fwdPDescPos].revents & (POLLERR | POLLHUP))) {
 			worker_fwderror(eptr);
 		}
 		lstate = entry.state;
@@ -1749,20 +1772,22 @@ void NetworkWorkerThread::servePoll() {
 		    lstate == ChunkserverEntry::State::WriteLast ||
 		    lstate == ChunkserverEntry::State::WriteFinish ||
 		    lstate == ChunkserverEntry::State::GetBlock) {
-			if (entry.pdescpos >= 0 && (pdesc[entry.pdescpos].revents & POLLIN)) {
-				entry.activity = now;
+			if (entry.pDescPos >= 0 &&
+			    (pdesc[entry.pDescPos].revents & POLLIN)) {
+				entry.lastActivity = now;
 				worker_read(eptr);
 			}
-			if (entry.pdescpos >= 0 && (pdesc[entry.pdescpos].revents & POLLOUT)
-					&& entry.state == lstate) {
-				entry.activity = now;
+			if (entry.pDescPos >= 0 &&
+			    (pdesc[entry.pDescPos].revents & POLLOUT) &&
+			    entry.state == lstate) {
+				entry.lastActivity = now;
 				worker_write(eptr);
 			}
 		} else if (lstate == ChunkserverEntry::State::Connecting &&
-		           entry.fwdpdescpos >= 0 &&
-		           (pdesc[entry.fwdpdescpos].revents &
+		           entry.fwdPDescPos >= 0 &&
+		           (pdesc[entry.fwdPDescPos].revents &
 		            POLLOUT)) {  // FD_ISSET(entry.fwdsock,wset)) {
-			entry.activity = now;
+			entry.lastActivity = now;
 			worker_fwdconnected(eptr);
 			if (entry.state == ChunkserverEntry::State::WriteInit) {
 				worker_fwdwrite(eptr); // after connect likely some data can be send
@@ -1771,29 +1796,32 @@ void NetworkWorkerThread::servePoll() {
 				worker_forward(eptr); // and also some data can be forwarded
 			}
 		} else if (entry.state == ChunkserverEntry::State::WriteInit &&
-		           entry.fwdpdescpos >= 0 &&
-		           (pdesc[entry.fwdpdescpos].revents &
+		           entry.fwdPDescPos >= 0 &&
+		           (pdesc[entry.fwdPDescPos].revents &
 		            POLLOUT)) {  // FD_ISSET(entry.fwdsock,wset)) {
-			entry.activity = now;
+			entry.lastActivity = now;
 			worker_fwdwrite(eptr); // after sending init packet
 			if (entry.state == ChunkserverEntry::State::WriteForward) {
 				worker_forward(eptr); // likely some data can be forwarded
 			}
 		} else if (entry.state == ChunkserverEntry::State::WriteForward) {
-			if ((entry.pdescpos >= 0 && (pdesc[entry.pdescpos].revents & POLLIN))
-					|| (entry.fwdpdescpos >= 0
-							&& (pdesc[entry.fwdpdescpos].revents & POLLOUT))) {
-				entry.activity = now;
+			if ((entry.pDescPos >= 0 &&
+			     (pdesc[entry.pDescPos].revents & POLLIN)) ||
+			    (entry.fwdPDescPos >= 0 &&
+			     (pdesc[entry.fwdPDescPos].revents & POLLOUT))) {
+				entry.lastActivity = now;
 				worker_forward(eptr);
 			}
-			if (entry.fwdpdescpos >= 0 && (pdesc[entry.fwdpdescpos].revents & POLLIN)
-					&& entry.state == lstate) {
-				entry.activity = now;
+			if (entry.fwdPDescPos >= 0 &&
+			    (pdesc[entry.fwdPDescPos].revents & POLLIN) &&
+			    entry.state == lstate) {
+				entry.lastActivity = now;
 				worker_fwdread(eptr);
 			}
-			if (entry.pdescpos >= 0 && (pdesc[entry.pdescpos].revents & POLLOUT)
-					&& entry.state == lstate) {
-				entry.activity = now;
+			if (entry.pDescPos >= 0 &&
+			    (pdesc[entry.pDescPos].revents & POLLOUT) &&
+			    entry.state == lstate) {
+				entry.lastActivity = now;
 				worker_write(eptr);
 			}
 		}
@@ -1801,14 +1829,16 @@ void NetworkWorkerThread::servePoll() {
 		    entry.outputHead == nullptr) {
 			entry.state = ChunkserverEntry::State::Close;
 		}
-		if (entry.state == ChunkserverEntry::State::Connecting
-				&& entry.connstart + CONNECT_TIMEOUT(entry.connretrycnt) < usecnow) {
+		if (entry.state == ChunkserverEntry::State::Connecting &&
+		    entry.connectStartTimeUSec +
+		            CONNECT_TIMEOUT(entry.connectRetryCounter) <
+		        usecnow) {
 			worker_retryconnect(eptr);
 		}
 		if (entry.state != ChunkserverEntry::State::Close &&
 		    entry.state != ChunkserverEntry::State::CloseWait &&
 		    entry.state != ChunkserverEntry::State::Closed &&
-		    entry.activity + CSSERV_TIMEOUT < now) {
+		    entry.lastActivity + CSSERV_TIMEOUT < now) {
 			// Close connection if inactive for more than CSSERV_TIMEOUT seconds
 			entry.state = ChunkserverEntry::State::Close;
 		}
@@ -1841,8 +1871,8 @@ void NetworkWorkerThread::servePoll() {
 			if (eptr->writePacket) {
 				worker_delete_preserved(eptr->writePacket);
 			}
-			if (eptr->fwdsock >= 0) {
-				tcpclose(eptr->fwdsock);
+			if (eptr->fwdSocket >= 0) {
+				tcpclose(eptr->fwdSocket);
 			}
 			if (eptr->inputPacket.packet) {
 				free(eptr->inputPacket.packet);
@@ -1879,7 +1909,7 @@ void NetworkWorkerThread::addConnection(int newSocketFD) {
 
 	std::unique_lock lock(csservheadLock);
 	csservEntries.emplace_front(newSocketFD, bgJobPool_);
-	csservEntries.front().activity = eventloop_time();
+	csservEntries.front().lastActivity = eventloop_time();
 
 	eassert(write(notify_pipe[1], "9", 1) == 1);
 }

@@ -99,78 +99,68 @@ struct ChunkserverEntry {
 	ChunkserverEntry::Mode fwdMode = ChunkserverEntry::Mode::Header;
 
 	int sock;
-	int fwdsock; // forwarding socket for writing
-	uint64_t connstart; // 'connect' start time in usec (for timeout and retry)
-	uint8_t connretrycnt; // 'connect' retry counter
+	int fwdSocket = -1; ///< forwarding socket for writing
+	uint64_t connectStartTimeUSec = 0; ///< for timeout and retry (usec)
+	uint8_t connectRetryCounter = 0; ///< for timeout and retry
 	NetworkAddress fwdServer; // the next server in write chain
-	int32_t pdescpos;
-	int32_t fwdpdescpos;
-	uint32_t activity;
-	uint8_t hdrbuff[PacketHeader::kSize];
-	uint8_t fwdhdrbuff[PacketHeader::kSize];
+	int32_t pDescPos = -1;  ///< Position in the poll descriptors array
+	int32_t fwdPDescPos = -1;  ///< Position in poll descriptors for fwdSocket
+	uint32_t lastActivity = 0; ///< Last activity time
+	uint8_t headerBuffer[PacketHeader::kSize];  ///< buffer for packet header
+	uint8_t fwdHeaderBuffer[PacketHeader::kSize];  ///< buffer for fwd packet header
+	/// Stores the data of the incoming packet for processing
 	PacketStruct inputPacket;
-	uint8_t *fwdstartptr; // used for forwarding inputpacket data
-	uint32_t fwdbytesleft; // used for forwarding inputpacket data
-	PacketStruct fwdInputPacket; // used for receiving status from fwdsocket
-	std::vector<uint8_t> fwdinitpacket; // used only for write initialization
+	uint8_t *fwdStartPtr = nullptr; ///< used for forwarding inputpacket data
+	uint32_t fwdBytesLeft = 0; ///< used for forwarding inputpacket data
+	PacketStruct fwdInputPacket; ///< used for receiving status from fwdSocket
+	std::vector<uint8_t> fwdInitPacket; ///< used only for write initialization
+
+	/// Pointer to the head of the output packets list
 	PacketStruct *outputHead = nullptr;
+	/// Pointer to the tail of the output packets list
 	PacketStruct **outputTail = &outputHead;
 
 	/* write */
-	uint32_t wjobid;
-	uint32_t wjobwriteid;
-	std::set<uint32_t> partiallyCompletedWrites; // writeId's which:
-	// * have been completed by our worker, but need ack from the next chunkserver from the chain
-	// * have been acked by the next chunkserver from the chain, but are still being written by us
+	uint32_t writeJobId = 0; ///< ID of the current write job being processed
+	uint32_t writeJobWriteId = 0; ///< Specific write operation from client
+	/// writeJobWriteId's which:
+	/// - have been completed by our worker, but need ack from the next
+	///   chunkserver from the chain.
+	/// - have been acked by the next chunkserver from the chain, but are still
+	///   being written by us.
+	std::set<uint32_t> partiallyCompletedWrites;
 
 	/* read */
-	uint32_t rjobid;
-	uint8_t todocnt; // R (read finished + send finished)
+	uint32_t readJobId = 0; ///< ID of the current read job being processed.
+	uint8_t todoReadCounter = 0; ///< R (read finished + send finished)
 
 	/* get blocks */
-	uint32_t getBlocksJobId;
-	uint16_t getBlocksJobResult;
+	uint32_t getBlocksJobId = 0; ///< Current job ID for retrieving chunk blocks
+	uint16_t getBlocksJobResult = 0; ///< Result of the get blocks job
 
 	/* common for read and write but meaning is different !!! */
 	void *readPacket = nullptr;
 	void *writePacket = nullptr;
 
-	uint8_t chunkisopen;
-	uint64_t chunkid; // R+W
-	uint32_t version; // R+W
-	ChunkPartType chunkType; // R
-	uint32_t offset; // R
-	uint32_t size; // R
-	MessageSerializer* messageSerializer; // R+W
+	uint8_t isChunkOpen = 0;
+	uint64_t chunkId = 0; // R+W
+	uint32_t chunkVersion = 0; // R+W
+	ChunkPartType chunkType = slice_traits::standard::ChunkPartType(); // R
+	uint32_t offset = 0; ///< R: Offset within the chunk for the operation.
+	uint32_t size = 0; ///< R: Size of the current operation.
+
+	/// Pointer to the concrete serializer singleton.
+	/// Serializers coud be of type:
+	/// - LegacyMessageSerializer: for legacy messages
+	/// - SaunaFsMessageSerializer: for new messages
+	MessageSerializer* messageSerializer = nullptr; // R+W
 
 	LOG_AVG_TYPE readOperationTimer;
 
-	ChunkserverEntry(int socket, void* workerJobPool)
-			: workerJobPool(workerJobPool),
-			  sock(socket),
-			  fwdsock(-1),
-			  connstart(0),
-			  connretrycnt(0),
-			  pdescpos(-1),
-			  fwdpdescpos(-1),
-			  activity(0),
-			  fwdstartptr(NULL),
-			  fwdbytesleft(0),
-			  wjobid(0),
-			  wjobwriteid(0),
-			  rjobid(0),
-			  todocnt(0),
-			  getBlocksJobId(0),
-			  getBlocksJobResult(0),
-			  chunkisopen(0),
-			  chunkid(0),
-			  version(0),
-			  chunkType(slice_traits::standard::ChunkPartType()),
-			  offset(0),
-			  size(0),
-			  messageSerializer(nullptr) {
+	ChunkserverEntry(int socket, void *workerJobPool)
+	    : workerJobPool(workerJobPool), sock(socket) {
 		inputPacket.bytesLeft = PacketHeader::kSize;
-		inputPacket.startPtr = hdrbuff;
+		inputPacket.startPtr = headerBuffer;
 		inputPacket.packet = nullptr;
 	}
 
