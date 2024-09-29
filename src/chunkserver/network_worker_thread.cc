@@ -129,13 +129,13 @@ MessageSerializer* MessageSerializer::getSerializer(PacketHeader::Type type) {
 	}
 }
 
-PacketStruct* worker_create_detached_packet_with_output_buffer(
-		const std::vector<uint8_t>& packetPrefix) {
+std::unique_ptr<PacketStruct> worker_create_detached_packet_with_output_buffer(
+    const std::vector<uint8_t> &packetPrefix) {
 	TRACETHIS();
 	PacketHeader header;
 	deserializePacketHeader(packetPrefix, header);
 	uint32_t sizeOfWholePacket = PacketHeader::kSize + header.length;
-	auto *outPacket = new PacketStruct();
+	std::unique_ptr<PacketStruct> outPacket = std::make_unique<PacketStruct>();
 	passert(outPacket);
 	outPacket->outputBuffer = getReadOutputBufferPool().get(sizeOfWholePacket);
 
@@ -144,59 +144,49 @@ PacketStruct* worker_create_detached_packet_with_output_buffer(
 		if (outPacket->outputBuffer) {
 			getReadOutputBufferPool().put(std::move(outPacket->outputBuffer));
 		}
-		delete outPacket;
 		return nullptr;
 	}
 
 	return outPacket;
 }
 
-uint8_t* worker_get_packet_data(void *packet) {
+void ChunkserverEntry::releasePacketResources(
+    std::unique_ptr<PacketStruct> &packet) {
 	TRACETHIS();
-	auto *outPacket = static_cast<PacketStruct *>(packet);
-	return outPacket->packet + PacketHeader::kSize;
+	free(packet->packet);
+	packet->packet = nullptr;
 }
 
-void worker_delete_packet(void *packet) {
-	TRACETHIS();
-	auto *outPacket = static_cast<PacketStruct *>(packet);
-	free(outPacket->packet);
-	delete outPacket;
+void ChunkserverEntry::attachPacket(std::unique_ptr<PacketStruct> &&packet) {
+	outputPackets.push_back(std::move(packet));
 }
 
-void worker_attach_packet(ChunkserverEntry *eptr, void *packet) {
-	auto *outPacket = static_cast<PacketStruct *>(packet);
-	*(eptr->outputTail) = outPacket;
-	eptr->outputTail = &(outPacket->next);
+void ChunkserverEntry::preserveInputPacket() {
+	TRACETHIS();
+	writePacket->packet = inputPacket.packet;
+	inputPacket.packet = nullptr;
 }
 
-void* worker_preserve_inputpacket(ChunkserverEntry *eptr) {
+void ChunkserverEntry::deletePreservedPacket(
+    std::unique_ptr<PacketStruct> &packet) {
 	TRACETHIS();
-	void* ret;
-	ret = eptr->inputPacket.packet;
-	eptr->inputPacket.packet = nullptr;
-	return ret;
-}
-
-void worker_delete_preserved(void *p) {
-	TRACETHIS();
-	if (p) {
-		free(p);
-		p = nullptr;
+	if (packet) {
+		free(packet->packet);
+		packet->packet = nullptr;
 	}
 }
 
 void worker_create_attached_packet(ChunkserverEntry *eptr,
                                    const std::vector<uint8_t> &packet) {
 	TRACETHIS();
-	auto *outpacket = new PacketStruct();
+	std::unique_ptr<PacketStruct> outpacket = std::make_unique<PacketStruct>();
 	passert(outpacket);
 	outpacket->packet = (uint8_t*) malloc(packet.size());
 	passert(outpacket->packet);
 	memcpy(outpacket->packet, packet.data(), packet.size());
 	outpacket->bytesLeft = packet.size();
 	outpacket->startPtr = outpacket->packet;
-	worker_attach_packet(eptr, outpacket);
+	eptr->attachPacket(std::move(outpacket));
 }
 
 uint8_t *worker_create_attached_packet(ChunkserverEntry *eptr, uint32_t type,
@@ -205,7 +195,7 @@ uint8_t *worker_create_attached_packet(ChunkserverEntry *eptr, uint32_t type,
 	uint8_t *ptr;
 	uint32_t packetSize;
 
-	auto *outPacket = new PacketStruct();
+	std::unique_ptr<PacketStruct> outPacket = std::make_unique<PacketStruct>();
 	passert(outPacket);
 	packetSize = size + PacketHeader::kSize;
 	outPacket->packet = (uint8_t*) malloc(packetSize);
@@ -216,7 +206,7 @@ uint8_t *worker_create_attached_packet(ChunkserverEntry *eptr, uint32_t type,
 	put32bit(&ptr, size);
 	outPacket->startPtr = outPacket->packet;
 	outPacket->next = nullptr;
-	worker_attach_packet(eptr, outPacket);
+	eptr->attachPacket(std::move(outPacket));
 
 	return ptr;
 }
@@ -322,8 +312,8 @@ void worker_read_finished(uint8_t status, void *e) {
 		}
 	} else {
 		if (eptr->readPacket) {
-			worker_delete_packet(eptr->readPacket);
-			eptr->readPacket = nullptr;
+			eptr->releasePacketResources(eptr->readPacket);
+			eptr->readPacket.reset();
 		}
 		std::vector<uint8_t> buffer;
 		eptr->messageSerializer->serializeCstoclReadStatus(
@@ -353,8 +343,8 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 	TRACETHIS2(eptr->offset, eptr->size);
 
 	if (eptr->readPacket) {
-		worker_attach_packet(eptr, eptr->readPacket);
-		eptr->readPacket = nullptr;
+		eptr->attachPacket(std::move(eptr->readPacket));
+		eptr->readPacket.reset();
 		eptr->todoReadCounter++;
 	}
 	if (eptr->size == 0) { // everything has been read
@@ -380,13 +370,13 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 		std::vector<uint8_t> readDataPrefix;
 		eptr->messageSerializer->serializePrefixOfCstoclReadData(
 		    readDataPrefix, eptr->chunkId, eptr->offset, thisPartSize);
-		PacketStruct *packet =
+		auto packet =
 		    worker_create_detached_packet_with_output_buffer(readDataPrefix);
 		if (packet == nullptr) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		eptr->readPacket = (void*)packet;
+		eptr->readPacket = std::move(packet);
 		uint32_t readAheadBlocks = 0;
 		uint32_t maxReadBehindBlocks = 0;
 		if (!eptr->isChunkOpen) {
@@ -400,8 +390,8 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 		eptr->readJobId = job_read(
 		    eptr->workerJobPool, worker_read_finished, eptr, eptr->chunkId,
 		    eptr->chunkVersion, eptr->chunkType, eptr->offset, thisPartSize,
-		    maxReadBehindBlocks, readAheadBlocks, packet->outputBuffer.get(),
-		    !eptr->isChunkOpen);
+		    maxReadBehindBlocks, readAheadBlocks,
+		    eptr->readPacket->outputBuffer.get(), !eptr->isChunkOpen);
 		if (eptr->readJobId == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
@@ -717,9 +707,9 @@ void worker_write_data(ChunkserverEntry *eptr, const uint8_t *data,
 		return;
 	}
 	if (eptr->writePacket) {
-		worker_delete_preserved(eptr->writePacket);
+		ChunkserverEntry::deletePreservedPacket(eptr->writePacket);
 	}
-	eptr->writePacket = worker_preserve_inputpacket(eptr);
+	eptr->preserveInputPacket();
 	eptr->writeJobWriteId = writeId;
 	eptr->writeJobId = job_write(eptr->workerJobPool, worker_write_finished,
 	                             eptr, chunkId, eptr->chunkVersion, eptr->chunkType,
@@ -799,7 +789,7 @@ void worker_write_end(ChunkserverEntry *eptr, const uint8_t *data,
 		return;
 	}
 	if (eptr->writeJobId > 0 || !eptr->partiallyCompletedWrites.empty() ||
-	    eptr->outputHead != nullptr) {
+	    !eptr->outputPackets.empty()) {
 		/*
 		 * WRITE_END received too early:
 		 * eptr->wjobid > 0 -- hdd worker is working (writing some data)
@@ -1537,7 +1527,7 @@ void worker_write(ChunkserverEntry *eptr) {
 	PacketStruct *pack = nullptr;
 	int32_t i;
 	for (;;) {
-		pack = eptr->outputHead;
+		pack = eptr->outputPackets.front().get();
 		if (pack == nullptr) {
 			return;
 		}
@@ -1580,11 +1570,7 @@ void worker_write(ChunkserverEntry *eptr) {
 			getReadOutputBufferPool().put(std::move(pack->outputBuffer));
 		}
 		free(pack->packet);
-		eptr->outputHead = pack->next;
-		if (eptr->outputHead == nullptr) {
-			eptr->outputTail = &(eptr->outputHead);
-		}
-		delete pack;
+		eptr->outputPackets.pop_front();
 		worker_outputcheck(eptr);
 	}
 }
@@ -1647,20 +1633,17 @@ void NetworkWorkerThread::terminate() {
 			free(entry.inputPacket.packet);
 		}
 		if (entry.writePacket) {
-			worker_delete_preserved(entry.writePacket);
+			ChunkserverEntry::deletePreservedPacket(entry.writePacket);
 		}
 		if (entry.fwdInputPacket.packet) {
 			free(entry.fwdInputPacket.packet);
 		}
-		PacketStruct* pptr = entry.outputHead;
-		while (pptr) {
-			if (pptr->packet) {
-				free(pptr->packet);
+		for (auto& outputPacket : entry.outputPackets) {
+			if (outputPacket->packet) {
+				free(outputPacket->packet);
 			}
-			PacketStruct* paptr = pptr;
-			pptr = pptr->next;
-			delete paptr;
 		}
+		entry.outputPackets.clear();
 		csservEntries.pop_back();
 	}
 }
@@ -1693,7 +1676,7 @@ void NetworkWorkerThread::preparePollFds() {
 				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
 				}
-				if (entry.outputHead != nullptr) {
+				if (!entry.outputPackets.empty()) {
 					pdesc.back().events |= POLLOUT;
 				}
 				break;
@@ -1727,12 +1710,12 @@ void NetworkWorkerThread::preparePollFds() {
 				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
 				}
-				if (entry.outputHead != NULL) {
+				if (!entry.outputPackets.empty()) {
 					pdesc.back().events |= POLLOUT;
 				}
 				break;
 			case ChunkserverEntry::State::WriteFinish:
-				if (entry.outputHead != nullptr) {
+				if (!entry.outputPackets.empty()) {
 					pdesc.emplace_back();
 					pdesc.back().fd = entry.sock;
 					pdesc.back().events = POLLOUT;
@@ -1826,7 +1809,7 @@ void NetworkWorkerThread::servePoll() {
 			}
 		}
 		if (entry.state == ChunkserverEntry::State::WriteFinish &&
-		    entry.outputHead == nullptr) {
+		    entry.outputPackets.empty()) {
 			entry.state = ChunkserverEntry::State::Close;
 		}
 		if (entry.state == ChunkserverEntry::State::Connecting &&
@@ -1866,10 +1849,11 @@ void NetworkWorkerThread::servePoll() {
 		if (eptr->state == ChunkserverEntry::State::Closed) {
 			tcpclose(eptr->sock);
 			if (eptr->readPacket) {
-				worker_delete_packet(eptr->readPacket);
+				eptr->releasePacketResources(eptr->readPacket);
+				eptr->readPacket.reset();
 			}
 			if (eptr->writePacket) {
-				worker_delete_preserved(eptr->writePacket);
+				ChunkserverEntry::deletePreservedPacket(eptr->writePacket);
 			}
 			if (eptr->fwdSocket >= 0) {
 				tcpclose(eptr->fwdSocket);
@@ -1880,16 +1864,12 @@ void NetworkWorkerThread::servePoll() {
 			if (eptr->fwdInputPacket.packet) {
 				free(eptr->fwdInputPacket.packet);
 			}
-			PacketStruct *pptr, *paptr;
-			pptr = eptr->outputHead;
-			while (pptr) {
-				if (pptr->packet) {
-					free(pptr->packet);
+			for (auto& outputPacket : eptr->outputPackets) {
+				if (outputPacket->packet) {
+					free(outputPacket->packet);
 				}
-				paptr = pptr;
-				pptr = pptr->next;
-				delete paptr;
 			}
+			eptr->outputPackets.clear();
 			eptr = csservEntries.erase(eptr);
 		} else {
 			++eptr;
