@@ -129,13 +129,13 @@ MessageSerializer* MessageSerializer::getSerializer(PacketHeader::Type type) {
 	}
 }
 
-packetstruct* worker_create_detached_packet_with_output_buffer(
+PacketStruct* worker_create_detached_packet_with_output_buffer(
 		const std::vector<uint8_t>& packetPrefix) {
 	TRACETHIS();
 	PacketHeader header;
 	deserializePacketHeader(packetPrefix, header);
 	uint32_t sizeOfWholePacket = PacketHeader::kSize + header.length;
-	packetstruct* outPacket = new packetstruct();
+	auto *outPacket = new PacketStruct();
 	passert(outPacket);
 	outPacket->outputBuffer = getReadOutputBufferPool().get(sizeOfWholePacket);
 
@@ -147,33 +147,34 @@ packetstruct* worker_create_detached_packet_with_output_buffer(
 		delete outPacket;
 		return nullptr;
 	}
+
 	return outPacket;
 }
 
 uint8_t* worker_get_packet_data(void *packet) {
 	TRACETHIS();
-	packetstruct *outpacket = (packetstruct*) packet;
-	return outpacket->packet + 8;
+	auto *outPacket = static_cast<PacketStruct *>(packet);
+	return outPacket->packet + PacketHeader::kSize;
 }
 
 void worker_delete_packet(void *packet) {
 	TRACETHIS();
-	packetstruct *outpacket = (packetstruct*) packet;
-	free(outpacket->packet);
-	delete outpacket;
+	auto *outPacket = static_cast<PacketStruct *>(packet);
+	free(outPacket->packet);
+	delete outPacket;
 }
 
 void worker_attach_packet(ChunkserverEntry *eptr, void *packet) {
-	packetstruct *outpacket = (packetstruct*)packet;
-	*(eptr->outputtail) = outpacket;
-	eptr->outputtail = &(outpacket->next);
+	auto *outPacket = static_cast<PacketStruct *>(packet);
+	*(eptr->outputTail) = outPacket;
+	eptr->outputTail = &(outPacket->next);
 }
 
 void* worker_preserve_inputpacket(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	void* ret;
-	ret = eptr->inputpacket.packet;
-	eptr->inputpacket.packet = NULL;
+	ret = eptr->inputPacket.packet;
+	eptr->inputPacket.packet = nullptr;
 	return ret;
 }
 
@@ -181,42 +182,42 @@ void worker_delete_preserved(void *p) {
 	TRACETHIS();
 	if (p) {
 		free(p);
-		p = NULL;
+		p = nullptr;
 	}
 }
 
 void worker_create_attached_packet(ChunkserverEntry *eptr,
                                    const std::vector<uint8_t> &packet) {
 	TRACETHIS();
-	packetstruct* outpacket = new packetstruct();
+	auto *outpacket = new PacketStruct();
 	passert(outpacket);
 	outpacket->packet = (uint8_t*) malloc(packet.size());
 	passert(outpacket->packet);
 	memcpy(outpacket->packet, packet.data(), packet.size());
-	outpacket->bytesleft = packet.size();
-	outpacket->startptr = outpacket->packet;
+	outpacket->bytesLeft = packet.size();
+	outpacket->startPtr = outpacket->packet;
 	worker_attach_packet(eptr, outpacket);
 }
 
 uint8_t *worker_create_attached_packet(ChunkserverEntry *eptr, uint32_t type,
                                        uint32_t size) {
 	TRACETHIS();
-	packetstruct *outpacket;
 	uint8_t *ptr;
-	uint32_t psize;
+	uint32_t packetSize;
 
-	outpacket = new packetstruct();
-	passert(outpacket);
-	psize = size + 8;
-	outpacket->packet = (uint8_t*) malloc(psize);
-	passert(outpacket->packet);
-	outpacket->bytesleft = psize;
-	ptr = outpacket->packet;
+	auto *outPacket = new PacketStruct();
+	passert(outPacket);
+	packetSize = size + PacketHeader::kSize;
+	outPacket->packet = (uint8_t*) malloc(packetSize);
+	passert(outPacket->packet);
+	outPacket->bytesLeft = packetSize;
+	ptr = outPacket->packet;
 	put32bit(&ptr, type);
 	put32bit(&ptr, size);
-	outpacket->startptr = (uint8_t*) (outpacket->packet);
-	outpacket->next = NULL;
-	worker_attach_packet(eptr, outpacket);
+	outPacket->startPtr = outPacket->packet;
+	outPacket->next = nullptr;
+	worker_attach_packet(eptr, outPacket);
+
 	return ptr;
 }
 
@@ -316,15 +317,16 @@ void worker_read_finished(uint8_t status, void *e) {
 			worker_read_continue(eptr);
 		}
 	} else {
-		if (eptr->rpacket) {
-			worker_delete_packet(eptr->rpacket);
-			eptr->rpacket = NULL;
+		if (eptr->readPacket) {
+			worker_delete_packet(eptr->readPacket);
+			eptr->readPacket = nullptr;
 		}
 		std::vector<uint8_t> buffer;
 		eptr->messageSerializer->serializeCstoclReadStatus(buffer, eptr->chunkid, status);
 		worker_create_attached_packet(eptr, buffer);
 		if (eptr->chunkisopen) {
-			job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkid, eptr->chunkType);
+			job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkid,
+			          eptr->chunkType);
 			eptr->chunkisopen = 0;
 		}
 		// after sending status even if there was an error it's possible to
@@ -345,9 +347,9 @@ void worker_send_finished(ChunkserverEntry *eptr) {
 void worker_read_continue(ChunkserverEntry *eptr) {
 	TRACETHIS2(eptr->offset, eptr->size);
 
-	if (eptr->rpacket) {
-		worker_attach_packet(eptr, eptr->rpacket);
-		eptr->rpacket = NULL;
+	if (eptr->readPacket) {
+		worker_attach_packet(eptr, eptr->readPacket);
+		eptr->readPacket = nullptr;
 		eptr->todocnt++;
 	}
 	if (eptr->size == 0) { // everything has been read
@@ -355,7 +357,8 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 		eptr->messageSerializer->serializeCstoclReadStatus(buffer, eptr->chunkid, SAUNAFS_STATUS_OK);
 		worker_create_attached_packet(eptr, buffer);
 		sassert(eptr->chunkisopen);
-		job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkid, eptr->chunkType);
+		job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkid,
+		          eptr->chunkType);
 		eptr->chunkisopen = 0;
 		// no error - do not disconnect - go direct to the IDLE state, ready for
 		// requests on the same connection
@@ -371,12 +374,13 @@ void worker_read_continue(ChunkserverEntry *eptr) {
 		std::vector<uint8_t> readDataPrefix;
 		eptr->messageSerializer->serializePrefixOfCstoclReadData(readDataPrefix,
 				eptr->chunkid, eptr->offset, thisPartSize);
-		packetstruct* packet = worker_create_detached_packet_with_output_buffer(readDataPrefix);
+		PacketStruct *packet =
+		    worker_create_detached_packet_with_output_buffer(readDataPrefix);
 		if (packet == nullptr) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		eptr->rpacket = (void*)packet;
+		eptr->readPacket = (void*)packet;
 		uint32_t readAheadBlocks = 0;
 		uint32_t maxReadBehindBlocks = 0;
 		if (!eptr->chunkisopen) {
@@ -703,10 +707,10 @@ void worker_write_data(ChunkserverEntry *eptr, const uint8_t *data,
 		eptr->state = ChunkserverEntry::State::WriteFinish;
 		return;
 	}
-	if (eptr->wpacket) {
-		worker_delete_preserved(eptr->wpacket);
+	if (eptr->writePacket) {
+		worker_delete_preserved(eptr->writePacket);
 	}
-	eptr->wpacket = worker_preserve_inputpacket(eptr);
+	eptr->writePacket = worker_preserve_inputpacket(eptr);
 	eptr->wjobwriteid = writeId;
 	eptr->wjobid = job_write(eptr->workerJobPool, worker_write_finished, eptr,
 			chunkId, eptr->version, eptr->chunkType,
@@ -785,13 +789,14 @@ void worker_write_end(ChunkserverEntry *eptr, const uint8_t *data,
 		eptr->state = ChunkserverEntry::State::WriteFinish;
 		return;
 	}
-	if (eptr->wjobid > 0 || !eptr->partiallyCompletedWrites.empty() || eptr->outputhead != NULL) {
+	if (eptr->wjobid > 0 || !eptr->partiallyCompletedWrites.empty() ||
+	    eptr->outputHead != nullptr) {
 		/*
 		 * WRITE_END received too early:
 		 * eptr->wjobid > 0 -- hdd worker is working (writing some data)
 		 * !eptr->partiallyCompletedWrites.empty() -- there are write tasks which have not been
 		 *         acked by our hdd worker EX-or next chunkserver from a chain
-		 * eptr->outputhead != NULL -- there is a status being send
+		 * eptr->outputhead != nullptr -- there is a status being send
 		 */
 		// TODO(msulikowski) temporary syslog message. May be useful until this code is fully tested
 		safs_pretty_syslog(LOG_NOTICE, "Received WRITE_END message too early");
@@ -1134,39 +1139,41 @@ void worker_check_nextpacket(ChunkserverEntry *eptr) {
 	const uint8_t *ptr;
 	if (eptr->state == ChunkserverEntry::State::WriteForward) {
 		if (eptr->mode == ChunkserverEntry::Mode::Data &&
-		    eptr->inputpacket.bytesleft == 0 && eptr->fwdbytesleft == 0) {
+		    eptr->inputPacket.bytesLeft == 0 && eptr->fwdbytesleft == 0) {
 			ptr = eptr->hdrbuff;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
 			eptr->mode = ChunkserverEntry::Mode::Header;
-			eptr->inputpacket.bytesleft = 8;
-			eptr->inputpacket.startptr = eptr->hdrbuff;
+			eptr->inputPacket.bytesLeft = PacketHeader::kSize;
+			eptr->inputPacket.startPtr = eptr->hdrbuff;
 
-			worker_gotpacket(eptr, type, eptr->inputpacket.packet + 8, size);
+			worker_gotpacket(eptr, type,
+			                 eptr->inputPacket.packet + PacketHeader::kSize,
+			                 size);
 
-			if (eptr->inputpacket.packet) {
-				free(eptr->inputpacket.packet);
+			if (eptr->inputPacket.packet) {
+				free(eptr->inputPacket.packet);
 			}
-			eptr->inputpacket.packet = NULL;
+			eptr->inputPacket.packet = nullptr;
 		}
 	} else {
 		if (eptr->mode == ChunkserverEntry::Mode::Data &&
-		    eptr->inputpacket.bytesleft == 0) {
+		    eptr->inputPacket.bytesLeft == 0) {
 			ptr = eptr->hdrbuff;
 			type = get32bit(&ptr);
 			size = get32bit(&ptr);
 
 			eptr->mode = ChunkserverEntry::Mode::Header;
-			eptr->inputpacket.bytesleft = 8;
-			eptr->inputpacket.startptr = eptr->hdrbuff;
+			eptr->inputPacket.bytesLeft = PacketHeader::kSize;
+			eptr->inputPacket.startPtr = eptr->hdrbuff;
 
-			worker_gotpacket(eptr, type, eptr->inputpacket.packet, size);
+			worker_gotpacket(eptr, type, eptr->inputPacket.packet, size);
 
-			if (eptr->inputpacket.packet) {
-				free(eptr->inputpacket.packet);
+			if (eptr->inputPacket.packet) {
+				free(eptr->inputPacket.packet);
 			}
-			eptr->inputpacket.packet = NULL;
+			eptr->inputPacket.packet = nullptr;
 		}
 	}
 }
@@ -1190,8 +1197,8 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 	uint32_t type, size;
 	const uint8_t *ptr;
 	if (eptr->fwdMode == ChunkserverEntry::Mode::Header) {
-		i = read(eptr->fwdsock, eptr->fwdinputpacket.startptr,
-				eptr->fwdinputpacket.bytesleft);
+		i = read(eptr->fwdsock, eptr->fwdInputPacket.startPtr,
+		         eptr->fwdInputPacket.bytesLeft);
 		if (i == 0) {
 			worker_fwderror(eptr);
 			return;
@@ -1204,9 +1211,9 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 			return;
 		}
 		stats_bytesin += i;
-		eptr->fwdinputpacket.startptr += i;
-		eptr->fwdinputpacket.bytesleft -= i;
-		if (eptr->fwdinputpacket.bytesleft > 0) {
+		eptr->fwdInputPacket.startPtr += i;
+		eptr->fwdInputPacket.bytesLeft -= i;
+		if (eptr->fwdInputPacket.bytesLeft > 0) {
 			return;
 		}
 		ptr = eptr->fwdhdrbuff + 4;
@@ -1217,17 +1224,17 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 			return;
 		}
 		if (size > 0) {
-			eptr->fwdinputpacket.packet = (uint8_t*) malloc(size);
-			passert(eptr->fwdinputpacket.packet);
-			eptr->fwdinputpacket.startptr = eptr->fwdinputpacket.packet;
+			eptr->fwdInputPacket.packet = (uint8_t*) malloc(size);
+			passert(eptr->fwdInputPacket.packet);
+			eptr->fwdInputPacket.startPtr = eptr->fwdInputPacket.packet;
 		}
-		eptr->fwdinputpacket.bytesleft = size;
+		eptr->fwdInputPacket.bytesLeft = size;
 		eptr->fwdMode = ChunkserverEntry::Mode::Data;
 	}
 	if (eptr->fwdMode == ChunkserverEntry::Mode::Data) {
-		if (eptr->fwdinputpacket.bytesleft > 0) {
-			i = read(eptr->fwdsock, eptr->fwdinputpacket.startptr,
-					eptr->fwdinputpacket.bytesleft);
+		if (eptr->fwdInputPacket.bytesLeft > 0) {
+			i = read(eptr->fwdsock, eptr->fwdInputPacket.startPtr,
+			         eptr->fwdInputPacket.bytesLeft);
 			if (i == 0) {
 				worker_fwderror(eptr);
 				return;
@@ -1240,9 +1247,9 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 				return;
 			}
 			stats_bytesin += i;
-			eptr->fwdinputpacket.startptr += i;
-			eptr->fwdinputpacket.bytesleft -= i;
-			if (eptr->fwdinputpacket.bytesleft > 0) {
+			eptr->fwdInputPacket.startPtr += i;
+			eptr->fwdInputPacket.bytesLeft -= i;
+			if (eptr->fwdInputPacket.bytesLeft > 0) {
 				return;
 			}
 		}
@@ -1251,15 +1258,15 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 		size = get32bit(&ptr);
 
 		eptr->fwdMode = ChunkserverEntry::Mode::Header;
-		eptr->fwdinputpacket.bytesleft = 8;
-		eptr->fwdinputpacket.startptr = eptr->fwdhdrbuff;
+		eptr->fwdInputPacket.bytesLeft = PacketHeader::kSize;
+		eptr->fwdInputPacket.startPtr = eptr->fwdhdrbuff;
 
-		worker_gotpacket(eptr, type, eptr->fwdinputpacket.packet, size);
+		worker_gotpacket(eptr, type, eptr->fwdInputPacket.packet, size);
 
-		if (eptr->fwdinputpacket.packet) {
-			free(eptr->fwdinputpacket.packet);
+		if (eptr->fwdInputPacket.packet) {
+			free(eptr->fwdInputPacket.packet);
 		}
-		eptr->fwdinputpacket.packet = NULL;
+		eptr->fwdInputPacket.packet = nullptr;
 	}
 }
 
@@ -1287,9 +1294,9 @@ void worker_fwdwrite(ChunkserverEntry *eptr) {
 		eptr->fwdinitpacket.clear();
 		eptr->fwdstartptr = NULL;
 		eptr->fwdMode = ChunkserverEntry::Mode::Header;
-		eptr->fwdinputpacket.bytesleft = 8;
-		eptr->fwdinputpacket.startptr = eptr->fwdhdrbuff;
-		eptr->fwdinputpacket.packet = NULL;
+		eptr->fwdInputPacket.bytesLeft = PacketHeader::kSize;
+		eptr->fwdInputPacket.startPtr = eptr->fwdhdrbuff;
+		eptr->fwdInputPacket.packet = nullptr;
 		eptr->state = ChunkserverEntry::State::WriteForward;
 	}
 }
@@ -1298,7 +1305,8 @@ void worker_forward(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	int32_t i;
 	if (eptr->mode == ChunkserverEntry::Mode::Header) {
-		i = read(eptr->sock, eptr->inputpacket.startptr, eptr->inputpacket.bytesleft);
+		i = read(eptr->sock, eptr->inputPacket.startPtr,
+		         eptr->inputPacket.bytesLeft);
 		if (i == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
@@ -1311,9 +1319,9 @@ void worker_forward(ChunkserverEntry *eptr) {
 			return;
 		}
 		stats_bytesin += i;
-		eptr->inputpacket.startptr += i;
-		eptr->inputpacket.bytesleft -= i;
-		if (eptr->inputpacket.bytesleft > 0) {
+		eptr->inputPacket.startPtr += i;
+		eptr->inputPacket.bytesLeft -= i;
+		if (eptr->inputPacket.bytesLeft > 0) {
 			return;
 		}
 		PacketHeader header;
@@ -1331,24 +1339,25 @@ void worker_forward(ChunkserverEntry *eptr) {
 			return;
 		}
 		uint32_t totalPacketLength = PacketHeader::kSize + header.length;
-		if (eptr->inputpacket.packet) {
-			free(eptr->inputpacket.packet);
+		if (eptr->inputPacket.packet) {
+			free(eptr->inputPacket.packet);
 		}
-		eptr->inputpacket.packet = static_cast<uint8_t*>(malloc(totalPacketLength));
-		passert(eptr->inputpacket.packet);
-		memcpy(eptr->inputpacket.packet, eptr->hdrbuff, PacketHeader::kSize);
-		eptr->inputpacket.bytesleft = header.length;
-		eptr->inputpacket.startptr = eptr->inputpacket.packet + PacketHeader::kSize;
+		eptr->inputPacket.packet = static_cast<uint8_t*>(malloc(totalPacketLength));
+		passert(eptr->inputPacket.packet);
+		memcpy(eptr->inputPacket.packet, eptr->hdrbuff, PacketHeader::kSize);
+		eptr->inputPacket.bytesLeft = header.length;
+		eptr->inputPacket.startPtr = eptr->inputPacket.packet + PacketHeader::kSize;
 		if (header.type == CLTOCS_WRITE_DATA
 				|| header.type == SAU_CLTOCS_WRITE_DATA
 				|| header.type == SAU_CLTOCS_WRITE_END) {
 			eptr->fwdbytesleft = 8;
-			eptr->fwdstartptr = eptr->inputpacket.packet;
+			eptr->fwdstartptr = eptr->inputPacket.packet;
 		}
 		eptr->mode = ChunkserverEntry::Mode::Data;
 	}
-	if (eptr->inputpacket.bytesleft > 0) {
-		i = read(eptr->sock, eptr->inputpacket.startptr, eptr->inputpacket.bytesleft);
+	if (eptr->inputPacket.bytesLeft > 0) {
+		i = read(eptr->sock, eptr->inputPacket.startPtr,
+		         eptr->inputPacket.bytesLeft);
 		if (i == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
@@ -1361,8 +1370,8 @@ void worker_forward(ChunkserverEntry *eptr) {
 			return;
 		}
 		stats_bytesin += i;
-		eptr->inputpacket.startptr += i;
-		eptr->inputpacket.bytesleft -= i;
+		eptr->inputPacket.startPtr += i;
+		eptr->inputPacket.bytesLeft -= i;
 		if (eptr->fwdstartptr != NULL) {
 			eptr->fwdbytesleft += i;
 		}
@@ -1385,7 +1394,8 @@ void worker_forward(ChunkserverEntry *eptr) {
 		eptr->fwdstartptr += i;
 		eptr->fwdbytesleft -= i;
 	}
-	if (eptr->inputpacket.bytesleft == 0 && eptr->fwdbytesleft == 0 && eptr->wjobid == 0) {
+	if (eptr->inputPacket.bytesLeft == 0 && eptr->fwdbytesleft == 0 &&
+	    eptr->wjobid == 0) {
 		PacketHeader header;
 		try {
 			deserializePacketHeader(eptr->hdrbuff, sizeof(eptr->hdrbuff), header);
@@ -1395,16 +1405,16 @@ void worker_forward(ChunkserverEntry *eptr) {
 			return;
 		}
 		eptr->mode = ChunkserverEntry::Mode::Header;
-		eptr->inputpacket.bytesleft = 8;
-		eptr->inputpacket.startptr = eptr->hdrbuff;
+		eptr->inputPacket.bytesLeft = PacketHeader::kSize;
+		eptr->inputPacket.startPtr = eptr->hdrbuff;
 
-		uint8_t* packetData = eptr->inputpacket.packet + PacketHeader::kSize;
+		uint8_t* packetData = eptr->inputPacket.packet + PacketHeader::kSize;
 		worker_gotpacket(eptr, header.type, packetData, header.length);
-		if (eptr->inputpacket.packet) {
-			free(eptr->inputpacket.packet);
+		if (eptr->inputPacket.packet) {
+			free(eptr->inputPacket.packet);
 		}
-		eptr->inputpacket.packet = NULL;
-		eptr->fwdstartptr = NULL;
+		eptr->inputPacket.packet = nullptr;
+		eptr->fwdstartptr = nullptr;
 	}
 }
 
@@ -1415,9 +1425,10 @@ void worker_read(ChunkserverEntry *eptr) {
 	const uint8_t *ptr;
 
 	if (eptr->mode == ChunkserverEntry::Mode::Header) {
-		sassert(eptr->inputpacket.startptr + eptr->inputpacket.bytesleft == eptr->hdrbuff + 8);
-		i = read(eptr->sock, eptr->inputpacket.startptr,
-				eptr->inputpacket.bytesleft);
+		sassert(eptr->inputPacket.startPtr + eptr->inputPacket.bytesLeft ==
+		        eptr->hdrbuff + PacketHeader::kSize);
+		i = read(eptr->sock, eptr->inputPacket.startPtr,
+		         eptr->inputPacket.bytesLeft);
 		if (i == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
@@ -1430,10 +1441,10 @@ void worker_read(ChunkserverEntry *eptr) {
 			return;
 		}
 		stats_bytesin += i;
-		eptr->inputpacket.startptr += i;
-		eptr->inputpacket.bytesleft -= i;
+		eptr->inputPacket.startPtr += i;
+		eptr->inputPacket.bytesLeft -= i;
 
-		if (eptr->inputpacket.bytesleft > 0) {
+		if (eptr->inputPacket.bytesLeft > 0) {
 			return;
 		}
 
@@ -1446,20 +1457,20 @@ void worker_read(ChunkserverEntry *eptr) {
 				eptr->state = ChunkserverEntry::State::Close;
 				return;
 			}
-			if (eptr->inputpacket.packet) {
-				free(eptr->inputpacket.packet);
+			if (eptr->inputPacket.packet) {
+				free(eptr->inputPacket.packet);
 			}
-			eptr->inputpacket.packet = (uint8_t*) malloc(size);
-			passert(eptr->inputpacket.packet);
-			eptr->inputpacket.startptr = eptr->inputpacket.packet;
+			eptr->inputPacket.packet = (uint8_t*) malloc(size);
+			passert(eptr->inputPacket.packet);
+			eptr->inputPacket.startPtr = eptr->inputPacket.packet;
 		}
-		eptr->inputpacket.bytesleft = size;
+		eptr->inputPacket.bytesLeft = size;
 		eptr->mode = ChunkserverEntry::Mode::Data;
 	}
 	if (eptr->mode == ChunkserverEntry::Mode::Data) {
-		if (eptr->inputpacket.bytesleft > 0) {
-			i = read(eptr->sock, eptr->inputpacket.startptr,
-					eptr->inputpacket.bytesleft);
+		if (eptr->inputPacket.bytesLeft > 0) {
+			i = read(eptr->sock, eptr->inputPacket.startPtr,
+			         eptr->inputPacket.bytesLeft);
 			if (i == 0) {
 				eptr->state = ChunkserverEntry::State::Close;
 				return;
@@ -1472,10 +1483,10 @@ void worker_read(ChunkserverEntry *eptr) {
 				return;
 			}
 			stats_bytesin += i;
-			eptr->inputpacket.startptr += i;
-			eptr->inputpacket.bytesleft -= i;
+			eptr->inputPacket.startPtr += i;
+			eptr->inputPacket.bytesLeft -= i;
 
-			if (eptr->inputpacket.bytesleft > 0) {
+			if (eptr->inputPacket.bytesLeft > 0) {
 				return;
 			}
 		}
@@ -1485,26 +1496,26 @@ void worker_read(ChunkserverEntry *eptr) {
 			size = get32bit(&ptr);
 
 			eptr->mode = ChunkserverEntry::Mode::Header;
-			eptr->inputpacket.bytesleft = 8;
-			eptr->inputpacket.startptr = eptr->hdrbuff;
+			eptr->inputPacket.bytesLeft = PacketHeader::kSize;
+			eptr->inputPacket.startPtr = eptr->hdrbuff;
 
-			worker_gotpacket(eptr, type, eptr->inputpacket.packet, size);
+			worker_gotpacket(eptr, type, eptr->inputPacket.packet, size);
 
-			if (eptr->inputpacket.packet) {
-				free(eptr->inputpacket.packet);
+			if (eptr->inputPacket.packet) {
+				free(eptr->inputPacket.packet);
 			}
-			eptr->inputpacket.packet = NULL;
+			eptr->inputPacket.packet = nullptr;
 		}
 	}
 }
 
 void worker_write(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	packetstruct *pack;
+	PacketStruct *pack = nullptr;
 	int32_t i;
 	for (;;) {
-		pack = eptr->outputhead;
-		if (pack == NULL) {
+		pack = eptr->outputHead;
+		if (pack == nullptr) {
 			return;
 		}
 		if (pack->outputBuffer) {
@@ -1522,7 +1533,7 @@ void worker_write(ChunkserverEntry *eptr) {
 				return;
 			}
 		} else {
-			i = write(eptr->sock, pack->startptr, pack->bytesleft);
+			i = write(eptr->sock, pack->startPtr, pack->bytesLeft);
 			if (i == 0) {
 				eptr->state = ChunkserverEntry::State::Close;
 				return;
@@ -1535,9 +1546,9 @@ void worker_write(ChunkserverEntry *eptr) {
 				return;
 			}
 			stats_bytesout += i;
-			pack->startptr += i;
-			pack->bytesleft -= i;
-			if (pack->bytesleft > 0) {
+			pack->startPtr += i;
+			pack->bytesLeft -= i;
+			if (pack->bytesLeft > 0) {
 				return;
 			}
 		}
@@ -1546,9 +1557,9 @@ void worker_write(ChunkserverEntry *eptr) {
 			getReadOutputBufferPool().put(std::move(pack->outputBuffer));
 		}
 		free(pack->packet);
-		eptr->outputhead = pack->next;
-		if (eptr->outputhead == NULL) {
-			eptr->outputtail = &(eptr->outputhead);
+		eptr->outputHead = pack->next;
+		if (eptr->outputHead == nullptr) {
+			eptr->outputTail = &(eptr->outputHead);
 		}
 		delete pack;
 		worker_outputcheck(eptr);
@@ -1609,21 +1620,21 @@ void NetworkWorkerThread::terminate() {
 		if (entry.fwdsock >= 0) {
 			tcpclose(entry.fwdsock);
 		}
-		if (entry.inputpacket.packet) {
-			free(entry.inputpacket.packet);
+		if (entry.inputPacket.packet) {
+			free(entry.inputPacket.packet);
 		}
-		if (entry.wpacket) {
-			worker_delete_preserved(entry.wpacket);
+		if (entry.writePacket) {
+			worker_delete_preserved(entry.writePacket);
 		}
-		if (entry.fwdinputpacket.packet) {
-			free(entry.fwdinputpacket.packet);
+		if (entry.fwdInputPacket.packet) {
+			free(entry.fwdInputPacket.packet);
 		}
-		packetstruct* pptr = entry.outputhead;
+		PacketStruct* pptr = entry.outputHead;
 		while (pptr) {
 			if (pptr->packet) {
 				free(pptr->packet);
 			}
-			packetstruct* paptr = pptr;
+			PacketStruct* paptr = pptr;
 			pptr = pptr->next;
 			delete paptr;
 		}
@@ -1656,10 +1667,10 @@ void NetworkWorkerThread::preparePollFds() {
 				pdesc.back().fd = entry.sock;
 				pdesc.back().events = 0;
 				entry.pdescpos = pdesc.size() - 1;
-				if (entry.inputpacket.bytesleft > 0) {
+				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
 				}
-				if (entry.outputhead != NULL) {
+				if (entry.outputHead != nullptr) {
 					pdesc.back().events |= POLLOUT;
 				}
 				break;
@@ -1690,15 +1701,15 @@ void NetworkWorkerThread::preparePollFds() {
 				pdesc.back().fd = entry.sock;
 				pdesc.back().events = 0;
 				entry.pdescpos = pdesc.size() - 1;
-				if (entry.inputpacket.bytesleft > 0) {
+				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
 				}
-				if (entry.outputhead != NULL) {
+				if (entry.outputHead != NULL) {
 					pdesc.back().events |= POLLOUT;
 				}
 				break;
 			case ChunkserverEntry::State::WriteFinish:
-				if (entry.outputhead != NULL) {
+				if (entry.outputHead != nullptr) {
 					pdesc.emplace_back();
 					pdesc.back().fd = entry.sock;
 					pdesc.back().events = POLLOUT;
@@ -1787,7 +1798,7 @@ void NetworkWorkerThread::servePoll() {
 			}
 		}
 		if (entry.state == ChunkserverEntry::State::WriteFinish &&
-		    entry.outputhead == NULL) {
+		    entry.outputHead == nullptr) {
 			entry.state = ChunkserverEntry::State::Close;
 		}
 		if (entry.state == ChunkserverEntry::State::Connecting
@@ -1824,23 +1835,23 @@ void NetworkWorkerThread::servePoll() {
 	while (eptr != csservEntries.end()) {
 		if (eptr->state == ChunkserverEntry::State::Closed) {
 			tcpclose(eptr->sock);
-			if (eptr->rpacket) {
-				worker_delete_packet(eptr->rpacket);
+			if (eptr->readPacket) {
+				worker_delete_packet(eptr->readPacket);
 			}
-			if (eptr->wpacket) {
-				worker_delete_preserved(eptr->wpacket);
+			if (eptr->writePacket) {
+				worker_delete_preserved(eptr->writePacket);
 			}
 			if (eptr->fwdsock >= 0) {
 				tcpclose(eptr->fwdsock);
 			}
-			if (eptr->inputpacket.packet) {
-				free(eptr->inputpacket.packet);
+			if (eptr->inputPacket.packet) {
+				free(eptr->inputPacket.packet);
 			}
-			if (eptr->fwdinputpacket.packet) {
-				free(eptr->fwdinputpacket.packet);
+			if (eptr->fwdInputPacket.packet) {
+				free(eptr->fwdInputPacket.packet);
 			}
-			packetstruct *pptr, *paptr;
-			pptr = eptr->outputhead;
+			PacketStruct *pptr, *paptr;
+			pptr = eptr->outputHead;
 			while (pptr) {
 				if (pptr->packet) {
 					free(pptr->packet);

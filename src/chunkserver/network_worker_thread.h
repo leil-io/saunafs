@@ -37,15 +37,18 @@
 #include "protocol/packet.h"
 #include "devtools/request_log.h"
 
-struct packetstruct {
-	packetstruct *next;
-	uint8_t *startptr;
-	uint32_t bytesleft;
-	uint8_t *packet;
+/**
+ * @brief Encapsulates the data associated with a packet.
+ *
+ * Including pointers to the packet data, the number of bytes left to process,
+ * and an optional output buffer for writing data.
+ */
+struct PacketStruct {
+	PacketStruct *next = nullptr;
+	uint8_t *startPtr = nullptr;
+	uint32_t bytesLeft = 0;
+	uint8_t *packet = nullptr;
 	std::shared_ptr<OutputBuffer> outputBuffer;
-
-	packetstruct() : next(nullptr), startptr(nullptr), bytesleft(0), packet(nullptr) {
-	}
 };
 
 class MessageSerializer;
@@ -105,12 +108,13 @@ struct ChunkserverEntry {
 	uint32_t activity;
 	uint8_t hdrbuff[PacketHeader::kSize];
 	uint8_t fwdhdrbuff[PacketHeader::kSize];
-	packetstruct inputpacket;
+	PacketStruct inputPacket;
 	uint8_t *fwdstartptr; // used for forwarding inputpacket data
 	uint32_t fwdbytesleft; // used for forwarding inputpacket data
-	packetstruct fwdinputpacket; // used for receiving status from fwdsocket
+	PacketStruct fwdInputPacket; // used for receiving status from fwdsocket
 	std::vector<uint8_t> fwdinitpacket; // used only for write initialization
-	packetstruct *outputhead, **outputtail;
+	PacketStruct *outputHead = nullptr;
+	PacketStruct **outputTail = &outputHead;
 
 	/* write */
 	uint32_t wjobid;
@@ -128,8 +132,8 @@ struct ChunkserverEntry {
 	uint16_t getBlocksJobResult;
 
 	/* common for read and write but meaning is different !!! */
-	void *rpacket;
-	void *wpacket;
+	void *readPacket = nullptr;
+	void *writePacket = nullptr;
 
 	uint8_t chunkisopen;
 	uint64_t chunkid; // R+W
@@ -152,16 +156,12 @@ struct ChunkserverEntry {
 			  activity(0),
 			  fwdstartptr(NULL),
 			  fwdbytesleft(0),
-			  outputhead(nullptr),
-			  outputtail(&outputhead),
 			  wjobid(0),
 			  wjobwriteid(0),
 			  rjobid(0),
 			  todocnt(0),
 			  getBlocksJobId(0),
 			  getBlocksJobResult(0),
-			  rpacket(nullptr),
-			  wpacket(nullptr),
 			  chunkisopen(0),
 			  chunkid(0),
 			  version(0),
@@ -169,9 +169,9 @@ struct ChunkserverEntry {
 			  offset(0),
 			  size(0),
 			  messageSerializer(nullptr) {
-		inputpacket.bytesleft = 8;
-		inputpacket.startptr = hdrbuff;
-		inputpacket.packet = NULL;
+		inputPacket.bytesLeft = PacketHeader::kSize;
+		inputPacket.startPtr = hdrbuff;
+		inputPacket.packet = nullptr;
 	}
 
 	ChunkserverEntry(const ChunkserverEntry&) = delete;
