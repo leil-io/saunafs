@@ -205,7 +205,6 @@ uint8_t *worker_create_attached_packet(ChunkserverEntry *eptr, uint32_t type,
 	put32bit(&ptr, type);
 	put32bit(&ptr, size);
 	outPacket->startPtr = outPacket->packet;
-	outPacket->next = nullptr;
 	eptr->attachPacket(std::move(outPacket));
 
 	return ptr;

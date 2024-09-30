@@ -45,7 +45,6 @@
  * and an optional output buffer for writing data.
  */
 struct PacketStruct {
-	PacketStruct *next = nullptr;
 	uint8_t *startPtr = nullptr;
 	uint32_t bytesLeft = 0;
 	uint8_t *packet = nullptr;
