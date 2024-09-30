@@ -47,7 +47,7 @@
 struct PacketStruct {
 	uint8_t *startPtr = nullptr;
 	uint32_t bytesLeft = 0;
-	uint8_t *packet = nullptr;
+	std::vector<uint8_t> packet;
 	std::shared_ptr<OutputBuffer> outputBuffer;
 };
 
@@ -160,7 +160,6 @@ struct ChunkserverEntry {
 	    : workerJobPool(workerJobPool), sock(socket) {
 		inputPacket.bytesLeft = PacketHeader::kSize;
 		inputPacket.startPtr = headerBuffer;
-		inputPacket.packet = nullptr;
 	}
 
 	// Disallow copying and moving to avoid misuse.
@@ -169,19 +168,14 @@ struct ChunkserverEntry {
 	ChunkserverEntry(ChunkserverEntry &&) = delete;
 	ChunkserverEntry &operator=(ChunkserverEntry &&) = delete;
 
-	~ChunkserverEntry() = default;
+	/// Destructor: releases the sockets and packet resources.
+	~ChunkserverEntry();
 
 	/// Attaches a packet to the output packet list (taking ownership).
 	inline void attachPacket(std::unique_ptr<PacketStruct> &&packet);
-	/// Releases the packet resources, primarily the packet buffer.
-	/// This function should be used until the code is refactored to use RAII.
-	inline void releasePacketResources(std::unique_ptr<PacketStruct> &packet);
 	/// Preserves the inputPacket buffer into writePacket (to avoid copying it).
 	/// Used for write operations, where the data comes from the network.
 	inline void preserveInputPacket();
-	/// Releases the preserved packet resources.
-	static inline void deletePreservedPacket(
-	    std::unique_ptr<PacketStruct> &packet);
 };
 
 class NetworkWorkerThread {
