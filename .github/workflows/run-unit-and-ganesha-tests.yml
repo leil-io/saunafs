@@ -15,7 +15,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Install nfs-ganesha v4.3 from Ubuntu repository
       run: |
@@ -23,7 +23,7 @@ jobs:
         sudo apt install -y nfs-common nfs-ganesha nfs-ganesha-vfs
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
