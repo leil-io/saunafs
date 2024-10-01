@@ -75,7 +75,7 @@ public:
 	/// This information is usually sent to master.
 	virtual DiskInfo toDiskInfo() const = 0;
 
-	/// Retrives the paths in the format [*]metaPath[ | dataPath].
+	/// Retrieves the paths in the format [*]metaPath[ | dataPath].
 	/// [] means optional, depending on current configuration.
 	virtual std::string getPaths() const = 0;
 

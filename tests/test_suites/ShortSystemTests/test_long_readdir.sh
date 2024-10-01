@@ -9,7 +9,7 @@ file_names() {
 	local N=30000
 	seq 1 $N
 	seq 1 $N | sed -e "s/^/dir_/"
-	seq 1 $N | sed -e "s/^/a bit longer name of a direcotry /"
+	seq 1 $N | sed -e "s/^/a bit longer name of a directory /"
 	seq 1 $N | sed -e "s/^/$(yes loooooong | tr '\n' '_' | head -c 245)_/"
 }
 

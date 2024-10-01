@@ -173,7 +173,7 @@ private:
 /*! \brief Compact vector storage class for 64 bit system
  *
  * On 64 bit system there is a limit on where memory can be allocated in user space.
- * Also current processors have build-in hardware limit on how much memory can be addressed.
+ * Also current processors have built-in hardware limit on how much memory can be addressed.
  * User space limit by OS:
  *   - Linux   128 TB
  *   - Windows 8 TB

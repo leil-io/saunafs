@@ -18,7 +18,7 @@ FILE_SIZE=${file_size_mb}M file-generate "$tmpf"
 # Create a file on SaunaFS filesystem with random data
 dd if=/dev/urandom of="$dir/file" bs=1MiB count=$file_size_mb
 
-# Overwirte the file using data from the temporary file
+# Overwrite the file using data from the temporary file
 # Use 20 parallel threads, each of them overwrites a random 1 KB block
 seq 0 $((file_size_mb*1024-1)) | shuf | xargs -P20 -IXX \
 		dd if="$tmpf" of="$dir/file" bs=1K count=1 seek=XX skip=XX conv=notrunc 2>/dev/null

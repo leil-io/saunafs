@@ -35,7 +35,7 @@ saunafs_master_n 1 stop
 touch "${info[mount0]}"/file2
 sed -i 's/file2/fool2/g' "${info[master_data_path]}"/changelog.sfs
 
-# Start the shadow master again; it shouldn't synchonize within first seconds because of
+# Start the shadow master again; it shouldn't synchronize within first seconds because of
 # METADATA_SAVE_REQUEST_MIN_PERIOD. Let's verify if the synchronization needs at least 7 seconds.
 saunafs_master_n 1 start
 sleep $(timeout_rescale_seconds 7)

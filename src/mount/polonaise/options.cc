@@ -103,7 +103,7 @@ void parse_command_line(int argc, char** argv, Setup& setup) {
 				"password for saunafs instance")
 			("io-retries",
 				po::value<uint32_t>(&setup.io_retries)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultIoRetries),
-				"number of retries for I/O failres")
+				"number of retries for I/O failures")
 			("write-buffer-size",
 				po::value<uint32_t>(&setup.write_buffer_size)->default_value((unsigned)SaunaClient::FsInitParams::kDefaultWriteCacheSize),
 				"size of global write buffer in MiB")

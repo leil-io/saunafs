@@ -54,7 +54,7 @@ public:
 	/// Returns a DiskInfo object from the information inside this Disk
 	DiskInfo toDiskInfo() const override;
 
-	/// Retrives the paths in the format [*]metaPath[ | dataPath]
+	/// Retrieves the paths in the format [*]metaPath[ | dataPath]
 	///
 	/// [] means optional, depending on current configuration.
 	std::string getPaths() const override;

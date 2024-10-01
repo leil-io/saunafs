@@ -39,14 +39,14 @@ TEST(ChunkCopiesCalculator, addPart) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 2), MediaLabel("B"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 1), MediaLabel("B"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 0), MediaLabel("A"));
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
-	ASSERT_EQ(avalible, goal);
+	ASSERT_EQ(available, goal);
 
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 0), MediaLabel("A"));
 
-	ASSERT_NE(avalible, goal);
+	ASSERT_NE(available, goal);
 }
 
 TEST(ChunkCopiesCalculator, removePart) {
@@ -56,10 +56,10 @@ TEST(ChunkCopiesCalculator, removePart) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 2), MediaLabel("B"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 1), MediaLabel("B"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 0), MediaLabel("A"));
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
-	ASSERT_EQ(avalible, goal);
+	ASSERT_EQ(available, goal);
 
 	cccp.removePart(sneakyPartType(kXor3), 0, MediaLabel("A"));
 	cccp.removePart(sneakyPartType(kXor3), 1, MediaLabel("B"));
@@ -171,8 +171,8 @@ TEST(ChunkCopiesCalculator, optimize) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(5, 4), MediaLabel("X"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(5, 5), MediaLabel("A"));
 
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
 	cccp.optimize();
 	int cost = cccp.countPartsToRecover();
@@ -187,8 +187,8 @@ TEST(ChunkCopiesCalculator, updateRedundancyLevel) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 2), MediaLabel("B"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 1), MediaLabel("B"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(3, 0), MediaLabel("A"));
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
 	cccp.evalRedundancyLevel();
 	ASSERT_EQ(ChunksAvailabilityState::State::kSafe, cccp.getState());
@@ -244,8 +244,8 @@ TEST(ChunkCopiesCalculator, canRemoveExtraPartsFromSlice) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(5, 4), MediaLabel("A"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(5, 5), MediaLabel("C"));
 
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
 	cccp.optimize();
 	// goalname: $xor5 {C A A B B C}
@@ -287,8 +287,8 @@ TEST(ChunkCopiesCalculator, getLabelsToRecover) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(4, 2), MediaLabel("A"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(4, 3), MediaLabel("C"));
 
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
 	cccp.optimize();
 	//goalname: $xor4 {A B A C B}
@@ -323,8 +323,8 @@ TEST(ChunkCopiesCalculator, getRemovePool) {
 
 	cccp.evalRedundancyLevel();
 
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
 	cccp.updateRedundancyLevel(sneakyPartType(kXor4));
 	ASSERT_EQ(ChunksAvailabilityState::State::kSafe, cccp.getState());
@@ -368,8 +368,8 @@ TEST(ChunkCopiesCalculator, countPartsToMove) {
 	cccp.addPart(slice_traits::xors::ChunkPartType(4, 4), MediaLabel("A"));
 	cccp.addPart(slice_traits::xors::ChunkPartType(4, 4), MediaLabel("C"));
 
-	Goal &avalible = cccp.getAvailable();
-	avalible.setName("goalname");
+	Goal &available = cccp.getAvailable();
+	available.setName("goalname");
 
 	cccp.updateRedundancyLevel(sneakyPartType(kXor4));
 
