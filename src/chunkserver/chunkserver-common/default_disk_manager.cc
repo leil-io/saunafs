@@ -259,7 +259,7 @@ IDisk *DefaultDiskManager::getDiskForNewChunk(
 	}
 
 	if (bestDisk != DiskNotFound) {
-		// Lower the probability of being choosen again
+		// Lower the probability of being chosen again
 		bestDisk->setCarry(bestDisk->carry() - 1.0);
 		return bestDisk;
 	}

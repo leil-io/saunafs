@@ -747,7 +747,7 @@ int hddRead(uint64_t chunkId, uint32_t version, ChunkPartType chunkType,
 		OutputBuffer tmp(kHddBlockSize);
 		status = hddReadCrcAndBlock(chunk, block, &tmp);
 
-		if (status == SAUNAFS_STATUS_OK) {  // Succesful read of the full block
+		if (status == SAUNAFS_STATUS_OK) {  // Successful read of the full block
 			status = hddCheckCrcForFullBlock(chunk, block, &tmp, true);
 
 			if (status == SAUNAFS_STATUS_OK) {  // CRC is OK or check disabled
@@ -1616,7 +1616,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 		crcDataDup = gOpenChunks.getResource(dupChunk->metaFD()).crcData();
 	}
 
-	// Seek to the beggining of data block on both chunks
+	// Seek to the beginning of data block on both chunks
 	if (!dupDisk->isZonedDevice()) {
 		dupDisk->lseekData(dupChunk, dupChunk->getBlockOffset(0), SEEK_SET);
 	}

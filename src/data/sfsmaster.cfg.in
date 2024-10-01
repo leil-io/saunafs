@@ -249,7 +249,7 @@
 # deprecated:
 # CHUNKS_DEL_LIMIT - use CHUNKS_SOFT_DEL_LIMIT instead
 
-## Use Berkley DB for file/directory name storage (Boolean, 0 or 1).
+## Use Berkeley DB for file/directory name storage (Boolean, 0 or 1).
 ## By default system memory is used for storing file/directory names.
 ## With this option enabled Berkeley DB is used for storing
 ## names in file (@DATA_PATH@/name_storage.db)

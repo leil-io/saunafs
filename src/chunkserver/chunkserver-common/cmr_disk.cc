@@ -46,7 +46,7 @@ void CmrDisk::createPathsAndSubfolders() {
 	if (ret) {
 		safs_pretty_syslog(LOG_INFO,
 		                   "Folders structures for disk %s "
-		                   "auto-generated succesfully",
+		                   "auto-generated successfully",
 		                   getPaths().c_str());
 	}
 }

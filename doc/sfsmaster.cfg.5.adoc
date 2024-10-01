@@ -192,7 +192,7 @@ list of open files) should be sustained in the master server after connection
 with the client was lost. Values between 60 and 604800 (one week) are accepted.
 (default is 86400)
 
-*USE_BDB_FOR_NAME_STORAGE*:: When this option is set to 1 Berkley DB is used
+*USE_BDB_FOR_NAME_STORAGE*:: When this option is set to 1 Berkeley DB is used
 for storing file/directory names in file (DATA_PATH/name_storage.db). By
 default all strings are kept in system memory. (default is 0)
 

@@ -31,7 +31,7 @@
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(GetIoLimitGroupIdException, Exception);
 
-// parse 'is' assuming that it conains /proc/*/cgroup - formatted data
+// parse 'is' assuming that it contains /proc/*/cgroup - formatted data
 IoLimitGroupId getIoLimitGroupId(std::istream& is, const std::string& subsystem);
 
 // parse /proc/pid/cgroup

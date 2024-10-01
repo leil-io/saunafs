@@ -76,7 +76,7 @@ uint8_t fs_repair(uint32_t rootinode, uint8_t sesflags, uint32_t inode, uint32_t
 /*! \brief Perform a flock operation on filesystem
  * Possible operations:
  * - unlock
- * - shared/exlusive blocking/nonblocking lock
+ * - shared/exclusive blocking/nonblocking lock
  * - handle interrupt
  */
 int fs_flock_op(const FsContext &context, uint32_t inode, uint64_t owner, uint32_t sessionid,
@@ -86,7 +86,7 @@ int fs_flock_op(const FsContext &context, uint32_t inode, uint64_t owner, uint32
 /*! \brief Perform a posix lock operation on filesystem
  * Possible operations:
  * - unlock
- * - shared/exlusive blocking/nonblocking lock
+ * - shared/exclusive blocking/nonblocking lock
  * - handle interrupt
  */
 int fs_posixlock_op(const FsContext &context, uint32_t inode, uint64_t start,

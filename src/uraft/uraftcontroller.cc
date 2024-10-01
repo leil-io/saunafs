@@ -370,7 +370,7 @@ bool uRaftController::runCommand(const std::vector<std::string> &cmd, std::strin
  * Reads data from file descriptor and store them in string (with timeout).
  * \param fd file descriptor to read
  * \param result string with read data.
- * \param timoeut time (ms) after which we stop reading data.
+ * \param timeout time (ms) after which we stop reading data.
  * \return -1 error
  *         0  timeout did occur
  *         1  no error

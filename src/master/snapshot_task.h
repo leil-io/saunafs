@@ -34,7 +34,7 @@
  *
  * This class uses new approach to executing snapshots.
  * Each snapshot request is split into clone tasks.
- * Clone task is responsible for snapshoting only one inode.
+ * Clone task is responsible for snapshotting only one inode.
  * In the case of cloning directory inode new clone tasks can be enqueued
  * with child inodes.
  *

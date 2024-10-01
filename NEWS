@@ -174,7 +174,7 @@ This file lists noteworthy changes in SaunaFS.
  - (master) reimplement directory entry cache for faster lookups
  - (master) add whole-path lookups
  - (master, chunkserver) add chunkserver load awareness
- - (mount) add readahead to improve sequential read perfromance
+ - (mount) add readahead to improve sequential read performance
  - (mount) add secondary groups support
  - (tools) add correct-only flag to filerepair
  - (tools) add -s and -i options to snapshot command
@@ -282,10 +282,10 @@ This file lists noteworthy changes in SaunaFS.
   - (master) High availability provided by shadow master servers
   - (mount, chunkserver) CRC algorithm replaced with a 3 times faster implementation
   - (mount, master) Support for quotas (for users and groups)
-  - (mount, master) Support for posix access contol lists (requires additional OS support)
+  - (mount, master) Support for posix access control lists (requires additional OS support)
   - (mount, master) Support for global I/O limiting (bandwidth limiting)
   - (mount) Support for per-mountpoint I/O limiting (bandwidth limiting)
-  - (adm) New package lizardfs-adm with a lizardfs-probe command-line tool which can be used to query the installation for variuos parameteres
+  - (adm) New package lizardfs-adm with a lizardfs-probe command-line tool which can be used to query the installation for various parameters
   - (master) New mechanism of storing metadata backup files which improves performance of the hourly metadata dumps
   - (all) A comprehensive test suite added
   - (all) Multiple bugfixes
@@ -391,7 +391,7 @@ This file lists noteworthy changes in SaunaFS.
   - (daemon) fixed return values (return non zero on error)
   - (cs) fixed chunk testing bug (any error during chunk opening caused assigning whole disk as damaged)
   - (cs,metalogger) added resolving master name when connection failed (patch contributed by Davies Liu)
-  - (mount) added creating new session when prevoius is lost (inspired by Davies Liu)
+  - (mount) added creating new session when previous is lost (inspired by Davies Liu)
   - (cs) added for unused chunks week delay before deletion (inspired by Davies Liu)
   - (cgi) added switching between name and IP in 'path' column in 'Disks' table (inspired by Davies Liu)
   - (master) do not update ctime when goal, trashtime or extra attributes are not changing
@@ -400,7 +400,7 @@ This file lists noteworthy changes in SaunaFS.
 
   - (metalogger) added sending metadata after metalogger startup
   - (master,metalogger) added sending two change logs together with metadata
-  - (metarestore) imporved merging change logs
+  - (metarestore) improved merging change logs
   - (all) added a lot of assertions (mainly NULL pointers, and unsuccessful thread functions)
   - (all) fixed some minor bugs and potential race conditions (makes valgrind happy)
   - (cs) added ability to use read-only disks in "marked for removal" mode (to retrieve missing chunks from damaged disks)
@@ -435,7 +435,7 @@ This file lists noteworthy changes in SaunaFS.
   - (metarestore) fixed bugs in "REPAIR" and "SNAPSHOT" entries
   - (master) fixed bug in "snapshot" command ("mfsmakesnapshot dir dir/" caused master to hung-up)
   - (master) preserving atime and mtime during "snapshot" operation (makes "snapshot" to work more like "cp -Rp" than "cp -R")
-  - (cs) ommit "marked for removal" disks during chunk test loop
+  - (cs) omit "marked for removal" disks during chunk test loop
 
 * MooseFS 1.6.14 (2010-03-19)
 

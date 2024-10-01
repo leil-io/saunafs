@@ -249,7 +249,7 @@ bool fsnodes_isancestor(FSNodeDirectory *ancestor, FSNode *node) {
  * or \param ancestor is ancestor of \param node.
  */
 bool fsnodes_isancestor_or_node_reserved_or_trash(FSNodeDirectory *ancestor, FSNode *node) {
-	// Return true if file is reservered:
+	// Return true if file is reserved:
 	if (node && (node->type == FSNode::kReserved || node->type == FSNode::kTrash)) {
 		return true;
 	}
@@ -1422,7 +1422,7 @@ uint8_t fsnodes_undel(uint32_t ts, FSNodeFile *node) {
 			}
 		}
 	}
-	if (partleng == 0) {  // last part canot be empty - it's the name of undeleted file
+	if (partleng == 0) {  // last part cannot be empty - it's the name of undeleted file
 		return SAUNAFS_ERROR_CANTCREATEPATH;
 	}
 	if (partleng == dots && partleng <= 2) {  // '.' or '..' in path

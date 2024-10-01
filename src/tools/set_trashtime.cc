@@ -174,7 +174,7 @@ static int gene_set_trashtime_run(int argc, char **argv, int rflag) {
 	} else {
 		fprintf(
 		    stderr,
-		    "trashtime should be given as number of seconds optionally folowed by '-' or '+'\n");
+		    "trashtime should be given as number of seconds optionally followed by '-' or '+'\n");
 		set_trashtime_usage();
 		return 1;
 	}

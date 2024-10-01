@@ -307,7 +307,7 @@ create_magic_debug_log_entry_() {
 	fi | sed -e 's/,$//'
 }
 
-# Sometimes use Berkley DB name storage
+# Sometimes use Berkeley DB name storage
 create_bdb_name_storage_entry_() {
 	if (($RANDOM % 2)); then
 		echo "USE_BDB_FOR_NAME_STORAGE = 0"

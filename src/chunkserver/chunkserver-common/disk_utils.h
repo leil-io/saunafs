@@ -15,7 +15,7 @@ constexpr uint8_t kLastErrorSize = 30;
 constexpr uint32_t kSecondsInOneMinute = 60;
 constexpr uint32_t kMinutesInOneHour = 60;
 
-/// Number of bytes which should be addded to each disk's used space
+/// Number of bytes which should be added to each disk's used space
 inline uint64_t gLeaveFree;
 
 /// Default value for HDD_LEAVE_SPACE_DEFAULT

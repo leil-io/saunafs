@@ -122,7 +122,7 @@ the value is aligned down to 64 KiB)
 
 *MAX_READ_BEHIND_KB*:: try to fix out-of-order read requests; the value tells
 how much of skipped data to read if an offset of some read operation is greater
-than the offset where the previos operation finished (default is 0, i.e. don't
+than the offset where the previous operation finished (default is 0, i.e. don't
 read any skipped data; the value is aligned down to 64 KiB)
 
 *PERFORM_FSYNC*:: call fsync() after a chunk is modified (default is 1, i.e.

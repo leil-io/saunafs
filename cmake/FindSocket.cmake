@@ -10,7 +10,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# This is for finding berkley socket functions
+# This is for finding berkeley socket functions
 # it specifically looks for socket()
 
 # brought from: https://raw.github.com/cjdelisle/cjdns/master/cmake/modules/FindSocket.cmake

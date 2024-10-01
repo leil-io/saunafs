@@ -97,7 +97,7 @@ struct ChunkserverEntry {
 	enum class State : uint8_t {
 		Idle,        // idle connection, new or used previously
 		Read,        // after CLTOCS_READ, but didn't send all of the
-		             // CSTOCL_READ_(DATA|STAUS)
+		             // CSTOCL_READ_(DATA|STATUS)
 		GetBlock,    // after CSTOCS_GET_CHUNK_BLOCKS, but didn't send response
 		WriteLast,   // ready for writing data; data not forwarded to other CSs
 		Connecting,  // connecting to other chunkserver to form a writing chain
@@ -166,7 +166,7 @@ struct ChunkserverEntry {
 	uint32_t size = 0; ///< R: Size of the current operation.
 
 	/// Pointer to the concrete serializer singleton.
-	/// Serializers coud be of type:
+	/// Serializers could be of type:
 	/// - LegacyMessageSerializer: for legacy messages
 	/// - SaunaFsMessageSerializer: for new messages
 	MessageSerializer* messageSerializer = nullptr; // R+W

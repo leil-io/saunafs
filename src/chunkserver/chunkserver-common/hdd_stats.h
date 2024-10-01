@@ -114,7 +114,7 @@ private:
 	uint64_t dataSize_;          ///< Size of the IO operation
 	IDisk *disk_;                 ///< Disk for this operation
 	StatsUpdateFunc updateFunc_; ///< Delegate function to call at destruction
-	bool success_ = true;        ///< Tells if the operation succeded
+	bool success_ = true;        ///< Tells if the operation succeeded
 };
 
 /// Concrete updater for write operations

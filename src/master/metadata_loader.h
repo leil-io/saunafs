@@ -88,7 +88,7 @@ struct MetadataSection {
 	/// Whether to load the section asynchronously or not (default: true).
 	bool asyncLoad;
 
-	/// Whether the section is legacy and wont be loaded by default (default: false).
+	/// Whether the section is legacy and won't be loaded by default (default: false).
 	bool isLegacy;
 };
 

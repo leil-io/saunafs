@@ -120,7 +120,7 @@ public:
 	 * @brief Calculate hash of a part.
 	 *
 	 * Hash of a part is P(```kBasePart_```) mod ```kModPart_```. P is a
-	 * polynomial whose coeficients are values dependant on each (labelId,
+	 * polynomial whose coefficients are values dependent on each (labelId,
 	 * copies) pair of the part.
 	 *
 	 * @param part Part to be calculated hash.
@@ -141,11 +141,11 @@ public:
 	 * @brief Calculate hash of a slice starting from a given hash.
 	 *
 	 * Hash of a part is Q(```kBaseSlice_```) mod ```kModSlice_```. Q is a
-	 * polynomial whose coeficients are the hashed of each of the parts in the
+	 * polynomial whose coefficients are the hashed of each of the parts in the
 	 * slice.
 	 *
 	 * @param startingHash Could be the ```kInitialStartingHash_``` or some hash
-	 * calculation from a previos slice.
+	 * calculation from a previous slice.
 	 * @param slice Slice to be calculated hash.
 	 * @return Hash of the given slice starting from the provided hash.
 	 */

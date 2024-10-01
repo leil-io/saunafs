@@ -7,7 +7,7 @@
 #include "common/time_utils.h"
 #include "uraftstatus.h"
 
-/*! \brief Managament of SaunaFS metadata server based on uRaft algorithm.
+/*! \brief Management of SaunaFS metadata server based on uRaft algorithm.
  *
  * This class manages local SaunaFS master/shadow server. This is done using
  * base class uRaft for selection of leader. We get informed on leader change by call
