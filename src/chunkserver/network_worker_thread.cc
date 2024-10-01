@@ -207,7 +207,7 @@ uint8_t *worker_create_attached_packet(ChunkserverEntry *eptr, uint32_t type,
 
 void worker_fwderror(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	sassert(eptr->messageSerializer != NULL);
+	sassert(eptr->messageSerializer != nullptr);
 	std::vector<uint8_t> buffer;
 	uint8_t status = (eptr->state == ChunkserverEntry::State::Connecting
 	                      ? SAUNAFS_ERROR_CANTCONNECT
@@ -515,7 +515,7 @@ void worker_write_finished(uint8_t status, void *e) {
 	TRACETHIS();
 	auto *eptr = static_cast<ChunkserverEntry*>(e);
 	eptr->writeJobId = 0;
-	sassert(eptr->messageSerializer != NULL);
+	sassert(eptr->messageSerializer != nullptr);
 	if (status != SAUNAFS_STATUS_OK) {
 		std::vector<uint8_t> buffer;
 		eptr->messageSerializer->serializeCstoclWriteStatus(
@@ -536,7 +536,7 @@ void worker_write_finished(uint8_t status, void *e) {
 		if (eptr->partiallyCompletedWrites.count(eptr->writeJobWriteId) > 0) {
 			// found - it means that it was added by status_receive, ie. next chunkserver from
 			// a chain finished writing before our worker
-			sassert(eptr->messageSerializer != NULL);
+			sassert(eptr->messageSerializer != nullptr);
 			std::vector<uint8_t> buffer;
 			eptr->messageSerializer->serializeCstoclWriteStatus(
 			    buffer, eptr->chunkId, eptr->writeJobWriteId,
@@ -712,7 +712,7 @@ void worker_write_status(ChunkserverEntry *eptr, const uint8_t *data,
 	uint8_t status;
 
 	sassert(type == SAU_CSTOCL_WRITE_STATUS || type == CSTOCL_WRITE_STATUS);
-	sassert(eptr->messageSerializer != NULL);
+	sassert(eptr->messageSerializer != nullptr);
 	try {
 		const MessageSerializer *serializer = MessageSerializer::getSerializer(type);
 		if (eptr->messageSerializer != serializer) {
@@ -791,7 +791,7 @@ void worker_write_end(ChunkserverEntry *eptr, const uint8_t *data,
 		return;
 	}
 	if (eptr->isChunkOpen) {
-		job_close(eptr->workerJobPool, NULL, NULL, eptr->chunkId,
+		job_close(eptr->workerJobPool, nullptr, nullptr, eptr->chunkId,
 		          eptr->chunkType);
 		eptr->isChunkOpen = 0;
 	}
@@ -1180,26 +1180,27 @@ void worker_fwdconnected(ChunkserverEntry *eptr) {
 
 void worker_fwdread(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	int32_t i;
+	int32_t bytesRead;
 	uint32_t type, size;
 	const uint8_t *ptr;
+
 	if (eptr->fwdMode == ChunkserverEntry::Mode::Header) {
-		i = read(eptr->fwdSocket, eptr->fwdInputPacket.startPtr,
-		         eptr->fwdInputPacket.bytesLeft);
-		if (i == 0) {
+		bytesRead = read(eptr->fwdSocket, eptr->fwdInputPacket.startPtr,
+		                 eptr->fwdInputPacket.bytesLeft);
+		if (bytesRead == 0) {
 			worker_fwderror(eptr);
 			return;
 		}
-		if (i < 0) {
+		if (bytesRead < 0) {
 			if (errno != EAGAIN) {
 				safs_silent_errlog(LOG_NOTICE, "(fwdread) read error");
 				worker_fwderror(eptr);
 			}
 			return;
 		}
-		stats_bytesin += i;
-		eptr->fwdInputPacket.startPtr += i;
-		eptr->fwdInputPacket.bytesLeft -= i;
+		stats_bytesin += bytesRead;
+		eptr->fwdInputPacket.startPtr += bytesRead;
+		eptr->fwdInputPacket.bytesLeft -= bytesRead;
 		if (eptr->fwdInputPacket.bytesLeft > 0) {
 			return;
 		}
@@ -1218,24 +1219,25 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 		eptr->fwdInputPacket.bytesLeft = size;
 		eptr->fwdMode = ChunkserverEntry::Mode::Data;
 	}
+
 	if (eptr->fwdMode == ChunkserverEntry::Mode::Data) {
 		if (eptr->fwdInputPacket.bytesLeft > 0) {
-			i = read(eptr->fwdSocket, eptr->fwdInputPacket.startPtr,
-			         eptr->fwdInputPacket.bytesLeft);
-			if (i == 0) {
+			bytesRead = read(eptr->fwdSocket, eptr->fwdInputPacket.startPtr,
+			                 eptr->fwdInputPacket.bytesLeft);
+			if (bytesRead == 0) {
 				worker_fwderror(eptr);
 				return;
 			}
-			if (i < 0) {
+			if (bytesRead < 0) {
 				if (errno != EAGAIN) {
 					safs_silent_errlog(LOG_NOTICE, "(fwdread) read error");
 					worker_fwderror(eptr);
 				}
 				return;
 			}
-			stats_bytesin += i;
-			eptr->fwdInputPacket.startPtr += i;
-			eptr->fwdInputPacket.bytesLeft -= i;
+			stats_bytesin += bytesRead;
+			eptr->fwdInputPacket.startPtr += bytesRead;
+			eptr->fwdInputPacket.bytesLeft -= bytesRead;
 			if (eptr->fwdInputPacket.bytesLeft > 0) {
 				return;
 			}
@@ -1254,24 +1256,29 @@ void worker_fwdread(ChunkserverEntry *eptr) {
 
 void worker_fwdwrite(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	int32_t i;
+	int32_t bytesWritten;
+
 	if (eptr->fwdBytesLeft > 0) {
-		i = write(eptr->fwdSocket, eptr->fwdStartPtr, eptr->fwdBytesLeft);
-		if (i == 0) {
+		bytesWritten =
+		    write(eptr->fwdSocket, eptr->fwdStartPtr, eptr->fwdBytesLeft);
+		if (bytesWritten == 0) {
 			worker_fwderror(eptr);
 			return;
 		}
-		if (i < 0) {
+
+		if (bytesWritten < 0) {
 			if (errno != EAGAIN) {
 				safs_silent_errlog(LOG_NOTICE, "(fwdwrite) write error");
 				worker_fwderror(eptr);
 			}
 			return;
 		}
-		stats_bytesout += i;
-		eptr->fwdStartPtr += i;
-		eptr->fwdBytesLeft -= i;
+
+		stats_bytesout += bytesWritten;
+		eptr->fwdStartPtr += bytesWritten;
+		eptr->fwdBytesLeft -= bytesWritten;
 	}
+
 	if (eptr->fwdBytesLeft == 0) {
 		eptr->fwdInitPacket.clear();
 		eptr->fwdStartPtr = nullptr;
@@ -1284,24 +1291,24 @@ void worker_fwdwrite(ChunkserverEntry *eptr) {
 
 void worker_forward(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	int32_t i;
+	int32_t bytesReadOrWritten;
 	if (eptr->mode == ChunkserverEntry::Mode::Header) {
-		i = read(eptr->sock, eptr->inputPacket.startPtr,
-		         eptr->inputPacket.bytesLeft);
-		if (i == 0) {
+		bytesReadOrWritten = read(eptr->sock, eptr->inputPacket.startPtr,
+		                          eptr->inputPacket.bytesLeft);
+		if (bytesReadOrWritten == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		if (i < 0) {
+		if (bytesReadOrWritten < 0) {
 			if (errno != EAGAIN) {
 				safs_silent_errlog(LOG_NOTICE, "(forward) read error");
 				eptr->state = ChunkserverEntry::State::Close;
 			}
 			return;
 		}
-		stats_bytesin += i;
-		eptr->inputPacket.startPtr += i;
-		eptr->inputPacket.bytesLeft -= i;
+		stats_bytesin += bytesReadOrWritten;
+		eptr->inputPacket.startPtr += bytesReadOrWritten;
+		eptr->inputPacket.bytesLeft -= bytesReadOrWritten;
 		if (eptr->inputPacket.bytesLeft > 0) {
 			return;
 		}
@@ -1337,43 +1344,44 @@ void worker_forward(ChunkserverEntry *eptr) {
 		eptr->mode = ChunkserverEntry::Mode::Data;
 	}
 	if (eptr->inputPacket.bytesLeft > 0) {
-		i = read(eptr->sock, eptr->inputPacket.startPtr,
-		         eptr->inputPacket.bytesLeft);
-		if (i == 0) {
+		bytesReadOrWritten = read(eptr->sock, eptr->inputPacket.startPtr,
+		                          eptr->inputPacket.bytesLeft);
+		if (bytesReadOrWritten == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		if (i < 0) {
+		if (bytesReadOrWritten < 0) {
 			if (errno != EAGAIN) {
 				safs_silent_errlog(LOG_NOTICE, "(forward) read error");
 				eptr->state = ChunkserverEntry::State::Close;
 			}
 			return;
 		}
-		stats_bytesin += i;
-		eptr->inputPacket.startPtr += i;
-		eptr->inputPacket.bytesLeft -= i;
+		stats_bytesin += bytesReadOrWritten;
+		eptr->inputPacket.startPtr += bytesReadOrWritten;
+		eptr->inputPacket.bytesLeft -= bytesReadOrWritten;
 		if (eptr->fwdStartPtr != nullptr) {
-			eptr->fwdBytesLeft += i;
+			eptr->fwdBytesLeft += bytesReadOrWritten;
 		}
 	}
 	if (eptr->fwdBytesLeft > 0) {
 		sassert(eptr->fwdStartPtr != nullptr);
-		i = write(eptr->fwdSocket, eptr->fwdStartPtr, eptr->fwdBytesLeft);
-		if (i == 0) {
+		bytesReadOrWritten =
+		    write(eptr->fwdSocket, eptr->fwdStartPtr, eptr->fwdBytesLeft);
+		if (bytesReadOrWritten == 0) {
 			worker_fwderror(eptr);
 			return;
 		}
-		if (i < 0) {
+		if (bytesReadOrWritten < 0) {
 			if (errno != EAGAIN) {
 				safs_silent_errlog(LOG_NOTICE, "(forward) write error");
 				worker_fwderror(eptr);
 			}
 			return;
 		}
-		stats_bytesout += i;
-		eptr->fwdStartPtr += i;
-		eptr->fwdBytesLeft -= i;
+		stats_bytesout += bytesReadOrWritten;
+		eptr->fwdStartPtr += bytesReadOrWritten;
+		eptr->fwdBytesLeft -= bytesReadOrWritten;
 	}
 	if (eptr->inputPacket.bytesLeft == 0 && eptr->fwdBytesLeft == 0 &&
 	    eptr->writeJobId == 0) {
@@ -1399,35 +1407,36 @@ void worker_forward(ChunkserverEntry *eptr) {
 
 void worker_read(ChunkserverEntry *eptr) {
 	TRACETHIS();
-	int32_t i;
-	uint32_t type, size;
+	int32_t bytesRead;
+	uint32_t type;
+	uint32_t size;
 	const uint8_t *ptr;
 
 	if (eptr->mode == ChunkserverEntry::Mode::Header) {
 		sassert(eptr->inputPacket.startPtr + eptr->inputPacket.bytesLeft ==
 		        eptr->headerBuffer + PacketHeader::kSize);
-		i = read(eptr->sock, eptr->inputPacket.startPtr,
-		         eptr->inputPacket.bytesLeft);
-		if (i == 0) {
+		bytesRead = read(eptr->sock, eptr->inputPacket.startPtr,
+		                 eptr->inputPacket.bytesLeft);
+		if (bytesRead == 0) {
 			eptr->state = ChunkserverEntry::State::Close;
 			return;
 		}
-		if (i < 0) {
+		if (bytesRead < 0) {
 			if (errno != EAGAIN) {
 				safs_silent_errlog(LOG_NOTICE, "(read) read error");
 				eptr->state = ChunkserverEntry::State::Close;
 			}
 			return;
 		}
-		stats_bytesin += i;
-		eptr->inputPacket.startPtr += i;
-		eptr->inputPacket.bytesLeft -= i;
+		stats_bytesin += bytesRead;
+		eptr->inputPacket.startPtr += bytesRead;
+		eptr->inputPacket.bytesLeft -= bytesRead;
 
 		if (eptr->inputPacket.bytesLeft > 0) {
 			return;
 		}
 
-		ptr = eptr->headerBuffer + 4;
+		ptr = eptr->headerBuffer + sizeof(type);
 		size = get32bit(&ptr);
 
 		if (size > 0) {
@@ -1445,22 +1454,22 @@ void worker_read(ChunkserverEntry *eptr) {
 	}
 	if (eptr->mode == ChunkserverEntry::Mode::Data) {
 		if (eptr->inputPacket.bytesLeft > 0) {
-			i = read(eptr->sock, eptr->inputPacket.startPtr,
-			         eptr->inputPacket.bytesLeft);
-			if (i == 0) {
+			bytesRead = read(eptr->sock, eptr->inputPacket.startPtr,
+			                 eptr->inputPacket.bytesLeft);
+			if (bytesRead == 0) {
 				eptr->state = ChunkserverEntry::State::Close;
 				return;
 			}
-			if (i < 0) {
+			if (bytesRead < 0) {
 				if (errno != EAGAIN) {
 					safs_silent_errlog(LOG_NOTICE, "(read) read error");
 					eptr->state = ChunkserverEntry::State::Close;
 				}
 				return;
 			}
-			stats_bytesin += i;
-			eptr->inputPacket.startPtr += i;
-			eptr->inputPacket.bytesLeft -= i;
+			stats_bytesin += bytesRead;
+			eptr->inputPacket.startPtr += bytesRead;
+			eptr->inputPacket.bytesLeft -= bytesRead;
 
 			if (eptr->inputPacket.bytesLeft > 0) {
 				return;
@@ -1483,7 +1492,7 @@ void worker_read(ChunkserverEntry *eptr) {
 void worker_write(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	PacketStruct *pack = nullptr;
-	int32_t i;
+	int32_t bytesWritten;
 	for (;;) {
 		pack = eptr->outputPackets.front().get();
 		if (pack == nullptr) {
@@ -1504,21 +1513,21 @@ void worker_write(ChunkserverEntry *eptr) {
 				return;
 			}
 		} else {
-			i = write(eptr->sock, pack->startPtr, pack->bytesLeft);
-			if (i == 0) {
+			bytesWritten = write(eptr->sock, pack->startPtr, pack->bytesLeft);
+			if (bytesWritten == 0) {
 				eptr->state = ChunkserverEntry::State::Close;
 				return;
 			}
-			if (i < 0) {
+			if (bytesWritten < 0) {
 				if (errno != EAGAIN) {
 					safs_silent_errlog(LOG_NOTICE, "(write) write error");
 					eptr->state = ChunkserverEntry::State::Close;
 				}
 				return;
 			}
-			stats_bytesout += i;
-			pack->startPtr += i;
-			pack->bytesLeft -= i;
+			stats_bytesout += bytesWritten;
+			pack->startPtr += bytesWritten;
+			pack->bytesLeft -= bytesWritten;
 			if (pack->bytesLeft > 0) {
 				return;
 			}
