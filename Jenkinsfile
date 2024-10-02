@@ -18,7 +18,7 @@ pipeline {
                 sh '''
                     git clone "https://github.com/leil-io/sfstests"
                     cd sfstests
-                    git checkout v0.2.x
+                    git checkout v0.2.1
                     go build -o $WORKSPACE/sfstests
                     '''
             }
