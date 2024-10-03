@@ -238,6 +238,11 @@ chunkserver disk usage to determine most fitting chunkserver. Heavy loaded
 chunkservers will be picked for operations less frequently. (default is 0,
 correct values are in range from 0 to 0.5)
 
+*PRIORITIZE_DATA_PARTS*:: When set, master server will prioritize data parts in
+EC goals to land in the chunkservers with higher percentage of available space.
+Could cause parities landing always in the same chunkservers if the cluster is
+not well balanced. (default: 1)
+
 *ENABLE_PROMETHEUS*:: Whether to enable Prometheus support and metric
 collection. Note that this requires compiling with Prometheus support. Set to
 either 1 to enable, or 0 to disable (default is 0)

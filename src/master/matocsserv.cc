@@ -70,6 +70,7 @@
 enum{KILL, CONNECTED};
 
 double gLoadFactorPenalty = 0.;
+bool gPrioritizeDataParts = true;
 
 struct matocsserventry {
 	matocsserventry() : inputPacket(MaxPacketSize) {}
@@ -407,18 +408,29 @@ std::vector<std::pair<matocsserventry *, ChunkPartType>> matocsserv_getservers_f
 		std::array<int, Goal::Slice::kMaxPartsCount> shuffle;
 
 		std::iota(shuffle.begin(), shuffle.begin() + slice.size(), 0);
-		// Move xor parity to the end of a list
-		if (slice_traits::isXor(slice)) {
-			std::swap(shuffle[0], shuffle[slice.size() - 1]);
+
+		if (gPrioritizeDataParts) {
+			// Move xor parity to the end of a list
+			if (slice_traits::isXor(slice)) {
+				std::swap(shuffle[0], shuffle[slice.size() - 1]);
+			}
+
+			// Shuffle data before parity to prioritize data parts before parity
+			// in partial writes
+			int data_count = slice_traits::getNumberOfDataParts(slice);
+			assert(std::all_of(shuffle.begin(), shuffle.begin() + data_count,
+			                   [&slice](int i) {
+				                   return slice_traits::isDataPart(
+				                       ChunkPartType(slice.getType(), i));
+			                   }));
+			std::shuffle(shuffle.begin(), shuffle.begin() + data_count,
+			             kRandomEngine);
+			std::shuffle(shuffle.begin() + data_count,
+			             shuffle.begin() + slice.size(), kRandomEngine);
+		} else {
+			std::shuffle(shuffle.begin(), shuffle.begin() + slice.size(),
+			             kRandomEngine);
 		}
-		// Shuffle data before parity to prioritize data parts before parity in partial writes
-		int data_count = slice_traits::getNumberOfDataParts(slice);
-		assert(std::all_of(shuffle.begin(), shuffle.begin() + data_count,
-				[&slice](int i){
-			return slice_traits::isDataPart(ChunkPartType(slice.getType(), i));
-		}));
-		std::shuffle(shuffle.begin(), shuffle.begin() + data_count, kRandomEngine);
-		std::shuffle(shuffle.begin() + data_count, shuffle.begin() + slice.size(), kRandomEngine);
 
 		uint32_t min_version = std::max({
 			slice_traits::isXor(slice) ? kFirstXorVersion : 0,
@@ -1594,6 +1606,18 @@ void matocsserv_reload(void) {
 	ListenHost = cfg_getstr("MATOCS_LISTEN_HOST","*");
 	ListenPort = cfg_getstr("MATOCS_LISTEN_PORT","9420");
 	gLoadFactorPenalty = cfg_get_minmaxvalue<double>("LOAD_FACTOR_PENALTY", 0., 0., 0.5);
+
+	auto previousValue = gPrioritizeDataParts;
+	gPrioritizeDataParts =
+	    static_cast<bool>(cfg_getuint32("PRIORITIZE_DATA_PARTS", 1));
+
+	if (previousValue != gPrioritizeDataParts) {
+		safs_pretty_syslog(LOG_NOTICE,
+		                   "master <-> chunkservers module: "
+		                   "PRIORITIZE_DATA_PARTS has changed to %d",
+		                   static_cast<int>(gPrioritizeDataParts));
+	}
+
 	if (strcmp(oldListenHost,ListenHost)==0 && strcmp(oldListenPort,ListenPort)==0) {
 		free(oldListenHost);
 		free(oldListenPort);
@@ -1640,6 +1664,8 @@ int matocsserv_init(void) {
 	ListenHost = cfg_getstr("MATOCS_LISTEN_HOST","*");
 	ListenPort = cfg_getstr("MATOCS_LISTEN_PORT","9420");
 	gLoadFactorPenalty = cfg_get_minmaxvalue<double>("LOAD_FACTOR_PENALTY", 0., 0., 0.5);
+	gPrioritizeDataParts =
+	    static_cast<bool>(cfg_getuint32("PRIORITIZE_DATA_PARTS", 1));
 
 	lsock = tcpsocket();
 	if (lsock<0) {

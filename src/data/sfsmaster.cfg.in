@@ -271,6 +271,12 @@
 ## (Default: 0, Valid range: [0, 0.5])
 # LOAD_FACTOR_PENALTY = 0
 
+## When set, master server will prioritize data parts in EC goals to land in the
+## chunkservers with higher percentage of available space. Could cause parities
+## landing always in the same chunkservers if the cluster is not well balanced.
+## (Default: 1)
+# PRIORITIZE_DATA_PARTS = 1
+
 ## Minimum number of required redundant chunk parts that can be lost before
 ## chunk becomes endangered
 ## (Default: 0)
