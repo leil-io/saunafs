@@ -29,6 +29,7 @@
 #include "common/massert.h"
 #include "devtools/TracePrinter.h"
 #include "errors/sfserr.h"
+#include "slogger/slogger.h"
 
 typedef struct _qentry {
 	uint32_t id;
@@ -69,11 +70,41 @@ void* queue_new(uint32_t size) {
 	return q;
 }
 
+/// Waits for all threads to finish.
+/// Must be called with the queue lock held.
+void queue_wait_for_threads_to_finish(queue *que) {
+	TRACETHIS();
+
+	// Wait up to 20 seconds for all threads to finish their jobs
+	constexpr uint32_t kMaxRetries = 100;
+	constexpr uint32_t kWaitTimeMs = 200;
+
+	for (uint32_t retry = 0; que->freewaiting > 0 && retry < kMaxRetries;
+	     ++retry) {
+		safs_pretty_syslog(LOG_NOTICE,
+		                   "pcqueue: Waiting %d ms for %u threads to "
+		                   "finish (retry %d of %d)",
+		                   kWaitTimeMs, que->freewaiting, retry, kMaxRetries);
+
+		zassert(pthread_cond_signal(&(que->waitfree)));
+		que->freewaiting--;
+
+		zassert(pthread_mutex_unlock(&(que->lock)));
+		std::this_thread::sleep_for(std::chrono::milliseconds(kWaitTimeMs));
+		zassert(pthread_mutex_lock(&(que->lock)));
+	}
+}
+
 void queue_delete(void *que, void (*deleter)(uint8_t *)) {
 	TRACETHIS();
 	queue *q = (queue*)que;
 	qentry *qe,*qen;
 	zassert(pthread_mutex_lock(&(q->lock)));
+
+	if (q->freewaiting > 0) {
+		queue_wait_for_threads_to_finish(q);
+	}
+
 	sassert(q->freewaiting==0);
 	sassert(q->fullwaiting==0);
 	for (qe = q->head ; qe ; qe = qen) {
