@@ -598,7 +598,8 @@ void worker_write_init(ChunkserverEntry *eptr, const uint8_t *data,
 				                               legacy_chain);
 				eptr->chunkType = legacy_type;
 				for (const auto &address : legacy_chain) {
-					chain.push_back(ChunkTypeWithAddress(address, eptr->chunkType, kFirstXorVersion));
+					chain.emplace_back(address, eptr->chunkType,
+					                   kFirstXorVersion);
 				}
 			}
 		} else {
@@ -606,7 +607,9 @@ void worker_write_init(ChunkserverEntry *eptr, const uint8_t *data,
 			deserializeAllLegacyPacketDataNoHeader(data, length,
 				eptr->chunkId, eptr->chunkVersion, legacyChain);
 			for (const auto &address : legacyChain) {
-				chain.push_back(ChunkTypeWithAddress(address, slice_traits::standard::ChunkPartType(), kStdVersion));
+				chain.emplace_back(address,
+				                   slice_traits::standard::ChunkPartType(),
+				                   kStdVersion);
 			}
 			eptr->chunkType = slice_traits::standard::ChunkPartType();
 		}
@@ -1603,12 +1606,8 @@ void NetworkWorkerThread::preparePollFds() {
 	LOG_AVG_TILL_END_OF_SCOPE0("preparePollFds");
 	TRACETHIS();
 	pdesc.clear();
-	pdesc.emplace_back();
-	pdesc.back().fd = notify_pipe[0];
-	pdesc.back().events = POLLIN;
-	pdesc.emplace_back();
-	pdesc.back().fd = bgJobPoolWakeUpFd_;
-	pdesc.back().events = POLLIN;
+	pdesc.emplace_back(pollfd(notify_pipe[0], POLLIN, 0));
+	pdesc.emplace_back(pollfd(bgJobPoolWakeUpFd_, POLLIN, 0));
 	sassert(JOB_FD_PDESC_POS == (pdesc.size() - 1));
 
 	std::unique_lock lock(csservheadLock);
@@ -1620,9 +1619,7 @@ void NetworkWorkerThread::preparePollFds() {
 			case ChunkserverEntry::State::Read:
 			case ChunkserverEntry::State::GetBlock:
 			case ChunkserverEntry::State::WriteLast:
-				pdesc.emplace_back();
-				pdesc.back().fd = entry.sock;
-				pdesc.back().events = 0;
+				pdesc.emplace_back(pollfd(entry.sock, 0, 0));
 				entry.pDescPos = pdesc.size() - 1;
 				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
@@ -1632,31 +1629,23 @@ void NetworkWorkerThread::preparePollFds() {
 				}
 				break;
 			case ChunkserverEntry::State::Connecting:
-				pdesc.emplace_back();
-				pdesc.back().fd = entry.fwdSocket;
-				pdesc.back().events = POLLOUT;
+				pdesc.emplace_back(pollfd(entry.fwdSocket, POLLOUT, 0));
 				entry.fwdPDescPos = pdesc.size() - 1;
 				break;
 			case ChunkserverEntry::State::WriteInit:
 				if (entry.fwdBytesLeft > 0) {
-					pdesc.emplace_back();
-					pdesc.back().fd = entry.fwdSocket;
-					pdesc.back().events = POLLOUT;
+					pdesc.emplace_back(pollfd(entry.fwdSocket, POLLOUT, 0));
 					entry.fwdPDescPos = pdesc.size() - 1;
 				}
 				break;
 			case ChunkserverEntry::State::WriteForward:
-				pdesc.emplace_back();
-				pdesc.back().fd = entry.fwdSocket;
-				pdesc.back().events = POLLIN;
+				pdesc.emplace_back(pollfd(entry.fwdSocket, POLLIN, 0));
 				entry.fwdPDescPos = pdesc.size() - 1;
 				if (entry.fwdBytesLeft > 0) {
 					pdesc.back().events |= POLLOUT;
 				}
 
-				pdesc.emplace_back();
-				pdesc.back().fd = entry.sock;
-				pdesc.back().events = 0;
+				pdesc.emplace_back(pollfd(entry.sock, 0, 0));
 				entry.pDescPos = pdesc.size() - 1;
 				if (entry.inputPacket.bytesLeft > 0) {
 					pdesc.back().events |= POLLIN;
@@ -1667,9 +1656,7 @@ void NetworkWorkerThread::preparePollFds() {
 				break;
 			case ChunkserverEntry::State::WriteFinish:
 				if (!entry.outputPackets.empty()) {
-					pdesc.emplace_back();
-					pdesc.back().fd = entry.sock;
-					pdesc.back().events = POLLOUT;
+					pdesc.emplace_back(pollfd(entry.sock, POLLOUT, 0));
 					entry.pDescPos = pdesc.size() - 1;
 				}
 				break;
