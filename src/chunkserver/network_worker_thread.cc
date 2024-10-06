@@ -153,8 +153,6 @@ std::unique_ptr<PacketStruct> worker_create_detached_packet_with_output_buffer(
 ChunkserverEntry::~ChunkserverEntry() {
 	if (sock >= 0) { tcpclose(sock); }
 	if (fwdSocket >= 0) { tcpclose(fwdSocket); }
-
-	outputPackets.clear();
 }
 
 void ChunkserverEntry::attachPacket(std::unique_ptr<PacketStruct> &&packet) {
