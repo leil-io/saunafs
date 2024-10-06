@@ -168,14 +168,206 @@ struct ChunkserverEntry {
 	ChunkserverEntry(ChunkserverEntry &&) = delete;
 	ChunkserverEntry &operator=(ChunkserverEntry &&) = delete;
 
-	/// Destructor: releases the sockets and packet resources.
+	/// Destructor: closes the sockets.
 	~ChunkserverEntry();
 
 	/// Attaches a packet to the output packet list (taking ownership).
 	inline void attachPacket(std::unique_ptr<PacketStruct> &&packet);
+
 	/// Preserves the inputPacket buffer into writePacket (to avoid copying it).
 	/// Used for write operations, where the data comes from the network.
 	inline void preserveInputPacket();
+
+	/// Creates an attached packet from the given vector.
+	/// The function takes ownership of the vector.
+	void createAttachedPacket(std::vector<uint8_t> &packet);
+
+	/// Creates an attached packet with the given type and operation size.
+	///
+	/// @param type The type of the packet.
+	/// @param opSize The size of the operation.
+	/// @return Pointer to the created packet data.
+	uint8_t *createAttachedPacket(uint32_t type, uint32_t operationSize);
+
+	/// Creates a detached packet with an output buffer.
+	/// @see OutputBufferPool
+	static std::unique_ptr<PacketStruct> createDetachedPacketWithOutputBuffer(
+	    const std::vector<uint8_t> &packetPrefix);
+
+	/// Handles forwarding errors by setting the appropriate error status and
+	/// transitioning the connection state to `WriteFinish`.
+	///
+	/// This function is called when an error occurs during forwarding
+	/// operations, such as read or write errors on the forwarding socket. It
+	/// serializes an error status message and attaches it to the packet, then
+	/// sets the state to `WriteFinish` to indicate that the connection should
+	/// be closed after sending the error status.
+	void fwdError();
+
+	/// Handles the event when a connection to another chunkserver is
+	/// successfully established.
+	///
+	/// This function is called when the connection to the next chunkserver in
+	/// the write chain is successfully established.
+	///
+	/// Typically invoked after a successful non-blocking connect operation.
+	///
+	/// \see ChunkserverEntry::retryConnect
+	void fwdConnected();
+
+	/// Reads data from the forwarding socket and processes it.
+	void fwdRead();
+
+	/// Writes data to the forwarding socket.
+	///
+	/// This function handles writing data to the forwarding socket
+	/// (`fwdSocket`). It attempts to write the remaining data in the
+	/// `fwdStartPtr` buffer to the socket.
+	///
+	/// This function is typically invoked when the forwarding socket is ready
+	/// for writing, as indicated by the `POLLOUT` event in the poll descriptor.
+	void fwdWrite();
+
+	/// Initiates the forwarding process for the current packet.
+	///
+	/// This function is responsible for initiating the forwarding process of
+	/// the current packet to the next chunkserver in the chain.
+	///
+	/// This function is typically called when a packet needs to be forwarded to
+	/// another chunkserver for further processing.
+	void forward();
+
+	/// Initializes the connection to the next chunkserver in the chain.
+	///
+	/// This function sets up the necessary parameters and state for
+	/// establishing a connection to the next chunkserver.
+	///
+	/// This function is typically called when a new connection needs to be made
+	/// to forward data to another chunkserver.
+	///
+	/// @return An integer status code indicating the success or failure of the
+	///         connection initialization. A return value of 0 indicates
+	///         success, while a non-zero value indicates an error.
+	int initConnection();
+
+	/// Attempts to re-establish a connection to the next chunkserver.
+	/// Implements a retry mechanism to ensure that the connection
+	/// is eventually established
+	void retryConnect();
+
+	/// Checks and processes the next packet in the input buffer.
+	void checkNextPacket();
+
+	/// Processes a received packet based on its type.
+	///
+	/// @param type The type of the packet.
+	/// @param data Pointer to the packet data.
+	/// @param length The length of the packet data.
+	void gotPacket(uint32_t type, const uint8_t *data, uint32_t length);
+
+	/* IDLE Operations */
+
+	/// Answers to a ping message with the given data and length.
+	void ping(const uint8_t *data, PacketHeader::Length length);
+
+	/// Initializes a read operation
+	///
+	/// @param data Pointer to the buffer containing the information to read.
+	/// @param type The type of the packet.
+	/// @param length The length of the packet data.
+	void readInit(const uint8_t *data, PacketHeader::Type type,
+	              PacketHeader::Length length);
+
+	/// Continues a previously started read operation.
+	///
+	/// Processes the remaining data to be read from the chunkserver. If all
+	/// data has been read, it sends a read status message and closes the chunk.
+	/// Otherwise, it prepares the next part of the read operation.
+	///
+	/// @see ChunkserverEntry::readInit
+	void readContinue();
+
+	/// Requests a data prefetch operation.
+	/// Prefetch in this context means reading data from the disk and storing it
+	/// in the page cache.
+	void prefetch(const uint8_t *data, PacketHeader::Type type,
+	              PacketHeader::Length length);
+
+	/// Callback for when a read operation finishes.
+	static void readFinishedCallback(uint8_t status, void *entry);
+	/// Callback after delayed close operations.
+	static void delayedCloseCallback(uint8_t status, void *entry);
+	/// Callback for when a write operation finishes.
+	static void writeFinishedCallback(uint8_t status, void *entry);
+	/// Callback for legacy chunk block retrieval completion.
+	static void sauGetChunkBlocksFinishedLegacyCallback(uint8_t status,
+	                                                    void *entry);
+	/// Callback for chunk block retrieval completion.
+	static void sauGetChunkBlocksFinishedCallback(uint8_t status, void *entry);
+	/// Callback for chunk block retrieval completion.
+	static void getChunkBlocksFinishedCallback(uint8_t status, void *entry);
+
+	/// Retrieves chunk blocks from the given information.
+	void getChunkBlocks(const uint8_t *data, uint32_t length);
+
+	/// Retrieves chunk blocks from the given information using the new way.
+	void sauGetChunkBlocks(const uint8_t *data, uint32_t length);
+
+	/// Retrieves the list with the HDDs information.
+	void hddListV2([[maybe_unused]] const uint8_t *data, uint32_t length);
+
+	/// Lists the disk groups (if the DiskManager supports it).
+	void listDiskGroups([[maybe_unused]] const uint8_t *data,
+	                    [[maybe_unused]] uint32_t length);
+
+	/// Generates a chart in PNG or CSV format.
+	void generateChartPNGorCSV(const uint8_t *data, uint32_t length);
+
+	/// Generates chart data.
+	void generateChartData(const uint8_t *data, uint32_t length);
+
+	/// Adds a chunk to the test queue for CRC checking.
+	/// Usually the master server sends this command after a client reports an
+	/// error in the CRC of a block.
+	void testChunk(const uint8_t *data, uint32_t length);
+
+	/// Initializes a write operation.
+	void writeInit(const uint8_t *data, PacketHeader::Type type,
+	               PacketHeader::Length length);
+
+	/* WriteLast or WriteForward*/
+
+	/// Writes a block of data to the drives.
+	void writeData(const uint8_t *data, PacketHeader::Type type,
+	               PacketHeader::Length length);
+
+	/// Finalizes a write operation and closes the chunk and connection.
+	void writeEnd(const uint8_t *data, uint32_t length);
+
+	/// Posts a write a status message to be sent through the network.
+	void writeStatus(const uint8_t *data, PacketHeader::Type type,
+	                 PacketHeader::Length length);
+
+	/* servePoll related */
+
+	/// Writes data from an output packet to the socket.
+	void writeToSocket();
+
+	/// Reads data from the socket into the input buffer.
+	void readFromSocket();
+	/// Checks if it is a read operation and tries to finish it.
+	void outputCheckReadFinished();
+	/// Indirectly sends a read status message if there is no more data to read.
+	void sendFinished();
+
+	/// Closes all active jobs and updates the state.
+	///
+	/// This function disables and changes the callback for any active read,
+	/// write, or get blocks jobs. If no jobs are active, it closes the chunk
+	/// and sets the state to `Closed`.
+	///
+	/// Called from the `NetworkWorkerThread` when a connection is closed.
+	void closeJobs();
 };
 
 class NetworkWorkerThread {
