@@ -1494,11 +1494,12 @@ void worker_write(ChunkserverEntry *eptr) {
 	TRACETHIS();
 	PacketStruct *pack = nullptr;
 	int32_t bytesWritten;
+
 	for (;;) {
+		if (eptr->outputPackets.empty()) { return; }
+
 		pack = eptr->outputPackets.front().get();
-		if (pack == nullptr) {
-			return;
-		}
+
 		if (pack->outputBuffer) {
 			size_t bytesInBufferBefore = pack->outputBuffer->bytesInABuffer();
 			OutputBuffer::WriteStatus ret = pack->outputBuffer->writeOutToAFileDescriptor(eptr->sock);
