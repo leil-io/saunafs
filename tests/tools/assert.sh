@@ -3,6 +3,9 @@
 # * assert_some_condition -- adds error to the test results and immediately stops the test
 # * assertlocal_some_condition -- adds error to the results and exits current subshell
 
+DEFAULT_ASSERT_TIMEOUT="15 seconds"
+: "${ASSERT_TIMEOUT:=$DEFAULT_ASSERT_TIMEOUT}"
+
 # (assert|assertlocal|expect)_program_installed <program>...
 assert_template_program_installed_() {
 	for program in "$@"; do
@@ -195,11 +198,7 @@ rescale_timeout_for_assert_eventually_() {
 	if [[ -n "$1" ]]; then
 		timeout_rescale "$1"
 	else
-		if valgrind_enabled; then
-			echo 60 seconds
-		else
-			echo 15 seconds
-		fi
+		timeout_rescale $ASSERT_TIMEOUT
 	fi
 }
 

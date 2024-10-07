@@ -81,26 +81,17 @@ timeout_get_multiplier() {
 	cat "$test_timeout_multiplier_file"
 }
 
-# takes as parameter timeout (e.g. '1 minute') and rescales it by valgrind multiplier
+# takes as parameter timeout (e.g. '1 minute') and rescales it by multiplier
 # prints result in seconds to standard output (e.g. '900 seconds')
 timeout_rescale() {
-	if valgrind_enabled; then
-		local multiplier=$(timeout_get_multiplier)
-		local value=$(($(date +%s -d "$1") - $(date +%s)))
-
-		echo $((value * multiplier)) seconds
-	else
-		echo "$1"
-	fi
+	local multiplier=$(timeout_get_multiplier)
+	local value=$(($(date +%s -d "$1") - $(date +%s)))
+	echo $((value * multiplier)) seconds
 }
 
-# takes as parameter timeout in seconds (e.g. '60') and rescales it by valgrind multiplier
+# takes as parameter timeout in seconds (e.g. '60') and rescales it by multiplier
 # prints result to standard output (e.g. '900')
 timeout_rescale_seconds() {
-	if valgrind_enabled; then
-		local multiplier=$(timeout_get_multiplier)
-		echo $(($1 * multiplier))
-	else
-		echo "$1"
-	fi
+	local multiplier=$(timeout_get_multiplier)
+	echo $(($1 * multiplier))
 }
