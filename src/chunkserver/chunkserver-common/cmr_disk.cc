@@ -2,7 +2,6 @@
 
 #include <sys/statvfs.h>
 #include <c++/13/iostream>
-#include <filesystem>
 
 #include "chunkserver-common/chunk_interface.h"
 #include "chunkserver-common/cmr_chunk.h"
