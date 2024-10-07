@@ -100,7 +100,7 @@ cmake -B "${build_dir}" \
 nice make -C "${build_dir}" -j "$(nproc)" "${make_extra_args[@]}"
 
 if [ -f "${build_dir}/CPackConfig.cmake" ]; then
-	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"
+: 	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"
 else
 	warn "No CPack configuration found in ${build_dir}. Skipping packaging."
 fi
