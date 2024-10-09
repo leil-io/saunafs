@@ -198,7 +198,7 @@ rescale_timeout_for_assert_eventually_() {
 	if [[ -n "$1" ]]; then
 		timeout_rescale "$1"
 	else
-		timeout_rescale $ASSERT_TIMEOUT
+		timeout_rescale "${ASSERT_TIMEOUT}"
 	fi
 }
 
