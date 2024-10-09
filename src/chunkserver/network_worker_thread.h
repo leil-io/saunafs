@@ -25,6 +25,7 @@
 #include <atomic>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <vector>
@@ -44,10 +45,9 @@
  * and an optional output buffer for writing data.
  */
 struct PacketStruct {
-	PacketStruct *next = nullptr;
 	uint8_t *startPtr = nullptr;
 	uint32_t bytesLeft = 0;
-	uint8_t *packet = nullptr;
+	std::vector<uint8_t> packet;
 	std::shared_ptr<OutputBuffer> outputBuffer;
 };
 
@@ -106,8 +106,8 @@ struct ChunkserverEntry {
 	int32_t pDescPos = -1;  ///< Position in the poll descriptors array
 	int32_t fwdPDescPos = -1;  ///< Position in poll descriptors for fwdSocket
 	uint32_t lastActivity = 0; ///< Last activity time
-	uint8_t headerBuffer[PacketHeader::kSize];  ///< buffer for packet header
-	uint8_t fwdHeaderBuffer[PacketHeader::kSize];  ///< buffer for fwd packet header
+	uint8_t headerBuffer[PacketHeader::kSize]{};  ///< buffer for packet header
+	uint8_t fwdHeaderBuffer[PacketHeader::kSize]{};  ///< fwd packet header buff
 	/// Stores the data of the incoming packet for processing
 	PacketStruct inputPacket;
 	uint8_t *fwdStartPtr = nullptr; ///< used for forwarding inputpacket data
@@ -115,10 +115,8 @@ struct ChunkserverEntry {
 	PacketStruct fwdInputPacket; ///< used for receiving status from fwdSocket
 	std::vector<uint8_t> fwdInitPacket; ///< used only for write initialization
 
-	/// Pointer to the head of the output packets list
-	PacketStruct *outputHead = nullptr;
-	/// Pointer to the tail of the output packets list
-	PacketStruct **outputTail = &outputHead;
+	/// List of output packets waiting to be sent to the clients
+	std::list<std::unique_ptr<PacketStruct>> outputPackets;
 
 	/* write */
 	uint32_t writeJobId = 0; ///< ID of the current write job being processed
@@ -139,8 +137,9 @@ struct ChunkserverEntry {
 	uint16_t getBlocksJobResult = 0; ///< Result of the get blocks job
 
 	/* common for read and write but meaning is different !!! */
-	void *readPacket = nullptr;
-	void *writePacket = nullptr;
+	std::unique_ptr<PacketStruct> readPacket = nullptr;
+	std::unique_ptr<PacketStruct> writePacket =
+	    std::make_unique<PacketStruct>();
 
 	uint8_t isChunkOpen = 0;
 	uint64_t chunkId = 0; // R+W
@@ -161,12 +160,22 @@ struct ChunkserverEntry {
 	    : workerJobPool(workerJobPool), sock(socket) {
 		inputPacket.bytesLeft = PacketHeader::kSize;
 		inputPacket.startPtr = headerBuffer;
-		inputPacket.packet = nullptr;
 	}
 
-	ChunkserverEntry(const ChunkserverEntry&) = delete;
-	ChunkserverEntry(ChunkserverEntry&&) = default;
-	ChunkserverEntry& operator=(const ChunkserverEntry&) = delete;
+	// Disallow copying and moving to avoid misuse.
+	ChunkserverEntry(const ChunkserverEntry &) = delete;
+	ChunkserverEntry &operator=(const ChunkserverEntry &) = delete;
+	ChunkserverEntry(ChunkserverEntry &&) = delete;
+	ChunkserverEntry &operator=(ChunkserverEntry &&) = delete;
+
+	/// Destructor: releases the sockets and packet resources.
+	~ChunkserverEntry();
+
+	/// Attaches a packet to the output packet list (taking ownership).
+	inline void attachPacket(std::unique_ptr<PacketStruct> &&packet);
+	/// Preserves the inputPacket buffer into writePacket (to avoid copying it).
+	/// Used for write operations, where the data comes from the network.
+	inline void preserveInputPacket();
 };
 
 class NetworkWorkerThread {
