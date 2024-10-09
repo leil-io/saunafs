@@ -54,6 +54,9 @@ public:
 	//! called by uRaft with new leader id.
 	virtual void     nodeLeader(int id);
 
+	//! called to check if floating ip is alive.
+	bool isFloatingIpAlive();
+
 protected:
 	void  checkCommandStatus(const boost::system::error_code &error);
 	void  checkNodeStatus(const boost::system::error_code &error);

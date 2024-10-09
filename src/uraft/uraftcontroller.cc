@@ -1,4 +1,5 @@
 #include "common/platform.h"
+#include "uraft.h"
 #include "uraftcontroller.h"
 
 #include <poll.h>
@@ -145,6 +146,21 @@ void uRaftController::nodeLeader(int id) {
 	syslog(LOG_NOTICE, "Node '%s' is now a leader.", name.c_str());
 }
 
+bool uRaftController::isFloatingIpAlive() {
+	std::vector<std::string> params = {"saunafs-uraft-helper",
+	                                   "is-floating-ip-alive"};
+	std::string result;
+
+	if (runCommand(params, result, opt_.check_cmd_status_period)) {
+		if (result == "alive" || result == "dead") { return result == "alive"; }
+		syslog(LOG_ERR, "Invalid floating IP status.");
+	} else {
+		syslog(LOG_WARNING, "is-floating-ip-alive timeout.");
+	}
+
+	return false;
+}
+
 /*! \brief Check promote/demote script status. */
 void uRaftController::checkCommandStatus(const boost::system::error_code &error) {
 	if (error) return;
@@ -212,6 +228,14 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 				}
 			}
 			node_alive_ = is_alive;
+		}
+
+		if (!isFloatingIpAlive()) {
+			if (state_.president) {
+				syslog(LOG_ERR, "Floating IP is not alive. Demoting leader.");
+				demoteLeader(); // Demote current leader and trigger a new election
+				nodeDemote();   // Restart metadata server and sync metadata version
+			}
 		}
 	}
 
