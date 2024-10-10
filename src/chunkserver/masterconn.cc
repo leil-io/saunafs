@@ -115,6 +115,10 @@ static uint32_t Timeout_ms;
 static void* reconnect_hook;
 static std::string gLabel;
 
+constexpr uint32_t kDefaultNumberOfWorkers = 10;
+constexpr uint32_t kMinNumberOfWorkers = 2;
+static uint32_t gNumberOfWorkers = kDefaultNumberOfWorkers;
+
 static uint64_t stats_bytesout=0;
 static uint64_t stats_bytesin=0;
 static uint32_t stats_maxjobscnt=0;
@@ -835,6 +839,9 @@ int masterconn_init(void) {
 //      BackLogsNumber = cfg_getuint32("BACK_LOGS",50);
 	gEnableLoadFactor = cfg_getuint32("ENABLE_LOAD_FACTOR", 0);
 
+	gNumberOfWorkers = cfg_get_minvalue<uint32_t>(
+	    "MASTER_NR_OF_WORKERS", kDefaultNumberOfWorkers, kMinNumberOfWorkers);
+
 	if (!masterconn_load_label()) {
 		return -1;
 	}
@@ -860,9 +867,13 @@ int masterconn_init(void) {
 }
 
 int masterconn_init_threads(void) {
-	jpool = job_pool_new(10,BGJOBSCNT,&jobfd);
-	if (jpool==NULL) {
-		return -1;
-	}
+	jpool = job_pool_new(gNumberOfWorkers, BGJOBSCNT, &jobfd);
+
+	if (jpool == nullptr) { return -1; }
+
+	safs_pretty_syslog(LOG_INFO,
+	                   "master connection: %u background workers created",
+	                   gNumberOfWorkers);
+
 	return 0;
 }
