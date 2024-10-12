@@ -68,6 +68,10 @@ install(TARGETS safs_ping_pong RUNTIME DESTINATION ${BIN_SUBDIR})
 add_executable(readdir-unlink-test readdir_unlink_test.cc)
 install(TARGETS readdir-unlink-test RUNTIME DESTINATION ${BIN_SUBDIR})
 
+# big_session_metadata_benchmark test for testing sessions with large amount of files open
+add_executable(big-session-metadata-benchmark big_session_metadata_benchmark.cc)
+install(TARGETS big-session-metadata-benchmark RUNTIME DESTINATION ${BIN_SUBDIR})
+
 add_library(slow_chunk_scan SHARED slow_chunk_scan.c)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
   target_link_libraries(slow_chunk_scan dl)
