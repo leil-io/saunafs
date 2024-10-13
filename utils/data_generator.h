@@ -117,7 +117,8 @@ public:
 				if (actual_buffer[i] != proper_buffer[i]) {
 					std::stringstream ss;
 					ss << "(inode " << file_information.st_ino << ")"
-							<< " data mismatch at offset " << i << ", seed " << seed_ << ". Expected/actual:\n";
+					   << " data mismatch at offset " << current_offset + i
+					   << ", seed " << seed_ << ". Expected/actual:\n";
 					for (size_t j = i; j < (size_t)bytes_read && j < i + 32; ++j) {
 						ss << std::hex << std::setfill('0') << std::setw(2)
 								<< static_cast<int>(static_cast<unsigned char>(proper_buffer[j]))
