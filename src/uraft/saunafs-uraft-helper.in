@@ -151,6 +151,30 @@ saunafs_metadata_version() {
 	esac
 }
 
+is_ip_present() {
+	local ip="${1}"
+	local iface="${2:-}"
+	local -a ip_command_extra_args=()
+	if [ -n "${iface}" ]; then
+		ip_command_extra_args+=("dev" "${iface}")
+	fi
+	ip addr show "${ip_command_extra_args[@]}" | grep -wq -m1 "${ip}"
+}
+
+saunafs_is_floating_ip_present() {
+	load_config
+	if is_ip_present "${ipaddr}" "${iface}"; then
+		echo -n alive
+		return 0
+	fi
+	if [ -n "${ipaddr2}" ] && is_ip_present "${ipaddr2}" "${iface2}"; then
+		echo -n alive
+		return 0
+	fi
+	echo -n dead
+	return 1
+}
+
 saunafs_isalive() {
 	saunafs_master isalive
 	if [[ $? == 0 ]] ; then
@@ -196,6 +220,7 @@ print_help() {
 	echo "assign-ip"
 	echo "drop-ip"
 	echo "dead"
+	echo "is-floating-ip-alive"
 }
 
 case "$1" in
@@ -207,6 +232,7 @@ case "$1" in
 	assign-ip)         saunafs_assign_ip;;
 	drop-ip)           saunafs_drop_ip;;
 	dead)              saunafs_dead;;
+	is-floating-ip-alive) saunafs_is_floating_ip_present;;
 	*)                 print_help;;
 
 esac

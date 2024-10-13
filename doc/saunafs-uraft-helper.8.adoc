@@ -14,7 +14,7 @@ saunafs-uraft-helper
 
 *saunafs-uraft-helper* is a helper script, used internally by *saunafs-uraft*
 to manage nodes. The script should implement the following operations: isalive
-metadata-version quick-stop promote demote assign-ip drop-ip
+metadata-version quick-stop promote demote assign-ip drop-ip is-floating-ip-alive
 
 Except from *isalive*, this script should not be used on its own. If anyone
 needs special actions to be taken during *saunafs-uraft* management stages
