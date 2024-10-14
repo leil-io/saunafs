@@ -77,6 +77,7 @@
 #include "chunkserver-common/subfolder.h"
 #include "chunkserver/chartsdata.h"
 #include "chunkserver/chunk_filename_parser.h"
+#include "chunkserver/network_worker_thread.h"
 #include "common/cfg.h"
 #include "common/chunk_version_with_todel_flag.h"
 #include "common/crc.h"
