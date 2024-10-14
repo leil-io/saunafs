@@ -61,8 +61,6 @@
 #include "protocol/SFSCommunication.h"
 
 #define IDLE_CONNECTION_TIMEOUT 6
-#define IDHASHSIZE 256
-#define IDHASH(inode) (((inode)*0xB239FB71)%IDHASHSIZE)
 
 namespace {
 
@@ -80,7 +78,6 @@ struct inodedata {
 	int alterations_in_chain; // number of adherent blocks with different chunk ids in chain
 	std::condition_variable flushcond; // wait for !inqueue (flush)
 	std::condition_variable writecond; // wait for flushwaiting==0 (write)
-	inodedata *next;
 	std::unique_ptr<WriteChunkLocator> locator;
 	int newDataInChainPipe[2];
 	bool workerWaitingForData;
@@ -98,7 +95,6 @@ struct inodedata {
 			  inqueue(false),
 			  minimumBlocksToWrite(1),
 			  alterations_in_chain(),
-			  next(nullptr),
 			  workerWaitingForData(false) {
 #ifdef _WIN32
 		// We don't use inodeData->waitingworker and inodeData->pipe on Cygwin because
@@ -212,7 +208,10 @@ typedef std::unique_lock<std::mutex> Glock;
 static std::condition_variable fcbcond;
 static uint32_t fcbwaiting = 0;
 static int64_t freecacheblocks;
-static inodedata **idhash;
+
+// <inode, respective inodedata> and sorted by inode
+using InodeDataMap = std::map<uint32_t, inodedata *>;
+static InodeDataMap inodedataMap;
 
 static uint32_t gWriteWindowSize;
 static uint32_t gChunkserverTimeout_ms;
@@ -256,42 +255,32 @@ void write_cb_wait_for_block(inodedata* id, Glock& glock) {
 
 /* inode */
 
-inodedata* write_find_inodedata(uint32_t inode, Glock&) {
-	uint32_t idh = IDHASH(inode);
-	for (inodedata* id = idhash[idh]; id; id = id->next) {
-		if (id->inode == inode) {
-			return id;
-		}
+inodedata *write_find_inodedata(uint32_t inode, Glock &) {
+	if (inodedataMap.contains(inode)) {
+		return inodedataMap[inode];
 	}
 	return NULL;
 }
 
-inodedata* write_get_inodedata(uint32_t inode, Glock&) {
-	uint32_t idh = IDHASH(inode);
-	inodedata* id;
-	for (inodedata* id = idhash[idh]; id; id = id->next) {
-		if (id->inode == inode) {
-			return id;
-		}
+inodedata *write_get_inodedata(uint32_t inode, Glock &) {
+	if (inodedataMap.contains(inode)) {
+		return inodedataMap[inode];
 	}
-	id = new inodedata(inode);
-	id->next = idhash[idh];
-	idhash[idh] = id;
+	auto id = new inodedata(inode);
+	inodedataMap[inode] = id;
 	return id;
 }
 
-void write_free_inodedata(inodedata* fid, Glock&) {
-	uint32_t idh = IDHASH(fid->inode);
-	inodedata *id, **idp;
-	idp = &(idhash[idh]);
-	while ((id = *idp)) {
-		if (id == fid) {
-			*idp = id->next;
-			delete id;
-			return;
-		}
-		idp = &(id->next);
+void write_free_inodedata(inodedata *fid, Glock &) {
+	uint32_t inode = fid->inode;
+	if (!inodedataMap.contains(inode)) {
+		return;
 	}
+
+	auto id = inodedataMap[inode];
+	sassert(id == fid);
+	delete id;
+	inodedataMap.erase(inode);
 }
 
 /* delayed queue */
@@ -689,7 +678,6 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 		uint32_t writewindowsize, uint32_t chunkserverTimeout_ms, uint32_t cachePerInodePercentage) {
 	uint64_t cachebytecount = uint64_t(cachesize) * 1024 * 1024;
 	uint64_t cacheblockcount = (cachebytecount / SFSBLOCKSIZE);
-	uint32_t i;
 	pthread_attr_t thattr;
 
 	gChunkConnector.setSourceIp(fs_getsrcip());
@@ -702,11 +690,6 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 
 	freecacheblocks = cacheblockcount;
 	gCachePerInodePercentage = cachePerInodePercentage;
-
-	idhash = (inodedata**) malloc(sizeof(inodedata*) * IDHASHSIZE);
-	for (i = 0; i < IDHASHSIZE; i++) {
-		idhash[i] = NULL;
-	}
 
 	jqueue = queue_new(0);
 
@@ -724,7 +707,6 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 
 void write_data_term(void) {
 	uint32_t i;
-	inodedata *id, *idn;
 
 	{
 		Glock lock(gMutex);
@@ -738,13 +720,10 @@ void write_data_term(void) {
 	}
 	pthread_join(delayed_queue_worker_th, NULL);
 	queue_delete(jqueue, queue_deleter_delete<inodedata>);
-	for (i = 0; i < IDHASHSIZE; i++) {
-		for (id = idhash[i]; id; id = idn) {
-			idn = id->next;
-			delete id;
-		}
+	for (const auto &[_, id] : inodedataMap) {
+		delete id;
 	}
-	free(idhash);
+	inodedataMap.clear();
 }
 
 /* glock: UNLOCKED */

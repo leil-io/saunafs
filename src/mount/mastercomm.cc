@@ -74,12 +74,6 @@ struct threc {
 	threc *next;
 };
 
-typedef struct _acquired_file {
-	uint32_t inode;
-	uint32_t cnt;
-	struct _acquired_file *next;
-} acquired_file;
-
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
 #define DEFAULT_INPUT_BUFFSIZE 0x10000
 #define NO_DATA_RECEIVED_FROM_MASTER NULL
@@ -87,7 +81,9 @@ typedef struct _acquired_file {
 
 static threc *threchead=NULL;
 
-static acquired_file *afhead=NULL;
+// <inode, cnt> and sorted by inode
+using AcquiredFileMap = std::map<uint32_t, uint32_t>;
+static AcquiredFileMap acquiredFiles;
 
 static int fd;
 static bool disconnect;
@@ -214,42 +210,15 @@ static inline void setDisconnect(bool value) {
 }
 
 void fs_inc_acnt(uint32_t inode) {
-	acquired_file *afptr,**afpptr;
 	std::unique_lock<std::mutex> acquiredFileLock(acquiredFileMutex);
-	afpptr = &afhead;
-	while ((afptr=*afpptr)) {
-		if (afptr->inode==inode) {
-			afptr->cnt++;
-			return;
-		}
-		if (afptr->inode>inode) {
-			break;
-		}
-		afpptr = &(afptr->next);
-	}
-	afptr = (acquired_file*)malloc(sizeof(acquired_file));
-	afptr->inode = inode;
-	afptr->cnt = 1;
-	afptr->next = *afpptr;
-	*afpptr = afptr;
+	acquiredFiles[inode]++;
 }
 
 void fs_dec_acnt(uint32_t inode) {
-	acquired_file *afptr,**afpptr;
 	std::unique_lock<std::mutex> afLock(acquiredFileMutex);
-	afpptr = &afhead;
-	while ((afptr=*afpptr)) {
-		if (afptr->inode == inode) {
-			if (afptr->cnt<=1) {
-				*afpptr = afptr->next;
-				free(afptr);
-			} else {
-				afptr->cnt--;
-			}
-			return;
-		}
-		afpptr = &(afptr->next);
-	}
+	auto &cnt = acquiredFiles[inode];
+	cnt--;
+	if (cnt <= 0) { acquiredFiles.erase(inode); }
 }
 
 threc* fs_get_my_threc() {
@@ -1038,7 +1007,6 @@ void* fs_nop_thread(void *arg) {
 
 	uint8_t *ptr,hdr[12],*inodespacket;
 	int32_t inodesleng;
-	acquired_file *afptr;
 	int now;
 	uint32_t inodeswritecnt=0;
 	(void)arg;
@@ -1078,17 +1046,13 @@ void* fs_nop_thread(void *arg) {
 			if (++inodeswritecnt >= gInitParams.report_reserved_period) {
 				inodeswritecnt = 0;
 				std::unique_lock<std::mutex> asLock(acquiredFileMutex);
-				inodesleng=8;
-				for (afptr=afhead ; afptr ; afptr=afptr->next) {
-					//safs_pretty_syslog(LOG_NOTICE,"reserved inode: %" PRIu32,afptr->inode);
-					inodesleng+=4;
-				}
+				inodesleng = 8 + 4 * acquiredFiles.size();
 				inodespacket = (uint8_t*) malloc(inodesleng);
 				ptr = inodespacket;
 				put32bit(&ptr,CLTOMA_FUSE_RESERVED_INODES);
 				put32bit(&ptr,inodesleng-8);
-				for (afptr=afhead ; afptr ; afptr=afptr->next) {
-					put32bit(&ptr,afptr->inode);
+				for (const auto &[inode, _] : acquiredFiles) {
+					put32bit(&ptr, inode);
 				}
 				if (tcptowrite(fd,inodespacket,inodesleng,1000)!=inodesleng) {
 					disconnect = true;
@@ -1341,7 +1305,6 @@ void fs_init_threads(uint32_t retries) {
 
 void fs_term(void) {
 	threc *tr,*trn;
-	acquired_file *af,*afn;
 	std::unique_lock<std::mutex> fd_lock(fdMutex);
 	fterm = 1;
 	fd_lock.unlock();
@@ -1357,11 +1320,7 @@ void fs_term(void) {
 	threchead = nullptr;
 	rec_lock.unlock();
 	std::unique_lock<std::mutex> af_lock(acquiredFileMutex);
-	for (af = afhead ; af ; af = afn) {
-		afn = af->next;
-		free(af);
-	}
-	afhead = nullptr;
+	acquiredFiles.clear();
 	af_lock.unlock();
 	fd_lock.lock();
 	if (fd>=0) {

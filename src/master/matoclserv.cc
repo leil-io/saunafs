@@ -120,14 +120,10 @@ typedef struct chunklist {
 	struct chunklist *next;
 } chunklist;
 
-// opened files
-typedef struct filelist {
-	uint32_t inode;
-	struct filelist *next;
-} filelist;
-
 struct session {
 	typedef GenericLruCache<uint32_t, FsContext::GroupsContainer, 1024> GroupCache;
+
+	using OpenedFilesSet = std::set<uint32_t>;
 
 	uint32_t sessionid;
 	char *info;
@@ -150,7 +146,7 @@ struct session {
 	std::array<uint32_t,SESSION_STATS> currentopstats;
 	std::array<uint32_t,SESSION_STATS> lasthouropstats;
 	GroupCache group_cache;
-	filelist *openedfiles;
+	OpenedFilesSet openedfiles;
 	struct session *next;
 
 	session()
@@ -823,34 +819,21 @@ int matoclserv_load_sessions() {
 }
 #undef MFSSIGNATURE
 
-int matoclserv_insert_openfile(session* cr,uint32_t inode) {
-	filelist *ofptr,**ofpptr;
-	int status;
-
-	ofpptr = &(cr->openedfiles);
-	while ((ofptr=*ofpptr)) {
-		if (ofptr->inode==inode) {
-			return SAUNAFS_STATUS_OK;       // file already acquired - nothing to do
-		}
-		if (ofptr->inode>inode) {
-			break;
-		}
-		ofpptr = &(ofptr->next);
+int matoclserv_insert_openfile(session *cr, uint32_t inode) {
+	if (cr->openedfiles.contains(inode)) {
+		return SAUNAFS_STATUS_OK;  // file already acquired - nothing to do
 	}
-	status = fs_acquire(FsContext::getForMaster(eventloop_time()), inode, cr->sessionid);
-	if (status==SAUNAFS_STATUS_OK) {
-		ofptr = (filelist*)malloc(sizeof(filelist));
-		passert(ofptr);
-		ofptr->inode = inode;
-		ofptr->next = *ofpptr;
-		*ofpptr = ofptr;
+
+	int status = fs_acquire(FsContext::getForMaster(eventloop_time()), inode,
+	                        cr->sessionid);
+	if (status == SAUNAFS_STATUS_OK) {
+		cr->openedfiles.insert(inode);
 	}
 	return status;
 }
 
 void matoclserv_add_open_file(uint32_t sessionid,uint32_t inode) {
 	session *asesdata;
-	filelist *ofptr,**ofpptr;
 
 	for (asesdata = sessionshead ; asesdata && asesdata->sessionid!=sessionid; asesdata=asesdata->next) ;
 	if (asesdata==NULL) {
@@ -863,21 +846,10 @@ void matoclserv_add_open_file(uint32_t sessionid,uint32_t inode) {
 		sessionshead = asesdata;
 	}
 
-	ofpptr = &(asesdata->openedfiles);
-	while ((ofptr=*ofpptr)) {
-		if (ofptr->inode==inode) {
-			return;
-		}
-		if (ofptr->inode>inode) {
-			break;
-		}
-		ofpptr = &(ofptr->next);
+	if (asesdata->openedfiles.contains(inode)) {
+		return;  // file already open - nothing to do
 	}
-	ofptr = (filelist*)malloc(sizeof(filelist));
-	passert(ofptr);
-	ofptr->inode = inode;
-	ofptr->next = *ofpptr;
-	*ofpptr = ofptr;
+	asesdata->openedfiles.insert(inode);
 }
 
 void matoclserv_remove_open_file(uint32_t sessionid, uint32_t inode) {
@@ -890,15 +862,8 @@ void matoclserv_remove_open_file(uint32_t sessionid, uint32_t inode) {
 		return;
 	}
 
-	filelist *ofptr = NULL;
-	filelist** ofpptr = &(asesdata->openedfiles);
-	while ((ofptr = *ofpptr)) {
-		if (ofptr->inode == inode) {
-			*ofpptr = ofptr->next;
-			free(ofptr);
-			break;
-		}
-		ofpptr = &(ofptr->next);
+	if (asesdata->openedfiles.contains(inode)) {
+		asesdata->openedfiles.erase(inode);
 	}
 }
 
@@ -1936,8 +1901,6 @@ void matoclserv_register_config(matoclserventry *eptr, const uint8_t *data,
 
 void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	const uint8_t *ptr;
-	filelist *ofptr,**ofpptr;
-	uint32_t inode;
 
 	if ((length&0x3)!=0) {
 		safs_pretty_syslog(LOG_NOTICE,"CLTOMA_FUSE_RESERVED_INODES - wrong size (%" PRIu32 "/N*4)",length);
@@ -1946,67 +1909,37 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 	}
 
 	ptr = data;
-	ofpptr = &(eptr->sesdata->openedfiles);
 	length >>= 2;
-	if (length) {
+	std::set<uint32_t> inodes_to_reserve;
+	// read in advance all the files to reserve
+	while (length) {
 		length--;
-		inode = get32bit(&ptr);
-	} else {
-		inode=0;
+		inodes_to_reserve.insert(get32bit(&ptr));
 	}
 
 	FsContext context = FsContext::getForMaster(eventloop_time());
 	changelog_disable_flush();
-	while ((ofptr=*ofpptr) && inode>0) {
-		if (ofptr->inode<inode) {
-			fs_release(context, ofptr->inode, eptr->sesdata->sessionid);
-			*ofpptr = ofptr->next;
-			free(ofptr);
-		} else if (ofptr->inode>inode) {
-			if (fs_acquire(context, inode, eptr->sesdata->sessionid) == SAUNAFS_STATUS_OK) {
-				ofptr = (filelist*)malloc(sizeof(filelist));
-				passert(ofptr);
-				ofptr->next = *ofpptr;
-				ofptr->inode = inode;
-				*ofpptr = ofptr;
-				ofpptr = &(ofptr->next);
-			}
-			if (length) {
-				length--;
-				inode = get32bit(&ptr);
-			} else {
-				inode=0;
-			}
+	auto it = eptr->sesdata->openedfiles.begin();
+	while (it != eptr->sesdata->openedfiles.end()) {
+		uint32_t openFileIno = *it;
+		if (!inodes_to_reserve.contains(openFileIno)) { 
+			// erase files not belonging to the reserve inodes list provided
+			fs_release(context, openFileIno, eptr->sesdata->sessionid);
+			it = eptr->sesdata->openedfiles.erase(it);
 		} else {
-			ofpptr = &(ofptr->next);
-			if (length) {
-				length--;
-				inode = get32bit(&ptr);
-			} else {
-				inode=0;
-			}
+			// skip files already in session
+			it++;
+			// no need to remind this file as reserved, as it is already open
+			inodes_to_reserve.erase(openFileIno);
 		}
 	}
-	while (inode>0) {
-		if (fs_acquire(context, inode, eptr->sesdata->sessionid) == SAUNAFS_STATUS_OK) {
-			ofptr = (filelist*)malloc(sizeof(filelist));
-			passert(ofptr);
-			ofptr->next = *ofpptr;
-			ofptr->inode = inode;
-			*ofpptr = ofptr;
-			ofpptr = &(ofptr->next);
+
+	for (const auto &inode_to_reserve : inodes_to_reserve) {
+		if (fs_acquire(context, inode_to_reserve, eptr->sesdata->sessionid) ==
+		    SAUNAFS_STATUS_OK) {
+			// Insert reserved inodes into the opened files set
+			eptr->sesdata->openedfiles.insert(inode_to_reserve);
 		}
-		if (length) {
-			length--;
-			inode = get32bit(&ptr);
-		} else {
-			inode=0;
-		}
-	}
-	while ((ofptr=*ofpptr)) {
-		fs_release(context, ofptr->inode, eptr->sesdata->sessionid);
-		*ofpptr = ofptr->next;
-		free(ofptr);
 	}
 	changelog_enable_flush();
 }
@@ -4638,23 +4571,16 @@ void matocl_locks_release(const FsContext &context, uint32_t inode, uint32_t ses
 }
 
 void matocl_close_files(session *sesdata) {
-	filelist *fl = sesdata->openedfiles;
-	filelist *next_fl = fl;
 	FsContext context = FsContext::getForMaster(eventloop_time());
-	while (next_fl) {
-		fl = next_fl;
-		next_fl = fl->next;
-		fs_release(context, fl->inode, sesdata->sessionid);
-		matocl_locks_release(context, fl->inode, sesdata->sessionid);
-		free(fl);
+	for (const auto &openFileInode : sesdata->openedfiles) {
+		fs_release(context, openFileInode, sesdata->sessionid);
+		matocl_locks_release(context, openFileInode, sesdata->sessionid);
 	}
-	sesdata->openedfiles=NULL;
+	sesdata->openedfiles.clear();
 }
 
 uint32_t session_number_of_files(session *sess) {
-	uint32_t count = 0;
-	for (auto *file = sess->openedfiles; file; file = file->next, count++) {}
-	return count;
+	return sess->openedfiles.size();
 }
 
 void matoclserv_session_files(matoclserventry *eptr,
@@ -5762,10 +5688,7 @@ int matoclserv_networkinit(void) {
 void matoclserv_session_unload(void) {
 	for (session* ss = sessionshead, *ssn = NULL; ss ; ss = ssn) {
 		ssn = ss->next;
-		for (filelist* of = ss->openedfiles, *ofn = NULL; of; of = ofn) {
-			ofn = of->next;
-			free(of);
-		}
+		ss->openedfiles.clear();
 		if (ss->info) {
 			free(ss->info);
 		}
