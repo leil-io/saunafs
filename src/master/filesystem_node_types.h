@@ -33,7 +33,7 @@
 #include "common/goal.h"
 #include "common/compact_vector.h"
 
-#ifdef SAUNAFS_HAVE_64BIT_JUDY
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
 #  include "common/judy_map.h"
 #else
 #  include <map>
@@ -194,7 +194,7 @@ struct FSNodeDevice : public FSNode {
  * Avg size (10 files) ~ 280B (28B per file)
  */
 struct FSNodeDirectory : public FSNode {
-#ifdef SAUNAFS_HAVE_64BIT_JUDY
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
 	typedef judy_map<hstorage::Handle, FSNode *> EntriesContainer;
 #else
 	struct HandleCompare {
@@ -343,7 +343,7 @@ struct TrashPathKey {
 #endif
 };
 
-#ifdef SAUNAFS_HAVE_64BIT_JUDY
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
 typedef judy_map<TrashPathKey, hstorage::Handle> TrashPathContainer;
 typedef judy_map<uint32_t, hstorage::Handle> ReservedPathContainer;
 #else

@@ -758,7 +758,7 @@ void fsnodes_getdetacheddata(const TrashPathContainer &data, uint8_t *dbuff)
 }
 
 void fsnodes_getdetacheddata(const TrashPathContainer &data, uint32_t off, uint32_t max_entries, std::vector<NamedInodeEntry> &entries) {
-#ifdef SAUNAFS_HAVE_64BIT_JUDY
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
 	auto it = data.find_nth(off);
 #else
 	auto it = off < data.size() ? std::next(data.begin(), off) : data.end();
@@ -777,7 +777,7 @@ void fsnodes_getdetacheddata(const ReservedPathContainer &data, uint8_t *dbuff) 
 }
 
 void fsnodes_getdetacheddata(const ReservedPathContainer &data, uint32_t off, uint32_t max_entries, std::vector<NamedInodeEntry> &entries) {
-#ifdef SAUNAFS_HAVE_64BIT_JUDY
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
 	auto it = data.find_nth(off);
 #else
 	auto it = off < data.size() ? std::next(data.begin(), off) : data.end();
