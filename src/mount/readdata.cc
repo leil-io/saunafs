@@ -72,7 +72,6 @@ std::unique_ptr<IMemoryInfo> createMemoryInfo() {
 std::unique_ptr<IMemoryInfo> gMemoryInfo = createMemoryInfo();
 
 bool readShouldWaitForSystemMemory(size_t bytesToReadLeft) {
-	std::lock_guard lock(gUsedReadCacheMemoryMutex);
 	uint64_t avalaibleSystemMemory = gMemoryInfo->getAvailableMemory();
 	uint64_t virtualReadCacheAvailableMemory =
 		gReadCacheMaxSize.load() - gUsedReadCacheMemory;
@@ -80,9 +79,12 @@ bool readShouldWaitForSystemMemory(size_t bytesToReadLeft) {
 			bytesToReadLeft > avalaibleSystemMemory;
 }
 
-void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
-	std::lock_guard lock(gUsedReadCacheMemoryMutex);
+inline void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
 	gUsedReadCacheMemory += bytesToReadLeft;
+}
+
+inline void decreaseUsedReadCacheMemory(size_t bytesToReadLeft) {
+	gUsedReadCacheMemory -= bytesToReadLeft;
 }
 
 uint32_t getBytesToBeReadFromCS(uint32_t index, uint32_t offset, uint32_t size,
@@ -631,6 +633,9 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 
 	bool force_prepare = (rrec->refreshCounter == REFRESHTICKS);
 
+	uint32_t total_read_cache_bytes_to_reserve = 0,
+	         last_read_cache_bytes_to_reserve = 0;
+
 	while (bytes_to_read > 0) {
 		Timeout sleep_timeout = Timeout(std::chrono::milliseconds(sleep_time_ms));
 		// Increase communicationTimeout to sleepTime; longer poll() can't be worse
@@ -664,6 +669,8 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 				    "Not enough read cache memory available for reading");
 			}
 			increaseUsedReadCacheMemory(read_cache_bytes_to_reserve);
+			last_read_cache_bytes_to_reserve = read_cache_bytes_to_reserve;
+			total_read_cache_bytes_to_reserve += read_cache_bytes_to_reserve;
 			lock.unlock();
 			uint32_t bytes_read_from_chunk = reader.readData(
 					read_buffer, offset_in_chunk, size_in_chunk,
@@ -680,6 +687,9 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			try_counter = 0;
 		} catch (UnrecoverableReadException &ex) {
 			print_error_msg(reader, try_counter, ex);
+			std::unique_lock lock(gReadCacheMemoryMutex);
+			decreaseUsedReadCacheMemory(total_read_cache_bytes_to_reserve);
+			lock.unlock();
 			if (ex.status() == SAUNAFS_ERROR_ENOENT) {
 				return SAUNAFS_ERROR_EBADF; // stale handle
 			} else {
@@ -691,8 +701,20 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			}
 			force_prepare = true;
 			if (try_counter > maxRetries) {
+				std::unique_lock lock(gReadCacheMemoryMutex);
+				decreaseUsedReadCacheMemory(total_read_cache_bytes_to_reserve);
+				lock.unlock();
 				return SAUNAFS_ERROR_IO;
 			} else {
+				std::unique_lock lock(gReadCacheMemoryMutex);
+				decreaseUsedReadCacheMemory(last_read_cache_bytes_to_reserve);
+				total_read_cache_bytes_to_reserve -= last_read_cache_bytes_to_reserve;
+				lock.unlock();
+				if (strcmp(ex.what(), "Not enough read cache memory available for reading") == 0) {
+					std::unique_lock inodeLock(rrec->mutex);
+					rrec->cache.collectGarbage();
+					inodeLock.unlock();
+				}
 				usleep(sleep_timeout.remaining_us());
 				sleep_time_ms = read_data_sleep_time_ms(try_counter);
 			}
