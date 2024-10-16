@@ -162,8 +162,8 @@ disables cache (default: 1000).
 *-o readaheadmaxwindowsize=*'KB'::
 Set max value of readahead window per single descriptor in kibibytes (default: 16384).
 
-*-o readcachemaxsize=*'MB'::
-Set max value of read cache size in mebibytes (default: 16384).
+*-o readcachemaxsizepercentage=*'P'::
+Set percentage of system memory used for max value of read cache size (default: 60%).
 
 *-o readworkers=*'N'::
 Define number of read workers (default: 30).

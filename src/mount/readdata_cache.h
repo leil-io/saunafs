@@ -282,6 +282,19 @@ public:
 		assert(reserved_entries_.empty());
 	}
 
+	void collectGarbage(unsigned count = 1000000) {
+		unsigned reserved_count = count;
+		while (!lru_.empty() && count-- > 0) {
+			Entry *e = std::addressof(lru_.front());
+			if (e->expired(expiration_time_) && e->done) {
+				erase(entries_.iterator_to(*e));
+			} else {
+				break;
+			}
+		}
+		clearReserved(reserved_count);
+	}
+
 	/*!
 	 * \brief Try to get data from cache.
 	 *
@@ -388,19 +401,6 @@ protected:
 		lru_.push_back(*e);
 		assert(entries_.find(*e) == entries_.end());
 		return entries_.insert(it, *e);
-	}
-
-	void collectGarbage(unsigned count = 4) {
-		unsigned reserved_count = count;
-		while (!lru_.empty() && count-- > 0) {
-			Entry *e = std::addressof(lru_.front());
-			if (e->expired(expiration_time_) && e->done) {
-				erase(entries_.iterator_to(*e));
-			} else {
-				break;
-			}
-		}
-		clearReserved(reserved_count);
 	}
 
 	EntrySet::iterator erase(EntrySet::iterator it) {
