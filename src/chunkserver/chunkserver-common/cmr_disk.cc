@@ -1,7 +1,6 @@
 #include "cmr_disk.h"
 
 #include <sys/statvfs.h>
-#include <iostream>
 
 #include "chunkserver-common/chunk_interface.h"
 #include "chunkserver-common/cmr_chunk.h"
