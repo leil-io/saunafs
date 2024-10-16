@@ -27,12 +27,25 @@
 #include <set>
 #include <vector>
 
+#include "chunkserver-common/disk_utils.h"
+#include "chunkserver/aligned_allocator.h"
 #include "chunkserver/output_buffer.h"
 #include "common/chunk_part_type.h"
 #include "common/network_address.h"
 #include "common/slice_traits.h"
-#include "protocol/packet.h"
 #include "devtools/request_log.h"
+#include "protocol/cltocs.h"
+
+using AlignedVectorForIO =
+    std::vector<uint8_t, AlignedAllocator<uint8_t, disk::kIoBlockSize>>;
+
+// 4 K + 64 K
+// [4K    ....   HEADER]+[Up to SFSBLOCKSIZE of aligned data              ...]
+constexpr uint32_t kIOAlignedPacketSize = disk::kIoBlockSize + SFSBLOCKSIZE;
+
+// Starting point to have the data aligned to 4 K
+constexpr uint32_t kIOAlignedOffset =
+    disk::kIoBlockSize - cltocs::writeData::kPrefixSize;
 
 /**
  * @brief Encapsulates the data associated with a packet.
@@ -43,7 +56,12 @@
 struct PacketStruct {
 	uint8_t *startPtr = nullptr;
 	uint32_t bytesLeft = 0;
+
 	std::vector<uint8_t> packet;
+
+	bool useAlignedMemory = false;
+	AlignedVectorForIO alignedBuffer;
+
 	std::shared_ptr<OutputBuffer> outputBuffer;
 };
 
