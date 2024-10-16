@@ -8,9 +8,11 @@
 #include "chunkserver-common/hdd_stats.h"
 #include "chunkserver-common/subfolder.h"
 #include "common/crc.h"
-#include "errors/saunafs_error_codes.h"
 #include "devtools/TracePrinter.h"
 #include "devtools/request_log.h"
+#include "errors/saunafs_error_codes.h"
+
+#include "chunk_trash_manager.h"
 
 CmrDisk::CmrDisk(const std::string &_metaPath, const std::string &_dataPath,
                  bool _isMarkedForRemoval, bool _isZonedDevice)
@@ -26,9 +28,14 @@ void CmrDisk::createPathsAndSubfolders() {
 
 	if (!isMarkedForDeletion()) {
 		ret &= (::mkdir(metaPath().c_str(), mode) == 0);
+		ret &= (::mkdir((std::filesystem::path(metaPath()) /
+		                 ChunkTrashManager::kTrashDirname).c_str(), mode) == 0);
 
 		if (dataPath() != metaPath()) {
 			ret &= (::mkdir(dataPath().c_str(), mode) == 0);
+			ret &= (::mkdir((std::filesystem::path(dataPath()) /
+			                 ChunkTrashManager::kTrashDirname).c_str(), mode)
+			        == 0);
 		}
 
 		for (uint32_t i = 0; i < Subfolder::kNumberOfSubfolders; ++i) {
@@ -173,17 +180,37 @@ void CmrDisk::open(IChunk *chunk) {
 }
 
 int CmrDisk::unlinkChunk(IChunk *chunk) {
-	int result = 0;
+	// Get absolute paths for meta and data files
+	const std::filesystem::path metaFile = chunk->metaFilename();
+	const std::filesystem::path dataFile = chunk->dataFilename();
 
-	if (::unlink(chunk->metaFilename().c_str()) != 0) {
-		result = -1;
+	// Use the metaPath() and dataPath() to get the disk paths
+	const std::string metaDiskPath = metaPath();
+	const std::string dataDiskPath = dataPath();
+
+	// Ensure we found a valid disk path
+	if (metaDiskPath.empty() || dataDiskPath.empty()) {
+		safs_pretty_errlog(LOG_ERR, "Error finding disk path for chunk: %s",
+		                   chunk->metaFilename().c_str());
+		return SAUNAFS_ERROR_ENOENT;
 	}
 
-	if (::unlink(chunk->dataFilename().c_str()) != 0) {
-		result = -1;
+	// Create a deletion timestamp
+	const std::string deletionTime = ChunkTrashManager::getDeletionTimeString();
+
+	// Move meta file to trash
+	int result = ChunkTrashManager::moveToTrash(metaFile, metaDiskPath, deletionTime);
+	if (result != SAUNAFS_STATUS_OK) {
+		return result;
 	}
 
-	return result;
+	// Move data file to trash
+	result = ChunkTrashManager::moveToTrash(dataFile, dataDiskPath, deletionTime);
+	if (result != SAUNAFS_STATUS_OK) {
+		return result;
+	}
+
+	return SAUNAFS_STATUS_OK;
 }
 
 int CmrDisk::ftruncateData(IChunk *chunk, uint64_t size) {
