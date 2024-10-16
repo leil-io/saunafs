@@ -61,7 +61,7 @@ if ! touch "$TEMP_DIR/check_tmp_dir" || ! rm "$TEMP_DIR/check_tmp_dir"; then
 	exit 1
 fi
 
-# This function shold be called just after test_fail is able to work
+# This function should be called just after test_fail is able to work
 check_configuration() {
 	for prog in \
 		$SAUNAFS_ROOT/sbin/{sfsmaster,sfschunkserver} \

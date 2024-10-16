@@ -137,7 +137,7 @@ assert_template_eventually_() {
 	local command=$1
 	local timeout=$(rescale_timeout_for_assert_eventually_ "${2:-}")
 	if ! wait_for "$command" "$timeout"; then
-		$FAIL_FUNCTION "'$command' didn't succedd within $timeout"
+		$FAIL_FUNCTION "'$command' didn't succeed within $timeout"
 	fi
 }
 

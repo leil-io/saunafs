@@ -29,7 +29,7 @@
  */
 void normalize_argument_casing(char *arg) {
 	// A single argument looks like this: arg1=val1,arg2=val2,...,argn=valn
-	// So, case change should be applied at the begining and between a comma
+	// So, case change should be applied at the beginning and between a comma
 	// appearance and the next equal sign
 
 	std::string argument(arg);

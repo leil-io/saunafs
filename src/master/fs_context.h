@@ -251,7 +251,7 @@ public:
 	}
 
 	/**
-	 * Returns timestap.
+	 * Returns timestamp.
 	 * This is a timestamp of any operations performed in this context.
 	 */
 	uint32_t ts() const {

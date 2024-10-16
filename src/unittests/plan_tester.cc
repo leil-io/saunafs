@@ -36,7 +36,7 @@ namespace unittests {
  * \param data Vector with chunkserver data.
  * \param offset Offset with position of data in \param data vector that should be read.
  * \param size Size of data to read.
- * \return 0 on succes
+ * \return 0 on success
  *         -1 on failure
  */
 int ReadPlanTester::readDataFromChunkServer(std::vector<uint8_t> &output, int output_offset,
@@ -59,7 +59,7 @@ int ReadPlanTester::readDataFromChunkServer(std::vector<uint8_t> &output, int ou
  * \param write_buffer_offset Offset where data should be stored in output_buffer_ vector.
  * \param available_data Map with data for each chunk part type.
  * \param op Structure describing requested read operation.
- * \return 0 on succes
+ * \return 0 on success
  *         -1 on failure
  */
 int ReadPlanTester::startReadOperation(int write_buffer_offset,

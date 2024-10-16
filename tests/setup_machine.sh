@@ -37,7 +37,7 @@ fi
 
 if grep -q 'saunafstest_loop' /etc/fstab; then
 	if [[ "${1}" != "setup-force" ]]; then
-		echo 'The machine is at least partialy configured'
+		echo 'The machine is at least partially configured'
 		echo 'Run revert-setup-machine.sh to revert the current configuration'
 		exit 1
 	fi
