@@ -132,6 +132,11 @@ void fs_dumpedgelist(FSNodeDirectory *parent) {
 	for (const auto &entry : parent->entries) {
 		fs_dumpedge(parent, entry.second, (std::string)entry.first);
 	}
+	if (parent->case_insensitive) {
+		for (const auto &entry : parent->lowerCaseEntries) {
+			fs_dumpedge(parent, entry.second, (std::string)entry.first);
+		}
+	}
 }
 
 void fs_dumpedgelist(const TrashPathContainer &data) {
@@ -154,6 +159,14 @@ void fs_dumpedges(FSNodeDirectory *parent) {
 		FSNode *child = entry.second;
 		if (child->type == FSNode::kDirectory) {
 			fs_dumpedges(static_cast<FSNodeDirectory*>(child));
+		}
+	}
+	if (parent->case_insensitive) {
+		for (const auto &entry : parent->lowerCaseEntries) {
+			FSNode *child = entry.second;
+			if (child->type == FSNode::kDirectory) {
+				fs_dumpedges(static_cast<FSNodeDirectory *>(child));
+			}
 		}
 	}
 }

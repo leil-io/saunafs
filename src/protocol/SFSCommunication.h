@@ -185,6 +185,7 @@
 #define SESFLAG_MAPALL            0x10  // all users (except root) are mapped to specific uid and gid
 #define SESFLAG_NOMASTERPERMCHECK 0x20  // disable permission checks in master server
 #define SESFLAG_NONROOTMETA       0x40  // allow non-root users to use filesystem mounted in the meta mode
+#define SESFLAG_CASEINSENSITIVE   0x80  // allow specified folder to behave as case insensitive when dealing with file and folder names
 
 #define SESFLAG_POS_STRINGS \
 	"read-only", \
