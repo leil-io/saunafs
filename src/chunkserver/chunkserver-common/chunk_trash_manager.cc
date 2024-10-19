@@ -16,40 +16,29 @@
    along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <memory>
+
 #include "chunk_trash_manager.h"
-#include "errors/saunafs_error_codes.h"
+#include "chunk_trash_manager_impl.h"
 
-std::string ChunkTrashManager::getDeletionTimeString() {
-	const std::time_t nowTime = std::time(nullptr);
-	std::tm* utcTime = std::gmtime(&nowTime);  // Convert to UTC
+ChunkTrashManager::ChunkTrashManager() : pImpl(
+		std::make_unique<ChunkTrashManagerImpl>()) {}
 
-	std::ostringstream oss;
-	oss << std::put_time(utcTime, "%Y%m%d%H%M%S");
-	return oss.str();
+ChunkTrashManager &ChunkTrashManager::instance() {
+	static ChunkTrashManager instance;
+	return instance;
 }
 
 int ChunkTrashManager::moveToTrash(const std::filesystem::path &filePath,
                                    const std::filesystem::path &diskPath,
-                                   const std::string &deletionTime) {
-	if (!std::filesystem::exists(filePath)) {
-		return SAUNAFS_ERROR_ENOENT;
-	}
+                                   const std::time_t &deletionTime) {
+	return pImpl->moveToTrash(filePath, diskPath, deletionTime);
+}
 
-	const std::filesystem::path trashDir = diskPath / kTrashDirname;
-	std::filesystem::create_directories(trashDir);
+void ChunkTrashManager::init(const std::string &diskPath) {
+	pImpl->init(diskPath);
+}
 
-	if (!filePath.string().starts_with(diskPath.string())) {
-		return SAUNAFS_ERROR_EINVAL;
-	}
-
-	const std::filesystem::path trashPath =
-			trashDir / (filePath.filename().string() + "." + deletionTime);
-
-	try {
-		std::filesystem::rename(filePath, trashPath);
-	} catch (const std::filesystem::filesystem_error &e) {
-		return SAUNAFS_ERROR_IO;
-	}
-
-	return SAUNAFS_STATUS_OK;
+void ChunkTrashManager::collectGarbage() {
+	pImpl->collectGarbage();
 }

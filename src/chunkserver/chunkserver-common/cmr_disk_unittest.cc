@@ -86,7 +86,6 @@ protected:
 };
 
 std::filesystem::path CmrDiskTest::testDir;
-
 TEST_F(CmrDiskTest, UnlinkChunkSuccessful) {
 	// Create a dummy meta and data file in the test directory
 	std::filesystem::path const metaFile = std::filesystem::path(cmrDiskInstance.metaPath()) / "chunk_meta_file.txt";
@@ -99,16 +98,17 @@ TEST_F(CmrDiskTest, UnlinkChunkSuccessful) {
 	// Call the unlinkChunk method
 	int const result = cmrDiskInstance.unlinkChunk(&chunk);
 
-	// Capture the deletion time immediately after unlinking to ensure consistency
-	std::string const deletionTime = ChunkTrashManager::getDeletionTimeString();
+	// Capture the deletion time as a timestamp immediately after unlinking to ensure consistency
+	time_t const deletionTime = std::time(nullptr); // Use the current time as deletion time
+	std::string const deletionTimeString = std::to_string(deletionTime); // Convert time_t to string
 	std::filesystem::path const expectedMetaTrashPath =
 			std::filesystem::path(cmrDiskInstance.metaPath()) /
 			ChunkTrashManager::kTrashDirname /
-			(metaFile.filename().string() + "." + deletionTime);
+			(metaFile.filename().string() + "." + deletionTimeString);
 	std::filesystem::path const expectedDataTrashPath =
 			std::filesystem::path(cmrDiskInstance.dataPath()) /
 			ChunkTrashManager::kTrashDirname /
-			(dataFile.filename().string() + "." + deletionTime);
+			(dataFile.filename().string() + "." + deletionTimeString);
 
 	// Verify that the meta and data files were moved to the trash
 	EXPECT_TRUE(std::filesystem::exists(expectedMetaTrashPath));
