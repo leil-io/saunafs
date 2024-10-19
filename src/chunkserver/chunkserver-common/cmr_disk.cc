@@ -16,10 +16,10 @@
 
 CmrDisk::CmrDisk(const std::string &_metaPath, const std::string &_dataPath,
                  bool _isMarkedForRemoval, bool _isZonedDevice)
-    : FDDisk(_metaPath, _dataPath, _isMarkedForRemoval, _isZonedDevice) {}
+		: FDDisk(_metaPath, _dataPath, _isMarkedForRemoval, _isZonedDevice) {}
 
 CmrDisk::CmrDisk(const disk::Configuration &configuration)
-    : FDDisk(configuration) {}
+		: FDDisk(configuration) {}
 
 void CmrDisk::createPathsAndSubfolders() {
 	bool ret = true;
@@ -40,12 +40,13 @@ void CmrDisk::createPathsAndSubfolders() {
 
 		for (uint32_t i = 0; i < Subfolder::kNumberOfSubfolders; ++i) {
 			const auto subfolderName =
-			    Subfolder::getSubfolderNameGivenNumber(i);
+					Subfolder::getSubfolderNameGivenNumber(i);
 			ret &= (::mkdir((metaPath() + subfolderName).c_str(), mode) == 0);
 
 			if (dataPath() != metaPath()) {
 				ret &=
-				    (::mkdir((dataPath() + subfolderName).c_str(), mode) == 0);
+						(::mkdir((dataPath() + subfolderName).c_str(), mode) ==
+						 0);
 			}
 		}
 	}
@@ -69,7 +70,7 @@ void CmrDisk::createLockFiles(bool isLockNeeded,
 
 void CmrDisk::refreshDataDiskUsage() {
 	TRACETHIS();
-	struct statvfs fsinfo {};
+	struct statvfs fsinfo{};
 
 	if (statvfs(dataPath().c_str(), &fsinfo) < 0) {
 		setAvailableSpace(0ULL);
@@ -94,9 +95,9 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 	assert(chunk);
 	TRACETHIS1(chunk->id());
 
-	(void)isFromScan;  // Not needed for conventional disks
+	(void) isFromScan;  // Not needed for conventional disks
 
-	struct stat metaStat {};
+	struct stat metaStat{};
 	if (stat(chunk->metaFilename().c_str(), &metaStat) < 0) {
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
@@ -104,7 +105,7 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
-	struct stat dataStat {};
+	struct stat dataStat{};
 	if (stat(chunk->dataFilename().c_str(), &dataStat) < 0) {
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
@@ -123,7 +124,7 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 
 std::unique_ptr<ChunkSignature> CmrDisk::createChunkSignature(IChunk *chunk) {
 	return std::make_unique<ChunkSignature>(
-	    ChunkSignature(chunk->id(), chunk->version(), chunk->type()));
+			ChunkSignature(chunk->id(), chunk->version(), chunk->type()));
 }
 
 std::unique_ptr<ChunkSignature> CmrDisk::createChunkSignature() {
@@ -147,13 +148,13 @@ IChunk *CmrDisk::instantiateNewConcreteChunk(uint64_t chunkId,
 
 void CmrDisk::setChunkBlocks(IChunk *chunk, uint16_t originalBlocks,
                              uint16_t newBlocks) {
-	(void)originalBlocks;
+	(void) originalBlocks;
 	chunk->setBlocks(newBlocks);
 }
 
 int CmrDisk::defragmentOrMoveChunk(IChunk *chunk, uint8_t *crcData) {
-	(void)chunk;
-	(void)crcData;
+	(void) chunk;
+	(void) crcData;
 	return SAUNAFS_STATUS_OK;
 }
 
@@ -195,19 +196,39 @@ int CmrDisk::unlinkChunk(IChunk *chunk) {
 		return SAUNAFS_ERROR_ENOENT;
 	}
 
-	// Create a deletion timestamp
-	const std::string deletionTime = ChunkTrashManager::getDeletionTimeString();
+	if (ChunkTrashManager::isEnabled) {
+		// Create a deletion timestamp
+		const std::time_t deletionTime = std::time(nullptr);
 
-	// Move meta file to trash
-	int result = ChunkTrashManager::moveToTrash(metaFile, metaDiskPath, deletionTime);
-	if (result != SAUNAFS_STATUS_OK) {
-		return result;
-	}
+		// Move meta file to trash
+		int result = ChunkTrashManager::instance().moveToTrash(metaFile,
+		                                                       metaDiskPath,
+		                                                       deletionTime);
+		if (result != SAUNAFS_STATUS_OK) {
+			return result;
+		}
 
-	// Move data file to trash
-	result = ChunkTrashManager::moveToTrash(dataFile, dataDiskPath, deletionTime);
-	if (result != SAUNAFS_STATUS_OK) {
-		return result;
+		// Move data file to trash
+		result = ChunkTrashManager::instance().moveToTrash(dataFile,
+		                                                   dataDiskPath,
+		                                                   deletionTime);
+		if (result != SAUNAFS_STATUS_OK) {
+			return result;
+		}
+	} else {
+		// Unlink the meta file
+		if (::unlink(metaFile.c_str()) != 0) {
+			safs_pretty_errlog(LOG_ERR, "Error unlinking meta file: %s",
+			                   metaFile.c_str());
+			return SAUNAFS_ERROR_UNKNOWN;
+		}
+
+		// Unlink the data file
+		if (::unlink(dataFile.c_str()) != 0) {
+			safs_pretty_errlog(LOG_ERR, "Error unlinking data file: %s",
+			                   dataFile.c_str());
+			return SAUNAFS_ERROR_UNKNOWN;
+		}
 	}
 
 	return SAUNAFS_STATUS_OK;
@@ -248,8 +269,8 @@ int CmrDisk::readBlockAndCrc(IChunk *chunk, uint8_t *blockBuffer,
 	{
 		DiskReadStatsUpdater updater(chunk->owner(), SFSBLOCKSIZE);
 		const ssize_t bytesRead =
-		    ::pread(chunk->dataFD(), blockBuffer + kCrcSize, SFSBLOCKSIZE,
-		            chunk->getBlockOffset(blocknum));
+				::pread(chunk->dataFD(), blockBuffer + kCrcSize, SFSBLOCKSIZE,
+				        chunk->getBlockOffset(blocknum));
 		if (bytesRead != SFSBLOCKSIZE) {
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_silent_errlog(LOG_WARNING, "%s: file:%s - read error",
@@ -294,7 +315,7 @@ int CmrDisk::writePartialBlockAndCrc(IChunk *chunk, const uint8_t *buffer,
                                      const uint8_t *crcBuff, uint8_t *crcData,
                                      uint16_t blockNum, bool isNewBlock,
                                      const char *errorMsg) {
-	(void)isNewBlock;
+	(void) isNewBlock;
 
 	{
 		DiskWriteStatsUpdater updater(chunk->owner(), size);
@@ -333,13 +354,13 @@ void CmrDisk::punchHoles(IChunk *chunk, const uint8_t *buffer, uint32_t offset,
 
 	constexpr uint32_t blockSize = 4096;
 	uint32_t step =
-	    (offset % blockSize) == 0 ? 0 : blockSize - (offset % blockSize);
+			(offset % blockSize) == 0 ? 0 : blockSize - (offset % blockSize);
 	uint32_t holeStart = 0;
 	uint32_t holeSize = 0;
 
 	for (; (step + blockSize) <= size; step += blockSize) {
 		const auto *zero_test =
-		    reinterpret_cast<const std::size_t *>(buffer + step);
+				reinterpret_cast<const std::size_t *>(buffer + step);
 		bool is_zero = true;
 		for (unsigned i = 0; i < blockSize / sizeof(std::size_t); ++i) {
 			if (zero_test[i] != 0) {
@@ -432,7 +453,8 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 
 		if (blocknum < chunk->blocks()) {  // It is an existing block
 			auto readBytes = chunk->owner()->readBlockAndCrc(
-			    chunk, crcAndBlockbuffer, crcData, blocknum, "writeChunkBlock");
+					chunk, crcAndBlockbuffer, crcData, blocknum,
+					"writeChunkBlock");
 			uint8_t *dataInBuffer = crcAndBlockbuffer + kCrcSize;  // Skip crc
 			if (readBytes < 0) {
 				return SAUNAFS_ERROR_IO;
@@ -445,13 +467,14 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 
 			if (offsetInBlock == 0) {
 				combinedCrc = mycrc32_combine(
-				    chcrc, postCrc, SFSBLOCKSIZE - (offsetInBlock + size));
+						chcrc, postCrc, SFSBLOCKSIZE - (offsetInBlock + size));
 			} else {
 				combinedCrc = mycrc32_combine(preCrc, chcrc, size);
 				if ((offsetInBlock + size) < SFSBLOCKSIZE) {
 					combinedCrc =
-					    mycrc32_combine(combinedCrc, postCrc,
-					                    SFSBLOCKSIZE - (offsetInBlock + size));
+							mycrc32_combine(combinedCrc, postCrc,
+							                SFSBLOCKSIZE -
+							                (offsetInBlock + size));
 				}
 			}
 
@@ -469,7 +492,7 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 			}
 		} else {  // It is a new block at the end
 			if (::ftruncate(chunk->dataFD(), chunk->getFileSizeFromBlockCount(
-			                                     blocknum + 1)) < 0) {
+					blocknum + 1)) < 0) {
 				hddAddErrorAndPreserveErrno(chunk);
 				safs_silent_errlog(LOG_WARNING,
 				                   "writeChunkBlock: file:%s - ftruncate error",
@@ -489,18 +512,18 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 
 			preCrc = mycrc32_zeroblock(0, offsetInBlock);
 			postCrc =
-			    mycrc32_zeroblock(0, SFSBLOCKSIZE - (offsetInBlock + size));
+					mycrc32_zeroblock(0, SFSBLOCKSIZE - (offsetInBlock + size));
 		}
 
 		if (offsetInBlock == 0) {
 			combinedCrc = mycrc32_combine(
-			    crc, postCrc, SFSBLOCKSIZE - (offsetInBlock + size));
+					crc, postCrc, SFSBLOCKSIZE - (offsetInBlock + size));
 		} else {
 			combinedCrc = mycrc32_combine(preCrc, crc, size);
 			if ((offsetInBlock + size) < SFSBLOCKSIZE) {
 				combinedCrc =
-				    mycrc32_combine(combinedCrc, postCrc,
-				                    SFSBLOCKSIZE - (offsetInBlock + size));
+						mycrc32_combine(combinedCrc, postCrc,
+						                SFSBLOCKSIZE - (offsetInBlock + size));
 			}
 		}
 
@@ -508,8 +531,8 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 		put32bit(&crcBuffPointer, combinedCrc);
 
 		int written = writePartialBlockAndCrc(
-		    chunk, buffer, offsetInBlock, size, crcAndBlockbuffer, crcData,
-		    blocknum, isNewBlock, "writeChunkBlock");
+				chunk, buffer, offsetInBlock, size, crcAndBlockbuffer, crcData,
+				blocknum, isNewBlock, "writeChunkBlock");
 
 		if (written < 0) {
 			return SAUNAFS_ERROR_IO;
@@ -521,7 +544,7 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 
 int CmrDisk::writeChunkData(IChunk *chunk, uint8_t *blockBuffer,
                             int32_t blockSize, off64_t offset) {
-	(void)offset;  // Not needed for conventional disks
+	(void) offset;  // Not needed for conventional disks
 
 	return ::write(chunk->dataFD(), blockBuffer, blockSize);
 }
