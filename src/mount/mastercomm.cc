@@ -211,6 +211,11 @@ static inline void setDisconnect(bool value) {
 
 void fs_inc_acnt(uint32_t inode) {
 	std::unique_lock<std::mutex> acquiredFileLock(acquiredFileMutex);
+#ifdef _WIN32
+	std::unique_lock<std::mutex> acquiredFilesLastTimeUsedLock(
+	    acquiredFilesLastTimeUsedMutex);
+	addAcquiredFileLastTimeUsed(inode, time(nullptr));
+#endif
 	acquiredFiles[inode]++;
 }
 
@@ -218,7 +223,14 @@ void fs_dec_acnt(uint32_t inode) {
 	std::unique_lock<std::mutex> afLock(acquiredFileMutex);
 	auto &cnt = acquiredFiles[inode];
 	cnt--;
-	if (cnt <= 0) { acquiredFiles.erase(inode); }
+	if (cnt <= 0) {
+#ifdef _WIN32
+		std::unique_lock<std::mutex> acquiredFilesLastTimeUsedLock(
+		    acquiredFilesLastTimeUsedMutex);
+		removeAcquiredFileLastTimeUsed(inode);
+#endif
+		acquiredFiles.erase(inode);
+	}
 }
 
 threc* fs_get_my_threc() {
@@ -1320,6 +1332,12 @@ void fs_term(void) {
 	threchead = nullptr;
 	rec_lock.unlock();
 	std::unique_lock<std::mutex> af_lock(acquiredFileMutex);
+#ifdef _WIN32
+	std::unique_lock<std::mutex> acquiredFilesLastTimeUsedLock(
+	    acquiredFilesLastTimeUsedMutex);
+	acquiredFilesLastTimeUsed.clear();
+	acquiredFilesLastTimeUsedLock.unlock();
+#endif
 	acquiredFiles.clear();
 	af_lock.unlock();
 	fd_lock.lock();
