@@ -236,6 +236,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	params.prefetch_xor_stripes = gMountOptions.prefetchxorstripes;
 	params.bandwidth_overuse = gMountOptions.bandwidthoveruse;
 	params.write_cache_size = gMountOptions.writecachesize;
+	params.write_wave_timeout_ms = gMountOptions.chunkserverwavewriteto;
 	params.write_workers = gMountOptions.writeworkers;
 	params.write_window_size = gMountOptions.writewindowsize;
 	params.chunkserver_write_timeout_ms = gMountOptions.chunkserverwriteto;
@@ -252,6 +253,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 	params.acl_cache_size = gMountOptions.aclcachesize;
 	params.debug_mode = gMountOptions.debug;
 	params.direct_io = gMountOptions.directio;
+	params.use_old_write_algorithm = gMountOptions.useoldwritealgorithm;
 	params.ignore_flush = gMountOptions.ignoreflush;
 
 	if (!gMountOptions.meta) {

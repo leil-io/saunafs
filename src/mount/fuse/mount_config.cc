@@ -55,6 +55,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfsmemlock", memlock, 1),
 #endif
 	SFS_OPT("sfswritecachesize=%u", writecachesize, 0),
+	SFS_OPT("sfschunkserverwavewriteto=%u", chunkserverwavewriteto, 0),
 	SFS_OPT("sfsaclcachesize=%u", aclcachesize, 0),
 	SFS_OPT("sfscacheperinodepercentage=%u", cachePerInodePercentage, 0),
 	SFS_OPT("sfswriteworkers=%u", writeworkers, 0),
@@ -92,6 +93,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("bandwidthoveruse=%lf", bandwidthoveruse, 1),
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
+	SFS_OPT("sfsuseoldwritealgorithm", useoldwritealgorithm, 1),
 	SFS_OPT("sfsignoreflush", ignoreflush, 1),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
@@ -161,6 +163,8 @@ void usage(const char *progname) {
 "Write related options:\n"
 "    -o sfschunkserverwriteto=MSEC  set chunkserver response timeout during "
 				"write operation in milliseconds (default: %u)\n"
+"    -o sfschunkserverwavewriteto=MSEC  set timeout for executing each wave "
+				"of a write operation in milliseconds (default: %u)\n"
 "    -o sfswritecachesize=N      define size of write cache in MiB (default: %u)\n"
 "    -o sfscacheperinodepercentage=P  define what part of the write cache non "
 				"occupied by other inodes can a single inode "
@@ -168,6 +172,7 @@ void usage(const char *progname) {
 "    -o sfswriteworkers=N        define number of write workers (default: %u)\n"
 "    -o sfswritewindowsize=N     define write window size (in blocks) for "
 				"each chunk (default: %u)\n"
+"    -o sfsuseoldwritealgorithm  use legacy write algorithm.\n"
 "    -o sfsignoreflush           Advanced: use with caution. Ignore flush usual "
 				"behavior by replying SUCCESS to it immediately. Targets fast "
 				"creation of small files, but may cause data loss during crashes.\n"
@@ -244,6 +249,7 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultBandwidthOveruse,
 		SaunaClient::FsInitParams::kDefaultReadCacheMaxSizePercentage,
 		SaunaClient::FsInitParams::kDefaultChunkserverWriteTo,
+		SaunaClient::FsInitParams::kDefaultWriteWaveTo,
 		SaunaClient::FsInitParams::kDefaultWriteCacheSize,
 		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,
 		SaunaClient::FsInitParams::kDefaultWriteWorkers,
