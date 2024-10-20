@@ -85,10 +85,6 @@ struct threc {
 
 static threc *threchead=NULL;
 
-// <inode, cnt> and sorted by inode
-using AcquiredFileMap = std::map<uint32_t, uint32_t>;
-static AcquiredFileMap acquiredFiles;
-
 static int fd;
 static bool disconnect;
 static time_t lastwrite;
@@ -106,7 +102,7 @@ int *mountingGid = nullptr;
 static uint32_t maxretries;
 
 static pthread_t rpthid,npthid;
-static std::mutex fdMutex, recMutex, acquiredFileMutex;
+static std::mutex fdMutex, recMutex;
 
 static uint32_t sessionid;
 static uint32_t masterversion;
@@ -216,13 +212,28 @@ static inline void setDisconnect(bool value) {
 void fs_inc_acnt(uint32_t inode) {
 	std::unique_lock<std::mutex> acquiredFileLock(acquiredFileMutex);
 	acquiredFiles[inode]++;
+#ifdef _WIN32
+	if (gCleanAcquiredFilesPeriod > 0) {
+		addOrUpdateAcquiredFileLastTimeUsed(inode);
+	}
+#endif
 }
 
 void fs_dec_acnt(uint32_t inode) {
 	std::unique_lock<std::mutex> afLock(acquiredFileMutex);
+	if (!acquiredFiles.contains(inode)) {
+		return;
+	}
 	auto &cnt = acquiredFiles[inode];
 	cnt--;
-	if (cnt <= 0) { acquiredFiles.erase(inode); }
+	if (cnt <= 0) {
+#ifdef _WIN32
+		if (gCleanAcquiredFilesPeriod > 0) {
+			removeAcquiredFileLastTimeUsed(inode);
+		}
+#endif
+		acquiredFiles.erase(inode);
+	}
 }
 
 threc* fs_get_my_threc() {
@@ -1326,6 +1337,10 @@ void fs_term(void) {
 	threchead = nullptr;
 	rec_lock.unlock();
 	std::unique_lock<std::mutex> af_lock(acquiredFileMutex);
+#ifdef _WIN32
+	acquiredFilesLastTimeUsed.clear();
+	inodeToFileMap.clear();
+#endif
 	acquiredFiles.clear();
 	af_lock.unlock();
 	fd_lock.lock();
