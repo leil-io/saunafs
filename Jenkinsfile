@@ -18,7 +18,7 @@ pipeline {
                 sh '''
                     git clone "https://github.com/leil-io/sfstests"
                     cd sfstests
-                    git checkout v0.2.1
+                    git checkout v0.3.0
                     go build -o $WORKSPACE/sfstests
                     '''
             }
@@ -38,19 +38,19 @@ pipeline {
 
         stage('Run Sanity') {
             steps {
-                sh ''' ./sfstests/sfstests --workers 28 --cpus 1'''
+                sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --workers 28 --cpus 1'''
             }
         }
 
         stage('Run short system tests') {
             steps {
-                sh ''' ./sfstests/sfstests --suite ShortSystemTests --workers 16 --multiplier 2 --cpus 2'''
+                sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite ShortSystemTests --workers 16 --multiplier 2 --cpus 2'''
             }
         }
 
         stage('Run long system tests') {
             steps {
-                sh ''' ./sfstests/sfstests --suite LongSystemTests --workers 12 --multiplier 2 --cpus 2'''
+                sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite LongSystemTests --workers 12 --multiplier 2 --cpus 2'''
             }
         }
     }
