@@ -6,6 +6,7 @@
 # in the downgrade command.
 
 SAUNAFSXX_TAG="4.1.0"
+: "${APT_AUTH_LOCATION:="/etc/apt/auth.conf.d/saunafs.conf"}"
 
 install_saunafsXX() {
 	if [ "${SAUNAFSXX_DIR:?}" == "/" ]; then
@@ -27,8 +28,8 @@ install_saunafsXX() {
 		mkdir -p "${TEMP_DIR}/apt/var/lib/dpkg"
 		mkdir -p "${TEMP_DIR}/usr/share/keyrings"
 		cp /var/lib/dpkg/status "${TEMP_DIR}/apt/var/lib/dpkg/status"
-		if [ -f /tmp/saunafs-test-auth.conf ]; then
-			cp /tmp/saunafs-test-auth.conf "${TEMP_DIR}/apt/auth.conf.d/saunafs.conf"
+		if [ -f $APT_AUTH_LOCATION ]; then
+			cp $APT_AUTH_LOCATION "${TEMP_DIR}/apt/auth.conf.d/saunafs.conf"
 		fi
 		cat >"${TEMP_DIR}/apt/apt.conf" <<END
 Dir::Cache "${TEMP_DIR}/apt/var/cache/apt";
