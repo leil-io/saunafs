@@ -9,7 +9,7 @@ test_add_failure() {
 		return
 	fi
 	local message="[$(date +"%F %T")] $*"
-	# Env. valiable ERROR_FILE can be used to store error messages in a file
+	# Env. variable ERROR_FILE can be used to store error messages in a file
 	echo "$message" | tee -a "${ERROR_FILE:-/dev/null}" >> "$test_result_file"
 	# Print bold red message to the console
 	tput setaf 1

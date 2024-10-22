@@ -78,13 +78,13 @@ valgrind_enable() {
 			valgrind_command+="$(getHelgrindOptions)"
 		fi
 
-		# Supressions files for known false positives
+		# Suppressions files for known false positives
 		valgrind_command+=" --suppressions=$SOURCE_DIR/tests/tools/valgrind-${valgrind_tool_}.supp"
 
 		# Valgrind error messages will be written here.
 		valgrind_command+=" --log-file=${ERROR_DIR}/valgrind__\${1}_%p.log"
 
-		# Valgrind errors will generate suppresions:
+		# Valgrind errors will generate suppressions:
 		valgrind_command+=" --gen-suppressions=all"
 
 		# Valgrind will show filepaths with module subdirectories on errors:

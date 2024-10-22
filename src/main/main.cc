@@ -569,7 +569,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 		}
 		if (runmode==RunMode::kReload) {
 			/*
-			 * FIXME: buissiness logic should not be in file locking function.
+			 * FIXME: business logic should not be in file locking function.
 			 */
 			if (kill(ownerpid,SIGHUP)<0) {
 				safs_pretty_errlog(LOG_ERR,
@@ -582,7 +582,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 		}
 		if (runmode==RunMode::kKill) {
 			/*
-			 * FIXME: buissiness logic should not be in file locking function.
+			 * FIXME: business logic should not be in file locking function.
 			 */
 #ifdef ENABLE_EXIT_ON_USR1
 			if (kill(ownerpid,SIGUSR1)<0) {
@@ -597,7 +597,7 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 		} else {
 			sassert((runmode == RunMode::kStop) || (runmode == RunMode::kRestart));
 			/*
-			 * FIXME: buissiness logic should not be in file locking function.
+			 * FIXME: business logic should not be in file locking function.
 			 */
 			if (kill(ownerpid,SIGTERM)<0) {
 				safs_pretty_errlog(LOG_ERR,

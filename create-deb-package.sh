@@ -8,7 +8,7 @@ git diff --cached --exit-code > /dev/null 2>&1
 staged=$?
 
 if [[ $unstaged != 0 ]] || [[ $staged != 0 ]]; then
-	echo "WARNING: You have uncommited changes. They will NOT be included in the build."
+	echo "WARNING: You have uncommitted changes. They will NOT be included in the build."
 	read -n 1 -s -r -p "Press any key to continue"
 	echo
 fi

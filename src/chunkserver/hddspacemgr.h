@@ -82,7 +82,7 @@ int hddChunkGetNumberOfBlocks(uint64_t chunkId, ChunkPartType chunkType,
 // chunkNewVersion>0 && length==0xFFFFFFFF && chunkIdCopy==0   -> change version
 // chunkNewVersion>0 && length==0xFFFFFFFF && chunkIdCopy>0     -> duplicate
 // chunkNewVersion>0 && length<=SFSCHUNKSIZE && chunkIdCopy==0  -> truncate
-// chunkNewVersion>0 && length<=SFSCHUNKSIZE && chunkIdCopy>0   -> dup and trun
+// chunkNewVersion>0 && length<=SFSCHUNKSIZE && chunkIdCopy>0   -> dup and turn
 // chunkNewVersion==0 && length==0                              -> delete
 // chunkNewVersion==0 && length==1                              -> create
 // chunkNewVersion==0 && length==2                              -> test
@@ -103,7 +103,7 @@ int hddInit();
 // Chunk low-level operations
 // The following functions shouldn't be used, unless for specific implementation
 // i.e. \see ChunkFileCreator
-// In most cases functions above are prefered.
+// In most cases functions above are preferred.
 
 /// Deletes the chunk from the registry and from the disk's testlist in a
 /// thread-safe way.
