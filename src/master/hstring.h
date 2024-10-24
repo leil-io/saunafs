@@ -2,6 +2,7 @@
 
 #include "common/platform.h"
 
+#include <algorithm> 
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -66,6 +67,12 @@ public:
 
 	HashType hash() const {
 		return hash_;
+	}
+
+	static HString hstringToLowerCase(const HString &input) {
+		std::string str = input.c_str();
+		std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+		return HString(str);
 	}
 
 private:
