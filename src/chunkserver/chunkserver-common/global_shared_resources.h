@@ -60,6 +60,9 @@ inline std::atomic_bool gPerformFsync(true);
 
 inline std::atomic_bool gCheckCrcWhenWriting{true};
 
+/// Value of HDD_ADVISE_NO_CACHE from config
+inline std::atomic_bool gAdviseNoCache = false;
+
 inline IoStat gIoStat;
 
 inline PluginManager pluginManager;

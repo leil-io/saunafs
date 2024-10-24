@@ -170,6 +170,16 @@ int hddIOEnd(IChunk *chunk) {
 		chunk->setWasChanged(false);
 	}
 
+#ifdef SAUNAFS_HAVE_POSIX_FADVISE
+		if (gAdviseNoCache) {
+			::posix_fadvise(chunk->metaFD(), 0, 0, POSIX_FADV_DONTNEED);
+
+			if (chunk->dataFD() >= 0 && !chunk->owner()->isZonedDevice()) {
+				::posix_fadvise(chunk->dataFD(), 0, 0, POSIX_FADV_DONTNEED);
+			}
+		}
+#endif /* SAUNAFS_HAVE_POSIX_FADVISE */
+
 	if (chunk->refCount() <= 0) {
 		safs_silent_syslog(LOG_WARNING,
 		                   "hddIOEnd: refcount = 0 - "

@@ -102,9 +102,6 @@ constexpr int kLastErrorTime = 60;
 
 inline std::atomic_bool gCheckCrcWhenReading{true};
 
-/// Value of HDD_ADVISE_NO_CACHE from config
-static std::atomic_bool gAdviseNoCache;
-
 void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks,
                          std::size_t limit) {
 	TRACETHIS();
