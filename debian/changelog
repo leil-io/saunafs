@@ -15,7 +15,6 @@ saunafs (4.6.0) stable; urgency=medium
   * fix(cgi): Change key to re-order list of disks (#177)
   * fix(chunkserver): Refactor partially csserventry
   * fix(mount): Fix tcptoread-write error message
-  * fix(mount): Fix tcptoread-write error message
   * feat(chunkserver): Increase NR_OF_NETWORK_WORKERS
   * feat(chunkserver): Improve network workers params
   * feat(mount): Set default cache timeout to 1000
