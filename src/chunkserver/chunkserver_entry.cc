@@ -172,7 +172,12 @@ void ChunkserverEntry::attachPacket(std::unique_ptr<PacketStruct> &&packet) {
 
 void ChunkserverEntry::preserveInputPacket() {
 	TRACETHIS();
-	writePacket->packet = std::move(inputPacket.packet);
+
+	if (inputPacket.useAlignedMemory) {
+		writePacket->alignedBuffer = std::move(inputPacket.alignedBuffer);
+	} else {
+		writePacket->packet = std::move(inputPacket.packet);
+	}
 }
 
 void ChunkserverEntry::createAttachedPacket(std::vector<uint8_t> &packet) {
@@ -826,6 +831,7 @@ void ChunkserverEntry::writeEnd(const uint8_t *data, uint32_t length) {
 		tcpclose(fwdSocket);
 		fwdSocket = -1;
 	}
+	inputPacket.useAlignedMemory = false;
 	state = State::Idle;
 }
 
@@ -1177,8 +1183,15 @@ void ChunkserverEntry::checkNextPacket() {
 			inputPacket.bytesLeft = PacketHeader::kSize;
 			inputPacket.startPtr = headerBuffer;
 
-			gotPacket(type, inputPacket.packet.data() + PacketHeader::kSize,
-			          opSize);
+			if (inputPacket.useAlignedMemory) {
+				gotPacket(type,
+				          inputPacket.alignedBuffer.data() + kIOAlignedOffset +
+				              PacketHeader::kSize,
+				          opSize);
+			} else {
+				gotPacket(type, inputPacket.packet.data() + PacketHeader::kSize,
+				          opSize);
+			}
 		}
 	} else {
 		if (mode == Mode::Data && inputPacket.bytesLeft == 0) {
@@ -1189,7 +1202,14 @@ void ChunkserverEntry::checkNextPacket() {
 			mode = Mode::Header;
 			inputPacket.bytesLeft = PacketHeader::kSize;
 			inputPacket.startPtr = headerBuffer;
-			gotPacket(type, inputPacket.packet.data(), opSize);
+
+			if (inputPacket.useAlignedMemory) {
+				gotPacket(type,
+				          inputPacket.alignedBuffer.data() + kIOAlignedOffset,
+				          opSize);
+			} else {
+				gotPacket(type, inputPacket.packet.data(), opSize);
+			}
 		}
 	}
 }
@@ -1467,7 +1487,8 @@ void ChunkserverEntry::readFromSocket() {
 			return;
 		}
 
-		ptr = headerBuffer + sizeof(type);
+		ptr = headerBuffer;
+		type = get32bit(&ptr);
 		opSize = get32bit(&ptr);
 
 		if (opSize > 0) {
@@ -1478,9 +1499,22 @@ void ChunkserverEntry::readFromSocket() {
 				state = State::Close;
 				return;
 			}
-			inputPacket.packet.resize(opSize);
-			passert(inputPacket.packet.data());
-			inputPacket.startPtr = inputPacket.packet.data();
+
+			if (type == SAU_CLTOCS_WRITE_DATA || type == SAU_CLTOCS_WRITE_END) {
+				// Allocate memory only if needed. Reuse it most of the time.
+				if (inputPacket.alignedBuffer.size() < kIOAlignedPacketSize) {
+					inputPacket.alignedBuffer.reserve(kIOAlignedPacketSize);
+					passert(inputPacket.alignedBuffer.data());
+				}
+				inputPacket.startPtr =
+				    inputPacket.alignedBuffer.data() + kIOAlignedOffset;
+				inputPacket.useAlignedMemory = true;
+			} else {
+				inputPacket.packet.resize(opSize);
+				passert(inputPacket.packet.data());
+				inputPacket.startPtr = inputPacket.packet.data();
+				inputPacket.useAlignedMemory = false;
+			}
 		}
 		inputPacket.bytesLeft = opSize;
 		mode = Mode::Data;
@@ -1518,7 +1552,13 @@ void ChunkserverEntry::readFromSocket() {
 			inputPacket.bytesLeft = PacketHeader::kSize;
 			inputPacket.startPtr = headerBuffer;
 
-			gotPacket(type, inputPacket.packet.data(), opSize);
+			if (inputPacket.useAlignedMemory) {
+				gotPacket(type,
+				          inputPacket.alignedBuffer.data() + kIOAlignedOffset,
+				          opSize);
+			} else {
+				gotPacket(type, inputPacket.packet.data(), opSize);
+			}
 		}
 	}
 }
