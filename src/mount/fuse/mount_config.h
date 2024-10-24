@@ -89,6 +89,7 @@ struct sfsopts_ {
 	int passwordask;
 	int donotrememberpassword;
 	unsigned writecachesize;
+	unsigned chunkserverwavewriteto;
 	unsigned cachePerInodePercentage;
 	unsigned writeworkers;
 	unsigned ioretries;
@@ -114,6 +115,7 @@ struct sfsopts_ {
 	double bandwidthoveruse;
 	int nonemptymount;
 	bool directio;
+    int useoldwritealgorithm;
 	int ignoreflush;
 
 	sfsopts_()
@@ -146,6 +148,7 @@ struct sfsopts_ {
 		passwordask(0),
 		donotrememberpassword(SaunaClient::FsInitParams::kDefaultDoNotRememberPassword),
 		writecachesize(SaunaClient::FsInitParams::kDefaultWriteCacheSize),
+		chunkserverwavewriteto(SaunaClient::FsInitParams::kDefaultWriteWaveTo),
 		cachePerInodePercentage(SaunaClient::FsInitParams::kDefaultCachePerInodePercentage),
 		writeworkers(SaunaClient::FsInitParams::kDefaultWriteWorkers),
 		ioretries(SaunaClient::FsInitParams::kDefaultIoRetries),
@@ -171,6 +174,7 @@ struct sfsopts_ {
 		bandwidthoveruse(SaunaClient::FsInitParams::kDefaultBandwidthOveruse),
 		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
 		directio(SaunaClient::FsInitParams::kDirectIO),
+        useoldwritealgorithm(SaunaClient::FsInitParams::kDefaultUseOldWriteAlgorithm),
 		ignoreflush(SaunaClient::FsInitParams::kDefaultIgnoreFlush)
 	{ }
 };
