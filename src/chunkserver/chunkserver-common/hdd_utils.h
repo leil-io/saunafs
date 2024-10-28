@@ -51,6 +51,9 @@ void hddRemoveChunkFromContainers(IChunk *chunk);
 /// removes it from the registry and from the disk's testlist.
 void hddChunkRelease(IChunk *chunk);
 
+/// Advises the kernel that the chunk should not be cached (meta and data files)
+void hddAdviseNoCache(IChunk *chunk);
+
 int hddIOEnd(IChunk *chunk);
 
 int hddIOBegin(IChunk *chunk, int newFlag,

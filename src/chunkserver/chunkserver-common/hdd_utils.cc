@@ -134,6 +134,17 @@ int chunkWriteCrc(IChunk *chunk) {
 	return SAUNAFS_STATUS_OK;
 }
 
+void hddAdviseNoCache(IChunk *chunk) {
+	TRACETHIS();
+	assert(chunk);
+
+	::posix_fadvise(chunk->metaFD(), 0, 0, POSIX_FADV_DONTNEED);
+
+	if (chunk->dataFD() >= 0 && !chunk->owner()->isZonedDevice()) {
+		::posix_fadvise(chunk->dataFD(), 0, 0, POSIX_FADV_DONTNEED);
+	}
+}
+
 int hddIOEnd(IChunk *chunk) {
 	assert(chunk);
 	TRACETHIS1(chunk->id());
@@ -182,6 +193,12 @@ int hddIOEnd(IChunk *chunk) {
 	chunk->setRefCount(chunk->refCount() - 1);
 
 	if (chunk->refCount() == 0) {
+#ifdef SAUNAFS_HAVE_POSIX_FADVISE
+	if (gAdviseNoCache) {
+		hddAdviseNoCache(chunk);
+	}
+#endif /* SAUNAFS_HAVE_POSIX_FADVISE */
+
 		gOpenChunks.release(chunk->metaFD(), eventloop_time());
 	}
 

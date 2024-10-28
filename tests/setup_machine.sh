@@ -156,6 +156,7 @@ apt_packages=(
 	libnfsidmap-dev
 	libnsl-dev
 	libsqlite3-dev
+	util-linux-extra
 )
 noble_packages=(
 	prometheus-cpp-dev
