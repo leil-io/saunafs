@@ -234,7 +234,7 @@ enum class SugidClearMode {
 #define SAUNAFS_LOCK_INTERRUPT 8
 #define SAUNAFS_LOCK_NONBLOCK 16
 
-// flags: "flags" fileld in "CLTOMA_FUSE_AQUIRE"
+// flags: "flags" field in "CLTOMA_FUSE_AQUIRE"
 #define WANT_READ 1
 #define WANT_WRITE 2
 #define AFTER_CREATE 4

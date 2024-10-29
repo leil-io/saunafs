@@ -39,7 +39,7 @@ std::string tempDirForAllTests() {
 // but it does not need to outlive the test environment
 // it has to be in a separate folder due to
 // sticky bit in /tmp
-// It cannot be in TEMP_DIR, becaue the folder is cleaned
+// It cannot be in TEMP_DIR, because the folder is cleaned
 // after every test.
 std::string testErrFilePath() {
 	return tempDirForAllTests() + "/test_err";
@@ -49,7 +49,7 @@ std::string testErrFilePath() {
 
 class BashTestEnvironment : public ::testing::Environment {
 	virtual void SetUp() {
-		// remove prevoius temp dir
+		// remove previous temp dir
 		std::string tempForAllTests = tempDirForAllTests();
 		if (boost::filesystem::exists(tempForAllTests)) {
 			boost::filesystem::remove_all(tempForAllTests);
@@ -60,7 +60,7 @@ class BashTestEnvironment : public ::testing::Environment {
 		boost::filesystem::permissions(tempForAllTests, perms);
 	}
 	virtual void TearDown() {
-		// remove prevoius temp dir
+		// remove previous temp dir
 		std::string tempForAllTests = tempDirForAllTests();
 		if (boost::filesystem::exists(tempForAllTests)) {
 			boost::filesystem::remove_all(tempForAllTests);

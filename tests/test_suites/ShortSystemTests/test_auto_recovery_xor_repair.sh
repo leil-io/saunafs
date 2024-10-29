@@ -110,7 +110,7 @@ saunafs_wait_for_ready_chunkservers 4
 # chunk 0 [0 copies] - one xor part (id: 5, ver: 2), two xor parts (id: 5 ver: 1)
 # chunk 1 [1 copy  ] - three xor parts (id: 6, ver: 1)
 # chunk 2 [0 copies] - one xor part (id: 3, ver: 1)
-# chunk 3 [1 copy  ] - one std chunk with (id: 4 ver: 1) (from snaphot)
+# chunk 3 [1 copy  ] - one std chunk with (id: 4 ver: 1) (from snapshot)
 checkfile=$(saunafs checkfile dir/file)
 assert_awk_finds '/chunks with 0 copies: *2$/' "$checkfile"
 assert_awk_finds '/chunks with 1 copy: *2$/' "$checkfile"

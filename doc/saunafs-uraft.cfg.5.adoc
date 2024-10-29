@@ -57,7 +57,7 @@ election algorithm.
 heartbeat messages.
 
 *LOCAL_MASTER_CHECK_PERIOD*:: *[advanced]* period in milliseconds between
-checking wheter local master is alive.
+checking whether local master is alive.
 
 == REPORTING BUGS
 

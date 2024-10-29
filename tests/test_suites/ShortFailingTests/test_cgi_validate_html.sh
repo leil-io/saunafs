@@ -36,7 +36,7 @@ traverse_cgi() {
 	mkdir -p "$dir"
 	if wget --version | awk 'NR==1 && $3 < 1.14 {exit 1}' ; then
 		# Optimization for newer wgets -- don't download pages with two tabs open.
-		# This is achieved by filtering out URLs with '|' charecters (like in secions=IN|CS|MO).
+		# This is achieved by filtering out URLs with '|' characters (like in sections=IN|CS|MO).
 		filter="--reject-regex=%7C"
 	fi
 	wget -l2 --directory-prefix="$dir" $filter -r -q "${info[cgi_url]}"

@@ -54,7 +54,7 @@ is the one of *start*, *stop*, *restart*, *reload*, *test*, *isalive* or *kill*.
 
 *sfsmetalogger.cfg*::
 configuration file for SaunaFS metalogger process; refer to *sfsmetalogger.cfg*(5) manual for
-defails
+details
 
 *sfsmetalogger.lock*::
 PID file of running SaunaFS metalogger process

@@ -1,5 +1,5 @@
 # Goal of test:
-# Verify that combinations of different readahead parameters succesfully manage to read a file in different patterns.
+# Verify that combinations of different readahead parameters successfully manage to read a file in different patterns.
 #
 assert_program_installed fio
 

@@ -15,7 +15,7 @@ import urllib.parse
 
 # Http server based on recipes 511453,511454 from code.activestate.com by
 # Pierre Quentel Added support for indexes, access tests, proper handle of
-# SystemExit exception, fixed couple of errors and vulnerbilities, getopt,
+# SystemExit exception, fixed couple of errors and vulnerabilities, getopt,
 # lockfiles, daemonize etc. by Jakub Kruszona-Zawadzki
 
 # The dictionary holding one client handler for each connected client

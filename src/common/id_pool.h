@@ -32,7 +32,7 @@ namespace detail {
 /*! \brief Helper class for IdPool.
  *
  * This class is almost typical bit pool. The only difference is that
- * when pool is full or empty underlaying vector storage releases all data.
+ * when pool is full or empty underlying vector storage releases all data.
  */
 template<typename V,typename S>
 class IdPoolBlock {

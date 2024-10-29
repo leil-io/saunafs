@@ -286,7 +286,7 @@ for line in sys.stdin:
                 break
             (name, condition, typestr) = re.match(regex, arg).group(1, 2, 3)
             assert condition is not None or type is not None
-            # Condition, ie. somthing like version==3 or rver==0x55:8
+            # Condition, ie. something like version==3 or rver==0x55:8
             if condition:
                 variant.add_condition(name, condition)
                 condition_added = True

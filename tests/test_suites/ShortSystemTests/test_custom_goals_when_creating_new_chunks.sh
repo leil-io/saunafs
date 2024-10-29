@@ -13,7 +13,7 @@ USE_RAMDISK=YES \
 	setup_local_empty_saunafs info
 
 # For each goal, define all possible lists of labels. Each list is sorted alphabetically,
-# lists are separated using pipes, lables in a single list using commas.
+# lists are separated using pipes, labels in a single list using commas.
 expected_labels[1]="cn|de|us"
 expected_labels[2]="cn,de|cn,us|de,de|de,us|us,us"
 expected_labels[3]="cn,de,de|cn,de,us|cn,us,us|de,de,us|de,us,us"
@@ -35,7 +35,7 @@ expected_labels[18]="cn,de,us|cn,us,us|de,de,us|de,us,us"
 expected_labels[19]="cn,de,us|de,de,us|de,us,us"
 expected_labels[20]="cn,de,us,us|cn,de,de,us"
 
-# For a given file, prints lables of chunkservers where the file's chunks are placed, eg. de,us,us
+# For a given file, prints labels of chunkservers where the file's chunks are placed, eg. de,us,us
 get_file_labels() {
 	local fileinfo_to_labels="`
 			`/copy .*:(${info[chunkserver0_port]}|${info[chunkserver1_port]}):.*\$/ {print \"de\"} `

@@ -84,7 +84,7 @@ static void dsh_release(struct fsal_ds_handle *const dataServerHandle) {
 /**
  * @brief Open a file from DataServerHandle.
  *
- * Auxiliar function to open files in the syscalls related with Data Server.
+ * Auxiliary function to open files in the syscalls related with Data Server.
  *
  * @param[in] export         Handle to release
  * @param[in] dataServer     Data Server handle

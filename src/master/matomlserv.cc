@@ -94,7 +94,7 @@ static int lsock;
 static int32_t lsockpdescpos;
 static bool gExiting = false;
 
-/// Miminal period (in seconds) between two metadata save processes requested by shadow masters
+/// Minimal period (in seconds) between two metadata save processes requested by shadow masters
 static uint32_t gMinMetadataSaveRequestPeriod_s;
 
 /// Timestamp of the last metadata save request

@@ -111,7 +111,7 @@ void personality_reload(void) {
 				promoteToMaster();
 			} else {
 				safs_pretty_syslog(LOG_ERR,
-						"trying to preform forbidden personality change from Master to Shadow");
+						"trying to perform forbidden personality change from Master to Shadow");
 			}
 		}
 	} catch (const ConfigurationException& e) {

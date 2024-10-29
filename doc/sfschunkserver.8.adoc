@@ -65,7 +65,7 @@ or *kill*. Default action is *restart*.
 == FILES
 
 *sfschunkserver.cfg*:: configuration file for SaunaFS chunkserver process;
-refer to *sfschunkserver.cfg*(5) manual for defails
+refer to *sfschunkserver.cfg*(5) manual for details
 
 *sfshdd.cfg*:: list of directories (mountpoints) used for SaunaFS storage (one
 per line; directory prefixed by *** character causes given directory to be
