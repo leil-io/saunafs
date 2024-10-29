@@ -1,11 +1,17 @@
 timeout_set 2 minutes
 
+if is_windows_system; then
+	ioretries=15
+else
+	ioretries=14
+fi
+
 MOUNT_EXTRA_CONFIG="sfscachemode=NEVER`
 		`|readcachemaxsizepercentage=1`
 		`|maxreadaheadrequests=0`
-		`|sfsioretries=14`
+		`|sfsioretries=${ioretries}`
 		`|cacheexpirationtime=10000" \
-    setup_local_empty_saunafs info
+	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
 
