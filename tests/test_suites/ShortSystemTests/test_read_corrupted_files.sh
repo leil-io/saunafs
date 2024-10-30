@@ -4,7 +4,7 @@ assert_program_installed pv
 
 USE_RAMDISK=YES \
 	CHUNKSERVERS=5 \
-    MOUNT_EXTRA_CONFIG="sfscachemode=NEVER`
+	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER`
 			`|readcachemaxsizepercentage=1`
 			`|sfsioretries=1`
 			`|maxreadaheadrequests=0`
@@ -44,12 +44,12 @@ max_iterations=$((max_memory_mb / (file_size_mb * 50)))
 
 # Limit the iterations for large memory systems
 if [ $iterations -gt $max_iterations ]; then
-  iterations=$max_iterations
+	iterations=$max_iterations
 fi
 
 # Read the file in a loop
 for ((i=0; i<iterations; i++)); do
-  assert_failure pv -B ${SAUNAFS_BLOCK_SIZE} -E -Z ${SAUNAFS_BLOCK_SIZE} -Y ${dir}/file &> /dev/null
+	assert_failure pv -B ${SAUNAFS_BLOCK_SIZE} -E -Z ${SAUNAFS_BLOCK_SIZE} -Y ${dir}/file &> /dev/null
 done
 
 sleep 10
