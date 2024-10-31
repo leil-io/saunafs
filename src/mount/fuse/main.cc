@@ -23,12 +23,15 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fstream>
+#include <ostream>
+#include <print>
 #include <fuse.h>
 #include <fuse_lowlevel.h>
 #include <sys/types.h>
 
 #include "common/crc.h"
 #include "common/md5.h"
+#include "common/version.h"
 #include "errors/sfserr.h"
 #include "common/sockets.h"
 #include "mount/fuse/daemonize.h"
@@ -681,7 +684,7 @@ int main(int argc, char *argv[]) try {
 	}
 
 	if (fuse_opts.show_version) {
-		printf("SaunaFS version %s\n", SAUNAFS_PACKAGE_VERSION);
+		std::println("{}", common::version());
 		printf("FUSE library version: %s\n", fuse_pkgversion());
 		fuse_lowlevel_version();
 		return 0;
