@@ -97,6 +97,9 @@ Other options:
 *-r*::
 This option enables recursive mode.
 
+*-v*, *--version*::
+Print version and exit
+
 == INHERITANCE
 
 When new object is created in SaunaFS, attributes such as goal, trashtime and
