@@ -23,7 +23,6 @@
 #include <algorithm>
 #include <iostream>
 #include <ostream>
-#include <print>
 
 #include "admin/chunk_health_command.h"
 #include "admin/info_command.h"
@@ -91,7 +90,7 @@ int main(int argc, const char** argv) {
 #endif
 		std::string command_name = argv[1];
 		if (command_name == "-v" || command_name == "--version") {
-			std::println("{}", common::version());
+			std::cout << common::version() << '\n';
 			return 0;
 		}
 		std::vector<std::string> arguments(argv + 2, argv + argc);

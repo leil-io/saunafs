@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <fstream>
 #include <ostream>
-#include <print>
 #include <fuse.h>
 #include <fuse_lowlevel.h>
 #include <sys/types.h>
@@ -684,7 +683,7 @@ int main(int argc, char *argv[]) try {
 	}
 
 	if (fuse_opts.show_version) {
-		std::println("{}", common::version());
+		std::cout << common::version() << '\n';
 		printf("FUSE library version: %s\n", fuse_pkgversion());
 		fuse_lowlevel_version();
 		return 0;

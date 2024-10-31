@@ -42,10 +42,10 @@
 #include <algorithm>
 #include <atomic>
 #include <fstream>
+#include <iostream>
 #include <list>
 #include <memory>
 #include <ostream>
-#include <print>
 
 #include "common/version.h"
 #include "common/cfg.h"
@@ -839,7 +839,7 @@ int main(int argc,char **argv) {
 		switch(ch) {
 			case 'v':
 			case 'V':
-				std::println("{}", common::version());
+				std::cout << common::version() << '\n';
 				return 0;
 			case 'd':
 				gRunAsDaemon = false;
