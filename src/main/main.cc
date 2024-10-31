@@ -44,7 +44,10 @@
 #include <fstream>
 #include <list>
 #include <memory>
+#include <ostream>
+#include <print>
 
+#include "common/version.h"
 #include "common/cfg.h"
 #include "common/crc.h"
 #include "common/cwrap.h"
@@ -836,7 +839,7 @@ int main(int argc,char **argv) {
 		switch(ch) {
 			case 'v':
 			case 'V':
-				printf("version: %s\n",SAUNAFS_PACKAGE_VERSION);
+				std::println("{}", common::version());
 				return 0;
 			case 'd':
 				gRunAsDaemon = false;

@@ -22,6 +22,8 @@
 
 #include <algorithm>
 #include <iostream>
+#include <ostream>
+#include <print>
 
 #include "admin/chunk_health_command.h"
 #include "admin/info_command.h"
@@ -50,6 +52,7 @@
 #include "protocol/SFSCommunication.h"
 #include "errors/sfserr.h"
 #include "common/sockets.h"
+#include <common/version.h>
 
 int main(int argc, const char** argv) {
 	std::vector<const SaunaFsAdminCommand*> allCommands = {
@@ -86,7 +89,11 @@ int main(int argc, const char** argv) {
 #ifdef _WIN32
 		socketinit();
 #endif
-		command_name = argv[1];
+		std::string command_name = argv[1];
+		if (command_name == "-v" || command_name == "--version") {
+			std::println("{}", common::version());
+			return 0;
+		}
 		std::vector<std::string> arguments(argv + 2, argv + argc);
 		for (auto command : allCommands) {
 			if (command->name() == command_name) {
@@ -115,6 +122,9 @@ int main(int argc, const char** argv) {
 		std::cerr << ex.message() << std::endl;
 		std::cerr << "Usage:\n";
 		std::cerr << "    " << argv[0] << " COMMAND [OPTIONS...] [ARGUMENTS...]\n\n";
+
+		std::cerr << "Options:\n";
+		std::cerr << "-v --version: Print version\n\n";
 		if (command_name.empty()) {
 			std::cerr << "Available COMMANDs:\n\n";
 			for (auto command : allCommands) {
