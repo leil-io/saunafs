@@ -215,7 +215,7 @@ static unsigned gDirEntryCacheMaxSize = 100000;
 
 static int debug_mode = 0;
 static int usedircache = 1;
-static bool ignore_flush = false;
+static std::atomic<bool> gIgnoreFlush = false;
 static int keep_cache = 0;
 static double direntry_cache_timeout = 0.1;
 static double entry_cache_timeout = 0.0;
@@ -2408,7 +2408,7 @@ BytesWritten write(Context &ctx, Inode ino, const char *buf, size_t size, off_t 
 }
 
 void flush(Context &ctx, Inode ino, FileInfo* fi) {
-	if (ignore_flush) {
+	if (gIgnoreFlush) {
 		oplog_printf(ctx, "flush (%lu): OK",
 				(unsigned long int)ino);
 		return;
@@ -3411,7 +3411,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 	mounting_gid = mounting_gid_;
 	allowed_users = allowed_users_;
 #endif
-	ignore_flush = ignore_flush_;
+	gIgnoreFlush = ignore_flush_;
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
 	direntry_cache_timeout = direntry_cache_timeout_;
@@ -3443,6 +3443,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 			getAcl));
 
 	gTweaks.registerVariable("DirectIO", gDirectIo);
+	gTweaks.registerVariable("IgnoreFlush", gIgnoreFlush);
 	gTweaks.registerVariable("AclCacheMaxTime", acl_cache->maxTime_ms);
 	gTweaks.registerVariable("AclCacheHit", acl_cache->cacheHit);
 	gTweaks.registerVariable("AclCacheExpired", acl_cache->cacheExpired);
