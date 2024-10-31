@@ -217,6 +217,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m64")
 endif()
 
+if(GIT_COMMIT)
+    add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
+endif()
+
+if(GIT_BRANCH)
+    add_compile_definitions(GIT_BRANCH="${GIT_BRANCH}")
+endif()
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LINUX ON)
   set(UNIX ON)
