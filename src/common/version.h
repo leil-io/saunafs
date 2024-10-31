@@ -23,21 +23,20 @@
 namespace common {
 
 inline std::string version() {
-	const std::string version = "Version: " \
+	return "Version: " \
 	SAUNAFS_PACKAGE_VERSION "\n"
 	"Build time: " BUILD_TIME "\n"
 	#ifdef GIT_COMMIT
-		version += "Git commit: " GIT_COMMIT "\n";
+		"Git commit: " GIT_COMMIT "\n"
 	#else
 		"Git commit: N/A\n"
 	#endif
 	#ifdef GIT_BRANCH
-		version += "Git branch: " GIT_BRANCH "\n";
+		"Git branch: " GIT_BRANCH
 	#else
-		"Git branch: N/A\n"
+		"Git branch: N/A"
 	#endif
 	;
-	return version;
 }
 
 } // namespace common
