@@ -159,6 +159,7 @@ apt_packages=(
 )
 noble_packages=(
 	prometheus-cpp-dev
+	util-linux-extra
 )
 dnf_packages=(
 	boost-filesystem

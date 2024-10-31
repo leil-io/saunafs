@@ -25,14 +25,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ostream>
-#include <print>
 
 int printUsage(int argc, char **argv) {
 	if (argc < 2) {
 		fprintf(stderr, "usage:\n");
 		fprintf(stderr, "\tsaunafs <tool name> [options]\n");
 		printTools();
-		std::println();
+		printf("\n");
 		printOptions();
 	}
 	else {
@@ -65,8 +64,8 @@ void printTools() {
 }
 
 void printOptions() {
-	std::println("options: ");
-	std::println("\t-v/--version: print version");
+	printf("options: \n");
+	printf("\t-v/--version: print version\n");
 }
 
 static int cd_func(int argc, char **argv) {

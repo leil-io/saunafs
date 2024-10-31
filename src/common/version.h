@@ -22,19 +22,21 @@
 
 namespace common {
 
-constexpr std::string version() {
-	std::string version = "Version: " SAUNAFS_PACKAGE_VERSION "\n";
-	version += "Build time: " BUILD_TIME "\n";
+inline std::string version() {
+	const std::string version = "Version: " \
+	SAUNAFS_PACKAGE_VERSION "\n"
+	"Build time: " BUILD_TIME "\n"
 	#ifdef GIT_COMMIT
 		version += "Git commit: " GIT_COMMIT "\n";
 	#else
-		version += "Git commit: N/A\n";
+		"Git commit: N/A\n"
 	#endif
 	#ifdef GIT_BRANCH
 		version += "Git branch: " GIT_BRANCH "\n";
 	#else
-		version += "Git branch: N/A";
+		"Git branch: N/A\n"
 	#endif
+	;
 	return version;
 }
 

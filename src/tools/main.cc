@@ -24,7 +24,6 @@
 #include <cstring>
 #include <iostream>
 #include <ostream>
-#include <print>
 #include <limits.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -64,7 +63,7 @@ int main(int argc, char **argv) {
 	if (argc > 1) {
 		std::string func_name(argv[1]);
 		if (func_name == "--version" || func_name == "-v") {
-			std::println("{}", common::version());
+			std::cout << common::version() << '\n';
 			exit(EXIT_SUCCESS);
 		}
 		auto func = getCommand(func_name);
