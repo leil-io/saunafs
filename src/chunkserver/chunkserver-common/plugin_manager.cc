@@ -19,19 +19,27 @@
 #include "common/platform.h"
 
 #include "chunkserver-common/plugin_manager.h"
+#include <boost/filesystem/exception.hpp>
 
 #include "chunkserver-common/disk_plugin.h"
 #include "slogger/slogger.h"
 
 bool PluginManager::loadPlugins(const std::string &directory) {
-	if (!boost::filesystem::is_directory(directory) ||
-	    boost::filesystem::is_empty(directory)) {
-		// It is normal to not have any plugins in many scenarios
-		safs_pretty_syslog(
-		    LOG_NOTICE,
-		    "PluginManager: Directory %s does not exist or is empty",
-		    directory.c_str());
-		return false;
+	try {
+		if (!boost::filesystem::is_directory(directory) ||
+		    boost::filesystem::is_empty(directory)) {
+			// It is normal to not have any plugins in many scenarios
+			safs_pretty_syslog(
+			    LOG_NOTICE,
+			    "PluginManager: Directory %s does not exist or is empty",
+			    directory.c_str());
+			return false;
+		}
+	} catch (boost::filesystem::filesystem_error &e) {
+			safs::log_info(
+			    "PluginManager: Directory {} cannot not be checked: {}",
+			    directory.c_str(), e.what());
+			return false;
 	}
 
 	boost::filesystem::path dir(directory);
