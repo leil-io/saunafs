@@ -45,21 +45,20 @@
 #include <iostream>
 #include <list>
 #include <memory>
-#include <ostream>
 
-#include "common/version.h"
 #include "common/cfg.h"
 #include "common/crc.h"
 #include "common/cwrap.h"
+#include "common/event_loop.h"
 #include "common/exceptions.h"
 #include "common/exit_status.h"
-#include "common/event_loop.h"
 #include "common/main.h"
 #include "common/massert.h"
 #include "common/setup.h"
-#include "slogger/slogger.h"
 #include "common/time_utils.h"
+#include "common/version.h"
 #include "protocol/SFSCommunication.h"
+#include "slogger/slogger.h"
 
 #if defined(SAUNAFS_HAVE_MLOCKALL)
 #  if defined(SAUNAFS_HAVE_SYS_MMAN_H)
