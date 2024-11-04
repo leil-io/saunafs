@@ -48,11 +48,18 @@ pipeline {
             }
         }
 
+        stage('Run machine tests') {
+            steps {
+                sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite MachineTests --workers 1 --multiplier 2'''
+            }
+        }
+
         stage('Run long system tests') {
             steps {
                 sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite LongSystemTests --workers 12 --multiplier 2 --cpus 2'''
             }
         }
+
     }
     post {
         // Clean after build
