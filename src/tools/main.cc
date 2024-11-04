@@ -20,13 +20,13 @@
 #include "common/platform.h"
 
 #include <cassert>
+#include <climits>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <ostream>
-#include <limits.h>
 #include <unistd.h>
-#include <stdio.h>
 
 #include "common/version.h"
 #include "tools/tools_commands.h"

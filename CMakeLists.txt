@@ -50,6 +50,8 @@ option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                
 option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"             ON)
 option(ENABLE_PROMETHEUS        "Enable prometheus metrics"                              ON)
 
+option(GENERATE_GIT_INFO "Generate git info from current repository (for version commands)" ON)
+
 # If enabled (default), the file compile_commands.json is generated in the build
 # directory. Tools like clangd and vscode use this file for proper analysis.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ${ENABLE_COMPILE_COMMANDS})
@@ -193,6 +195,7 @@ set(DEFAULT_MIN_VERSION "4.6.0")
 string(TIMESTAMP BUILD_TIMESTAMP)
 add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
 
+
 if(VERSION_SUFFIX)
   set(PACKAGE_VERSION "${DEFAULT_MIN_VERSION}${VERSION_SUFFIX}")
 else()
@@ -218,11 +221,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
 endif()
 
 if(GIT_COMMIT)
-    add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
+  add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
+elseif(GENERATE_GIT_INFO)
+  execute_process(COMMAND "git" "rev-parse" "HEAD"
+  OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+  add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
 endif()
 
 if(GIT_BRANCH)
-    add_compile_definitions(GIT_BRANCH="${GIT_BRANCH}")
+  add_compile_definitions(GIT_BRANCH="${GIT_BRANCH}")
+elseif(GENERATE_GIT_INFO)
+  execute_process(COMMAND "git" "rev-parse" "--abbrev-ref" "HEAD"
+  OUTPUT_VARIABLE GIT_BRANCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+  add_compile_definitions(GIT_BRANCH="${GIT_BRANCH}")
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
