@@ -579,6 +579,7 @@ uint8_t fs_apply_trunc(uint32_t ts, uint32_t inode, uint32_t indx, uint64_t chun
 	}
 	ochunkid = p->chunks[indx];
 	if (ochunkid == 0) {
+		safs::log_err("fs_apply_trunc: node does not have a chunk at index {} chunks, inode {}", indx, inode);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	status = chunk_apply_modification(ts, ochunkid, lockid, p->goal, true, &nchunkid);
@@ -2112,8 +2113,10 @@ uint8_t fs_apply_repair(uint32_t ts, uint32_t inode, uint32_t indx, uint32_t nve
 	}
 	if (indx >= p->chunks.size()) {
 		return SAUNAFS_ERROR_NOCHUNK;
+		safs::log_err("fs_apply_repair: indx {} is greater than number of chunks ({}), inode {}", indx, p->chunks.size(), inode);
 	}
 	if (p->chunks[indx] == 0) {
+		safs::log_err("fs_apply_repair: node chunks at index {} has no chunks, inode {}", indx, inode);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	fsnodes_get_stats(p, &psr);
