@@ -524,6 +524,7 @@ int hddOpen(IChunk *chunk) {
 int hddOpen(uint64_t chunkId, ChunkPartType chunkType) {
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddOpen: could not find chunkid {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -548,6 +549,7 @@ int hddClose(IChunk *chunk) {
 int hddClose(uint64_t chunkId, ChunkPartType chunkType) {
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 	if (chunk == NULL) {
+		safs::log_err("hddClose: could not find chunkid {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	int status = hddClose(chunk);
@@ -604,8 +606,7 @@ int hddPrefetchBlocks(uint64_t chunkId, ChunkPartType chunkType,
 
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 	if (chunk == ChunkNotFound) {
-		safs_pretty_syslog(LOG_WARNING, "error finding chunk for prefetching: %"
-		                   PRIu64, chunkId);
+		safs::log_err("Couldn't find chunkID {} for prefetching", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -713,6 +714,7 @@ int hddRead(uint64_t chunkId, uint32_t version, ChunkPartType chunkType,
 	auto* chunk = hddChunkFindAndLock(chunkId, chunkType);
 
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddRead: Couldn't find chunkID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -786,6 +788,7 @@ int hddChunkWriteBlock(uint64_t chunkId, uint32_t version,
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddChunkWriteBlock: ChunkNotFound; chunkId {}, version {}, type {}", chunkId, version, chunkType.toString());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -806,6 +809,7 @@ int hddChunkGetNumberOfBlocks(uint64_t chunkId, ChunkPartType chunkType,
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 	*blocks = 0;
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddChunkGetNumberOfBlocks: Couldn't find chunkID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -920,6 +924,7 @@ static int hddInternalTestChunk(uint64_t chunkId, uint32_t version,
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddInternalTestChunk: Couldn't find chunkID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -1006,6 +1011,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 	originalChunk = hddChunkFindAndLock(chunkId, chunkType);
 
 	if (originalChunk == ChunkNotFound) {
+		safs::log_err("hddInternalDuplicate: Couldn't find original chunk, ID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (originalChunk->version() != chunkVersion && chunkVersion > 0) {
@@ -1265,6 +1271,7 @@ int hddInternalUpdateVersion(uint64_t chunkId, uint32_t version,
 
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddInternalUpdateVersion: Couldn't find original chunk, ID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -1293,6 +1300,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 
 	// step 1 - change version
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddInternalTruncate: Couldn't find original chunk, ID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (chunk->version() != oldVersion && oldVersion > 0) {
@@ -1506,6 +1514,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 	originalChunk = hddChunkFindAndLock(chunkId, chunkType);
 
 	if (originalChunk == nullptr) {
+		safs::log_err("hddInternalDuplicateTruncate: Couldn't find original chunk, ID {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (originalChunk->version() != chunkVersion && chunkVersion > 0) {
@@ -1998,6 +2007,7 @@ int hddInternalDelete(uint64_t chunkId, uint32_t version,
 
 	auto *chunk = hddChunkFindAndLock(chunkId, chunkType);
 	if (chunk == ChunkNotFound) {
+		safs::log_err("hddInternalDelete: could not find chunkid {}", chunkId);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
