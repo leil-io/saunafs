@@ -1024,6 +1024,7 @@ uint8_t matoclserv_fuse_write_chunk_respond(matoclserventry *eptr,
 	if (status == SAUNAFS_STATUS_OK && !serializer->isSaunaFsPacketSerializer()) {
 		for (const ChunkTypeWithAddress& chunkCopy : allChunkCopies) {
 			if (!slice_traits::isStandard(chunkCopy.chunk_type)) {
+				safs::log_err("matoclserv_fuse_write_chunk_respond: client tried to modify standard copy of a xor chunk, chunkID {}", chunkId);
 				status = SAUNAFS_ERROR_NOCHUNK;
 				break;
 			}
@@ -1922,7 +1923,7 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 	auto it = eptr->sesdata->openedfiles.begin();
 	while (it != eptr->sesdata->openedfiles.end()) {
 		uint32_t openFileIno = *it;
-		if (!inodes_to_reserve.contains(openFileIno)) { 
+		if (!inodes_to_reserve.contains(openFileIno)) {
 			// erase files not belonging to the reserve inodes list provided
 			fs_release(context, openFileIno, eptr->sesdata->sessionid);
 			it = eptr->sesdata->openedfiles.erase(it);
