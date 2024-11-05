@@ -213,10 +213,10 @@ Equivalent to *--nostdopts* (*-n*) option for use in fstab.
 *-o nonempty*::
 Equivalent to *--nonempty* option for use in fstab.
 
-*-o sfsignoreflush*::
+*-o sfsignoreflush*'0|1'::
 Advanced: use with caution. Ignore flush usual behavior by replying SUCCESS to it
 immediately. Targets fast creation of small files, but may cause data loss
-during crashes when allegedly flushed data is still being processed.
+during crashes when allegedly flushed data is still being processed (default: 0).
 
 *-o sfsdirectio=*'0|1'::
 Whether to use FUSE DirectIO. This may improve performance when reading large

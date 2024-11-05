@@ -215,7 +215,6 @@ static InodeDataMap inodedataMap;
 
 static uint32_t gWriteWindowSize;
 static uint32_t gChunkserverTimeout_ms;
-static std::atomic<bool> gIgnoreFlush;
 
 // percentage of the free cache (1% - 100%) which can be used by one inode
 static uint32_t gCachePerInodePercentage;
