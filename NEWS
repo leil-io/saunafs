@@ -1,6 +1,7 @@
 This file lists noteworthy changes in SaunaFS.
 
  * SaunaFS (4.6.0) (2024-10-23)
+ - build: Add allowing to pass suffix to version
  - fix(mount): Enhance read cache handling and add tests (#202)
  - fix: Clarify error offset in file-validate (#218)
  - feat: Configure judy use via directives (#219)
