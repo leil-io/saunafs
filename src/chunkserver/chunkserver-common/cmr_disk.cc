@@ -1,5 +1,6 @@
 #include "cmr_disk.h"
 
+#include <sys/stat.h>
 #include <sys/statvfs.h>
 
 #include "chunkserver-common/chunk_interface.h"
@@ -93,20 +94,30 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 
 	struct stat metaStat {};
 	if (stat(chunk->metaFilename().c_str(), &metaStat) < 0) {
+		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk metadata {}: {}",
+				chunk->metaFilename(), strerror(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
-	if ((metaStat.st_mode & S_IFMT) != S_IFREG) {
+	if (!S_ISREG(metaStat.st_mode)) {
+		safs::log_critical("CmrDisk::updateChunkAttributes: chunk metadata file {} not a regular file",
+					 chunk->metaFilename());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
 	struct stat dataStat {};
 	if (stat(chunk->dataFilename().c_str(), &dataStat) < 0) {
+		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk data {}: {}",
+				chunk->dataFilename(), strerror(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if ((dataStat.st_mode & S_IFMT) != S_IFREG) {
+		safs::log_critical("CmrDisk::updateChunkAttributes: chunk data file {} not a regular file",
+					 chunk->dataFilename());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (!chunk->isDataFileSizeValid(dataStat.st_size)) {
+		safs::log_critical("CmrDisk::updateChunkAttributes: chunk data file {} size is invalid, file size is {} and block size is {}, max blocks in chunk is {}",
+					 chunk->dataFilename(), dataStat.st_size, SFSBLOCKSIZE, chunk->maxBlocksInFile());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 

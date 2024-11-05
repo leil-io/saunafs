@@ -896,6 +896,7 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevgoal,uint8_t newgoal) {
 	}
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_change_file: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	try {
@@ -936,6 +937,7 @@ int chunk_delete_file(uint64_t chunkid,uint8_t goal) {
 	Chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_delete_file: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	return chunk_delete_file_int(c,goal);
@@ -945,6 +947,7 @@ int chunk_add_file(uint64_t chunkid,uint8_t goal) {
 	Chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_add_file: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	return chunk_add_file_int(c,goal);
@@ -954,6 +957,7 @@ int chunk_can_unlock(uint64_t chunkid, uint32_t lockid) {
 	Chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_can_unlock: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (lockid == 0) {
@@ -977,6 +981,7 @@ int chunk_unlock(uint64_t chunkid) {
 	Chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_unlock: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	// Don't remove lockid to safely accept retransmission of FUSE_CHUNK_UNLOCK message
@@ -1012,6 +1017,7 @@ int chunk_get_fullcopies(uint64_t chunkid,uint8_t *vcopies) {
 	*vcopies = 0;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_get_fullcopies: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -1026,6 +1032,7 @@ int chunk_get_partstomodify(uint64_t chunkid, int &recover, int &remove) {
 	remove = 0;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_get_partstomodify: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	recover = c->countMissingParts();
@@ -1076,6 +1083,7 @@ uint8_t chunk_multi_modify(uint64_t ochunkid, uint32_t *lockid, uint8_t goal,
 	} else {
 		Chunk *oc = chunk_find(ochunkid);
 		if (oc==NULL) {
+			safs::log_err("chunk_multi_modify: could not find chunkid {}", ochunkid);
 			return SAUNAFS_ERROR_NOCHUNK;
 		}
 		if (*lockid != 0 && *lockid != oc->lockid) {
@@ -1173,6 +1181,7 @@ uint8_t chunk_multi_truncate(uint64_t ochunkid, uint32_t lockid, uint32_t length
 	c=NULL;
 	oc = chunk_find(ochunkid);
 	if (oc==NULL) {
+		safs::log_err("chunk_multi_truncate: could not find chunkid {}", ochunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (!oc->isWritable()) {
@@ -1253,6 +1262,7 @@ uint8_t chunk_apply_modification(uint32_t ts, uint64_t oldChunkId, uint32_t lock
 	} else {
 		Chunk *oc = chunk_find(oldChunkId);
 		if (oc == NULL) {
+		    safs::log_err("chunk_apply_modification: could not find old chunkid {}", oldChunkId);
 			return SAUNAFS_ERROR_NOCHUNK;
 		}
 		if (oc->fileCount() == 0) { // refcount == 0
@@ -1353,6 +1363,7 @@ int chunk_set_version(uint64_t chunkid,uint32_t version) {
 	Chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_set_version: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	c->version = version;
@@ -1364,6 +1375,7 @@ int chunk_increase_version(uint64_t chunkid) {
 	Chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
+		safs::log_err("chunk_increase_version: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	c->version++;
@@ -1424,6 +1436,7 @@ int chunk_getversionandlocations(uint64_t chunkid, uint32_t currentIp, uint32_t&
 	c = chunk_find(chunkid);
 
 	if (c == NULL) {
+		safs::log_err("chunk_getversionandlocations: could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	version = c->version;
@@ -1464,6 +1477,7 @@ int chunk_getversionandlocations(uint64_t chunkid, uint32_t currentIp, uint32_t&
 	c = chunk_find(chunkid);
 
 	if (c == NULL) {
+		safs::log_err("chunk_getversionandlocations (2?): could not find chunkid {}", chunkid);
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	version = c->version;
