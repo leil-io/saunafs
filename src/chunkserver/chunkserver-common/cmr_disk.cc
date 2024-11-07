@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <cstring>
 
 #include "chunkserver-common/chunk_interface.h"
 #include "chunkserver-common/cmr_chunk.h"
@@ -95,7 +96,7 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 	struct stat metaStat {};
 	if (stat(chunk->metaFilename().c_str(), &metaStat) < 0) {
 		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk metadata {}: {}",
-				chunk->metaFilename(), strerror(errno));
+				chunk->metaFilename(), strerr(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (!S_ISREG(metaStat.st_mode)) {
@@ -107,7 +108,7 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 	struct stat dataStat {};
 	if (stat(chunk->dataFilename().c_str(), &dataStat) < 0) {
 		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk data {}: {}",
-				chunk->dataFilename(), strerror(errno));
+				chunk->dataFilename(), strerr(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if ((dataStat.st_mode & S_IFMT) != S_IFREG) {
@@ -171,10 +172,16 @@ void CmrDisk::creat(IChunk *chunk) {
 	chunk->setMetaFD(::open(chunk->metaFilename().c_str(),
 	                        O_RDWR | O_TRUNC | O_CREAT,
 	                        disk::kDefaultOpenMode));
+	if (chunk->metaFD() == -1) {
+		safs::log_err("failed to create chunk file: {}", strerr(errno));
+	}
 
 	chunk->setDataFD(::open(chunk->dataFilename().c_str(),
 	                        O_RDWR | O_TRUNC | O_CREAT,
 	                        disk::kDefaultOpenMode));
+	if (chunk->dataFD() == -1) {
+		safs::log_err("failed to create chunk file: {}", strerr(errno));
+	}
 }
 
 void CmrDisk::open(IChunk *chunk) {
