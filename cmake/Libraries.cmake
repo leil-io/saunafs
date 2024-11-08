@@ -137,7 +137,7 @@ endif()
 
 # Find Judy
 
-find_package(Judy)
+find_package(Judy REQUIRED)
 if(JUDY_FOUND)
   set(SAUNAFS_HAVE_JUDY YES)
   set(SAUNAFS_HAVE_WORKING_JUDY1 ${JUDY_HAVE_WORKING_JUDY1})
