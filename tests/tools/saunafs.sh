@@ -558,6 +558,8 @@ create_sfschunkserver_cfg_() {
 	echo "WORKING_USER = $(id -nu)"
 	echo "WORKING_GROUP = $(id -ng)"
 	echo "DATA_PATH = $chunkserver_data_path"
+	echo "METADATA_CACHE_PATH = ${chunkserver_data_path}/chunk_metadata"
+	mkdir -p "${chunkserver_data_path}/chunk_metadata" &>/dev/null
 	echo "HDD_CONF_FILENAME = $hdd_cfg"
 	echo "HDD_LEAVE_SPACE_DEFAULT = 128MiB"
 	echo "MASTER_HOST = $ip_address"

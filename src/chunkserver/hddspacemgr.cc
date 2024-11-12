@@ -18,9 +18,14 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "chunkserver-common/disk_interface.h"
+#include "common/chunk_part_type.h"
 #include "common/platform.h"
 
 #include "hddspacemgr.h"
+#include <sys/syslog.h>
+#include <cstdint>
+#include <filesystem>
 
 #ifdef SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE_IN_LINUX_FALLOC_H
 #  define SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE
@@ -59,6 +64,7 @@
 #endif // SAUNAFS_HAVE_THREAD_LOCAL
 #include <atomic>
 #include <deque>
+#include <regex>
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -77,6 +83,7 @@
 #include "chunkserver-common/subfolder.h"
 #include "chunkserver/chartsdata.h"
 #include "chunkserver/chunk_filename_parser.h"
+#include "chunkserver/metadata_cache.h"
 #include "chunkserver/network_worker_thread.h"
 #include "common/cfg.h"
 #include "common/chunk_version_with_todel_flag.h"
@@ -96,6 +103,8 @@
 #include "devtools/TracePrinter.h"
 #include "devtools/request_log.h"
 #include "protocol/SFSCommunication.h"
+
+using std::filesystem::file_size;
 
 constexpr int kErrorLimit = 2;
 constexpr int kLastErrorTime = 60;
@@ -2226,15 +2235,8 @@ static inline void hddAddChunkFromDiskScan(IDisk *disk,
 	hddChunkRelease(chunk);
 }
 
-/// Scans the Disk for new Chunks in bulks of 1000 Chunks
-void hddDiskScan(IDisk *disk, uint32_t beginTime) {
+void hddScanDiskFromSubfolders(IDisk *disk, uint32_t beginTime) {
 	std::unique_lock uniqueLock(gDisksMutex);
-	IDisk::ScanState scanState = disk->scanState();
-	uniqueLock.unlock();
-
-	if (scanState == IDisk::ScanState::kTerminate) {
-		return;
-	}
 
 	DIR *dd;
 	struct dirent *dirEntry;
@@ -2328,6 +2330,142 @@ void hddDiskScan(IDisk *disk, uint32_t beginTime) {
 			    LOG_NOTICE, "scanning disk %s: %" PRIu8 "%% (%" PRIu32 "s)",
 			    disk->getPaths().c_str(), lastPercent, currentTime - beginTime);
 		}
+	}
+}
+
+bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
+	std::unique_lock uniqueLock(gDisksMutex);
+
+	uint32_t totalCheckCount = 0;
+	uint8_t lastPercent = 0, currentPercent = 0;
+	bool terminateScan = false;
+	uint32_t lastTime = time(nullptr), currentTime;
+
+	// Get the cache file path
+	std::string cacheFilePath = MetadataCache::getMetadataCacheFilename(disk);
+
+	// Open the cache file
+	std::ifstream cacheFile(cacheFilePath, std::ios::binary);
+	if (!cacheFile.is_open()) {
+		safs_pretty_syslog(LOG_ERR, "Failed to open cache file %s",
+		                   cacheFilePath.c_str());
+		return false;
+	}
+
+	auto fileSizeBytes = file_size(cacheFilePath);
+	uint64_t numberOfChunks = fileSizeBytes / MetadataCache::kChunkSerializedSize;
+	uint64_t currentChunks = 0;
+
+	safs_pretty_syslog(LOG_NOTICE,
+	                   "GUILLEX: cache file: %s, size: %lu, "
+	                   "chunks: %lu",
+	                   cacheFilePath.c_str(), fileSizeBytes, numberOfChunks);
+
+	std::vector<uint8_t> currentChunkBuff(MetadataCache::kChunkSerializedSize);
+
+	// TODO(Guillex): Read bigger blocks from file.
+	// TODO(Guillex): Improve the progress calculation and reporting.
+	// TODO(Guillex): Add the serialize and deserialize methods to the Chunk.
+
+	while (!terminateScan && currentChunks < numberOfChunks) {
+		uint64_t chunkId;
+		uint32_t chunkVersion;
+		uint16_t chunkType;
+		uint16_t chunkBlocks;
+
+		cacheFile.read(reinterpret_cast<char *>(currentChunkBuff.data()),
+		               MetadataCache::kChunkSerializedSize);
+
+		const uint8_t *chunkBuff = currentChunkBuff.data();
+		chunkId = get64bit(&chunkBuff);
+		chunkVersion = get32bit(&chunkBuff);
+		chunkType = get16bit(&chunkBuff);
+		chunkBlocks = get16bit(&chunkBuff);
+		(void)chunkBlocks;
+
+		++currentChunks;
+
+		auto type = ChunkPartType(chunkType);
+		auto subfolderName = Subfolder::getSubfolderNameGivenChunkId(chunkId);
+		auto chunkFilename = MetadataCache::generateChunkMetaFilename(
+		    disk, chunkId, chunkVersion, type);
+
+		hddAddChunkFromDiskScan(disk, chunkFilename, chunkId, chunkVersion,
+		                        type);
+
+		totalCheckCount++;
+
+		if (totalCheckCount >= 1000) {
+			uniqueLock.lock();
+
+			if (disk->scanState() == IDisk::ScanState::kTerminate) {
+				terminateScan = true;
+			}
+
+			uniqueLock.unlock();
+
+			totalCheckCount = 0;
+		}
+	}
+
+	cacheFile.close();
+
+	currentTime = time(nullptr);
+
+	currentPercent = 100.0f;  // Since we are reading from the cache, we assume
+	                          // 100% completion
+
+	if (currentPercent > lastPercent && currentTime > lastTime) {
+		lastPercent = currentPercent;
+		lastTime = currentTime;
+
+		uniqueLock.lock();
+		disk->setScanProgress(currentPercent);
+		uniqueLock.unlock();
+
+		gHddSpaceChanged = true;  // report chunk count to master
+
+		safs_pretty_syslog(
+		    LOG_NOTICE, "scanning disk %s: %" PRIu8 "%% (%" PRIu32 "s)",
+		    disk->getPaths().c_str(), lastPercent, currentTime - beginTime);
+	}
+
+	// Remove the control file after successful scan to not read it again,
+	// it will be created again if the chunkserver is gracefully stopped.
+	auto controlFileName = MetadataCache::getMetadataCacheFilename(disk) +
+	                       MetadataCache::kControlFileExtension.data();
+
+	if (std::filesystem::exists(controlFileName)) {
+		std::filesystem::remove(controlFileName);
+	}
+
+	return true;
+}
+
+/// Scans the Disk for new Chunks in bulks of 1000 Chunks
+void hddDiskScan(IDisk *disk, uint32_t beginTime) {
+	std::unique_lock uniqueLock(gDisksMutex);
+	IDisk::ScanState scanState = disk->scanState();
+	uniqueLock.unlock();
+
+	if (scanState == IDisk::ScanState::kTerminate) {
+		return;
+	}
+
+	bool canScanFromCache = MetadataCache::diskCanLoadMetadataFromCache(disk);
+
+	if (canScanFromCache) {
+		if (!hddScanDiskFromBinaryCache(disk, beginTime)) {
+			safs_pretty_syslog(LOG_ERR,
+			                   "Can't load disk metadata from cache: %s",
+			                   disk->getPaths().c_str());
+		} else {
+			safs_pretty_syslog(
+			    LOG_NOTICE, "Loading disk metadata from cache: %s",
+			    MetadataCache::getMetadataCacheFilename(disk).c_str());
+		}
+	} else {
+		hddScanDiskFromSubfolders(disk, beginTime);
 	}
 
 	if (disk->isZonedDevice()) {
@@ -2467,6 +2605,8 @@ void hddTerminate(void) {
 		}
 	}
 
+	MetadataCache::hddWriteBinaryMetadataCache();
+
 	// Delete chunks even not in AVAILABLE state here, as all threads using
 	// chunk objects should already be joined (by this function and other
 	// cleanup functions of other chunkserver modules that are registered on
@@ -2492,6 +2632,9 @@ void hddReload(void) {
 	char *leaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT",
 	                                disk::gLeaveSpaceDefaultDefaultStrValue);
 	auto parsedLeaveFree = cfg_parse_size(leaveFreeStr);
+
+	std::string metadataCachePath = cfg_getstring("METADATA_CACHE_PATH", "");
+	MetadataCache::setMetadataCachePath(metadataCachePath);
 
 	if (parsedLeaveFree < 0) {
 		safs_pretty_syslog(LOG_NOTICE,
@@ -2591,6 +2734,9 @@ int hddInit() {
 	char *leaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT",
 	                                disk::gLeaveSpaceDefaultDefaultStrValue);
 	auto parsedLeaveFree = cfg_parse_size(leaveFreeStr);
+
+	std::string metadataCachePath = cfg_getstring("METADATA_CACHE_PATH", "");
+	MetadataCache::setMetadataCachePath(metadataCachePath);
 
 	if (parsedLeaveFree < 0) {
 		safs_pretty_syslog(

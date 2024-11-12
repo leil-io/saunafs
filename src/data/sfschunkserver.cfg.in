@@ -24,6 +24,15 @@
 ## (Default: @DATA_PATH@)
 # DATA_PATH = @DATA_PATH@
 
+## Where to store the metadata chunks binary cache.
+## If set to a valid path, accesible by the effective user, the chunkserver will
+## write a file per disk with the chunks metadata information.
+## This binary file can be used to speedup the scan and registration times when
+## there is a big amount of chunks (millions), avoiding the recursive scan from
+## the disk metadata path. An empty path disables the feature.
+## (Default: "")
+# METADATA_CACHE_PATH = ""
+
 ## Delay in seconds before reconnection attempt to the master server after
 ## disconnection.
 ## (Default: 5)
