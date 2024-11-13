@@ -2377,10 +2377,8 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 		++currentChunks;
 
 		auto type = ChunkPartType(chunkMetadata.type);
-		auto subfolderName =
-		    Subfolder::getSubfolderNameGivenChunkId(chunkMetadata.id);
-		auto chunkFilename = MetadataCache::generateChunkMetaFilename(
-		    disk, chunkMetadata.id, chunkMetadata.version, type);
+		auto chunkFilename = FDChunk::generateFilename(
+		    disk, chunkMetadata.id, chunkMetadata.version, type, true);
 
 		hddAddChunkFromDiskScan(disk, chunkFilename, chunkMetadata.id,
 		                        chunkMetadata.version, type);

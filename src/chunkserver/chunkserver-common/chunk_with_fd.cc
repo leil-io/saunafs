@@ -25,6 +25,42 @@ void FDChunk::updateFilenamesFromVersion(uint32_t _version) {
 	dataFilename_ = generateDataFilenameForVersion(_version);
 }
 
+std::string FDChunk::generateFilename(IDisk *disk, uint64_t chunkId,
+                                      uint32_t chunkVersion,
+                                      ChunkPartType chunkType,
+                                      bool isForMetadata) {
+	std::stringstream result;
+	result << (isForMetadata ? disk->metaPath() : disk->dataPath());
+	result << Subfolder::getSubfolderNameGivenChunkId(chunkId) << "/chunk_";
+
+	if (slice_traits::isXor(chunkType)) {
+		if (slice_traits::xors::isXorParity(chunkType)) {
+			result << "xor_parity_of_";
+		} else {
+			result << "xor_"
+			       << static_cast<unsigned>(
+			              slice_traits::xors::getXorPart(chunkType))
+			       << "_of_";
+		}
+		result << static_cast<unsigned>(slice_traits::xors::getXorLevel(chunkType))
+		       << "_";
+	}
+	if (slice_traits::isEC(chunkType)) {
+		result << "ec2_" << (chunkType.getSlicePart() + 1) << "_of_"
+		       << slice_traits::ec::getNumberOfDataParts(chunkType) << "_"
+		       << slice_traits::ec::getNumberOfParityParts(chunkType) << "_";
+	}
+
+	result << std::setfill('0') << std::hex << std::uppercase;
+	result << std::setw(16) << chunkId << "_";
+	result << std::setw(8) << chunkVersion;
+
+	result << (isForMetadata ? CHUNK_METADATA_FILE_EXTENSION
+	                         : CHUNK_DATA_FILE_EXTENSION);
+
+	return result.str();
+}
+
 std::string FDChunk::generateMetadataFilenameForVersion(
     uint32_t _version) const {
 	return generateFilenameForVersion(_version, true);
@@ -32,36 +68,7 @@ std::string FDChunk::generateMetadataFilenameForVersion(
 
 std::string FDChunk::generateFilenameForVersion(uint32_t _version,
                                                 bool isForMetadata) const {
-	std::stringstream result;
-	result << (isForMetadata ? owner_->metaPath() : owner_->dataPath());
-	result << Subfolder::getSubfolderNameGivenChunkId(id_) << "/chunk_";
-
-	if (slice_traits::isXor(type_)) {
-		if (slice_traits::xors::isXorParity(type_)) {
-			result << "xor_parity_of_";
-		} else {
-			result << "xor_"
-			       << static_cast<unsigned>(
-			              slice_traits::xors::getXorPart(type_))
-			       << "_of_";
-		}
-		result << static_cast<unsigned>(slice_traits::xors::getXorLevel(type_))
-		       << "_";
-	}
-	if (slice_traits::isEC(type_)) {
-		result << "ec2_" << (type_.getSlicePart() + 1) << "_of_"
-		       << slice_traits::ec::getNumberOfDataParts(type_) << "_"
-		       << slice_traits::ec::getNumberOfParityParts(type_) << "_";
-	}
-
-	result << std::setfill('0') << std::hex << std::uppercase;
-	result << std::setw(16) << id_ << "_";
-	result << std::setw(8) << _version;
-
-	result << (isForMetadata ? CHUNK_METADATA_FILE_EXTENSION
-	                         : CHUNK_DATA_FILE_EXTENSION);
-
-	return result.str();
+	return generateFilename(owner_, id_, _version, type_, isForMetadata);
 }
 
 off_t FDChunk::getBlockOffset(uint16_t blockNumber) const {

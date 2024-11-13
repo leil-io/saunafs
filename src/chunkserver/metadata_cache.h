@@ -54,8 +54,4 @@ public:
 	static std::string getMetadataCachePath() { return metadataCachePath; }
 
 	static void hddWriteBinaryMetadataCache();
-
-	static std::string generateChunkMetaFilename(IDisk *disk, uint64_t chunkId,
-	                                             uint32_t chunkVersion,
-	                                             ChunkPartType chunkType);
 };

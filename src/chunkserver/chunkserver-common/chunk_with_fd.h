@@ -72,6 +72,13 @@ public:
 	/// Updates the metadata and data filenames according to the given version.
 	void updateFilenamesFromVersion(uint32_t _version) override;
 
+	/// Reusable filename generator for metadata and data files.
+	/// Can be used before the Chunk exists (static).
+	static std::string generateFilename(IDisk *disk, uint64_t chunkId,
+	                                    uint32_t chunkVersion,
+	                                    ChunkPartType chunkType,
+	                                    bool isForMetadata);
+
 	/// Generates the metadata filename for the given version.
 	std::string generateMetadataFilenameForVersion(
 	    uint32_t _version) const override;

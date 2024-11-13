@@ -5,7 +5,6 @@ CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
 	MASTER_CUSTOM_GOALS="10 ec21: \$ec(2,1)" \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
-	#CHUNKSERVER_EXTRA_CONFIG="HDD_ADVISE_NO_CACHE = 0|METADATA_CACHE_PATH = /tmp/saunafs_metadata_cache" \
 	setup_local_empty_saunafs info
 
 cd "${info[mount0]}"
@@ -23,9 +22,6 @@ done
 
 drop_caches
 
-#echo "Checking metadata chunks"
-#find_all_metadata_chunks
-
 saunafs_chunkserver_daemon 0 restart
 saunafs_chunkserver_daemon 1 restart
 saunafs_chunkserver_daemon 2 restart
@@ -35,6 +31,3 @@ echo "Reading the ${number_of_files} small files"
 for i in $(seq 1 ${number_of_files}); do
 	dd if=file${i} of=/dev/null bs=1K count=1 &> /dev/null
 done
-
-cat "${info[chunkserver0_cfg]}"
-

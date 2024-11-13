@@ -85,42 +85,6 @@ std::string MetadataCache::getMetadataCacheFilename(
 	return metadataCachePath + "/" + filteredPath + kCacheFileExtension.data();
 }
 
-// TODO(Guillex): Make it reusable from the Chunks hierarchy
-std::string MetadataCache::generateChunkMetaFilename(IDisk *disk,
-                                                     uint64_t chunkId,
-                                                     uint32_t chunkVersion,
-                                                     ChunkPartType chunkType) {
-	std::stringstream result;
-	result << disk->metaPath()
-	       << Subfolder::getSubfolderNameGivenChunkId(chunkId) << "/chunk_";
-
-	if (slice_traits::isXor(chunkType)) {
-		if (slice_traits::xors::isXorParity(chunkType)) {
-			result << "xor_parity_of_";
-		} else {
-			result << "xor_"
-			       << static_cast<unsigned>(
-			              slice_traits::xors::getXorPart(chunkType))
-			       << "_of_";
-		}
-		result << static_cast<unsigned>(slice_traits::xors::getXorLevel(chunkType))
-		       << "_";
-	}
-	if (slice_traits::isEC(chunkType)) {
-		result << "ec2_" << (chunkType.getSlicePart() + 1) << "_of_"
-		       << slice_traits::ec::getNumberOfDataParts(chunkType) << "_"
-		       << slice_traits::ec::getNumberOfParityParts(chunkType) << "_";
-	}
-
-	result << std::setfill('0') << std::hex << std::uppercase;
-	result << std::setw(16) << chunkId << "_";
-	result << std::setw(8) << chunkVersion;
-
-	result << CHUNK_METADATA_FILE_EXTENSION;
-
-	return result.str();
-}
-
 bool MetadataCache::writeCacheFile(const std::string &cachePath,
                                    const std::vector<uint8_t> &chunks) {
 	safs_pretty_syslog(LOG_INFO, "Cache file: %s", cachePath.c_str());
