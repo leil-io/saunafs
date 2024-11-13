@@ -62,6 +62,15 @@ enum class ChunkFormat {
 	SPLIT      ///< The Chunk is split in two files (metadata and data)
 };
 
+/// Auxiliar structure to hold common Chunk metadata during
+/// serialization/deserialization to the binary metadata cache.
+struct CachedChunkCommonMetadata {
+	uint64_t id = 0;
+	uint32_t version = 0;
+	uint16_t type = 0;
+	uint16_t blocks = 0;
+};
+
 /**
  * Chunk is a part of a file stored on the filesystem.
  *

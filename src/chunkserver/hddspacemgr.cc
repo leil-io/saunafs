@@ -2362,36 +2362,28 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	                   cacheFilePath.c_str(), fileSizeBytes, numberOfChunks);
 
 	std::vector<uint8_t> currentChunkBuff(MetadataCache::kChunkSerializedSize);
+	CachedChunkCommonMetadata chunkMetadata;
 
 	// TODO(Guillex): Read bigger blocks from file.
 	// TODO(Guillex): Improve the progress calculation and reporting.
-	// TODO(Guillex): Add the serialize and deserialize methods to the Chunk.
 
 	while (!terminateScan && currentChunks < numberOfChunks) {
-		uint64_t chunkId;
-		uint32_t chunkVersion;
-		uint16_t chunkType;
-		uint16_t chunkBlocks;
-
 		cacheFile.read(reinterpret_cast<char *>(currentChunkBuff.data()),
 		               MetadataCache::kChunkSerializedSize);
 
 		const uint8_t *chunkBuff = currentChunkBuff.data();
-		chunkId = get64bit(&chunkBuff);
-		chunkVersion = get32bit(&chunkBuff);
-		chunkType = get16bit(&chunkBuff);
-		chunkBlocks = get16bit(&chunkBuff);
-		(void)chunkBlocks;
+		disk->deserializeChunkMetadataFromCache(chunkBuff, chunkMetadata);
 
 		++currentChunks;
 
-		auto type = ChunkPartType(chunkType);
-		auto subfolderName = Subfolder::getSubfolderNameGivenChunkId(chunkId);
+		auto type = ChunkPartType(chunkMetadata.type);
+		auto subfolderName =
+		    Subfolder::getSubfolderNameGivenChunkId(chunkMetadata.id);
 		auto chunkFilename = MetadataCache::generateChunkMetaFilename(
-		    disk, chunkId, chunkVersion, type);
+		    disk, chunkMetadata.id, chunkMetadata.version, type);
 
-		hddAddChunkFromDiskScan(disk, chunkFilename, chunkId, chunkVersion,
-		                        type);
+		hddAddChunkFromDiskScan(disk, chunkFilename, chunkMetadata.id,
+		                        chunkMetadata.version, type);
 
 		totalCheckCount++;
 

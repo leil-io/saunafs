@@ -188,18 +188,14 @@ void MetadataCache::hddWriteBinaryMetadataCache() {
 		diskChunks.emplace(disk->metaPath(), std::vector<uint8_t>());
 	}
 
+	static std::vector<uint8_t> currentChunk(kChunkSerializedSize);
+
 	for (const auto &chunkEntry : gChunksMap) {
 		IChunk *chunk = chunkEntry.second.get();
-		std::string diskPath = chunk->owner()->metaPath();
+		IDisk *disk = chunk->owner();
+		std::string diskPath = disk->metaPath();
 
-		// TODO(Guillex): Move the serialization to the Chunk or Disk hierarchy
-		static std::vector<uint8_t> currentChunk(kChunkSerializedSize);
-		uint8_t *currentChunkPtr = currentChunk.data();
-		put64bit(&currentChunkPtr, chunk->id());
-		put32bit(&currentChunkPtr, chunk->version());
-		serialize(&currentChunkPtr, chunk->type());
-		put16bit(&currentChunkPtr, chunk->blocks());
-
+		disk->serializeChunkMetadataIntoBuffer(currentChunk.data(), chunk);
 		diskChunks[diskPath].insert(diskChunks[diskPath].end(),
 		                            currentChunk.begin(), currentChunk.end());
 	}

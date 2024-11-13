@@ -10,6 +10,7 @@
 
 constexpr IDisk* DiskNotFound = nullptr;
 
+struct CachedChunkCommonMetadata;
 class IChunk;
 
 /// Represents a data disk in the Chunkserver context.
@@ -121,6 +122,14 @@ public:
 	/// The ChunkState is CH_LOCKED by default.
 	virtual IChunk *instantiateNewConcreteChunk(uint64_t chunkId,
 	                                            ChunkPartType type) = 0;
+
+	/// Serializes the common Chunk metadata into the provided buffer.
+	virtual void serializeChunkMetadataIntoBuffer(uint8_t *buffer,
+	                                              const IChunk *chunk) = 0;
+
+	/// Fills the outChunkMeta from the given buffer.
+	virtual void deserializeChunkMetadataFromCache(
+	    const uint8_t *buffer, CachedChunkCommonMetadata &outChunkMeta) = 0;
 
 	/// Sets the number of blocks for \a chunk from \a originalBlocks to \a
 	/// newBlocks.

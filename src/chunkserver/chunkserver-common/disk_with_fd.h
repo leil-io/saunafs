@@ -91,6 +91,15 @@ public:
 	/// in memory information (header + CRC).
 	int writeChunkHeader(IChunk *chunk) override;
 
+	/// Serializes the common Chunk metadata into the provided buffer.
+	void serializeChunkMetadataIntoBuffer(uint8_t *buffer,
+	                                      const IChunk *chunk) override;
+
+	/// Fills the outChunkMeta from the given buffer.
+	void deserializeChunkMetadataFromCache(
+	    const uint8_t *buffer,
+	    CachedChunkCommonMetadata &outChunkMeta) override;
+
 	/// Returns the path of the metadata directory
 	std::string metaPath() const override;
 	/// Sets the path of the metadata directory

@@ -309,6 +309,22 @@ int FDDisk::writeChunkHeader(IChunk *chunk) {
 	return SAUNAFS_ERROR_IO;
 }
 
+void FDDisk::serializeChunkMetadataIntoBuffer(uint8_t *buffer,
+                                              const IChunk *chunk) {
+	put64bit(&buffer, chunk->id());
+	put32bit(&buffer, chunk->version());
+	serialize(&buffer, chunk->type());
+	put16bit(&buffer, chunk->blocks());
+}
+
+void FDDisk::deserializeChunkMetadataFromCache(
+    const uint8_t *buffer, CachedChunkCommonMetadata &outChunkMeta) {
+	outChunkMeta.id = get64bit(&buffer);
+	outChunkMeta.version = get32bit(&buffer);
+	outChunkMeta.type = get16bit(&buffer);
+	outChunkMeta.blocks = get16bit(&buffer);
+}
+
 int FDDisk::fsyncFD(IChunk *chunk, bool isForMetadata) {
 	int result = -1;
 
