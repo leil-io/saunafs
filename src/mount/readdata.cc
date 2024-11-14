@@ -59,6 +59,7 @@
 inline std::condition_variable readOperationsAvailable;
 inline std::mutex gReadaheadRequestsContainerMutex;
 inline int kMaxReadCacheRequestRetries = 10;
+inline uint32_t kMaxWindowConsideringMaxReadCacheSize;
 
 std::unique_ptr<IMemoryInfo> createMemoryInfo() {
     std::unique_ptr<IMemoryInfo> memoryInfo;
@@ -206,8 +207,9 @@ bool ReadaheadOperationsManager::request(
 
 	rrec->cache.query(offset, size, result, false);
 
-	uint64_t recommendedSize = round_up_to_blocksize(
-	    std::max<uint64_t>(size, rrec->readahead_adviser.window()));
+	uint64_t recommendedSize = round_up_to_blocksize(std::max<uint64_t>(
+	    size, std::min<uint32_t>(rrec->readahead_adviser.window(),
+	                             kMaxWindowConsideringMaxReadCacheSize)));
 
 	if (!result.empty() && result.frontOffset() <= offset &&
 	    offset + size <= result.endOffset()) {
@@ -560,6 +562,7 @@ void read_data_init(uint32_t retries,
 	gReadCacheMaxSize.store((read_chache_max_size_percentage * 0.01) *
 	                        gMemoryInfo->getTotalMemory());
 	gReadWorkers = read_workers;
+	kMaxWindowConsideringMaxReadCacheSize = gReadCacheMaxSize.load() / gReadWorkers;
 	gMaxReadaheadRequests = max_readahead_requests;
 	gPrefetchXorStripes = prefetchXorStripes;
 	gBandwidthOveruse = bandwidth_overuse;
