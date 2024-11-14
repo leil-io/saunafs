@@ -34,7 +34,6 @@
 inline std::atomic<uint32_t> gReadaheadMaxWindowSize;
 inline std::atomic<uint32_t> gCacheExpirationTime_ms;
 inline std::atomic<uint32_t> gMaxReadaheadRequests;
-inline std::atomic<uint64_t> gReadCacheMaxSize;
 
 enum class ReadaheadRequestState {
 	kInqueued,
@@ -220,12 +219,9 @@ struct ReadRecord {
 	      inode(inode),
 	      stopThread(false),
 	      garbageCollectorThread(&ReadRecord::readCacheGarbageCollectionThread, this) {}
-	
-	~ReadRecord() { 
-		terminateThread();
-	}
 
 	~ReadRecord() {
+		terminateThread();
 		mutex.lock();  // Make helgrind happy
 		mutex.unlock();
 		pthread_mutex_destroy(mutex.native_handle());

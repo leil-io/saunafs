@@ -81,10 +81,16 @@ bool readShouldWaitForSystemMemory(size_t bytesToReadLeft) {
 
 inline void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
 	gUsedReadCacheMemory += bytesToReadLeft;
+	gReadCacheMemoryAlmostExceeded =
+	    gUsedReadCacheMemory >=
+	    static_cast<uint64_t>(0.8 * gReadCacheMaxSize.load());
 }
 
 inline void decreaseUsedReadCacheMemory(size_t bytesToReadLeft) {
 	gUsedReadCacheMemory -= bytesToReadLeft;
+	gReadCacheMemoryAlmostExceeded =
+	    gUsedReadCacheMemory >=
+	    static_cast<uint64_t>(0.8 * gReadCacheMaxSize.load());
 }
 
 uint32_t getBytesToBeReadFromCS(uint32_t index, uint32_t offset, uint32_t size,
@@ -293,6 +299,10 @@ RequestConditionVariablePair *ReadaheadOperationsManager::addRequest_(
 void ReadaheadOperationsManager::addExtraRequests_(
     ReadRecord *rrec, uint64_t currentOffset, uint64_t satisfyingSize,
     uint64_t maximumRequestedOffset) {
+	if (gReadCacheMemoryAlmostExceeded.load()) {
+		return;
+	}
+
 	if (!rrec->readaheadRequests.empty()) {
 		maximumRequestedOffset = rrec->readaheadRequests.lastPendingRequest()
 		                             ->requestPtr->endOffset();
