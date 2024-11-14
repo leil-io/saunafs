@@ -60,6 +60,8 @@ inline std::condition_variable readOperationsAvailable;
 inline std::mutex gReadaheadRequestsContainerMutex;
 inline int kMaxReadCacheRequestRetries = 10;
 inline uint32_t kMaxWindowConsideringMaxReadCacheSize;
+inline std::atomic<uint64_t> timesRequestedMemory = 0;
+inline std::atomic<uint64_t> successfulTimesRequestedMemory = 0;
 
 std::unique_ptr<IMemoryInfo> createMemoryInfo() {
     std::unique_ptr<IMemoryInfo> memoryInfo;
@@ -393,7 +395,8 @@ void* read_data_delayed_ops(void *arg) {
 	(void)arg;
 
 	pthread_setname_np(pthread_self(), "readDelayedOps");
-
+	
+	int ticksSinceLastUpdate = 0;
 	for (;;) {
 		gReadConnectionPool.cleanup();
 		std::unique_lock gMutexLock(gMutex);
@@ -421,7 +424,35 @@ void* read_data_delayed_ops(void *arg) {
 				++readRecordIt;
 			}
 		}
+
 		gMutexLock.unlock();
+		ticksSinceLastUpdate++;
+		if (ticksSinceLastUpdate == 180) {
+			std::unique_lock lock(gReadCacheMemoryMutex);
+			if (gOriginalCacheExpirationTime_ms.load() == 0) {
+				gCacheExpirationTime_ms.store(0);
+			} else if (gCacheExpirationTime_ms.load() == 0) {
+				gCacheExpirationTime_ms.store(
+				    gOriginalCacheExpirationTime_ms.load());
+			} else if (timesRequestedMemory.load() > 0) {
+				double successRate =
+				    (double)successfulTimesRequestedMemory.load() /
+				    (double)timesRequestedMemory.load();
+				if (successRate < 0.3) {
+					gCacheExpirationTime_ms =
+					    std::max<uint32_t>(gCacheExpirationTime_ms / 3, 1);
+				} else if (successRate > 0.8) {
+					gCacheExpirationTime_ms = std::min<uint32_t>(
+					    gCacheExpirationTime_ms * 2,
+					    gOriginalCacheExpirationTime_ms.load());
+				}
+			}
+			timesRequestedMemory.store(0);
+			successfulTimesRequestedMemory.store(0);
+			lock.unlock();
+			ticksSinceLastUpdate = 0;
+		}
+
 		usleep(USECTICK);
 	}
 }
@@ -532,6 +563,7 @@ void read_data_end(ReadRecord *rrec) {
 
 	std::unique_lock inodeLock(rrec->mutex);
 	rrec->readaheadRequests.discardAllPendingRequests();
+	rrec->stopThread.store(true);
 	inodeLock.unlock();
 }
 
@@ -557,6 +589,7 @@ void read_data_init(uint32_t retries,
 	gChunkserverConnectTimeout_ms = chunkserverConnectTimeout_ms;
 	gChunkserverWaveReadTimeout_ms = chunkServerWaveReadTimeout_ms;
 	gChunkserverTotalReadTimeout_ms = chunkserverTotalReadTimeout_ms;
+	gOriginalCacheExpirationTime_ms = cache_expiration_time_ms;
 	gCacheExpirationTime_ms = cache_expiration_time_ms;
 	gReadaheadMaxWindowSize = readahead_max_window_size_kB * 1024;
 	gReadCacheMaxSize.store((read_chache_max_size_percentage * 0.01) *
@@ -581,7 +614,7 @@ void read_data_init(uint32_t retries,
 	gTweaks.registerVariable("ReadConnectTimeout", gChunkserverConnectTimeout_ms);
 	gTweaks.registerVariable("ReadWaveTimeout", gChunkserverWaveReadTimeout_ms);
 	gTweaks.registerVariable("ReadTotalTimeout", gChunkserverTotalReadTimeout_ms);
-	gTweaks.registerVariable("CacheExpirationTime", gCacheExpirationTime_ms);
+	gTweaks.registerVariable("CacheExpirationTime", gOriginalCacheExpirationTime_ms);
 	gTweaks.registerVariable("ReadaheadMaxWindowSize", gReadaheadMaxWindowSize);
 	gTweaks.registerVariable("ReadCacheMaxSize", gReadCacheMaxSize);
 	gTweaks.registerVariable("MaxReadaheadRequests", gMaxReadaheadRequests);
@@ -686,10 +719,12 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 				getBytesToBeReadFromCS(reader.index(), offset_in_chunk,
 										size_in_chunk, reader.fileLength());
 			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
+			timesRequestedMemory++;
 			if (readShouldWaitForSystemMemory(read_cache_bytes_to_reserve)) {
 				throw RecoverableReadException(
 				    "Not enough read cache memory available for reading");
 			}
+			successfulTimesRequestedMemory++;
 			increaseUsedReadCacheMemory(read_cache_bytes_to_reserve);
 			last_read_cache_bytes_to_reserve = read_cache_bytes_to_reserve;
 			total_read_cache_bytes_to_reserve += read_cache_bytes_to_reserve;
@@ -730,14 +765,8 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			} else {
 				std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 				decreaseUsedReadCacheMemory(last_read_cache_bytes_to_reserve);
-				total_read_cache_bytes_to_reserve -=
-				    last_read_cache_bytes_to_reserve;
+				total_read_cache_bytes_to_reserve -= last_read_cache_bytes_to_reserve;
 				usedMemoryLock.unlock();
-				if (strcmp(ex.what(), "Not enough read cache memory available for reading") == 0) {
-					std::unique_lock inodeLock(rrec->mutex);
-					rrec->cache.collectGarbage();
-					inodeLock.unlock();
-				}
 				usleep(sleep_timeout.remaining_us());
 				sleep_time_ms = read_data_sleep_time_ms(try_counter);
 			}

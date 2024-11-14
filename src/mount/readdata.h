@@ -32,7 +32,7 @@
 #include "mount/readdata_cache.h"
 
 inline std::atomic<uint32_t> gReadaheadMaxWindowSize;
-inline std::atomic<uint32_t> gCacheExpirationTime_ms;
+inline std::atomic<uint32_t> gOriginalCacheExpirationTime_ms;
 inline std::atomic<uint32_t> gMaxReadaheadRequests;
 
 enum class ReadaheadRequestState {
