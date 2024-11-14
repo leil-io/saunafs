@@ -211,11 +211,19 @@ struct ReadRecord {
 	std::atomic<uint8_t> refreshCounter = 0;
 	std::atomic<uint16_t> requestsNotDone = 0;
 	bool expired = false; //gMutex
+	std::atomic<bool> stopThread;
+	std::thread garbageCollectorThread;
 
 	ReadRecord(uint32_t inode)
 	    : cache(gCacheExpirationTime_ms),
 	      readahead_adviser(gCacheExpirationTime_ms, gReadaheadMaxWindowSize),
-	      inode(inode) {}
+	      inode(inode),
+	      stopThread(false),
+	      garbageCollectorThread(&ReadRecord::readCacheGarbageCollectionThread, this) {}
+	
+	~ReadRecord() { 
+		terminateThread();
+	}
 
 	~ReadRecord() {
 		mutex.lock();  // Make helgrind happy
@@ -234,6 +242,21 @@ struct ReadRecord {
 
 	inline uint32_t suggestedReadaheadReqs() const {
 		return suggestedReadaheadReqs_;
+	}
+
+	void readCacheGarbageCollectionThread() {
+		while (!stopThread.load()) {
+			std::unique_lock inodeLock(this->mutex);
+			this->cache.collectGarbage();
+			inodeLock.unlock();
+			std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		}
+	}
+	void terminateThread() {
+		stopThread.store(true);
+		if (garbageCollectorThread.joinable()) {
+			garbageCollectorThread.join();
+		}
 	}
 
 private:
