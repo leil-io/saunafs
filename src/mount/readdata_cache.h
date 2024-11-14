@@ -291,14 +291,19 @@ public:
 
 	void collectGarbage(unsigned count = 1000000) {
 		unsigned reserved_count = count;
-		while (!lru_.empty() && count-- > 0) {
-			Entry *e = std::addressof(lru_.front());
-			if (e->expired(expiration_time_) && e->done) {
-				erase(entries_.iterator_to(*e));
-			} else {
-				break;
+		auto it = lru_.begin();
+		
+		std::vector<Entry *> entriesToErase;
+		while (!lru_.empty() && count-- > 0 && it != lru_.end()) {
+			if (it->done && it->expired(expiration_time_)) {
+				entriesToErase.push_back(std::addressof(*it));
 			}
+			it++;
 		}
+		for (auto e : entriesToErase) {
+			erase(entries_.iterator_to(*e));
+		}
+
 		clearReserved(reserved_count);
 	}
 
