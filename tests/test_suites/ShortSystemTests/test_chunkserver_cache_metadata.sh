@@ -7,25 +7,31 @@ CHUNKSERVERS=3 \
 
 cd "${info[mount0]}"
 
-mkdir ec21
-saunafs setgoal ec21 ec21
-cd ec21
-
 number_of_files=100
+goals="2 ec21"
 
-echo "Writing ${number_of_files} small files"
-for i in $(seq 1 ${number_of_files}); do
-	dd if=/dev/urandom of=file${i} bs=1K count=1 oflag=direct &> /dev/null
+for goal in ${goals}; do
+	mkdir ${goal}
+	saunafs setgoal ${goal} ${goal}
+
+	echo "Writing ${number_of_files} small files with goal ${goal}"
+	for i in $(seq 1 ${number_of_files}); do
+		dd if=/dev/urandom of="${goal}/file${i}" bs=1K count=1 oflag=direct &> /dev/null
+	done
 done
 
 drop_caches
 
+# Stopping or restarting gracefully the chunkservers will generate the metadata
+# cache files.
 saunafs_chunkserver_daemon 0 restart
 saunafs_chunkserver_daemon 1 restart
 saunafs_chunkserver_daemon 2 restart
 saunafs_wait_for_all_ready_chunkservers
 
-echo "Reading the ${number_of_files} small files"
-for i in $(seq 1 ${number_of_files}); do
-	dd if=file${i} of=/dev/null bs=1K count=1 &> /dev/null
+for goal in ${goals}; do
+	echo "Reading ${number_of_files} small files with goal ${goal}"
+	for i in $(seq 1 ${number_of_files}); do
+		dd if="${goal}/file${i}" of=/dev/null bs=1K count=1 &> /dev/null
+	done
 done
