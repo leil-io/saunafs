@@ -109,6 +109,10 @@ using std::filesystem::file_size;
 constexpr int kErrorLimit = 2;
 constexpr int kLastErrorTime = 60;
 
+// Scan related constants
+constexpr uint32_t kMaxScanBulk = 1000;
+constexpr uint8_t kMaxPercent = 100;
+
 inline std::atomic_bool gCheckCrcWhenReading{true};
 
 void hddGetDamagedChunks(std::vector<ChunkWithType>& chunks,
@@ -2296,7 +2300,7 @@ void hddScanDiskFromSubfolders(IDisk *disk, uint32_t beginTime) {
 
 			totalCheckCount++;
 
-			if (totalCheckCount >= 1000) {
+			if (totalCheckCount >= kMaxScanBulk) {
 				uniqueLock.lock();
 
 				if (disk->scanState() == IDisk::ScanState::kTerminate) {
@@ -2334,17 +2338,16 @@ void hddScanDiskFromSubfolders(IDisk *disk, uint32_t beginTime) {
 }
 
 bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
-	std::unique_lock uniqueLock(gDisksMutex);
-
 	uint32_t totalCheckCount = 0;
-	uint8_t lastPercent = 0, currentPercent = 0;
+	uint8_t lastPercent = 0;
+	uint8_t currentPercent = 0;
 	bool terminateScan = false;
-	uint32_t lastTime = time(nullptr), currentTime;
+	uint32_t lastTime = time(nullptr);
+	uint32_t currentTime = 0;
 
-	// Get the cache file path
+	// Thread-safe
 	std::string cacheFilePath = MetadataCache::getMetadataCacheFilename(disk);
 
-	// Open the cache file
 	std::ifstream cacheFile(cacheFilePath, std::ios::binary);
 	if (!cacheFile.is_open()) {
 		safs_pretty_syslog(LOG_ERR, "Failed to open cache file %s",
@@ -2353,7 +2356,8 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	}
 
 	auto fileSizeBytes = file_size(cacheFilePath);
-	uint64_t numberOfChunks = fileSizeBytes / MetadataCache::kChunkSerializedSize;
+	uint64_t numberOfChunks =
+	    fileSizeBytes / MetadataCache::kChunkSerializedSize;
 	uint64_t currentChunks = 0;
 
 	safs_pretty_syslog(LOG_NOTICE,
@@ -2365,13 +2369,16 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	CachedChunkCommonMetadata chunkMetadata;
 
 	// TODO(Guillex): Read bigger blocks from file.
-	// TODO(Guillex): Improve the progress calculation and reporting.
+
+	// Prepare a lock to reuse it
+	std::unique_lock uniqueLock(gDisksMutex, std::defer_lock);
 
 	while (!terminateScan && currentChunks < numberOfChunks) {
 		cacheFile.read(reinterpret_cast<char *>(currentChunkBuff.data()),
 		               MetadataCache::kChunkSerializedSize);
 
 		const uint8_t *chunkBuff = currentChunkBuff.data();
+		// Thread-safe deserialization
 		disk->deserializeChunkMetadataFromCache(chunkBuff, chunkMetadata);
 
 		++currentChunks;
@@ -2383,13 +2390,31 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 		hddAddChunkFromDiskScan(disk, chunkFilename, chunkMetadata.id,
 		                        chunkMetadata.version, type);
 
-		totalCheckCount++;
+		++totalCheckCount;
 
-		if (totalCheckCount >= 1000) {
+		if (totalCheckCount >= kMaxScanBulk) {
 			uniqueLock.lock();
 
 			if (disk->scanState() == IDisk::ScanState::kTerminate) {
 				terminateScan = true;
+			}
+
+			currentTime = time(nullptr);
+			currentPercent = static_cast<uint8_t>(
+			    (static_cast<double>(currentChunks) * kMaxPercent) /
+			    static_cast<double>(numberOfChunks));
+
+			if (currentPercent > lastPercent && currentTime > lastTime) {
+				lastPercent = currentPercent;
+				lastTime = currentTime;
+
+				disk->setScanProgress(currentPercent);  // Mutex already locked
+				gHddSpaceChanged = true;  // Report chunk count to master
+
+				safs_pretty_syslog(
+				    LOG_NOTICE, "scanning disk %s: %" PRIu8 "%% (%" PRIu32 "s)",
+				    disk->getPaths().c_str(), lastPercent,
+				    currentTime - beginTime);
 			}
 
 			uniqueLock.unlock();
@@ -2400,25 +2425,10 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 
 	cacheFile.close();
 
-	currentTime = time(nullptr);
-
-	currentPercent = 100.0f;  // Since we are reading from the cache, we assume
-	                          // 100% completion
-
-	if (currentPercent > lastPercent && currentTime > lastTime) {
-		lastPercent = currentPercent;
-		lastTime = currentTime;
-
-		uniqueLock.lock();
-		disk->setScanProgress(currentPercent);
-		uniqueLock.unlock();
-
-		gHddSpaceChanged = true;  // report chunk count to master
-
-		safs_pretty_syslog(
-		    LOG_NOTICE, "scanning disk %s: %" PRIu8 "%% (%" PRIu32 "s)",
-		    disk->getPaths().c_str(), lastPercent, currentTime - beginTime);
-	}
+	// All chunks were scanned from the cache, se the progress to 100%
+	uniqueLock.lock();
+	disk->setScanProgress(kMaxPercent);
+	uniqueLock.unlock();
 
 	// Remove the control file after successful scan to not read it again,
 	// it will be created again if the chunkserver is gracefully stopped.

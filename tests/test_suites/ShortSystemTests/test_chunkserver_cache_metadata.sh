@@ -1,5 +1,3 @@
-#timeout_set 1 minute
-
 CHUNKSERVERS=3 \
 	DISK_PER_CHUNKSERVER=2 \
 	USE_RAMDISK=YES \
