@@ -2348,34 +2348,38 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	// Thread-safe
 	std::string cacheFilePath = MetadataCache::getMetadataCacheFilename(disk);
 
-	std::ifstream cacheFile(cacheFilePath, std::ios::binary);
-	if (!cacheFile.is_open()) {
-		safs_pretty_syslog(LOG_ERR, "Failed to open cache file %s",
-		                   cacheFilePath.c_str());
+	int cacheFD = ::open(cacheFilePath.c_str(), O_RDONLY);
+	if (cacheFD == -1) {
+		safs::log_err("Failed to open cache file: {}", cacheFilePath);
 		return false;
 	}
+
+	// Advise the kernel that we will read the complete file sequentially
+	::posix_fadvise(cacheFD, 0, 0, POSIX_FADV_SEQUENTIAL);
 
 	auto fileSizeBytes = file_size(cacheFilePath);
 	uint64_t numberOfChunks =
 	    fileSizeBytes / MetadataCache::kChunkSerializedSize;
 	uint64_t currentChunks = 0;
 
-	safs_pretty_syslog(LOG_NOTICE,
-	                   "GUILLEX: cache file: %s, size: %lu, "
-	                   "chunks: %lu",
-	                   cacheFilePath.c_str(), fileSizeBytes, numberOfChunks);
+	safs::log_info("Loading metadata from cache ({} chunks): {}",
+	               numberOfChunks, cacheFilePath);
 
 	std::vector<uint8_t> currentChunkBuff(MetadataCache::kChunkSerializedSize);
 	CachedChunkCommonMetadata chunkMetadata;
-
-	// TODO(Guillex): Read bigger blocks from file.
 
 	// Prepare a lock to reuse it
 	std::unique_lock uniqueLock(gDisksMutex, std::defer_lock);
 
 	while (!terminateScan && currentChunks < numberOfChunks) {
-		cacheFile.read(reinterpret_cast<char *>(currentChunkBuff.data()),
-		               MetadataCache::kChunkSerializedSize);
+		ssize_t bytesRead = ::read(cacheFD, currentChunkBuff.data(),
+		                           MetadataCache::kChunkSerializedSize);
+		if (bytesRead != MetadataCache::kChunkSerializedSize) {
+			safs::log_err("Error reading chunk data from cache file: {}",
+			              cacheFilePath);
+			close(cacheFD);
+			return false;
+		}
 
 		const uint8_t *chunkBuff = currentChunkBuff.data();
 		// Thread-safe deserialization
@@ -2411,10 +2415,8 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 				disk->setScanProgress(currentPercent);  // Mutex already locked
 				gHddSpaceChanged = true;  // Report chunk count to master
 
-				safs_pretty_syslog(
-				    LOG_NOTICE, "scanning disk %s: %" PRIu8 "%% (%" PRIu32 "s)",
-				    disk->getPaths().c_str(), lastPercent,
-				    currentTime - beginTime);
+				safs::log_info("Scanning disk {}: {}% ({}s)", disk->getPaths(),
+				               lastPercent, currentTime - beginTime);
 			}
 
 			uniqueLock.unlock();
@@ -2423,7 +2425,7 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 		}
 	}
 
-	cacheFile.close();
+	::close(cacheFD);
 
 	// All chunks were scanned from the cache, se the progress to 100%
 	uniqueLock.lock();
@@ -2459,10 +2461,6 @@ void hddDiskScan(IDisk *disk, uint32_t beginTime) {
 			safs_pretty_syslog(LOG_ERR,
 			                   "Can't load disk metadata from cache: %s",
 			                   disk->getPaths().c_str());
-		} else {
-			safs_pretty_syslog(
-			    LOG_NOTICE, "Loading disk metadata from cache: %s",
-			    MetadataCache::getMetadataCacheFilename(disk).c_str());
 		}
 	} else {
 		hddScanDiskFromSubfolders(disk, beginTime);
