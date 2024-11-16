@@ -26,6 +26,7 @@
 #include <sys/syslog.h>
 #include <cstdint>
 #include <filesystem>
+#include <limits>
 
 #ifdef SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE_IN_LINUX_FALLOC_H
 #  define SAUNAFS_HAVE_FALLOC_FL_PUNCH_HOLE
@@ -2178,10 +2179,10 @@ void hddDiskRandomizeChunksForTests(IDisk *disk) {
 
 /* initialization */
 
-static inline void hddAddChunkFromDiskScan(IDisk *disk,
-                                           const std::string &fullname,
-                                           uint64_t chunkId, uint32_t version,
-                                           ChunkPartType chunkType) {
+static inline void hddAddChunkFromDiskScan(
+    IDisk *disk, const std::string &fullname, uint64_t chunkId,
+    uint32_t version, ChunkPartType chunkType,
+    uint16_t blocks = std::numeric_limits<uint16_t>::max()) {
 	TRACETHIS();
 
 	auto *chunk = hddChunkFindOrCreatePlusLock(
@@ -2220,10 +2221,14 @@ static inline void hddAddChunkFromDiskScan(IDisk *disk,
 	chunk->updateFilenamesFromVersion(version);
 	sassert(chunk->metaFilename() == fullname);
 
-	{
+	// The blocks are not known yet, so we get them from the files
+	if (blocks == std::numeric_limits<uint16_t>::max()) {
 		disk->updateChunkAttributes(chunk, true);
-		chunk->setValidAttr(0);
+	} else {  // We already know the blocks
+		chunk->setBlocks(blocks);
 	}
+
+	chunk->setValidAttr(0);
 
 	{
 		std::lock_guard testsLockGuard(gTestsMutex);
@@ -2392,7 +2397,8 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 		    disk, chunkMetadata.id, chunkMetadata.version, type, true);
 
 		hddAddChunkFromDiskScan(disk, chunkFilename, chunkMetadata.id,
-		                        chunkMetadata.version, type);
+		                        chunkMetadata.version, type,
+		                        chunkMetadata.blocks);
 
 		++totalCheckCount;
 
