@@ -55,7 +55,7 @@ system to speed up the build process. Note that setting `-j` without nice can
 lead to the system running out of memory/hanging.
 
 ```bash
-git clone https://github.com/leil-io/saunafs.github
+git clone https://github.com/leil-io/saunafs.git
 cd saunafs
 mkdir build
 cd build
