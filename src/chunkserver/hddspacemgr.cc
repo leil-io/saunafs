@@ -105,8 +105,6 @@
 #include "devtools/request_log.h"
 #include "protocol/SFSCommunication.h"
 
-using std::filesystem::file_size;
-
 constexpr int kErrorLimit = 2;
 constexpr int kLastErrorTime = 60;
 
@@ -2377,13 +2375,13 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	// Advise the kernel that we will read the complete file sequentially
 	::posix_fadvise(cacheFD, 0, 0, POSIX_FADV_SEQUENTIAL);
 
-	auto fileSizeBytes = file_size(cacheFilePath);
+	auto fileSizeBytes = std::filesystem::file_size(cacheFilePath);
 	uint64_t numberOfChunks =
 	    fileSizeBytes / MetadataCache::kChunkSerializedSize;
 	uint64_t currentChunks = 0;
 
-	safs::log_info("Loading metadata from cache ({} chunks): {}",
-	               numberOfChunks, cacheFilePath);
+	safs::log_info("Loading metadata from cache ({} chunks): {} {} bytes",
+	               numberOfChunks, cacheFilePath, fileSizeBytes);
 
 	std::vector<uint8_t> currentChunkBuff(MetadataCache::kChunkSerializedSize);
 	CachedChunkCommonMetadata chunkMetadata;

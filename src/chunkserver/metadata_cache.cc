@@ -20,7 +20,6 @@
 #include "common/platform.h"
 
 #include "chunkserver-common/global_shared_resources.h"
-#include "chunkserver-common/subfolder.h"
 #include "chunkserver/metadata_cache.h"
 #include "devtools/TracePrinter.h"
 
@@ -38,26 +37,24 @@ void MetadataCache::setMetadataCachePath(const std::string &path){
 	if (fs::exists(path)) {
 		metadataCachePath = path;
 		isValidPath = true;
-		safs_pretty_syslog(LOG_INFO, "Metadata cache path set to: %s",
-		                   path.c_str());
+		safs::log_info("Metadata cache path set to: {}", path);
 	} else if (!path.empty()) {
-		safs_pretty_syslog(LOG_ERR, "Metadata cache path %s does not exist",
-		                   path.c_str());
+		safs::log_err("Metadata cache path {} does not exist", path);
 	}
 }
 
 bool MetadataCache::diskCanLoadMetadataFromCache(IDisk *disk) {
 	if (!isValidPath) {
-		safs_pretty_syslog(LOG_ERR, "Metadata cache path is not valid");
+		safs::log_err("Metadata cache path is not valid");
 		return false;
 	}
 
 	// TODO(Guillex): Add support for zoned devices
 	if (disk->isZonedDevice()) {
-		safs_pretty_syslog(LOG_WARNING,
-		                   "Metadata cache for zoned devices is not supported "
-		                   "yet. Metadata will be loaded from: %s",
-		                   disk->metaPath().c_str());
+		safs::log_warn(
+		    "Metadata cache for zoned devices is not supported "
+		    "yet. Metadata will be loaded from: {}",
+		    disk->metaPath());
 		return false;
 	}
 
@@ -87,27 +84,44 @@ std::string MetadataCache::getMetadataCacheFilename(
 
 bool MetadataCache::writeCacheFile(const std::string &cachePath,
                                    const std::vector<uint8_t> &chunks) {
-	safs_pretty_syslog(LOG_INFO, "Cache file: %s", cachePath.c_str());
+	using Clock = std::chrono::system_clock;
+	using Seconds = std::chrono::seconds;
 
-	std::ofstream cacheFile(cachePath, std::ios::binary);
+	auto startTime = Clock::now();
 
-	if (!cacheFile.is_open()) {
-		safs_pretty_syslog(LOG_ERR, "Failed to open cache file %s",
-		                   cachePath.c_str());
+	constexpr int kFilePermissions = 0644;
+	int cacheFD = ::open(cachePath.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+	                     kFilePermissions);
+
+	if (cacheFD == -1) {
+		safs::log_err("Failed to open cache file {}", cachePath);
 		return false;
 	}
 
-	cacheFile.write(reinterpret_cast<const char *>(chunks.data()),
-	                chunks.size());
+	ssize_t bytesWritten = ::write(cacheFD, chunks.data(), chunks.size());
 
-	// Check if the entire file was written
-	if (cacheFile.tellp() != static_cast<std::streampos>(chunks.size())) {
-		safs_pretty_syslog(LOG_ERR, "Failed to write entire cache file %s",
-		                   cachePath.c_str());
+	if (static_cast<size_t>(bytesWritten) != chunks.size()) {
+		safs::log_err("Failed to write entire cache file {}", cachePath);
+		::close(cacheFD);
 		return false;
 	}
 
-	cacheFile.flush();
+	if (::fsync(cacheFD) == -1) {
+		safs::log_err("Failed to flush cache file {}", cachePath);
+		::close(cacheFD);
+		return false;
+	}
+
+	if (::close(cacheFD) == -1) {
+		safs::log_err("Failed to close cache file {}", cachePath);
+		return false;
+	}
+
+	auto endTime = Clock::now();
+	Seconds duration = std::chrono::duration_cast<Seconds>(endTime - startTime);
+	safs::log_info(
+	    "Chunk metadata cache file written: {} ({} chunks, {} seconds)",
+	    cachePath, chunks.size() / kChunkSerializedSize, duration.count());
 
 	return true;
 }
@@ -119,8 +133,7 @@ bool MetadataCache::writeControlFile(const std::string &diskPath,
 	std::ofstream controlFile(controlPath);
 
 	if (!controlFile.is_open()) {
-		safs_pretty_syslog(LOG_ERR, "Failed to create control file %s",
-		                   controlPath.c_str());
+		safs::log_err("Failed to create control file {}", controlPath);
 		return false;
 	}
 
@@ -164,18 +177,17 @@ void MetadataCache::hddWriteBinaryMetadataCache() {
 		                            currentChunk.begin(), currentChunk.end());
 	}
 
-	if (!fs::exists(MetadataCache::getMetadataCachePath())) {
-		if (!fs::create_directories(MetadataCache::getMetadataCachePath())) {
-			safs_pretty_syslog(LOG_ERR, "Failed to create cache directory %s",
-			                   MetadataCache::getMetadataCachePath().c_str());
+	std::string metadataCachePath = getMetadataCachePath();
+
+	if (!fs::exists(metadataCachePath)) {
+		if (!fs::create_directories(metadataCachePath)) {
+			safs::log_err("Failed to create cache directory {}",
+			              metadataCachePath);
 			return;
 		}
 	}
 
 	for (const auto &[diskPath, chunks] : diskChunks) {
-		safs_pretty_syslog(LOG_INFO, "Disk: %s: size: %zu", diskPath.c_str(),
-		                   chunks.size());
-
 		std::string cachePath = getMetadataCacheFilename(diskPath);
 
 		bool wasCacheFileWritten = false;
@@ -185,12 +197,11 @@ void MetadataCache::hddWriteBinaryMetadataCache() {
 			wasCacheFileWritten = writeCacheFile(cachePath, chunks);
 
 			if (!wasCacheFileWritten) {
-				safs_pretty_syslog(LOG_ERR, "Failed to write cache file %s",
-				                   cachePath.c_str());
+				safs::log_err("Failed to write cache file {}", cachePath);
 			}
 		} catch (const std::exception &e) {
-			safs_pretty_syslog(LOG_ERR, "Failed to write cache file: %s",
-			                   e.what());
+			safs::log_err("Failed to write cache file {} ({})", cachePath,
+			              e.what());
 		}
 
 		try {
@@ -198,13 +209,11 @@ void MetadataCache::hddWriteBinaryMetadataCache() {
 			    writeControlFile(diskPath, cachePath, chunks);
 
 			if (!wasControlFileWritten) {
-				safs_pretty_syslog(LOG_ERR,
-				                   "Failed to write control file for %s",
-				                   cachePath.c_str());
+				safs::log_err("Failed to write control file for {}", cachePath);
 			}
 		} catch (const std::exception &e) {
-			safs_pretty_syslog(LOG_ERR, "Failed to write control file: %s",
-			                   e.what());
+			safs::log_err("Failed to write control file for {} ({})", cachePath,
+			              e.what());
 		}
 
 		if (!wasCacheFileWritten || !wasControlFileWritten) {
@@ -217,9 +226,6 @@ void MetadataCache::hddWriteBinaryMetadataCache() {
 
 			continue;
 		}
-
-		safs_pretty_syslog(LOG_INFO, "Chunk metadata cache file written to: %s",
-		                   cachePath.c_str());
 	}
 }
 
