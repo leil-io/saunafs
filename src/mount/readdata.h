@@ -210,14 +210,13 @@ struct ReadRecord {
 	std::atomic<uint8_t> refreshCounter = 0;
 	std::atomic<uint16_t> requestsNotDone = 0;
 	bool expired = false; //gMutex
-	std::atomic<bool> stopThread;
+	std::atomic<bool> stopThread{false};
 	std::thread garbageCollectorThread;
 
 	ReadRecord(uint32_t inode)
 	    : cache(gCacheExpirationTime_ms),
 	      readahead_adviser(gCacheExpirationTime_ms, gReadaheadMaxWindowSize),
 	      inode(inode),
-	      stopThread(false),
 	      garbageCollectorThread(&ReadRecord::readCacheGarbageCollectionThread, this) {}
 
 	~ReadRecord() {
@@ -248,6 +247,7 @@ struct ReadRecord {
 			std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		}
 	}
+
 	void terminateThread() {
 		stopThread.store(true);
 		if (garbageCollectorThread.joinable()) {

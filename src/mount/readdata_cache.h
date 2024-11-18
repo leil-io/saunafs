@@ -45,6 +45,24 @@ inline uint64_t gUsedReadCacheMemory;
 inline std::atomic<bool> gReadCacheMemoryAlmostExceeded = false;
 inline std::atomic<uint32_t> gCacheExpirationTime_ms;
 
+constexpr double kReadCacheThreshold = 0.8;
+
+inline void updateReadCacheMemoryAlmostExceeded() {
+	gReadCacheMemoryAlmostExceeded =
+	    gUsedReadCacheMemory >=
+	    static_cast<uint64_t>(kReadCacheThreshold * gReadCacheMaxSize.load());
+}
+
+inline void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
+	gUsedReadCacheMemory += bytesToReadLeft;
+	updateReadCacheMemoryAlmostExceeded();
+}
+
+inline void decreaseUsedReadCacheMemory(size_t bytesToReadLeft) {
+	gUsedReadCacheMemory -= bytesToReadLeft;
+	updateReadCacheMemoryAlmostExceeded();
+}
+
 class ReadCache {
 public:
 	typedef uint64_t Offset;
@@ -430,10 +448,7 @@ protected:
 		} else {
 			assert(e->refcount == 0);
 			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
-			gUsedReadCacheMemory -= e->buffer.size();
-			gReadCacheMemoryAlmostExceeded =
-			    gUsedReadCacheMemory >=
-			    static_cast<uint64_t>(0.8 * gReadCacheMaxSize.load());
+			decreaseUsedReadCacheMemory(e->buffer.size());
 			usedMemoryLock.unlock();
 			delete e;
 		}
@@ -447,10 +462,7 @@ protected:
 			Entry *e = std::addressof(reserved_entries_.front());
 			if (e->refcount == 0) {
 				usedMemoryLock.lock();
-				gUsedReadCacheMemory -= e->buffer.size();
-				gReadCacheMemoryAlmostExceeded =
-				    gUsedReadCacheMemory >=
-				    static_cast<uint64_t>(0.8 * gReadCacheMaxSize.load());
+				decreaseUsedReadCacheMemory(e->buffer.size());
 				usedMemoryLock.unlock();
 				reserved_entries_.pop_front();
 				delete e;

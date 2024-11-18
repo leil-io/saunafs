@@ -58,10 +58,13 @@
 
 inline std::condition_variable readOperationsAvailable;
 inline std::mutex gReadaheadRequestsContainerMutex;
-inline int kMaxReadCacheRequestRetries = 10;
-inline uint32_t kMaxWindowConsideringMaxReadCacheSize;
-inline std::atomic<uint64_t> timesRequestedMemory = 0;
-inline std::atomic<uint64_t> successfulTimesRequestedMemory = 0;
+inline int kMaxThresholdTicks = 180;
+uint32_t maxWindowConsideringMaxReadCacheSize;
+uint64_t timesRequestedMemory = 0;
+uint64_t successfulTimesRequestedMemory = 0;
+constexpr double kTimesRequestedMemoryLowerSuccessRate = 0.3;
+constexpr double kTimesRequestedMemoryUpperSuccessRate = 0.8;
+constexpr uint32_t kMinCacheExpirationTime = 1;
 
 std::unique_ptr<IMemoryInfo> createMemoryInfo() {
     std::unique_ptr<IMemoryInfo> memoryInfo;
@@ -82,18 +85,26 @@ bool readShouldWaitForSystemMemory(size_t bytesToReadLeft) {
 			bytesToReadLeft > avalaibleSystemMemory;
 }
 
-inline void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
-	gUsedReadCacheMemory += bytesToReadLeft;
-	gReadCacheMemoryAlmostExceeded =
-	    gUsedReadCacheMemory >=
-	    static_cast<uint64_t>(0.8 * gReadCacheMaxSize.load());
-}
-
-inline void decreaseUsedReadCacheMemory(size_t bytesToReadLeft) {
-	gUsedReadCacheMemory -= bytesToReadLeft;
-	gReadCacheMemoryAlmostExceeded =
-	    gUsedReadCacheMemory >=
-	    static_cast<uint64_t>(0.8 * gReadCacheMaxSize.load());
+inline void updateCacheExpirationTime() {
+	if (gOriginalCacheExpirationTime_ms.load() == 0) {
+		gCacheExpirationTime_ms.store(0);
+	} else if (gCacheExpirationTime_ms.load() == 0) {
+		gCacheExpirationTime_ms.store(gOriginalCacheExpirationTime_ms.load());
+	} else if (timesRequestedMemory > 0) {
+		double successRate =
+		    static_cast<double>(successfulTimesRequestedMemory) /
+		    static_cast<double>(timesRequestedMemory);
+		if (successRate < kTimesRequestedMemoryLowerSuccessRate) {
+			gCacheExpirationTime_ms = std::max<uint32_t>(
+			    gCacheExpirationTime_ms / 3, kMinCacheExpirationTime);
+		} else if (successRate > kTimesRequestedMemoryUpperSuccessRate) {
+			gCacheExpirationTime_ms =
+			    std::min<uint32_t>(gCacheExpirationTime_ms * 2,
+			                       gOriginalCacheExpirationTime_ms.load());
+		}
+	}
+	timesRequestedMemory = 0;
+	successfulTimesRequestedMemory = 0;
 }
 
 uint32_t getBytesToBeReadFromCS(uint32_t index, uint32_t offset, uint32_t size,
@@ -211,7 +222,7 @@ bool ReadaheadOperationsManager::request(
 
 	uint64_t recommendedSize = round_up_to_blocksize(std::max<uint64_t>(
 	    size, std::min<uint32_t>(rrec->readahead_adviser.window(),
-	                             kMaxWindowConsideringMaxReadCacheSize)));
+	                             maxWindowConsideringMaxReadCacheSize)));
 
 	if (!result.empty() && result.frontOffset() <= offset &&
 	    offset + size <= result.endOffset()) {
@@ -395,11 +406,13 @@ void* read_data_delayed_ops(void *arg) {
 	(void)arg;
 
 	pthread_setname_np(pthread_self(), "readDelayedOps");
-	
+
+	std::unique_lock gMutexLock(gMutex, std::defer_lock),
+	    gUsedReadCacheMemoryLock(gReadCacheMemoryMutex, std::defer_lock);
 	int ticksSinceLastUpdate = 0;
 	for (;;) {
 		gReadConnectionPool.cleanup();
-		std::unique_lock gMutexLock(gMutex);
+		gMutexLock.lock();
 		if (readDataTerminate) {
 			return EMPTY_REQUEST;
 		}
@@ -424,32 +437,13 @@ void* read_data_delayed_ops(void *arg) {
 				++readRecordIt;
 			}
 		}
-
 		gMutexLock.unlock();
+
 		ticksSinceLastUpdate++;
-		if (ticksSinceLastUpdate == 180) {
-			std::unique_lock lock(gReadCacheMemoryMutex);
-			if (gOriginalCacheExpirationTime_ms.load() == 0) {
-				gCacheExpirationTime_ms.store(0);
-			} else if (gCacheExpirationTime_ms.load() == 0) {
-				gCacheExpirationTime_ms.store(
-				    gOriginalCacheExpirationTime_ms.load());
-			} else if (timesRequestedMemory.load() > 0) {
-				double successRate =
-				    (double)successfulTimesRequestedMemory.load() /
-				    (double)timesRequestedMemory.load();
-				if (successRate < 0.3) {
-					gCacheExpirationTime_ms =
-					    std::max<uint32_t>(gCacheExpirationTime_ms / 3, 1);
-				} else if (successRate > 0.8) {
-					gCacheExpirationTime_ms = std::min<uint32_t>(
-					    gCacheExpirationTime_ms * 2,
-					    gOriginalCacheExpirationTime_ms.load());
-				}
-			}
-			timesRequestedMemory.store(0);
-			successfulTimesRequestedMemory.store(0);
-			lock.unlock();
+		if (ticksSinceLastUpdate == kMaxThresholdTicks) {
+			gUsedReadCacheMemoryLock.lock();
+			updateCacheExpirationTime();
+			gUsedReadCacheMemoryLock.unlock();
 			ticksSinceLastUpdate = 0;
 		}
 
@@ -595,7 +589,7 @@ void read_data_init(uint32_t retries,
 	gReadCacheMaxSize.store((read_chache_max_size_percentage * 0.01) *
 	                        gMemoryInfo->getTotalMemory());
 	gReadWorkers = read_workers;
-	kMaxWindowConsideringMaxReadCacheSize = gReadCacheMaxSize.load() / gReadWorkers;
+	maxWindowConsideringMaxReadCacheSize = gReadCacheMaxSize.load() / gReadWorkers;
 	gMaxReadaheadRequests = max_readahead_requests;
 	gPrefetchXorStripes = prefetchXorStripes;
 	gBandwidthOveruse = bandwidth_overuse;
