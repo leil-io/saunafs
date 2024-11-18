@@ -2353,7 +2353,22 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	// Thread-safe
 	std::string cacheFilePath = MetadataCache::getMetadataCacheFilename(disk);
 
+	// Remove the control file immediately before the scan, to prevent from
+	// reading it again. Will be recreated if the chunkserver is nicely stopped.
+	auto controlFileName =
+	    cacheFilePath + MetadataCache::kControlFileExtension.data();
+
+	try {
+		if (std::filesystem::exists(controlFileName)) {
+			std::filesystem::remove(controlFileName);
+		}
+	} catch (const std::exception &e) {
+		safs::log_err("Failed to remove control file: {}", controlFileName);
+		return false;
+	}
+
 	int cacheFD = ::open(cacheFilePath.c_str(), O_RDONLY);
+
 	if (cacheFD == -1) {
 		safs::log_err("Failed to open cache file: {}", cacheFilePath);
 		return false;
@@ -2437,15 +2452,6 @@ bool hddScanDiskFromBinaryCache(IDisk *disk, uint32_t beginTime) {
 	uniqueLock.lock();
 	disk->setScanProgress(kMaxPercent);
 	uniqueLock.unlock();
-
-	// Remove the control file after successful scan to not read it again,
-	// it will be created again if the chunkserver is gracefully stopped.
-	auto controlFileName = MetadataCache::getMetadataCacheFilename(disk) +
-	                       MetadataCache::kControlFileExtension.data();
-
-	if (std::filesystem::exists(controlFileName)) {
-		std::filesystem::remove(controlFileName);
-	}
 
 	return true;
 }
