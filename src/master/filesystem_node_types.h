@@ -33,11 +33,20 @@
 #include "common/goal.h"
 #include "common/compact_vector.h"
 
-#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
-#  include "common/judy_map.h"
-#else
-#  include <map>
-#  include "common/flat_map.h"
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) &&               \
+    (!defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER) ||   \
+     !defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
+     !defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER))
+#include "common/judy_map.h"
+#endif
+#if !defined(SAUNAFS_HAVE_64BIT_JUDY) ||            \
+    defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
+    defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER)
+#include <map>
+#endif
+#if !defined(SAUNAFS_HAVE_64BIT_JUDY) || \
+    defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER)
+#include "common/flat_map.h"
 #endif
 
 #include "master/fs_context.h"
@@ -194,7 +203,7 @@ struct FSNodeDevice : public FSNode {
  * Avg size (10 files) ~ 280B (28B per file)
  */
 struct FSNodeDirectory : public FSNode {
-#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER)
 	typedef judy_map<hstorage::Handle, FSNode *> EntriesContainer;
 #else
 	struct HandleCompare {
@@ -389,10 +398,14 @@ struct TrashPathKey {
 #endif
 };
 
-#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER)
 typedef judy_map<TrashPathKey, hstorage::Handle> TrashPathContainer;
-typedef judy_map<uint32_t, hstorage::Handle> ReservedPathContainer;
 #else
 typedef std::map<TrashPathKey, hstorage::Handle> TrashPathContainer;
+#endif
+
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER)
+typedef judy_map<uint32_t, hstorage::Handle> ReservedPathContainer;
+#else
 typedef std::map<uint32_t, hstorage::Handle> ReservedPathContainer;
 #endif

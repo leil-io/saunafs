@@ -3,8 +3,7 @@
 #include "common/platform.h"
 #include "common/id_pool.h"
 
-#if defined(SAUNAFS_HAVE_JUDY) && defined(SAUNAFS_HAVE_WORKING_JUDY1) && \
-    !defined(DISABLE_JUDY_FOR_SPARSEBITSET)
+#if defined(SAUNAFS_HAVE_JUDY) && defined(SAUNAFS_HAVE_WORKING_JUDY1)
 #include <Judy.h>
 #include <iterator>
 #else
@@ -18,8 +17,7 @@
 
 namespace detail {
 
-#if defined(SAUNAFS_HAVE_JUDY) && defined(SAUNAFS_HAVE_WORKING_JUDY1) && \
-    !defined(DISABLE_JUDY_FOR_SPARSEBITSET)
+#if defined(SAUNAFS_HAVE_JUDY) && defined(SAUNAFS_HAVE_WORKING_JUDY1)
 
 /*! \brief Implementation of SparseBitset based on Judy array.
  *

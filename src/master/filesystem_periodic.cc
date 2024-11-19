@@ -26,7 +26,7 @@
 
 #include "common/cfg.h"
 #include "common/event_loop.h"
-#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_DEFECTIVENODESMAP)
 #  include "common/judy_map.h"
 #else
 #  include "common/flat_map.h"
@@ -73,7 +73,7 @@ enum NodeErrorFlag {
 	kAllNodeErrors    = 7
 };
 
-#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_FSCONTAINERS)
+#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_DEFECTIVENODESMAP)
 	typedef judy_map<uint32_t, uint8_t> DefectiveNodesMap;
 #else
 	typedef flat_map<uint32_t, uint8_t> DefectiveNodesMap;
