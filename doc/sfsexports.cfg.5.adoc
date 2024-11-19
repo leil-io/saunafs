@@ -43,6 +43,10 @@ done at *sfsmount* level) - in this case "group" and "other" permissions are
 logically added; needed for supplementary groups to work (*sfsmaster* receives
 only user primary group information)
 
+*caseinsensitive*:: This option allows the client to treat all file and folder
+names as case-insensitive. When enabled, the client will not differentiate 
+between uppercase and lowercase characters in file and folder names.
+
 *dynamicip*:: allows reconnecting of already authenticated client from any IP
 address (the default is to check IP address on reconnect)
 
