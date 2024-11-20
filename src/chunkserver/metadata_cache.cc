@@ -82,6 +82,17 @@ std::string MetadataCache::getMetadataCacheFilename(
 	return metadataCachePath + "/" + filteredPath + kCacheFileExtension.data();
 }
 
+std::string MetadataCache::getMetadataCacheFilename(
+    const std::string &diskPath, const std::string &customCachePath) {
+	// Remove the leading and trailing slashes from the path
+	std::string filteredPath =
+	    std::regex_replace(diskPath, std::regex("^/+|/+$"), "");
+	// Replace the remaining slashes with dots
+	filteredPath = std::regex_replace(filteredPath, std::regex("/"), ".");
+
+	return customCachePath + "/" + filteredPath + kCacheFileExtension.data();
+}
+
 bool MetadataCache::writeCacheFile(const std::string &cachePath,
                                    const std::vector<uint8_t> &chunks) {
 	using Clock = std::chrono::system_clock;
@@ -149,6 +160,9 @@ bool MetadataCache::writeControlFile(const std::string &diskPath,
 
 	controlFile.flush();
 
+	safs::log_info("Chunk metadata cache control file written: {} ({} chunks)",
+	               controlPath, chunks.size() / kChunkSerializedSize);
+
 	return true;
 }
 
@@ -176,8 +190,6 @@ void MetadataCache::hddWriteBinaryMetadataCache() {
 		diskChunks[diskPath].insert(diskChunks[diskPath].end(),
 		                            currentChunk.begin(), currentChunk.end());
 	}
-
-	std::string metadataCachePath = getMetadataCachePath();
 
 	if (!fs::exists(metadataCachePath)) {
 		if (!fs::create_directories(metadataCachePath)) {

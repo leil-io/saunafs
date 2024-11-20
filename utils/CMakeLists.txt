@@ -72,6 +72,11 @@ install(TARGETS readdir-unlink-test RUNTIME DESTINATION ${BIN_SUBDIR})
 add_executable(big-session-metadata-benchmark big_session_metadata_benchmark.cc)
 install(TARGETS big-session-metadata-benchmark RUNTIME DESTINATION ${BIN_SUBDIR})
 
+add_executable(sfs-chunk-metadata-cache-generator sfs_chunk_metadata_cache_generator.cc)
+target_link_libraries(sfs-chunk-metadata-cache-generator sfscommon chunkserver-common sfschunkserver)
+target_include_directories(sfs-chunk-metadata-cache-generator PRIVATE ${CMAKE_SOURCE_DIR}/src/chunkserver)
+install(TARGETS sfs-chunk-metadata-cache-generator RUNTIME DESTINATION ${BIN_SUBDIR})
+
 add_library(slow_chunk_scan SHARED slow_chunk_scan.c)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
   target_link_libraries(slow_chunk_scan dl)

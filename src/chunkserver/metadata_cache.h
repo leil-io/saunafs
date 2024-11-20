@@ -29,13 +29,6 @@ class MetadataCache {
 	static std::string metadataCachePath;
 	static bool isValidPath;
 
-	static bool writeCacheFile(const std::string &cachePath,
-	                           const std::vector<uint8_t> &chunks);
-
-	static bool writeControlFile(const std::string &diskPath,
-	                             const std::string &cachePath,
-	                             const std::vector<uint8_t> &chunks);
-
 public:
 	// 8 bytes for chunk id, 4 bytes for version, 2 bytes for type, 2 bytes
 	// for blocks
@@ -50,8 +43,16 @@ public:
 
 	static std::string getMetadataCacheFilename(IDisk *disk);
 	static std::string getMetadataCacheFilename(const std::string &diskPath);
+	static std::string getMetadataCacheFilename(
+	    const std::string &diskPath, const std::string &customCachePath);
 
 	static std::string getMetadataCachePath() { return metadataCachePath; }
 
+	static bool writeCacheFile(const std::string &cachePath,
+	                           const std::vector<uint8_t> &chunks);
+
+	static bool writeControlFile(const std::string &diskPath,
+	                             const std::string &cachePath,
+	                             const std::vector<uint8_t> &chunks);
 	static void hddWriteBinaryMetadataCache();
 };
