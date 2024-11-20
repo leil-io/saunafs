@@ -2243,14 +2243,14 @@ static inline void hddAddChunkFromDiskScan(
 }
 
 void hddScanDiskFromSubfolders(IDisk *disk, uint32_t beginTime) {
-	std::unique_lock uniqueLock(gDisksMutex);
-
 	DIR *dd;
 	struct dirent *dirEntry;
 	uint32_t totalCheckCount = 0;
 	uint8_t lastPercent = 0, currentPercent = 0;
 	bool terminateScan = false;
 	uint32_t lastTime = time(nullptr), currentTime;
+
+	std::unique_lock uniqueLock(gDisksMutex, std::defer_lock);
 
 	for (unsigned subfolderNumber = 0;
 	     subfolderNumber < Subfolder::kNumberOfSubfolders && !terminateScan;
