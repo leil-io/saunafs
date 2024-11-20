@@ -3,6 +3,7 @@ CHUNKSERVERS=3 \
 	USE_RAMDISK=YES \
 	SFSEXPORTS_EXTRA_OPTIONS="allcanchangequota" \
 	MASTER_EXTRA_CONFIG="METADATA_DUMP_PERIOD_SECONDS = 0|AUTO_RECOVERY = 1" \
+	CHUNKSERVER_EXTRA_CONFIG="METADATA_CACHE_PATH = IntentionallyInvalidPath" \
 	setup_local_empty_saunafs info
 
 # Remember version of the metadata file. We expect it not to change when generating data.

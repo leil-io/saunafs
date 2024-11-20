@@ -12,6 +12,7 @@ USE_RAMDISK=YES \
 			`|OPERATIONS_DELAY_INIT = 0`
 			`|ENDANGERED_CHUNKS_PRIORITY = 0.7`
 			`|OPERATIONS_DELAY_DISCONNECT = 0" \
+	CHUNKSERVER_EXTRA_CONFIG="METADATA_CACHE_PATH = IntentionallyInvalidPath" \
 	setup_local_empty_saunafs info
 
 # Leave only one "hdd" and one "ssd" server.

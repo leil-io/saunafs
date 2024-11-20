@@ -3,6 +3,7 @@ CHUNKSERVERS=1 \
 	MASTER_EXTRA_CONFIG="MAGIC_AUTO_FILE_REPAIR = 1"`
 			`"|MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=DEBUG" \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
+	CHUNKSERVER_EXTRA_CONFIG="METADATA_CACHE_PATH = IntentionallyInvalidPath" \
 	setup_local_empty_saunafs info
 
 file1="${info[mount0]}/file1"
