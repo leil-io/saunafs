@@ -1,5 +1,31 @@
 This file lists noteworthy changes in SaunaFS.
 
+ * SaunaFS (4.6.0) (2024-10-23)
+ - feat: Improve big sessions create/open speed
+ - fix(mount): Enhance read cache handling and add tests (#202)
+ - fix: Clarify error offset in file-validate (#218)
+ - feat: Configure judy use via directives (#219)
+ - docs(sfsgoals.cfg): Give more practical examples (#162)
+ - feat(common): Make poll timeout configurable (#211)
+ - feat: Improve idhash in client
+ - feat: Improve acquired files in client
+ - perf: Add benchmark test for many open files
+ - feat(master): Improve openedfiles per session
+ - feat(uraft): Add mechanism to recover floating IP (#214)
+ - feat(chunkserver): Make configurable masterconn workers (#212)
+ - fix(chunkserver): Avoid possible undefined behavior
+ - feat(master): Add option to toggle data parts priority (#208)
+ - fix(cgi): Change key to re-order list of disks (#177)
+ - fix(chunkserver): Refactor partially csserventry
+ - fix(mount): Fix tcptoread-write error message
+ - feat(chunkserver): Increase NR_OF_NETWORK_WORKERS
+ - feat(chunkserver): Improve network workers params
+ - feat(mount): Set default cache timeout to 1000
+ - fix(mount): Fix many parallel reads issue
+ - fix(mount): Fix client race conditions
+ - feat(chunkserver): Get chunk to test from manager (#174)
+ - feat(tests): Add RPC service recovery function (#189)
+
  * SaunaFS (4.5.1) (2024-09-16)
  - Fix critical issue with uraft assigning floating IP address to all nodes.
    Note that this fix reverts the previous fix for lost IP addresses after
