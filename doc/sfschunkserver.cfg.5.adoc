@@ -24,6 +24,10 @@ Configuration options:
 
 *DATA_PATH*:: where to store files with usage statistics and daemon lock file
 
+*METADATA_CACHE_PATH*:: where to store the binary chunk metadata cache for
+faster scanning.
+(default is DATA_PATH/chunk_metadata_cache)
+
 *LABEL*:: the label of this chunkserver (for tiering)
 
 *WORKING_USER*:: user to run daemon as

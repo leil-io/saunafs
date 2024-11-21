@@ -29,9 +29,9 @@
 ## write a file per disk with the chunks metadata information.
 ## This binary file can be used to speedup the scan and registration times when
 ## there is a big amount of chunks (millions), avoiding the recursive scan from
-## the disk metadata path. An empty path disables the feature.
-## (Default: "")
-# METADATA_CACHE_PATH = ""
+## the disk metadata path. An empty or invalid path disables the feature.
+## (Default: @DATA_PATH@/chunk_metadata_cache)
+# METADATA_CACHE_PATH = @DATA_PATH@/chunk_metadata_cache
 
 ## Delay in seconds before reconnection attempt to the master server after
 ## disconnection.

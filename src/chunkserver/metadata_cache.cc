@@ -39,7 +39,16 @@ void MetadataCache::setMetadataCachePath(const std::string &path){
 		isValidPath = true;
 		safs::log_info("Metadata cache path set to: {}", path);
 	} else if (!path.empty()) {
-		safs::log_err("Metadata cache path {} does not exist", path);
+		safs::log_err("Metadata cache path {} does not exist, creating it",
+		              path);
+
+		if (!fs::create_directories(path)) {
+			safs::log_err("Failed to create metadata cache path {}", path);
+		} else {
+			metadataCachePath = path;
+			isValidPath = true;
+			safs::log_info("Metadata cache path set to: {}", path);
+		}
 	}
 }
 

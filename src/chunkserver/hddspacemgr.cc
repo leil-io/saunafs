@@ -2641,7 +2641,9 @@ void hddReload(void) {
 	                                disk::gLeaveSpaceDefaultDefaultStrValue);
 	auto parsedLeaveFree = cfg_parse_size(leaveFreeStr);
 
-	std::string metadataCachePath = cfg_getstring("METADATA_CACHE_PATH", "");
+	std::string workDir = cfg_getstring("DATA_PATH", "");
+	std::string metadataCachePath =
+	    cfg_getstring("METADATA_CACHE_PATH", workDir + "/chunk_metadata_cache");
 	MetadataCache::setMetadataCachePath(metadataCachePath);
 
 	if (parsedLeaveFree < 0) {
@@ -2743,7 +2745,9 @@ int hddInit() {
 	                                disk::gLeaveSpaceDefaultDefaultStrValue);
 	auto parsedLeaveFree = cfg_parse_size(leaveFreeStr);
 
-	std::string metadataCachePath = cfg_getstring("METADATA_CACHE_PATH", "");
+	std::string workDir = cfg_getstring("DATA_PATH", "");
+	std::string metadataCachePath =
+	    cfg_getstring("METADATA_CACHE_PATH", workDir + "/chunk_metadata_cache");
 	MetadataCache::setMetadataCachePath(metadataCachePath);
 
 	if (parsedLeaveFree < 0) {
