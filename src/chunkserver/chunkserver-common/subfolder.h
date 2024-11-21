@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/platform.h"
+
 #include <array>
 #include <string>
 

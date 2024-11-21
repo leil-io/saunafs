@@ -16,7 +16,15 @@
    along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/platform.h"
+
+// A fix for https://stackoverflow.com/q/77034039/10788155
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include "chunkserver-common/subfolder.h"
+#pragma GCC diagnostic pop
+
 #include "chunkserver/chunk_filename_parser.h"
 #include "chunkserver/metadata_cache.h"
 #include "common/chunk_part_type.h"
