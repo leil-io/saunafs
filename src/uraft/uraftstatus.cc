@@ -1,5 +1,6 @@
 #include "common/platform.h"
 #include "uraftstatus.h"
+#include <sys/syslog.h>
 
 #include <iostream>
 #include <boost/format.hpp>
@@ -142,6 +143,8 @@ void uRaftStatus::acceptConnection() {
 		if (!error) {
 			storeData(conn->data_);
 			conn->init();
+		} else {
+			syslog(LOG_WARNING, "Could not accept connection: %s", error.what().c_str());
 		}
 
 		acceptConnection();
