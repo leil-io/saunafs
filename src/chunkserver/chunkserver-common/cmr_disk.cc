@@ -87,7 +87,9 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 	assert(chunk);
 	TRACETHIS1(chunk->id());
 
-	(void)isFromScan;  // Not needed for conventional disks
+	if (isFromScan && !gStatChunksAtDiskScan) {
+		return SAUNAFS_STATUS_OK;
+	}
 
 	struct stat metaStat {};
 	if (stat(chunk->metaFilename().c_str(), &metaStat) < 0) {

@@ -142,6 +142,14 @@
 ## (Default: 1), i.e. enabled.
 #PERFORM_FSYNC = 1
 
+## Verify that chunk metadata and data parts exists at scan time. If set to 1,
+## the data part is also checked to be multiple of SFSBLOCKSIZE. Disabling this
+## option accelerates the scan process, but does not check the chunk data files.
+## Warning: use it with caution, only in scenarios where a fast chunkserver
+## restart is needed.
+## (Default: 1), i.e. enabled.
+# STAT_CHUNKS_AT_DISK_SCAN = 1
+
 ## [ADVANCED] The DiskManager is responsible for assigning each chunk to a
 ## specific disk. By default the chunks are distributed in a balanced way among
 ## all the available disks. This variable can be changed to select a custom

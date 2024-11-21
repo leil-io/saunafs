@@ -56,6 +56,8 @@ inline std::vector<std::unique_ptr<CondVarWithWaitCount>> gFreeCondVars;
 /// started yet, but it's a _very_ unlikely situation.
 inline std::atomic_int gScansInProgress(0);
 
+inline std::atomic_bool gStatChunksAtDiskScan{true};
+
 inline std::atomic_bool gPerformFsync(true);
 
 inline std::atomic_bool gCheckCrcWhenWriting{true};

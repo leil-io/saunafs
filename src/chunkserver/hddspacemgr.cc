@@ -2483,6 +2483,16 @@ void hddReload(void) {
 
 	gAdviseNoCache = cfg_getuint32("HDD_ADVISE_NO_CACHE", 0);
 	gPerformFsync = cfg_getuint32("PERFORM_FSYNC", 1);
+
+	gStatChunksAtDiskScan = cfg_getuint8("STAT_CHUNKS_AT_DISK_SCAN", 1) != 0U;
+	if (!gStatChunksAtDiskScan) {
+		safs::log_warn(
+		    "hdd space manager: STAT_CHUNKS_AT_DISK_SCAN = {} (disabled): the "
+		    "chunk data files will not be checked at scan time, make sure they "
+		    "have not changed.",
+		    static_cast<uint8_t>(gStatChunksAtDiskScan));
+	}
+
 	gHDDTestFreq_ms =
 	    cfg_ranged_get("HDD_TEST_FREQ", 10., 0.001, 1000000.) * 1000;
 	gCheckCrcWhenReading = cfg_getuint8("HDD_CHECK_CRC_WHEN_READING", 1) != 0U;
@@ -2583,6 +2593,15 @@ int hddInit() {
 	initializeEmptyBlockCrcForDisks();
 
 	gPerformFsync = cfg_getuint32("PERFORM_FSYNC", 1);
+
+	gStatChunksAtDiskScan = cfg_getuint8("STAT_CHUNKS_AT_DISK_SCAN", 1) != 0U;
+	if (!gStatChunksAtDiskScan) {
+		safs::log_warn(
+		    "hdd space manager: STAT_CHUNKS_AT_DISK_SCAN = {} (disabled): the "
+		    "chunk data files will not be checked at scan time, make sure they "
+		    "have not changed.",
+		    static_cast<uint8_t>(gStatChunksAtDiskScan));
+	}
 
 	int64_t leaveSpaceDefaultDefaultValue =
 	    cfg_parse_size(disk::gLeaveSpaceDefaultDefaultStrValue);
