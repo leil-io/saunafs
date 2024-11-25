@@ -167,6 +167,7 @@ const static std::unordered_map<std::string, std::string> defaultOptionsCS = {
     {"BGJOBSCNT_PER_NETWORK_WORKER", "1000"},
     {"MAX_READ_BEHIND_KB", "0"},
     {"PERFORM_FSYNC", "1"},
+    {"STAT_CHUNKS_AT_DISK_SCAN", "1"},
     {"REPLICATION_TOTAL_TIMEOUT_MS", "60000"},
     {"REPLICATION_CONNECTION_TIMEOUT_MS", "1000"},
     {"REPLICATION_WAVE_TIMEOUT_MS", "500"},

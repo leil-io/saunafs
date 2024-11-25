@@ -128,6 +128,12 @@ read any skipped data; the value is aligned down to 64 KiB)
 *PERFORM_FSYNC*:: call fsync() after a chunk is modified (default is 1, i.e.
 enabled)
 
+*STAT_CHUNKS_AT_DISK_SCAN*:: verify that chunk metadata and data parts exists at
+scan time. If set to 1, the data part is also checked to be multiple of
+SFSBLOCKSIZE. Disabling this option accelerates the scan process, but does not
+check the chunk files. Warning: use it with caution, only in scenarios where a
+fast chunkserver restart is needed.(default is 1, i.e. enabled)
+
 *REPLICATION_TOTAL_TIMEOUT_MS*:: total timeout for single replication
 operation. Replications that take longer than that are considered failed and
 are immediately aborted (default: 60000)
