@@ -1922,7 +1922,7 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 	auto it = eptr->sesdata->openedfiles.begin();
 	while (it != eptr->sesdata->openedfiles.end()) {
 		uint32_t openFileIno = *it;
-		if (!inodes_to_reserve.contains(openFileIno)) { 
+		if (!inodes_to_reserve.contains(openFileIno)) {
 			// erase files not belonging to the reserve inodes list provided
 			fs_release(context, openFileIno, eptr->sesdata->sessionid);
 			it = eptr->sesdata->openedfiles.erase(it);
@@ -5233,7 +5233,7 @@ void matoclserv_read(matoclserventry *eptr) {
 		}
 		eptr->inputpacket.startptr+=i;
 		eptr->inputpacket.bytesleft-=i;
-		metrics::Counter::increment(metrics::master::CLIENT_RX_BYTES);
+		metrics::Counter::increment(metrics::master::CLIENT_RX_BYTES, i);
 		stats_brcvd+=i;
 
 		if (eptr->inputpacket.bytesleft>0) {
@@ -5305,7 +5305,7 @@ void matoclserv_write(matoclserventry *eptr) {
 		}
 		pack->startptr+=i;
 		pack->bytesleft-=i;
-		metrics::Counter::increment(metrics::master::CLIENT_TX_BYTES);
+		metrics::Counter::increment(metrics::master::CLIENT_TX_BYTES, i);
 		stats_bsent+=i;
 		if (pack->bytesleft>0) {
 			return;
