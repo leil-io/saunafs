@@ -31,13 +31,13 @@ struct Master {
 	Master(std::shared_ptr<prometheus::Registry>& registry);
 
 	// Metric(s)
-	CounterFamily *packet_client_counter{nullptr};
-	CounterFamily *byte_client_counter{nullptr};
-	CounterFamily *filesystem_counter{nullptr};
-	CounterFamily *chunk_counter{nullptr};
+	CounterFamily *packetClientCounter{nullptr};
+	CounterFamily *byteClientCounter{nullptr};
+	CounterFamily *filesystemCounter{nullptr};
+	CounterFamily *chunkCounter{nullptr};
 
 	// Master Counters
-	std::array<Counter, Counters::KEY_END + 1> master_counters;
+	std::array<Counter, Counters::KEY_END + 1> masterCounters;
 };
 }
 #endif

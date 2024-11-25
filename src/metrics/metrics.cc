@@ -57,11 +57,11 @@ constexpr auto THREAD_SLEEP_TIME_MS = 100;
 namespace metrics {
 
 std::unique_ptr<std::jthread>
-    metrics_main_thread;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+    gMetricsMainThread;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 void destroy() {
-	if (metrics_main_thread != nullptr) {
-		metrics_main_thread->request_stop();
+	if (gMetricsMainThread != nullptr) {
+		gMetricsMainThread->request_stop();
 	}
 }
 
@@ -74,12 +74,6 @@ void init(const char* /* unused */) {
 }
 #else
 
-CounterFamily &setup_family(
-    const char *name, const char *help,
-    std::shared_ptr<prometheus::Registry> &registry) {
-	return prometheus::BuildCounter().Name(name).Help(help).Register(*registry);
-}
-
 class PrometheusMetrics {
 public:
 	PrometheusMetrics()
@@ -88,7 +82,7 @@ public:
 		master = master::Master(registry);
 	}
 
-	std::shared_ptr<prometheus::Registry> get_registry() {
+	std::shared_ptr<prometheus::Registry> getRegistry() {
 		return registry;
 	}
 
@@ -99,22 +93,22 @@ private:
 	// Registry
 	std::shared_ptr<prometheus::Registry> registry;
 };
-PrometheusMetrics prometheus_metrics;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+PrometheusMetrics gPrometheusMetrics;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 void Counter::increment(master::Counters key, double n) {
 	// Safe as all values are constructed at specific keys, however a check
 	// needs to be made whether the actual counter initialized or not (for
 	// whatever reason)
-	auto counter = prometheus_metrics.master.master_counters[key]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+	auto counter = gPrometheusMetrics.master.masterCounters[key]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 	if (counter.counter_ != nullptr) { counter.counter_->Increment(n); }
 }
 
-void prometheus_loop(const std::stop_token& stop, const char* host) {
+void prometheusLoop(const std::stop_token& stop, const char* host) {
 	try {
 		// create an http server
 		prometheus::Exposer exposer{host};
 
-		exposer.RegisterCollectable(prometheus_metrics.get_registry());
+		exposer.RegisterCollectable(gPrometheusMetrics.getRegistry());
 		safs::log_info("started prometheus server");
 
 		while (!stop.stop_requested()) {
@@ -126,7 +120,7 @@ void prometheus_loop(const std::stop_token& stop, const char* host) {
 }
 
 void init(const char* host) {
-	metrics_main_thread = std::make_unique<std::jthread>(std::jthread(prometheus_loop, host));
+	gMetricsMainThread = std::make_unique<std::jthread>(std::jthread(prometheusLoop, host));
 }
 
 }
