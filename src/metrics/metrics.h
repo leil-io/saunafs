@@ -34,9 +34,9 @@ using CounterFamily = prometheus::Family<prometheus::Counter>;
 
 namespace metrics {
 
-namespace master {
-
-enum Counters {
+class Counter {
+public:
+enum class Master : unsigned int {
 	KEY_START = 0,      // Used internally, has no effect
 	CHUNK_DELETE,       // Chunk deletion operations
 	CHUNK_REPLICATE,    // Chunk replication operations
@@ -64,17 +64,14 @@ enum Counters {
 	KEY_END,            // Used internally, has no effect
 };
 
-}
-
-class Counter {
-public:
 #ifdef HAVE_PROMETHEUS
 	Counter() : counter_(nullptr) {};
 	Counter(const prometheus::Labels &labels,
 	        CounterFamily *family)
 	    : counter_(&family->Add(labels)) {};
 
-	static void increment(master::Counters key, double n = 1);
+	template <typename T>
+	static void increment(T key, double n = 1);
 
 private:
 	prometheus::Counter* counter_;
@@ -82,7 +79,8 @@ private:
 	// Dummy methods for packages without prometheus
 	explicit Counter() = default;
 
-	static void increment(master::Counters /*unused*/, double  /*unused*/= 1) {
+	template <typename T>
+	static void increment(T /*unused*/, double  /*unused*/= 1) {
 	}
 #endif
 };

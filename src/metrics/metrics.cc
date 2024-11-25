@@ -79,7 +79,7 @@ public:
 	PrometheusMetrics()
 	    :
 	      registry(std::make_shared<prometheus::Registry>()) {
-		master = master::Master(registry);
+		master = Master(registry);
 	}
 
 	std::shared_ptr<prometheus::Registry> getRegistry() {
@@ -87,7 +87,7 @@ public:
 	}
 
 	// Master metrics
-	master::Master master; // NOLINT(cppcoreguidelines-non-private-member-variables-in-classes)
+	Master master; // NOLINT(cppcoreguidelines-non-private-member-variables-in-classes)
 
 private:
 	// Registry
@@ -95,11 +95,12 @@ private:
 };
 PrometheusMetrics gPrometheusMetrics;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-void Counter::increment(master::Counters key, double n) {
+template <typename T>
+void Counter::increment(T key, double n) {
 	// Safe as all values are constructed at specific keys, however a check
 	// needs to be made whether the actual counter initialized or not (for
 	// whatever reason)
-	auto counter = gPrometheusMetrics.master.masterCounters[key]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+	auto counter = gPrometheusMetrics.master.masterCounters[static_cast<unsigned int>(key)]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 	if (counter.counter_ != nullptr) { counter.counter_->Increment(n); }
 }
 
@@ -125,3 +126,4 @@ void init(const char* host) {
 
 }
 #endif
+template void metrics::Counter::increment<metrics::Counter::Master>(metrics::Counter::Master key, double n);

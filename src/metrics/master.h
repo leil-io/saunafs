@@ -24,7 +24,7 @@
 #include <prometheus/counter.h>
 #include <prometheus/registry.h>
 
-namespace metrics::master {
+namespace metrics {
 
 struct Master {
 	Master() = default;
@@ -37,7 +37,7 @@ struct Master {
 	CounterFamily *chunkCounter{nullptr};
 
 	// Master Counters
-	std::array<Counter, Counters::KEY_END + 1> masterCounters;
+	std::array<Counter, static_cast<unsigned int>(Counter::Master::KEY_END) + 1> masterCounters;
 };
 }
 #endif
