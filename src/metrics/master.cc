@@ -26,16 +26,16 @@ using namespace metrics::master;
 Master::Master(std::shared_ptr<prometheus::Registry> &registry) {
 	// clang-format off
 	// NOLINTBEGIN(cppcoreguidelines-prefer-member-initializer)
-	packet_client_counter = &setup_family(
+	packetClientCounter = &setupFamily(
 		"metadata_observed_packets_client_total",
 		"Number of observed packets from and for client", registry);
-	byte_client_counter = &setup_family(
+	byteClientCounter = &setupFamily(
 		"metadata_observed_bytes_client_total",
 		"Number of observed bytes from and for client", registry);
-	filesystem_counter = &setup_family(
+	filesystemCounter = &setupFamily(
 		"metadata_stats_total",
 		"Number of observed filesystem operations", registry);
-	chunk_counter= &setup_family(
+	chunkCounter= &setupFamily(
 		"metadata_chunk_operations_total",
 		"Number of chunk operations", registry);
 	// NOLINTEND(cppcoreguidelines-prefer-member-initializer)
@@ -47,135 +47,135 @@ Master::Master(std::shared_ptr<prometheus::Registry> &registry) {
 		case KEY_START:
 			[[fallthrough]];
 		case CHUNK_DELETE:
-			master_counters[CHUNK_DELETE] =
+			masterCounters[CHUNK_DELETE] =
 				Counter(
 					{{"chunk", "operations"}, {"operation", "delete"}},
-					chunk_counter);
+					chunkCounter);
 			[[fallthrough]];
 		case CHUNK_REPLICATE:
-			master_counters[CHUNK_REPLICATE] =
+			masterCounters[CHUNK_REPLICATE] =
 				Counter(
 					{{"chunk", "operations"}, {"operation", "replicate"}},
-					chunk_counter);
+					chunkCounter);
 			[[fallthrough]];
 		case FS_STATFS:
-			master_counters[FS_STATFS] =
+			masterCounters[FS_STATFS] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "STATFS"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_GETATTR:
-			master_counters[FS_GETATTR] =
+			masterCounters[FS_GETATTR] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "GETATTR"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_SETATTR:
-			master_counters[FS_SETATTR] =
+			masterCounters[FS_SETATTR] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "SETATTR"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_LOOKUP:
-			master_counters[FS_LOOKUP] =
+			masterCounters[FS_LOOKUP] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "LOOKUP"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_MKDIR:
-			master_counters[FS_MKDIR] =
+			masterCounters[FS_MKDIR] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "MKDIR"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_RMDIR:
-			master_counters[FS_RMDIR] =
+			masterCounters[FS_RMDIR] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "RMDIR"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_SYMLINK:
-			master_counters[FS_SYMLINK] =
+			masterCounters[FS_SYMLINK] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "SYMLINK"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_READLINK:
-			master_counters[FS_READLINK] =
+			masterCounters[FS_READLINK] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "READLINK"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_MKNOD:
-			master_counters[FS_MKNOD] =
+			masterCounters[FS_MKNOD] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "MKNOD"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_UNLINK:
-			master_counters[FS_UNLINK] =
+			masterCounters[FS_UNLINK] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "UNLINK"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_RENAME:
-			master_counters[FS_RENAME] =
+			masterCounters[FS_RENAME] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "RENAME"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_LINK:
-			master_counters[FS_LINK] =
+			masterCounters[FS_LINK] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "LINK"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_READDIR:
-			master_counters[FS_READDIR] = Counter(
+			masterCounters[FS_READDIR] = Counter(
 				{{"filesystem", "operations"}, {"operation", "READDIR"}},
-				filesystem_counter);
+				filesystemCounter);
 			[[fallthrough]];
 		case FS_OPEN:
-			master_counters[FS_OPEN] =
+			masterCounters[FS_OPEN] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "OPEN"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_READ:
-			master_counters[FS_READ] =
+			masterCounters[FS_READ] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "READ"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case FS_WRITE:
-			master_counters[FS_WRITE] =
+			masterCounters[FS_WRITE] =
 				Counter(
 					{{"filesystem", "operations"}, {"operation", "WRITE"}},
-					filesystem_counter);
+					filesystemCounter);
 			[[fallthrough]];
 		case CLIENT_RX_PACKETS:
-			master_counters[CLIENT_RX_PACKETS] =
+			masterCounters[CLIENT_RX_PACKETS] =
 				Counter(
 					{{"protocol", "tcp"}, {"direction", "rx"}},
-					packet_client_counter);
+					packetClientCounter);
 			[[fallthrough]];
 		case CLIENT_TX_PACKETS:
-			master_counters[CLIENT_TX_PACKETS] =
+			masterCounters[CLIENT_TX_PACKETS] =
 				Counter(
 					{{"protocol", "tcp"}, {"direction", "tx"}},
-					packet_client_counter);
+					packetClientCounter);
 			[[fallthrough]];
 		case CLIENT_RX_BYTES:
-			master_counters[CLIENT_RX_BYTES] =
+			masterCounters[CLIENT_RX_BYTES] =
 				Counter(
 					{{"protocol", "tcp"}, {"direction", "rx"}},
-					byte_client_counter);
+					byteClientCounter);
 			[[fallthrough]];
 		case CLIENT_TX_BYTES:
-			master_counters[CLIENT_TX_BYTES] =
+			masterCounters[CLIENT_TX_BYTES] =
 				Counter(
 					{{"protocol", "tcp"}, {"direction", "tx"}},
-					byte_client_counter);
+					byteClientCounter);
 			[[fallthrough]];
 		case KEY_END:
 			break;
