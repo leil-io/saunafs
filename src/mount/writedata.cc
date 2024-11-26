@@ -222,7 +222,7 @@ static uint32_t gCachePerInodePercentage;
 static pthread_t delayed_queue_worker_th;
 static std::vector<pthread_t> write_worker_th;
 
-static void* jqueue;
+static std::unique_ptr<ProducerConsumerQueue> jobsQueue;
 static std::list<DelayedQueueEntry> delayedQueue;
 
 static ConnectionPool gChunkserverConnectionPool;
@@ -311,7 +311,8 @@ void* delayed_queue_worker(void*) {
 				return NULL;
 			}
 			if (--it->ticksLeft <= 0) {
-				queue_put(jqueue, 0, 0, reinterpret_cast<uint8_t*>(it->inodeData), 0);
+				auto *data = reinterpret_cast<uint8_t *>(it->inodeData);
+				jobsQueue->put(0, 0, data, 0);
 				it = delayedQueue.erase(it);
 			} else {
 				++it;
@@ -329,12 +330,12 @@ void write_delayed_enqueue(inodedata* id, uint32_t seconds, Glock& lock) {
 	if (seconds > 0) {
 		delayed_queue_put(id, seconds, lock);
 	} else {
-		queue_put(jqueue, 0, 0, (uint8_t*) id, 0);
+		jobsQueue->put(0, 0, reinterpret_cast<uint8_t*>(id), 0);
 	}
 }
 
 void write_enqueue(inodedata* id, Glock&) {
-	queue_put(jqueue, 0, 0, (uint8_t*) id, 0);
+	jobsQueue->put(0, 0, reinterpret_cast<uint8_t*>(id), 0);
 }
 
 void write_job_delayed_end(inodedata* id, int status, int seconds, Glock &lock) {
@@ -519,7 +520,7 @@ void InodeChunkWriter::processDataChain(ChunkWriter& writer) {
 	uint32_t maximumTime = kMaximumTime;
 	bool otherJobsAreWaiting = false;
 	while (true) {
-		bool newOtherJobsAreWaiting = !queue_isempty(jqueue);
+		bool newOtherJobsAreWaiting = !jobsQueue->isEmpty();
 		if (!otherJobsAreWaiting && newOtherJobsAreWaiting) {
 			// Some new jobs have just arrived in the queue -- we should finish faster.
 			maximumTime = kMaximumTimeWhenJobsWaiting;
@@ -660,7 +661,7 @@ void* write_worker(void*) {
 		uint8_t *data;
 		{
 			LOG_AVG_TILL_END_OF_SCOPE0("write_worker#idle");
-			queue_get(jqueue, &z1, &z2, &data, &z3);
+			jobsQueue->get(&z1, &z2, &data, &z3);
 		}
 		if (data == NULL) {
 			return NULL;
@@ -691,7 +692,7 @@ void write_data_init(uint32_t cachesize, uint32_t retries, uint32_t workers,
 	freecacheblocks = cacheblockcount;
 	gCachePerInodePercentage = cachePerInodePercentage;
 
-	jqueue = queue_new(0);
+	jobsQueue = std::make_unique<ProducerConsumerQueue>(0, deleterByType<inodedata>);
 
 	pthread_attr_init(&thattr);
 	pthread_attr_setstacksize(&thattr, 0x100000);
@@ -713,13 +714,13 @@ void write_data_term(void) {
 		delayed_queue_put(nullptr, 0, lock);
 	}
 	for (i = 0; i < write_worker_th.size(); i++) {
-		queue_put(jqueue, 0, 0, NULL, 0);
+		jobsQueue->put(0, 0, nullptr, 0);
 	}
 	for (i = 0; i < write_worker_th.size(); i++) {
 		pthread_join(write_worker_th[i], NULL);
 	}
 	pthread_join(delayed_queue_worker_th, NULL);
-	queue_delete(jqueue, queue_deleter_delete<inodedata>);
+	jobsQueue.reset();
 	for (const auto &[_, id] : inodedataMap) {
 		delete id;
 	}

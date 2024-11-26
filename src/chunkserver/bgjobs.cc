@@ -146,32 +146,44 @@ struct jobpool {
 	pthread_t *workerthreads;
 	pthread_mutex_t pipelock;
 	pthread_mutex_t jobslock;
-	void *jobqueue;
-	void *statusqueue;
+	std::unique_ptr<ProducerConsumerQueue> jobsQueue;
+	std::unique_ptr<ProducerConsumerQueue> statusQueue;
 	job* jobhash[JHASHSIZE];
-	uint32_t nextjobid;
+	uint32_t nextjobid = 1;
+
+	jobpool(int rpipe, int wpipe, uint8_t workers, uint32_t maxJobs)
+	    : rpipe(rpipe), wpipe(wpipe), workers(workers) {
+		workerthreads = (pthread_t *)malloc(sizeof(pthread_t) * workers);
+		passert(workerthreads);
+		zassert(pthread_mutex_init(&(pipelock), nullptr));
+		zassert(pthread_mutex_init(&(jobslock), nullptr));
+
+		jobsQueue = std::make_unique<ProducerConsumerQueue>(maxJobs);
+		statusQueue = std::make_unique<ProducerConsumerQueue>();
+
+		for (auto &job : jobhash) { job = nullptr; }
+	};
 };
 
 static inline void job_send_status(jobpool *jp, uint32_t jobid, uint8_t status) {
 	TRACETHIS2(jobid, (int)status);
 	zassert(pthread_mutex_lock(&(jp->pipelock)));
-	if (queue_isempty(jp->statusqueue)) {   // first status
+	if (jp->statusQueue->isEmpty()) {   // first status
 		eassert(write(jp->wpipe,&status,1)==1); // write anything to wake up select
 	}
-	queue_put(jp->statusqueue,jobid,status,NULL,1);
+	jp->statusQueue->put(jobid, status, nullptr, 1);
 	zassert(pthread_mutex_unlock(&(jp->pipelock)));
-	return;
 }
 
 static inline int job_receive_status(jobpool *jp,uint32_t *jobid,uint8_t *status) {
 	TRACETHIS();
 	uint32_t qstatus;
 	zassert(pthread_mutex_lock(&(jp->pipelock)));
-	queue_get(jp->statusqueue,jobid,&qstatus,NULL,NULL);
+	jp->statusQueue->get(jobid, &qstatus, nullptr, nullptr);
 	*status = qstatus;
 	PRINTTHIS(*jobid);
 	PRINTTHIS((int)*status);
-	if (queue_isempty(jp->statusqueue)) {
+	if (jp->statusQueue->isEmpty()) {
 		eassert(read(jp->rpipe,&qstatus,1)==1); // make pipe empty
 		zassert(pthread_mutex_unlock(&(jp->pipelock)));
 		return 0;       // last element
@@ -195,7 +207,7 @@ void* job_worker(void *th_arg) {
 	uint32_t op;
 
 	for (;;) {
-		queue_get(jp->jobqueue,&jobid,&op,&jptrarg,NULL);
+		jp->jobsQueue->get(&jobid, &op, &jptrarg, nullptr);
 		jptr = (job*)jptrarg;
 		PRINTTHIS(op);
 		zassert(pthread_mutex_lock(&(jp->jobslock)));
@@ -346,7 +358,7 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 	jptr->jstate = JSTATE_ENABLED;
 	jptr->next = jp->jobhash[jhpos];
 	jp->jobhash[jhpos] = jptr;
-	queue_put(jp->jobqueue,jobid,op,(uint8_t*)jptr,1);
+	jp->jobsQueue->put(jobid, op, reinterpret_cast<uint8_t*>(jptr), 1);
 	jp->nextjobid++;
 	if (jp->nextjobid==0) {
 		jp->nextjobid=1;
@@ -366,27 +378,14 @@ void* job_pool_new(uint8_t workers,uint32_t jobs,int *wakeupdesc) {
 	if (pipe(fd)<0) {
 		return NULL;
 	}
-	jp = (jobpool*) malloc(sizeof(jobpool));
+	jp = new jobpool(fd[0], fd[1], workers, jobs);
 	passert(jp);
 	*wakeupdesc = fd[0];
-	jp->rpipe = fd[0];
-	jp->wpipe = fd[1];
-	jp->workers = workers;
-	jp->workerthreads = (pthread_t*) malloc(sizeof(pthread_t)*workers);
-	passert(jp->workerthreads);
-	zassert(pthread_mutex_init(&(jp->pipelock),NULL));
-	zassert(pthread_mutex_init(&(jp->jobslock),NULL));
-	jp->jobqueue = queue_new(jobs);
-	jp->statusqueue = queue_new(0);
-	for (i=0 ; i<JHASHSIZE ; i++) {
-		jp->jobhash[i]=NULL;
-	}
-	jp->nextjobid = 1;
 	zassert(pthread_attr_init(&thattr));
 	zassert(pthread_attr_setstacksize(&thattr,0x100000));
 	zassert(pthread_attr_setdetachstate(&thattr,PTHREAD_CREATE_JOINABLE));
 	for (i=0 ; i<workers ; i++) {
-		zassert(pthread_create(jp->workerthreads+i,&thattr,job_worker,jp));
+		zassert(pthread_create(jp->workerthreads + i, &thattr, job_worker, jp));
 	}
 	zassert(pthread_attr_destroy(&thattr));
 	return jp;
@@ -395,7 +394,7 @@ void* job_pool_new(uint8_t workers,uint32_t jobs,int *wakeupdesc) {
 uint32_t job_pool_jobs_count(void *jpool) {
 	TRACETHIS();
 	jobpool* jp = (jobpool*)jpool;
-	return queue_elements(jp->jobqueue);
+	return jp->jobsQueue->elements();
 }
 
 void job_pool_disable_and_change_callback_all(void *jpool,void (*callback)(uint8_t status,void *extra)) {
@@ -480,27 +479,27 @@ void job_pool_delete(void *jpool) {
 	uint32_t i;
 
 	for (i = 0; i < jp->workers; i++) {
-		queue_put(jp->jobqueue, 0, OP_EXIT, NULL, 1);
+		jp->jobsQueue->put(0, OP_EXIT, nullptr, 1);
 	}
 
 	for (i = 0; i < jp->workers; i++) {
 		zassert(pthread_join(jp->workerthreads[i], NULL));
 	}
 
-	sassert(queue_isempty(jp->jobqueue));
+	sassert(jp->jobsQueue->isEmpty());
 
-	if (!queue_isempty(jp->statusqueue)) {
+	if (!jp->statusQueue->isEmpty()) {
 		job_pool_check_jobs(jp);
 	}
 
-	queue_delete(jp->jobqueue);
-	queue_delete(jp->statusqueue);
+	jp->jobsQueue.reset();
+	jp->statusQueue.reset();
 	zassert(pthread_mutex_destroy(&(jp->pipelock)));
 	zassert(pthread_mutex_destroy(&(jp->jobslock)));
 	free(jp->workerthreads);
 	close(jp->rpipe);
 	close(jp->wpipe);
-	free(jp);
+	delete jp;
 }
 
 uint32_t job_inval(void *jpool,void (*callback)(uint8_t status,void *extra),void *extra) {
