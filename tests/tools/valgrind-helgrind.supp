@@ -1,12 +1,114 @@
 # MOUNT
 
 {
-   fuse_session_loop_mt initialization
+   fuse_session_loop_mt_initialization
    # fuse_session_loop_mt is called only once at starting time. Looks like
    # related to fuse and not to our client.
    Helgrind:PthAPIerror
    ...
    fun:fuse_session_loop_mt
-   fun:fuse_session_loop_mt
    ...
+}
+
+{
+   generic_placeholder_start_thread
+   # Must be replaced by more specific suppresions
+   Helgrind:Race
+   ...
+   fun:start_thread
+   fun:clone
+}
+
+{
+   generic_placeholder_deallocate
+   # Must be replaced by more specific suppresions
+   Helgrind:Race
+   ...
+   fun:deallocate
+   ...
+}
+
+{
+   generic_placeholder_fs_term
+   # Must be classified
+   Helgrind:Race
+   ...
+   fun:_Z7fs_termv
+   fun:_ZN11SaunaClient7fs_termEv
+   ...
+}
+
+{
+   generic_placeholder_fuse_session_exit
+   # Must be classified
+   Helgrind:Race
+   ...
+   fun:fuse_session_exit
+   ...
+}
+
+{
+   generic_placeholder_read_data_delayed_ops
+   # Must be classified
+   Helgrind:Race
+   ...
+   fun:_Z21read_data_delayed_opsPv
+   ...
+}
+
+{
+   generic_placeholder_Unwind_RaiseException
+   # Must be replaced by more specific suppresions
+   Helgrind:Race
+   ...
+   fun:_Unwind_RaiseException
+   ...
+}
+
+{
+   generic_placeholder_Unwind_SetGR
+   # Must be replaced by more specific suppresions
+   Helgrind:Race
+   fun:_Unwind_SetGR
+   ...
+}
+
+{
+   generic_placeholder_ReadCache
+   # Must be replaced by more specific suppresions
+   Helgrind:Race
+   ...
+   fun:_ZN9ReadCache*
+   ...
+}
+
+{
+   generic_placeholder_ipToString
+   # Must be replaced by more specific suppresions
+   Helgrind:Race
+   ...
+   fun:_Z10ipToString*
+   ...
+}
+
+# MAIN LOOP (used in metadata servers and chunkservers)
+
+{
+   # False positive about gPollTimeout (not atomic to avoid not needed overhead)
+   poll_timeout_loading
+   Helgrind:Race
+   fun:_Z27eventloop_load_poll_timeoutv
+   fun:_Z13eventloop_runv
+   fun:main
+}
+
+# CHUNKSERVER
+
+{
+   # False positive about gPollTimeout (not atomic to avoid not needed overhead)
+   poll_timeout_in_network_worker_threads
+   Helgrind:Race
+   fun:_ZN19NetworkWorkerThreadclEv
+   ...
+   fun:start_thread
 }
