@@ -157,7 +157,7 @@ windows_unmount_fs() {
 			break
 		fi
 	done
-	taskkill.exe /IM sfsmount3.exe /F &> /dev/null || true
+	taskkill.exe /IM ${SAFS_MOUNT_COMMAND} /F &> /dev/null || true
 }
 
 # Unmounts all SaunaFS testing mountpoints created in Unix-like OS's

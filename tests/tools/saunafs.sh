@@ -642,8 +642,8 @@ windows_do_mount_() {
 	local user_id=$4
 	local group_id=$5
 	local mount_id=$6
-	local fuse_options=$(validate_and_append_fuse_options "${mount_id}" "sfsmount3.exe")
-	sfsmount3.exe -c ${mount_cfg} -D ${drive}: --uid $user_id --gid $group_id ${fuse_options} &
+	local fuse_options=$(validate_and_append_fuse_options "${mount_id}" "${SAFS_MOUNT_COMMAND}")
+	${SAFS_MOUNT_COMMAND} -c ${mount_cfg} -D ${drive}: --uid $user_id --gid $group_id ${fuse_options} &
 	disown $!
 
 	local counter=0
@@ -660,7 +660,7 @@ windows_do_mount_() {
 
 windows_do_umount_() {
 	sudo umount -l $2
-	sfsmount3.exe -u ${1}:
+	${SAFS_MOUNT_COMMAND} -u ${1}:
 }
 
 do_mount_() {
@@ -710,7 +710,7 @@ windows_prepare_mount_() {
 	saunafs_info_[mount${mount_id}]=$mount_dir
 	saunafs_info_[mount${mount_id}_cfg]=$mount_cfg
 	saunafs_info_[mntcall${mount_id}]=$mount_call
-	saunafs_info_[mnt${mount_id}_command]="sfsmount3.exe"
+	saunafs_info_[mnt${mount_id}_command]="${SAFS_MOUNT_COMMAND}"
 	saunafs_info_[umountcall${mount_id}]=$umount_call
 	saunafs_info_[mount_win_path${mount_id}]=${mount_big_dir_letter}:
 }

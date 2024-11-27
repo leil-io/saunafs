@@ -19,7 +19,7 @@ timeout_killer_thread() {
 		local value=$(($(date +%s -d "$value_string") - $(date +%s)))
 		local now_ts=$(date +%s)
 
-		# Triples test time in Windows environment
+		# Increase test time in Windows environment
 		if is_windows_system; then
 			multiplier=$((5 * $multiplier))
 		fi
