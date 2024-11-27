@@ -49,6 +49,7 @@ chmod 777 "$TEMP_DIR"
 export PATH="$SAUNAFS_ROOT/sbin:$SAUNAFS_ROOT/bin:$PATH"
 if is_windows_system; then
 	export PATH="$(get_windows_homepath)/SaunaFS:/mnt/c/Windows/System32:$PATH"
+	export SAFS_MOUNT_COMMAND="sfsmount.exe"
 fi
 
 # Quick checks needed to call test_begin and test_fail
