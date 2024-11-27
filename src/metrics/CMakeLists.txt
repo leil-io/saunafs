@@ -26,7 +26,7 @@ if (ENABLE_PROMETHEUS AND NOT SYSTEM_PROMETHEUS)
     FetchContent_Declare(
       prometheus-cpp
       GIT_REPOSITORY https://github.com/jupp0r/prometheus-cpp.git
-      GIT_TAG        v1.1.0
+      GIT_TAG        e5fada43131d251e9c4786b04263ce98b6767ba5 # v.1.3.0
     )
     FetchContent_MakeAvailable(prometheus-cpp)
 
