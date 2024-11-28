@@ -81,7 +81,6 @@ bool ProducerConsumerQueue::put(uint32_t jobId, uint32_t jobType, uint8_t *data,
 	queue_.emplace(jobId, jobType, data, length);
 	currentSize_ += length;
 
-	lock.unlock();
 	notEmpty_.notify_one();
 	return true;
 }
@@ -125,7 +124,6 @@ bool ProducerConsumerQueue::get(uint32_t *jobId, uint32_t *jobType,
 
 	queue_.pop();
 
-	lock.unlock();
 	notFull_.notify_one();
 	return true;
 }
