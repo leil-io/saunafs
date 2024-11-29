@@ -21,7 +21,7 @@ coredump_setup() {
 	fi
 
 	echo ${coredump_pattern} | sudo tee /proc/sys/kernel/core_pattern || echo "Could not setup coredump" && return
-	coredump_enabled_ = 1
+	coredump_enabled_=1
 }
 
 coredump_exists() {
