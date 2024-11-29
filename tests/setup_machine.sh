@@ -106,6 +106,7 @@ common_packages=(
 	doxygen
 	flex
 	tree
+	gdb
 )
 apt_packages=(
 	build-essential
