@@ -46,6 +46,7 @@ test_end() {
 	if [[ ${DEBUG} ]]; then
 		set +x
 	fi
+	coredump_restore
 	test_freeze_result
 	# some tests may leave pwd at sfs mount point, causing a lockup when we stop sfs
 	cd
@@ -228,5 +229,8 @@ catch_error_() {
 	# print_stack 1 removes catch_error_ from stack trace
 	local stack=$(print_stack 1)
 	local command=$(get_source_line "$file" "$line")
+	if coredump_exists; then
+		sleep infinity
+	fi
 	test_add_failure "Command '$command' failed $location"$'\nBacktrace:\n'"$stack"
 }
