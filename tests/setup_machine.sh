@@ -107,6 +107,7 @@ common_packages=(
 	flex
 	tree
 	gdb
+	inotify-tools
 )
 apt_packages=(
 	build-essential
@@ -158,11 +159,10 @@ apt_packages=(
 	libnsl-dev
 	libsqlite3-dev
 	util-linux-extra
+	xfslibs-dev
 )
 noble_packages=(
 	prometheus-cpp-dev
-	xfslibs-dev
-	inotify-tools
 )
 dnf_packages=(
 	boost-filesystem
