@@ -11,84 +11,40 @@
 }
 
 {
-   generic_placeholder_start_thread
-   # Must be replaced by more specific suppresions
+   # fuse_session_loop_mt is called only once at starting time, therefore only exits once. 
+   # Looks like related to fuse and not to our client.
+   fuse_session_loop_mt_exit
    Helgrind:Race
+   fun:fuse_session_exit
    ...
+   fun:fuse_session_loop_mt
+   ...
+}
+
+{
+   # fuse_session_new is called only once at starting time. 
+   # Looks like related to fuse and not to our client.
+   fuse_session_new_initialization
+   Helgrind:Race
+   obj:*
+   obj:*
+   obj:*
+   obj:*
    fun:start_thread
    fun:clone
 }
 
 {
-   generic_placeholder_deallocate
-   # Must be replaced by more specific suppresions
+   # False positive about std::to_string calls when naming the read/write worker threads.
+   to_string_in_workers_names
    Helgrind:Race
    ...
-   fun:deallocate
+   fun:operator<<
+   fun:to_string<short unsigned int>
+   fun:*worker*
    ...
-}
-
-{
-   generic_placeholder_fs_term
-   # Must be classified
-   Helgrind:Race
-   ...
-   fun:_Z7fs_termv
-   fun:_ZN11SaunaClient7fs_termEv
-   ...
-}
-
-{
-   generic_placeholder_fuse_session_exit
-   # Must be classified
-   Helgrind:Race
-   ...
-   fun:fuse_session_exit
-   ...
-}
-
-{
-   generic_placeholder_read_data_delayed_ops
-   # Must be classified
-   Helgrind:Race
-   ...
-   fun:_Z21read_data_delayed_opsPv
-   ...
-}
-
-{
-   generic_placeholder_Unwind_RaiseException
-   # Must be replaced by more specific suppresions
-   Helgrind:Race
-   ...
-   fun:_Unwind_RaiseException
-   ...
-}
-
-{
-   generic_placeholder_Unwind_SetGR
-   # Must be replaced by more specific suppresions
-   Helgrind:Race
-   fun:_Unwind_SetGR
-   ...
-}
-
-{
-   generic_placeholder_ReadCache
-   # Must be replaced by more specific suppresions
-   Helgrind:Race
-   ...
-   fun:_ZN9ReadCache*
-   ...
-}
-
-{
-   generic_placeholder_ipToString
-   # Must be replaced by more specific suppresions
-   Helgrind:Race
-   ...
-   fun:_Z10ipToString*
-   ...
+   fun:start_thread
+   fun:clone
 }
 
 # MAIN LOOP (used in metadata servers and chunkservers)
