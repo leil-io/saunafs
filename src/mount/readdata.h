@@ -217,6 +217,12 @@ struct ReadRecord {
 	      readahead_adviser(gCacheExpirationTime_ms, gReadaheadMaxWindowSize),
 	      inode(inode) {}
 
+	~ReadRecord() {
+		mutex.lock();  // Make helgrind happy
+		mutex.unlock();
+		pthread_mutex_destroy(mutex.native_handle());
+	}
+
 	void resetSuggestedReadaheadReqs() {
 		suggestedReadaheadReqs_ = 0;
 	}

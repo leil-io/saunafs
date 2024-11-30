@@ -72,6 +72,10 @@ struct threc {
 
 	uint32_t packetId;      // thread number
 	threc *next;
+
+	~threc() {
+		pthread_mutex_destroy(mutex.native_handle());
+	}
 };
 
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
@@ -1313,8 +1317,10 @@ void fs_term(void) {
 	std::unique_lock<std::mutex> rec_lock(recMutex);
 	for (tr = threchead ; tr ; tr = trn) {
 		trn = tr->next;
+		tr->mutex.lock();  // Make helgrind happy
 		tr->outputBuffer.clear();
 		tr->inputBuffer.clear();
+		tr->mutex.unlock();
 		delete tr;
 	}
 	threchead = nullptr;

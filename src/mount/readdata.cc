@@ -328,7 +328,6 @@ inline ConnectionPool gReadConnectionPool;
 inline ChunkConnectorUsingPool gChunkConnector(gReadConnectionPool);
 inline ReadaheadOperationsManager gReadaheadOperationsManager;
 inline std::mutex gMutex;
-inline std::mutex gReadCacheMemoryMutex;
 
 inline ReadRecords gActiveReadRecords;
 inline pthread_t delayedOpsThread;
@@ -369,7 +368,7 @@ bool read_data_get_prefetchxorstripes() {
 }
 
 inline void clear_active_read_records() {
-	std::unique_lock lock(gMutex);
+	std::unique_lock gMutexLock(gMutex);
 
 	for (ReadRecords::value_type& readRecord : gActiveReadRecords) {
 		delete readRecord.second;
@@ -385,7 +384,7 @@ void* read_data_delayed_ops(void *arg) {
 
 	for (;;) {
 		gReadConnectionPool.cleanup();
-		std::unique_lock lock(gMutex);
+		std::unique_lock gMutexLock(gMutex);
 		if (readDataTerminate) {
 			return EMPTY_REQUEST;
 		}
@@ -403,13 +402,14 @@ void* read_data_delayed_ops(void *arg) {
 					readRecordIt = gActiveReadRecords.erase(readRecordIt);
 				} else {
 					// Otherwise just try to clear the cache
+					std::unique_lock inodeLock(readRecordIt->second->mutex);
 					readRecordIt->second->cache.clear();
 				}
 			} else {
 				++readRecordIt;
 			}
 		}
-		lock.unlock();
+		gMutexLock.unlock();
 		usleep(USECTICK);
 	}
 }
@@ -429,7 +429,9 @@ void* read_worker(void *arg) {
 			});
 		}
 
-		auto [readRecord, request] = gReadaheadOperationsManager.nextRequest();
+		auto nextRequest = gReadaheadOperationsManager.nextRequest();
+		ReadRecord *readRecord = std::move(nextRequest.first);
+		ReadaheadRequestPtr request = std::move(nextRequest.second);
 		requestsLock.unlock();
 
 		if (!request) {
@@ -441,15 +443,20 @@ void* read_worker(void *arg) {
 		// request no longer valid or no longer needed
 		if (request->error_code != SAUNAFS_STATUS_OK
 		    || request->state == ReadaheadRequestState::kDiscarded) {
-			readRecord->requestsNotDone--;
-			std::unique_lock entryLock(*entry->mutexPtr);
+			{
+				std::unique_lock inodeLock(readRecord->mutex);
+				request.reset();
+			}
+
+			std::unique_lock entryLock(entry->mutex);  // Make helgrind happy
 			entry->release();
 			entry->done = true;
 			entry->requested_size = 0;
+			readRecord->requestsNotDone--;
 			continue;
 		}
 
-		std::unique_lock entryLock(*entry->mutexPtr);
+		std::unique_lock entryLock(entry->mutex);
 		ChunkReader reader(gChunkConnector, gBandwidthOveruse);
 		request->state = ReadaheadRequestState::kProcessing;
 
@@ -469,13 +476,14 @@ void* read_worker(void *arg) {
 			entry->done = true;
 			entryLock.unlock();
 
+			std::unique_lock inodeLock(readRecord->mutex);
 			// clear the list of read requests for this inode and notify waiting
 			// threads of this error
 			if (request->error_code == SAUNAFS_STATUS_OK) {
 				request->error_code = error_code;
-				std::unique_lock inodeLock(readRecord->mutex);
 				readRecord->readaheadRequests.clearAndNotify(request);
 			}
+			request.reset();
 
 			readRecord->requestsNotDone--;
 			continue;
@@ -486,11 +494,12 @@ void* read_worker(void *arg) {
 		entryLock.unlock();
 
 		request->state = ReadaheadRequestState::kFinished;
-		readRecord->requestsNotDone--;
 
 		std::unique_lock inodeLock(readRecord->mutex);
 		readRecord->readaheadRequests.tryNotify();
-		request = nullptr;
+		request.reset();
+
+		readRecord->requestsNotDone--;
 	}
 
 	return EMPTY_REQUEST;
@@ -498,7 +507,7 @@ void* read_worker(void *arg) {
 
 ReadRecord *read_data_new(uint32_t inode) {
 	ReadRecord *rrec = new ReadRecord(inode);
-	std::unique_lock lock(gMutex);
+	std::unique_lock gMutexLock(gMutex);
 
 	gActiveReadRecords.emplace(inode, rrec);
 
@@ -506,7 +515,7 @@ ReadRecord *read_data_new(uint32_t inode) {
 }
 
 void read_data_end(ReadRecord *rrec) {
-	std::unique_lock gLock(gMutex);
+	std::unique_lock gMutexLock(gMutex);
 	rrec->expired = true;
 
 	std::unique_lock inodeLock(rrec->mutex);
@@ -571,7 +580,7 @@ void read_data_init(uint32_t retries,
 
 void read_data_term(void) {
 	{
-		std::unique_lock lock(gMutex);
+		std::unique_lock gMutexLock(gMutex);
 		readDataTerminate = true;
 	}
 
@@ -589,7 +598,7 @@ void read_data_term(void) {
 }
 
 void read_inode_ops(uint32_t inode) { // attributes of inode have been changed - force reconnect and clear cache
-	std::unique_lock lock(gMutex);
+	std::unique_lock gMutexLock(gMutex);
 
 	ReadRecordRange range = gActiveReadRecords.equal_range(inode);
 
@@ -663,7 +672,7 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			uint32_t read_cache_bytes_to_reserve =
 				getBytesToBeReadFromCS(reader.index(), offset_in_chunk,
 										size_in_chunk, reader.fileLength());
-			std::unique_lock lock(gReadCacheMemoryMutex);
+			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 			if (readShouldWaitForSystemMemory(read_cache_bytes_to_reserve)) {
 				throw RecoverableReadException(
 				    "Not enough read cache memory available for reading");
@@ -671,7 +680,7 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			increaseUsedReadCacheMemory(read_cache_bytes_to_reserve);
 			last_read_cache_bytes_to_reserve = read_cache_bytes_to_reserve;
 			total_read_cache_bytes_to_reserve += read_cache_bytes_to_reserve;
-			lock.unlock();
+			usedMemoryLock.unlock();
 			uint32_t bytes_read_from_chunk = reader.readData(
 					read_buffer, offset_in_chunk, size_in_chunk,
 					gChunkserverConnectTimeout_ms, gChunkserverWaveReadTimeout_ms,
@@ -687,9 +696,9 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			try_counter = 0;
 		} catch (UnrecoverableReadException &ex) {
 			print_error_msg(reader, try_counter, ex);
-			std::unique_lock lock(gReadCacheMemoryMutex);
+			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 			decreaseUsedReadCacheMemory(total_read_cache_bytes_to_reserve);
-			lock.unlock();
+			usedMemoryLock.unlock();
 			if (ex.status() == SAUNAFS_ERROR_ENOENT) {
 				return SAUNAFS_ERROR_EBADF; // stale handle
 			} else {
@@ -701,15 +710,16 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			}
 			force_prepare = true;
 			if (try_counter > maxRetries) {
-				std::unique_lock lock(gReadCacheMemoryMutex);
+				std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 				decreaseUsedReadCacheMemory(total_read_cache_bytes_to_reserve);
-				lock.unlock();
+				usedMemoryLock.unlock();
 				return SAUNAFS_ERROR_IO;
 			} else {
-				std::unique_lock lock(gReadCacheMemoryMutex);
+				std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 				decreaseUsedReadCacheMemory(last_read_cache_bytes_to_reserve);
-				total_read_cache_bytes_to_reserve -= last_read_cache_bytes_to_reserve;
-				lock.unlock();
+				total_read_cache_bytes_to_reserve -=
+				    last_read_cache_bytes_to_reserve;
+				usedMemoryLock.unlock();
 				if (strcmp(ex.what(), "Not enough read cache memory available for reading") == 0) {
 					std::unique_lock inodeLock(rrec->mutex);
 					rrec->cache.collectGarbage();
@@ -745,7 +755,7 @@ int read_data(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 		inodeLock.unlock();
 
 		if (insertedEntry != nullptr) {
-			std::unique_lock entryLock(*insertedEntry->mutexPtr);
+			std::unique_lock entryLock(insertedEntry->mutex);
 			uint64_t requestOffset = result.remainingOffset();
 			uint64_t bytesToReadLeft = round_up_to_blocksize(
 			    size - (requestOffset - offset));

@@ -1960,6 +1960,8 @@ static finfo* fs_newfileinfo(uint8_t accmode, uint32_t inode) {
 void remove_file_info(FileInfo *f) {
 	finfo* fileinfo = (finfo*)(f->fh);
 	PthreadMutexWrapper lock(fileinfo->lock);
+	fileinfo->use_flocks = false;
+	fileinfo->use_posixlocks = false;
 	if (fileinfo->mode == IO_READONLY || fileinfo->mode == IO_READ) {
 		read_data_end(static_cast<ReadRecord *>(fileinfo->data));
 	} else if (fileinfo->mode == IO_WRITEONLY || fileinfo->mode == IO_WRITE) {
@@ -2171,9 +2173,7 @@ void release(Inode ino, FileInfo *fi) {
 	if (fileinfo != NULL){
 		if (fileinfo->use_flocks) {
 			fs_flock_send(ino, fi->lock_owner, 0, safs_locks::kRelease);
-			fileinfo->use_flocks = false;
 		}
-		fileinfo->use_posixlocks = false;
 		remove_file_info(fi);
 	}
 	fs_release(ino);
