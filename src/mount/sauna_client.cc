@@ -22,6 +22,7 @@
 #include "mount/sauna_client.h"
 
 #include <atomic>
+#include <mutex>
 #include <new>
 #include <memory>
 #include <vector>
@@ -116,6 +117,10 @@ struct ReaddirSession {
 };
 
 using ReaddirSessions = std::map<std::uint64_t, ReaddirSession>;
+
+/// Used to mitigate helgrind warnings when exceptions are thrown
+/// from multiple threads
+std::mutex gThrowExceptionMutex;
 
 std::mutex gReaddirMutex;
 inline ReaddirSessions gReaddirSessions;
@@ -3048,6 +3053,8 @@ XattrReply getxattr(Context &ctx, Inode ino, const char *name, size_t size, uint
 				name,
 				(uint64_t)size,
 				saunafs_error_string(status));
+
+		std::lock_guard lock(gThrowExceptionMutex);  // Make helgrind happy
 		throw RequestException(status);
 	}
 	if (size==0) {
