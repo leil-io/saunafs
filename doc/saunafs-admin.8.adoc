@@ -148,6 +148,11 @@ chunks with number of copies specified in the label to replicate/delete. +
     Dumps the configuration files of the master server +
     Authentication with the admin password is required +
 
+== OPTIONS
+
+*-v*, *--version*::
+Print version and exit
+
 == REPORTING BUGS
 
 Report bugs to the Github repository <https://github.com/leil/saunafs> as an

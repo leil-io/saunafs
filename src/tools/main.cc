@@ -20,11 +20,15 @@
 #include "common/platform.h"
 
 #include <cassert>
+#include <climits>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
-#include <limits.h>
+#include <ostream>
 #include <unistd.h>
-#include <stdio.h>
 
+#include "common/version.h"
 #include "tools/tools_commands.h"
 #include "tools/tools_common_functions.h"
 
@@ -58,6 +62,10 @@ int main(int argc, char **argv) {
 
 	if (argc > 1) {
 		std::string func_name(argv[1]);
+		if (func_name == "--version" || func_name == "-v") {
+			std::cout << common::version() << '\n';
+			exit(EXIT_SUCCESS);
+		}
 		auto func = getCommand(func_name);
 		if (func == nullptr) {
 			fprintf(stderr, "unknown command: %s\n", argv[1]);

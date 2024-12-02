@@ -31,6 +31,7 @@
 std::function<int(int, char **)> getCommand(const std::string &name);
 int printUsage(int argc = 0, char **argv = nullptr);
 void printTools();
+void printOptions();
 void printArgs(int argc, char **argv);
 
 int append_file_run(int argc, char **argv);

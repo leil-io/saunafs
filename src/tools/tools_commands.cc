@@ -20,15 +20,19 @@
 #include "common/platform.h"
 
 #include "tools/tools_commands.h"
+#include "common/version.h"
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <ostream>
 
 int printUsage(int argc, char **argv) {
 	if (argc < 2) {
 		fprintf(stderr, "usage:\n");
 		fprintf(stderr, "\tsaunafs <tool name> [options]\n");
 		printTools();
+		printf("\n");
+		printOptions();
 	}
 	else {
 		std::function<int(int, char **)> func = getCommand(argv[1]);
@@ -57,6 +61,11 @@ void printTools() {
 	fprintf(stderr, "\trsetgoal = setgoal -r\n");
 	fprintf(stderr, "\trgettrashtime = gettrashtime -r\n");
 	fprintf(stderr, "\trsettrashtime = settrashtime -r\n");
+}
+
+void printOptions() {
+	printf("options: \n");
+	printf("\t-v/--version: print version\n");
 }
 
 static int cd_func(int argc, char **argv) {

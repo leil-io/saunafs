@@ -50,6 +50,8 @@ option(ENABLE_NFS_ACL_SUPPORT   "Enable nfs-ganesha ACL support"                
 option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"             ON)
 option(ENABLE_PROMETHEUS        "Enable prometheus metrics"                              ON)
 
+option(GENERATE_GIT_INFO "Generate git info from current repository (for version commands)" ON)
+
 # If enabled (default), the file compile_commands.json is generated in the build
 # directory. Tools like clangd and vscode use this file for proper analysis.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ${ENABLE_COMPILE_COMMANDS})
@@ -188,16 +190,16 @@ endif()
 
 project(saunafs)
 
-if(NOT PACKAGE_VERSION)
-  set(DEFAULT_MIN_VERSION "4.6.0")
-  execute_process(COMMAND "git" "rev-parse" "--short" "HEAD"
-    OUTPUT_VARIABLE GIT_SHA1_SHORT RESULT_VARIABLE GIT_SHA1_SHORT_RETURN_VALUE
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND "git" "rev-parse" "--abbrev-ref" "HEAD"
-    OUTPUT_VARIABLE GIT_BRANCH_NAME RESULT_VARIABLE GIT_BRANCH_NAME_RETURN_VALUE
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(TIMESTAMP BUILD_TIMESTAMP "%y%m%d-%H%M%S")
-  set(PACKAGE_VERSION "${DEFAULT_MIN_VERSION}-${BUILD_TIMESTAMP}-unstable-${GIT_BRANCH_NAME}-${GIT_SHA1_SHORT}")
+set(DEFAULT_MIN_VERSION "4.6.0")
+
+string(TIMESTAMP BUILD_TIMESTAMP)
+add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
+
+
+if(VERSION_SUFFIX)
+  set(PACKAGE_VERSION "${DEFAULT_MIN_VERSION}${VERSION_SUFFIX}")
+else()
+  set(PACKAGE_VERSION "${DEFAULT_MIN_VERSION}-dev")
 endif()
 
 string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" PACKAGE_VERSION_MATCH ${PACKAGE_VERSION})
@@ -216,6 +218,22 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64" )
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m64")
+endif()
+
+if(GIT_COMMIT)
+  add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
+elseif(GENERATE_GIT_INFO)
+  execute_process(COMMAND "git" "rev-parse" "HEAD"
+  OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+  add_compile_definitions(GIT_COMMIT="${GIT_COMMIT}")
+endif()
+
+if(GIT_BRANCH)
+  add_compile_definitions(GIT_BRANCH="${GIT_BRANCH}")
+elseif(GENERATE_GIT_INFO)
+  execute_process(COMMAND "git" "rev-parse" "--abbrev-ref" "HEAD"
+  OUTPUT_VARIABLE GIT_BRANCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+  add_compile_definitions(GIT_BRANCH="${GIT_BRANCH}")
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
