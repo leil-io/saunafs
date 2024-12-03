@@ -93,7 +93,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("bandwidthoveruse=%lf", bandwidthoveruse, 1),
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
-	SFS_OPT("sfsuseoldwritealgorithm", useoldwritealgorithm, 1),
+	SFS_OPT("sfsuseinodebasedwritealgorithm=%d", useinodebasedwritealgorithm, 0),
 	SFS_OPT("sfsignoreflush=%d", ignoreflush, 0),
 	SFS_OPT("limitglibcmallocarenas=%d", limitglibcmallocarenas, 0),
 
@@ -173,7 +173,9 @@ void usage(const char *progname) {
 "    -o sfswriteworkers=N        define number of write workers (default: %u)\n"
 "    -o sfswritewindowsize=N     define write window size (in blocks) for "
 				"each chunk (default: %u)\n"
-"    -o sfsuseoldwritealgorithm  use legacy write algorithm.\n"
+"    -o sfsuseinodebasedwritealgorithm=0|1  use inode based write algorithm when "
+				"set to 1. Use chunk based write algorithm when set to 0 "
+				"(default: %d)\n"
 "    -o sfsignoreflush=0|1       Advanced: use with caution. Ignore flush usual "
 				"behavior by replying SUCCESS to it immediately. Targets fast "
 				"creation of small files, but may cause data loss during crashes "
@@ -259,6 +261,7 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultCachePerInodePercentage,
 		SaunaClient::FsInitParams::kDefaultWriteWorkers,
 		SaunaClient::FsInitParams::kDefaultWriteWindowSize,
+		SaunaClient::FsInitParams::kDefaultUseInodeBasedWriteAlgorithm,
 		SaunaClient::FsInitParams::kDefaultIgnoreFlush,
 		SaunaClient::FsInitParams::kDefaultUseRwLock,
 		SaunaClient::FsInitParams::kDefaultMkdirCopySgid,
