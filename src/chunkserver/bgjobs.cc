@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <cassert>
 #include <cstdint>
+#include <mutex>
 
 #include "chunkserver/chunk_replicator.h"
 #include "chunkserver/hddspacemgr.h"
@@ -144,8 +145,8 @@ struct jobpool {
 	int rpipe,wpipe;
 	uint8_t workers;
 	pthread_t *workerthreads;
-	pthread_mutex_t pipelock;
-	pthread_mutex_t jobslock;
+	std::mutex pipeMutex;
+	std::mutex jobsMutex;
 	std::unique_ptr<ProducerConsumerQueue> jobsQueue;
 	std::unique_ptr<ProducerConsumerQueue> statusQueue;
 	job* jobhash[JHASHSIZE];
@@ -155,8 +156,6 @@ struct jobpool {
 	    : rpipe(rpipe), wpipe(wpipe), workers(workers) {
 		workerthreads = (pthread_t *)malloc(sizeof(pthread_t) * workers);
 		passert(workerthreads);
-		zassert(pthread_mutex_init(&(pipelock), nullptr));
-		zassert(pthread_mutex_init(&(jobslock), nullptr));
 
 		jobsQueue = std::make_unique<ProducerConsumerQueue>(maxJobs);
 		statusQueue = std::make_unique<ProducerConsumerQueue>();
@@ -167,28 +166,29 @@ struct jobpool {
 
 static inline void job_send_status(jobpool *jp, uint32_t jobid, uint8_t status) {
 	TRACETHIS2(jobid, (int)status);
-	zassert(pthread_mutex_lock(&(jp->pipelock)));
+
+	std::lock_guard pipeLockGuard(jp->pipeMutex);
+
 	if (jp->statusQueue->isEmpty()) {   // first status
 		eassert(write(jp->wpipe,&status,1)==1); // write anything to wake up select
 	}
 	jp->statusQueue->put(jobid, status, nullptr, 1);
-	zassert(pthread_mutex_unlock(&(jp->pipelock)));
 }
 
 static inline int job_receive_status(jobpool *jp,uint32_t *jobid,uint8_t *status) {
 	TRACETHIS();
 	uint32_t qstatus;
-	zassert(pthread_mutex_lock(&(jp->pipelock)));
+
+	std::lock_guard pipeLockGuard(jp->pipeMutex);
+
 	jp->statusQueue->get(jobid, &qstatus, nullptr, nullptr);
 	*status = qstatus;
 	PRINTTHIS(*jobid);
 	PRINTTHIS((int)*status);
 	if (jp->statusQueue->isEmpty()) {
 		eassert(read(jp->rpipe,&qstatus,1)==1); // make pipe empty
-		zassert(pthread_mutex_unlock(&(jp->pipelock)));
 		return 0;       // last element
 	}
-	zassert(pthread_mutex_unlock(&(jp->pipelock)));
 	return 1;       // not last
 }
 
@@ -206,11 +206,13 @@ void* job_worker(void *th_arg) {
 	uint32_t jobid;
 	uint32_t op;
 
+	std::unique_lock jobsUniqueLock(jp->jobsMutex, std::defer_lock);
+
 	for (;;) {
 		jp->jobsQueue->get(&jobid, &op, &jptrarg, nullptr);
 		jptr = (job*)jptrarg;
 		PRINTTHIS(op);
-		zassert(pthread_mutex_lock(&(jp->jobslock)));
+		jobsUniqueLock.lock();
 		if (jptr!=NULL) {
 			jstate=jptr->jstate;
 			if (jptr->jstate==JSTATE_ENABLED) {
@@ -219,7 +221,7 @@ void* job_worker(void *th_arg) {
 		} else {
 			jstate=JSTATE_DISABLED;
 		}
-		zassert(pthread_mutex_unlock(&(jp->jobslock)));
+		jobsUniqueLock.unlock();
 		switch (op) {
 			case OP_INVAL:
 				status = SAUNAFS_ERROR_EINVAL;
@@ -403,7 +405,8 @@ void job_pool_disable_and_change_callback_all(void *jpool,void (*callback)(uint8
 	uint32_t jhpos;
 	job *jptr;
 
-	zassert(pthread_mutex_lock(&(jp->jobslock)));
+	std::lock_guard jobsLockGuard(jp->jobsMutex);
+
 	for (jhpos = 0 ; jhpos<JHASHSIZE ; jhpos++) {
 		for (jptr = jp->jobhash[jhpos] ; jptr ; jptr=jptr->next) {
 			if (jptr->jstate==JSTATE_ENABLED) {
@@ -412,7 +415,6 @@ void job_pool_disable_and_change_callback_all(void *jpool,void (*callback)(uint8
 			jptr->callback=callback;
 		}
 	}
-	zassert(pthread_mutex_unlock(&(jp->jobslock)));
 }
 
 void job_pool_disable_job(void *jpool,uint32_t jobid) {
@@ -420,13 +422,16 @@ void job_pool_disable_job(void *jpool,uint32_t jobid) {
 	jobpool* jp = (jobpool*)jpool;
 	uint32_t jhpos = JHASHPOS(jobid);
 	job *jptr;
+
+	std::unique_lock jobsUniqueLock(jp->jobsMutex, std::defer_lock);
+
 	for (jptr = jp->jobhash[jhpos] ; jptr ; jptr=jptr->next) {
 		if (jptr->jobid==jobid) {
-			zassert(pthread_mutex_lock(&(jp->jobslock)));
+			jobsUniqueLock.lock();
 			if (jptr->jstate==JSTATE_ENABLED) {
 				jptr->jstate=JSTATE_DISABLED;
 			}
-			zassert(pthread_mutex_unlock(&(jp->jobslock)));
+			jobsUniqueLock.unlock();
 		}
 	}
 }
@@ -494,8 +499,6 @@ void job_pool_delete(void *jpool) {
 
 	jp->jobsQueue.reset();
 	jp->statusQueue.reset();
-	zassert(pthread_mutex_destroy(&(jp->pipelock)));
-	zassert(pthread_mutex_destroy(&(jp->jobslock)));
 	free(jp->workerthreads);
 	close(jp->rpipe);
 	close(jp->wpipe);
