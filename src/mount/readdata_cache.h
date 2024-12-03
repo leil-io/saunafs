@@ -38,9 +38,8 @@
 
 #define MISSING_OFFSET_PTR nullptr
 
-inline std::mutex gUsedReadCacheMemoryMutex;
+inline std::mutex gReadCacheMemoryMutex;
 inline uint64_t gUsedReadCacheMemory;
-using MutexSharedPtr = std::shared_ptr<std::mutex>;
 
 class ReadCache {
 public:
@@ -57,7 +56,7 @@ public:
 		boost::intrusive::set_member_hook<> set_member_hook;
 		boost::intrusive::list_member_hook<> lru_member_hook;
 		boost::intrusive::list_member_hook<> reserved_member_hook;
-		MutexSharedPtr mutexPtr = std::make_shared<std::mutex>();
+		std::mutex mutex;
 
 		struct OffsetComp {
 			bool operator()(Offset offset, const Entry &entry) const {
@@ -69,12 +68,18 @@ public:
 		    : offset(offset), buffer(), timer(), requested_size(requested_size),
 		      set_member_hook(), lru_member_hook() {}
 
+		~Entry() {
+			mutex.lock();  // Make helgrind happy
+			mutex.unlock();
+			pthread_mutex_destroy(mutex.native_handle());
+		}
+
 		bool operator<(const Entry &other) const {
 			return offset < other.offset;
 		}
 
 		bool expired(uint32_t expiration_time) {
-			std::unique_lock lock(*mutexPtr);
+			std::unique_lock entryLock(mutex);
 			return timer.elapsed_ms() >= expiration_time;
 		}
 
@@ -87,7 +92,7 @@ public:
 		}
 
 		void acquire() {
-			std::unique_lock lock(*mutexPtr);
+			std::unique_lock entryLock(mutex);
 			timer.reset();
 			refcount++;
 		}
@@ -236,6 +241,8 @@ public:
 
 		void release() {
 			for (auto &entry : entries) {
+				std::unique_lock entryLock(
+				    entry->mutex);  // Make helgrind happy
 				entry->release();
 			}
 			entries.clear();
@@ -412,31 +419,25 @@ protected:
 			reserved_entries_.push_back(*e);
 		} else {
 			assert(e->refcount == 0);
-			std::unique_lock lock(gUsedReadCacheMemoryMutex);
+			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 			gUsedReadCacheMemory -= e->buffer.size();
-			lock.unlock();
-			auto mutexPtr = e->mutexPtr;
-			std::unique_lock entryLock(*mutexPtr);
+			usedMemoryLock.unlock();
 			delete e;
-			entryLock.unlock();
 		}
 		return ret;
 	}
 
 	void clearReserved(unsigned count) {
-		std::unique_lock<std::mutex> lock(gUsedReadCacheMemoryMutex,
-		                                  std::defer_lock);
+		std::unique_lock<std::mutex> usedMemoryLock(gReadCacheMemoryMutex,
+		                                            std::defer_lock);
 		while (!reserved_entries_.empty() && count-- > 0) {
 			Entry *e = std::addressof(reserved_entries_.front());
 			if (e->refcount == 0) {
-				lock.lock();
+				usedMemoryLock.lock();
 				gUsedReadCacheMemory -= e->buffer.size();
-				lock.unlock();
+				usedMemoryLock.unlock();
 				reserved_entries_.pop_front();
-				auto mutexPtr = e->mutexPtr;
-				std::unique_lock entryLock(*mutexPtr);
 				delete e;
-				entryLock.unlock();
 			} else {
 				assert(e->refcount >= 0);
 				reserved_entries_.splice(reserved_entries_.end(), reserved_entries_,

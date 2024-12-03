@@ -1,12 +1,70 @@
 # MOUNT
 
 {
-   fuse_session_loop_mt initialization
+   fuse_session_loop_mt_initialization
    # fuse_session_loop_mt is called only once at starting time. Looks like
    # related to fuse and not to our client.
    Helgrind:PthAPIerror
    ...
    fun:fuse_session_loop_mt
+   ...
+}
+
+{
+   # fuse_session_loop_mt is called only once at starting time, therefore only exits once. 
+   # Looks like related to fuse and not to our client.
+   fuse_session_loop_mt_exit
+   Helgrind:Race
+   fun:fuse_session_exit
+   ...
    fun:fuse_session_loop_mt
    ...
+}
+
+{
+   # fuse_session_new is called only once at starting time. 
+   # Looks like related to fuse and not to our client.
+   fuse_session_new_initialization
+   Helgrind:Race
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   fun:start_thread
+   fun:clone
+}
+
+{
+   # False positive about std::to_string calls when naming the read/write worker threads.
+   to_string_in_workers_names
+   Helgrind:Race
+   ...
+   fun:operator<<
+   fun:to_string<short unsigned int>
+   fun:*worker*
+   ...
+   fun:start_thread
+   fun:clone
+}
+
+# MAIN LOOP (used in metadata servers and chunkservers)
+
+{
+   # False positive about gPollTimeout (not atomic to avoid not needed overhead)
+   poll_timeout_loading
+   Helgrind:Race
+   fun:_Z27eventloop_load_poll_timeoutv
+   fun:_Z13eventloop_runv
+   fun:main
+}
+
+# CHUNKSERVER
+
+{
+   # False positive about gPollTimeout (not atomic to avoid not needed overhead)
+   poll_timeout_in_network_worker_threads
+   Helgrind:Race
+   fun:_ZN19NetworkWorkerThreadclEv
+   ...
+   fun:start_thread
 }

@@ -31,7 +31,7 @@ getHelgrindOptions() {
 	options+=" --track-lockorders=yes"
 	options+=" --read-var-info=no"
 	# Possible values: full, approx, none
-	options+=" --history-level=none"
+	options+=" --history-level=full"
 	options+=" --delta-stacktrace=yes"
 	options+=" --free-is-write=yes"
 	options+=" --cmp-race-err-addrs=yes"
