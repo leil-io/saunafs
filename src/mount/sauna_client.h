@@ -81,10 +81,12 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 	static constexpr bool     kDefaultIgnoreFlush = false;
+	static constexpr bool     kDefaultUseInodeBasedWriteAlgorithm = false;
+	static constexpr unsigned kDefaultWriteCacheSize = 128;
 #ifdef _WIN32
-	static constexpr unsigned kDefaultWriteCacheSize = 50;
+	static constexpr unsigned kDefaultWriteWaveTo = 10;
 #else
-	static constexpr unsigned kDefaultWriteCacheSize = 0;
+	static constexpr unsigned kDefaultWriteWaveTo = 50;
 #endif
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
 	static constexpr unsigned kDefaultWriteWorkers = 10;
@@ -136,6 +138,7 @@ struct FsInitParams {
 	             prefetch_xor_stripes(kDefaultPrefetchXorStripes),
 	             bandwidth_overuse(kDefaultBandwidthOveruse),
 	             write_cache_size(kDefaultWriteCacheSize),
+	             write_wave_timeout_ms(kDefaultWriteWaveTo),
 	             write_workers(kDefaultWriteWorkers), write_window_size(kDefaultWriteWindowSize),
 	             chunkserver_write_timeout_ms(kDefaultChunkserverWriteTo),
 	             cache_per_inode_percentage(kDefaultCachePerInodePercentage),
@@ -149,6 +152,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
+	             use_inode_based_write_algorithm(kDefaultUseInodeBasedWriteAlgorithm),
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
@@ -169,6 +173,7 @@ struct FsInitParams {
 	             prefetch_xor_stripes(kDefaultPrefetchXorStripes),
 	             bandwidth_overuse(kDefaultBandwidthOveruse),
 	             write_cache_size(kDefaultWriteCacheSize),
+	             write_wave_timeout_ms(kDefaultWriteWaveTo),
 	             write_workers(kDefaultWriteWorkers), write_window_size(kDefaultWriteWindowSize),
 	             chunkserver_write_timeout_ms(kDefaultChunkserverWriteTo),
 	             cache_per_inode_percentage(kDefaultCachePerInodePercentage),
@@ -182,6 +187,7 @@ struct FsInitParams {
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 #endif
+	             use_inode_based_write_algorithm(kDefaultUseInodeBasedWriteAlgorithm),
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
 
@@ -210,6 +216,7 @@ struct FsInitParams {
 	double bandwidth_overuse;
 
 	unsigned write_cache_size;
+	unsigned write_wave_timeout_ms;
 	unsigned write_workers;
 	unsigned write_window_size;
 	unsigned chunkserver_write_timeout_ms;
@@ -234,6 +241,7 @@ struct FsInitParams {
 	std::unordered_set<uint32_t> allowed_users;
 #endif
 
+	bool use_inode_based_write_algorithm;
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;
