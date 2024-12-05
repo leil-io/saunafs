@@ -32,6 +32,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <numeric>
 
 #include <boost/intrusive/list.hpp>
@@ -315,7 +316,7 @@ public:
 		unsigned reserved_count = count;
 		auto it = lru_.begin();
 		expiration_time_ = gCacheExpirationTime_ms.load();
-		
+
 		std::vector<Entry *> entriesToErase;
 		while (!lru_.empty() && count-- > 0 && it != lru_.end()) {
 			if (it->done && it->expired(expiration_time_)) {
