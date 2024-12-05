@@ -33,6 +33,7 @@
 #include <map>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include "common/connection_pool.h"
 #include "common/datapack.h"
@@ -407,9 +408,11 @@ void* read_data_delayed_ops(void *arg) {
 
 	pthread_setname_np(pthread_self(), "readDelayedOps");
 
-	std::unique_lock gMutexLock(gMutex, std::defer_lock),
-	    gUsedReadCacheMemoryLock(gReadCacheMemoryMutex, std::defer_lock);
+	std::unique_lock gMutexLock(gMutex, std::defer_lock);
+	std::unique_lock gUsedReadCacheMemoryLock(gReadCacheMemoryMutex,
+	                                          std::defer_lock);
 	int ticksSinceLastUpdate = 0;
+
 	for (;;) {
 		gReadConnectionPool.cleanup();
 		gMutexLock.lock();
@@ -417,6 +420,7 @@ void* read_data_delayed_ops(void *arg) {
 			return EMPTY_REQUEST;
 		}
 		auto readRecordIt = gActiveReadRecords.begin();
+		std::vector<ReadRecord *> toCollectGarbage;
 		while (readRecordIt != gActiveReadRecords.end()) {
 			if (readRecordIt->second->refreshCounter < REFRESHTICKS) {
 				++(readRecordIt->second->refreshCounter);
@@ -434,12 +438,21 @@ void* read_data_delayed_ops(void *arg) {
 					readRecordIt->second->cache.clear();
 				}
 			} else {
+				toCollectGarbage.push_back(readRecordIt->second);
+
 				++readRecordIt;
 			}
 		}
+
 		gMutexLock.unlock();
 
 		ticksSinceLastUpdate++;
+
+		for (auto *readRecord : toCollectGarbage) {
+			std::unique_lock inodeLock(readRecord->mutex);
+			readRecord->cache.collectGarbage();
+		}
+
 		if (ticksSinceLastUpdate == kMaxThresholdTicks) {
 			gUsedReadCacheMemoryLock.lock();
 			updateCacheExpirationTime();
@@ -498,9 +511,10 @@ void* read_worker(void *arg) {
 		request->state = ReadaheadRequestState::kProcessing;
 
 		uint64_t bytes_read = 0;
-		int error_code = read_to_buffer(readRecord, request->request_offset(),
-		                                request->bytes_to_read_left(),
-		                                entry->buffer, &bytes_read, reader);
+		int error_code =
+		    read_to_buffer(readRecord, request->request_offset(),
+		                   request->bytes_to_read_left(), entry->buffer,
+		                   &bytes_read, reader, entryLock);
 
 		entry->release();
 		entry->reset_timer();
@@ -671,7 +685,8 @@ static void print_error_msg(ChunkReader& reader, uint32_t try_counter, const Exc
 
 int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
                    uint64_t bytes_to_read, std::vector<uint8_t> &read_buffer,
-                   uint64_t *bytes_read, ChunkReader &reader) {
+                   uint64_t *bytes_read, ChunkReader &reader,
+                   std::unique_lock<std::mutex> &entryLock) {
 	uint32_t try_counter = 0;
 	uint32_t prepared_inode = 0; // this is always different than any real inode
 	uint32_t prepared_chunk_id = 0;
@@ -761,7 +776,9 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 				decreaseUsedReadCacheMemory(last_read_cache_bytes_to_reserve);
 				total_read_cache_bytes_to_reserve -= last_read_cache_bytes_to_reserve;
 				usedMemoryLock.unlock();
+				entryLock.unlock();
 				usleep(sleep_timeout.remaining_us());
+				entryLock.lock();
 				sleep_time_ms = read_data_sleep_time_ms(try_counter);
 			}
 			try_counter++;
@@ -805,7 +822,7 @@ int read_data(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 			                               bytesToReadLeft,
 			                               result.inputBuffer(),
 			                               &bytesRead,
-			                               reader);
+			                               reader, entryLock);
 			result.back()->done = true;
 
 			if (errorCode != SAUNAFS_STATUS_OK) {
@@ -816,7 +833,6 @@ int read_data(ReadRecord *rrec, off_t fuseOffset, size_t fuseSize,
 	} else {
 		// use the read operations manager to process the request
 		RequestConditionVariablePair *rcvpPtr = nullptr;
-
 		std::unique_lock inodeLock(rrec->mutex);
 		bool mustWait = gReadaheadOperationsManager.request(
 		    rrec, fuseOffset, fuseSize, offset, size, result, rcvpPtr);

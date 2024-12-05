@@ -211,16 +211,13 @@ struct ReadRecord {
 	std::atomic<uint16_t> requestsNotDone = 0;
 	bool expired = false; //gMutex
 	std::atomic<bool> stopThread{false};
-	std::thread garbageCollectorThread;
 
 	ReadRecord(uint32_t inode)
 	    : cache(gCacheExpirationTime_ms),
 	      readahead_adviser(gCacheExpirationTime_ms, gReadaheadMaxWindowSize),
-	      inode(inode),
-	      garbageCollectorThread(&ReadRecord::readCacheGarbageCollectionThread, this) {}
+	      inode(inode) {}
 
 	~ReadRecord() {
-		terminateThread();
 		mutex.lock();  // Make helgrind happy
 		mutex.unlock();
 		pthread_mutex_destroy(mutex.native_handle());
@@ -237,22 +234,6 @@ struct ReadRecord {
 
 	inline uint32_t suggestedReadaheadReqs() const {
 		return suggestedReadaheadReqs_;
-	}
-
-	void readCacheGarbageCollectionThread() {
-		while (!stopThread.load()) {
-			std::unique_lock inodeLock(this->mutex);
-			this->cache.collectGarbage();
-			inodeLock.unlock();
-			std::this_thread::sleep_for(std::chrono::milliseconds(300));
-		}
-	}
-
-	void terminateThread() {
-		stopThread.store(true);
-		if (garbageCollectorThread.joinable()) {
-			garbageCollectorThread.join();
-		}
 	}
 
 private:
@@ -391,7 +372,8 @@ ReadRecord *read_data_new(uint32_t inode);
 void read_data_end(ReadRecord *rr);
 int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
                    uint64_t bytes_to_read, std::vector<uint8_t> &read_buffer,
-                   uint64_t *bytes_read, ChunkReader &reader);
+                   uint64_t *bytes_read, ChunkReader &reader,
+                   std::unique_lock<std::mutex> &entryLock);
 int read_data(ReadRecord *rr, off_t fuseOffset, size_t fuseSize,
               uint64_t offset, uint32_t size, ReadCache::Result &ret);
 void read_data_init(uint32_t retries, uint32_t chunkserverRoundTripTime_ms,
