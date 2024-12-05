@@ -190,7 +190,7 @@ endif()
 
 project(saunafs)
 
-set(DEFAULT_MIN_VERSION "4.6.0")
+set(DEFAULT_MIN_VERSION "4.7.0")
 
 string(TIMESTAMP BUILD_TIMESTAMP)
 add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
