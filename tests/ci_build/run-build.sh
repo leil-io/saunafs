@@ -43,6 +43,8 @@ case "${build_type,,}" in
 			-DCODE_COVERAGE=OFF
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
+			-DDISABLE_TIMESTMAP=ON
+			-DGENERATE_GIT_INFO=OFF
 		)
 		build_dir="${WORKSPACE}/build/saunafs-debug"
 		make_extra_args+=( 'install' )
@@ -55,6 +57,8 @@ case "${build_type,,}" in
 			-DCODE_COVERAGE=ON
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=OFF
+			-DDISABLE_TIMESTMAP=ON
+			-DGENERATE_GIT_INFO=OFF
 		)
 		build_dir="${WORKSPACE}/build/saunafs-coverage"
 		make_extra_args+=( 'install' )
@@ -67,6 +71,8 @@ case "${build_type,,}" in
 			-DCODE_COVERAGE=OFF
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
+			-DDISABLE_TIMESTMAP=ON
+			-DGENERATE_GIT_INFO=OFF
 		)
 		build_dir="${WORKSPACE}/build/saunafs"
 		make_extra_args+=( 'install' )

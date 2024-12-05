@@ -51,6 +51,7 @@ option(ENABLE_COMPILE_COMMANDS  "Enable generation of compile_commands.json"    
 option(ENABLE_PROMETHEUS        "Enable prometheus metrics"                              ON)
 
 option(GENERATE_GIT_INFO "Generate git info from current repository (for version commands)" ON)
+option(DISABLE_TIMESTAMP "Do not generate timestamp (can improve caching)" OFF)
 
 # If enabled (default), the file compile_commands.json is generated in the build
 # directory. Tools like clangd and vscode use this file for proper analysis.
@@ -193,7 +194,11 @@ project(saunafs)
 set(DEFAULT_MIN_VERSION "4.6.0")
 
 string(TIMESTAMP BUILD_TIMESTAMP)
-add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
+if(DISABLE_TIMESTAMP)
+    add_compile_definitions(BUILD_TIME="N/A")
+else()
+    add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
+endif()
 
 
 if(VERSION_SUFFIX)

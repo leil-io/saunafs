@@ -33,9 +33,13 @@ jobs:
         cd $GITHUB_WORKSPACE/tests
         sudo ./setup_machine.sh setup /mnt/hdb /mnt/hdc /mnt/hdd
 
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+
     - name: Activate virtual environment and build SaunaFS
       run: |
         source /var/lib/saunafs_setup_machine_venv/bin/activate
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         cd $GITHUB_WORKSPACE/tests/ci_build
         ./run-build.sh test
 
