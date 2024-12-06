@@ -31,6 +31,9 @@
 #include "common/chunk_type_with_address.h"
 #include "mount/group_cache.h"
 #include "mount/sauna_client.h"
+#ifdef _WIN32
+#include "mount/acquired_files_last_time_used.h"
+#endif
 #include "protocol/packet.h"
 #include "protocol/lock_info.h"
 #include "protocol/directory_entry.h"
@@ -39,6 +42,11 @@
 #ifdef _WIN32
 inline std::atomic_bool gIsDisconnectedFromMaster;
 #endif
+
+inline std::mutex acquiredFileMutex;
+// <inode, cnt> and sorted by inode
+using AcquiredFileMap = std::map<uint32_t, uint32_t>;
+inline AcquiredFileMap acquiredFiles;
 
 void fs_getmasterlocation(uint8_t loc[14]);
 uint32_t fs_getsrcip(void);
