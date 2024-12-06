@@ -19,7 +19,7 @@
 
 #include "common/platform.h"
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/main.h"
 #include "master/filesystem_checksum_updater.h"
 #include "master/filesystem_metadata.h"

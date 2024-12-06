@@ -61,6 +61,16 @@ delay in seconds before trying to reconnect to master after disconnection (defau
 *MASTER_TIMEOUT*::
 timeout (in seconds) for master connections (default is 60)
 
+*LOG_LEVEL*:: Setup logging. Uses the environment variable SAUNAFS_LOG_LEVEL or
+config value LOG_LEVEL to determine logging level. Valid log levels are
+- 'trace'
+- 'debug'
+- 'info'
+- 'warn' or 'warning'
+- 'err' or 'error'
+- 'crit' or 'critical'
+- 'off'
+
 == REPORTING BUGS
 
 Report bugs to the Github repository <https://github.com/leil/saunafs> as an

@@ -3,8 +3,9 @@ assert_program_installed attr
 
 master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
 master_cfg+="|METADATA_CHECKSUM_RECALCULATION_SPEED = 1"
-master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=DEBUG"
+master_cfg+="|MAGIC_DEBUG_LOG = $TEMP_DIR/log|LOG_FLUSH_ON=TRACE"
 
+export SAUNAFS_LOG_LEVEL="trace"
 CHUNKSERVERS=1 \
 	USE_RAMDISK="YES" \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER" \
