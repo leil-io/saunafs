@@ -33,7 +33,7 @@ ChecksumBackgroundUpdater::ChecksumBackgroundUpdater()
 }
 
 bool ChecksumBackgroundUpdater::start() {
-	safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.updater_start");
+	safs::log_trace("master.fs.checksum.updater_start");
 	if (step_ == ChecksumRecalculatingStep::kNone) {
 		++step_;
 		return true;
@@ -45,7 +45,7 @@ bool ChecksumBackgroundUpdater::start() {
 void ChecksumBackgroundUpdater::end() {
 	updateChecksum();
 	reset();
-	safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.updater_end");
+	safs::log_trace("master.fs.checksum.updater_end");
 }
 
 bool ChecksumBackgroundUpdater::inProgress() {
@@ -78,9 +78,9 @@ bool ChecksumBackgroundUpdater::isNodeIncluded(FSNode *node) {
 		ret = true;
 	}
 	if (ret) {
-		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_recalculated_node");
+		safs::log_trace("master.fs.checksum.changing_recalculated_node");
 	} else {
-		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_not_recalculated_node");
+		safs::log_trace("master.fs.checksum.changing_not_recalculated_node");
 	}
 	return ret;
 }
@@ -95,9 +95,9 @@ bool ChecksumBackgroundUpdater::isXattrIncluded(xattr_data_entry *xde) {
 		ret = true;
 	}
 	if (ret) {
-		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_recalculated_xattr");
+		safs::log_trace("master.fs.checksum.changing_recalculated_xattr");
 	} else {
-		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.changing_not_recalculated_xattr");
+		safs::log_trace("master.fs.checksum.changing_not_recalculated_xattr");
 	}
 	return ret;
 }
@@ -114,12 +114,12 @@ void ChecksumBackgroundUpdater::updateChecksum() {
 	if (fsNodesChecksum != gMetadata->fsNodesChecksum) {
 		safs_pretty_syslog(LOG_WARNING, "FsNodes checksum mismatch found, replacing with a new value.");
 		gMetadata->fsNodesChecksum = fsNodesChecksum;
-		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.mismatch");
+		safs::log_trace("master.fs.checksum.mismatch");
 	}
 	if (xattrChecksum != gMetadata->xattrChecksum) {
 		safs_pretty_syslog(LOG_WARNING, "Xattr checksum mismatch found, replacing with a new value.");
 		gMetadata->xattrChecksum = xattrChecksum;
-		safs_silent_syslog(LOG_DEBUG, "master.fs.checksum.mismatch");
+		safs::log_trace("master.fs.checksum.mismatch");
 	}
 }
 

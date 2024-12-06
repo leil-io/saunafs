@@ -37,7 +37,7 @@
 #include <set>
 #include <vector>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/counting_sort.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
