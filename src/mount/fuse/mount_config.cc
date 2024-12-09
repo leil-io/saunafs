@@ -303,6 +303,10 @@ void usage(const char *progname) {
 	printf("\nFUSE options:\n");
 	fuse_lowlevel_help();
 	printf(
+	"    -o rw | ro\n"
+	"    -o suid | nosuid\n"
+	"    -o dev | nodev\n"
+	"    -o exec | noexec\n"
 	"    -o max_write=N\n"
 	"    -o max_readahead=N\n"
 	"    -o max_background=N\n"
