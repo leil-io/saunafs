@@ -22,7 +22,7 @@ function get_facl() {
 CHUNKSERVERS=1 \
 	USE_RAMDISK=YES \
 	SFSEXPORTS_EXTRA_OPTIONS=nomasterpermcheck,ignoregid \
-	MASTER_EXTRA_CONFIG="MAGIC_DEBUG_LOG = $TEMP_DIR/aclcache.log|LOG_FLUSH_ON=DEBUG" \
+	MASTER_EXTRA_CONFIG="MAGIC_DEBUG_LOG = $TEMP_DIR/aclcache.log|LOG_FLUSH_ON=TRACE" \
 	MOUNT_EXTRA_CONFIG="sfscachemode=NEVER|sfsaclcachesize=2|sfsaclcacheto=5.0|sfsattrcacheto=50" \
 	setup_local_empty_saunafs info
 

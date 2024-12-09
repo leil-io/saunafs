@@ -36,7 +36,7 @@
 #include <unistd.h>
 #include <set>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"

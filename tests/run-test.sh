@@ -110,6 +110,8 @@ fi
 export SOURCE_DIR=$(readlink -m "$(dirname "$0")/..")
 export ERROR_DIR=/tmp/saunafs_error_dir # Error dir content lifetime scope is a test suit
 export SAUNAFS_LOG_ORIGIN=yes # adds file:line:function to debug logs
+export SAUANFS_LOG_LEVEL="debug"
+
 umask 0022
 sudo rm -rf "${ERROR_DIR}"
 mkdir -p "${ERROR_DIR}"
