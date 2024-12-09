@@ -31,6 +31,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <numeric>
 
 #include <boost/intrusive/list.hpp>
@@ -38,8 +39,29 @@
 
 #define MISSING_OFFSET_PTR nullptr
 
+inline std::atomic<uint64_t> gReadCacheMaxSize;
 inline std::mutex gReadCacheMemoryMutex;
 inline uint64_t gUsedReadCacheMemory;
+inline std::atomic<bool> gReadCacheMemoryAlmostExceeded = false;
+inline std::atomic<uint32_t> gCacheExpirationTime_ms;
+
+constexpr double kReadCacheThreshold = 0.8;
+
+inline void updateReadCacheMemoryAlmostExceeded() {
+	gReadCacheMemoryAlmostExceeded =
+	    gUsedReadCacheMemory >=
+	    static_cast<uint64_t>(kReadCacheThreshold * gReadCacheMaxSize.load());
+}
+
+inline void increaseUsedReadCacheMemory(size_t bytesToReadLeft) {
+	gUsedReadCacheMemory += bytesToReadLeft;
+	updateReadCacheMemoryAlmostExceeded();
+}
+
+inline void decreaseUsedReadCacheMemory(size_t bytesToReadLeft) {
+	gUsedReadCacheMemory -= bytesToReadLeft;
+	updateReadCacheMemoryAlmostExceeded();
+}
 
 class ReadCache {
 public:
@@ -84,7 +106,7 @@ public:
 		}
 
 		void reset_timer() {
-			return timer.reset();
+			timer.reset();
 		}
 
 		Offset endOffset() const {
@@ -291,14 +313,20 @@ public:
 
 	void collectGarbage(unsigned count = 1000000) {
 		unsigned reserved_count = count;
-		while (!lru_.empty() && count-- > 0) {
-			Entry *e = std::addressof(lru_.front());
-			if (e->expired(expiration_time_) && e->done) {
-				erase(entries_.iterator_to(*e));
-			} else {
-				break;
+		auto it = lru_.begin();
+		expiration_time_ = gCacheExpirationTime_ms.load();
+
+		std::vector<Entry *> entriesToErase;
+		while (!lru_.empty() && count-- > 0 && it != lru_.end()) {
+			if (it->done && it->expired(expiration_time_)) {
+				entriesToErase.push_back(std::addressof(*it));
 			}
+			it++;
 		}
+		for (auto e : entriesToErase) {
+			erase(entries_.iterator_to(*e));
+		}
+
 		clearReserved(reserved_count);
 	}
 
@@ -420,7 +448,7 @@ protected:
 		} else {
 			assert(e->refcount == 0);
 			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
-			gUsedReadCacheMemory -= e->buffer.size();
+			decreaseUsedReadCacheMemory(e->buffer.size());
 			usedMemoryLock.unlock();
 			delete e;
 		}
@@ -434,14 +462,15 @@ protected:
 			Entry *e = std::addressof(reserved_entries_.front());
 			if (e->refcount == 0) {
 				usedMemoryLock.lock();
-				gUsedReadCacheMemory -= e->buffer.size();
+				decreaseUsedReadCacheMemory(e->buffer.size());
 				usedMemoryLock.unlock();
 				reserved_entries_.pop_front();
 				delete e;
 			} else {
 				assert(e->refcount >= 0);
-				reserved_entries_.splice(reserved_entries_.end(), reserved_entries_,
-							 reserved_entries_.begin());
+				reserved_entries_.splice(reserved_entries_.end(),
+				                         reserved_entries_,
+				                         reserved_entries_.begin());
 			}
 		}
 	}
