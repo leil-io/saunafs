@@ -206,14 +206,14 @@ bool isSpecialInode(Inode ino) {
 
 enum {IO_NONE,IO_READ,IO_WRITE,IO_READONLY,IO_WRITEONLY};
 
-typedef struct _finfo {
+struct finfo {
 	uint8_t mode;
 	void *data;
 	uint8_t use_flocks;
 	uint8_t use_posixlocks;
 	pthread_mutex_t lock;
 	pthread_mutex_t flushlock;
-} finfo;
+};
 
 static DirEntryCache gDirEntryCache;
 static unsigned gDirEntryCacheMaxSize = 100000;
