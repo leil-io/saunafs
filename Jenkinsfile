@@ -50,7 +50,7 @@ pipeline {
 
         stage('Run machine tests') {
             steps {
-                sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite MachineTests --workers 1 --multiplier 2'''
+                sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite SingleMachineTests --workers 1 --multiplier 2'''
             }
         }
 
