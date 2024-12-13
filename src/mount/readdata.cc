@@ -444,8 +444,6 @@ void* read_data_delayed_ops(void *arg) {
 			}
 		}
 
-		gMutexLock.unlock();
-
 		ticksSinceLastUpdate++;
 
 		for (auto *readRecord : toCollectGarbage) {
@@ -459,6 +457,8 @@ void* read_data_delayed_ops(void *arg) {
 			gUsedReadCacheMemoryLock.unlock();
 			ticksSinceLastUpdate = 0;
 		}
+
+		gMutexLock.unlock();
 
 		usleep(USECTICK);
 	}
