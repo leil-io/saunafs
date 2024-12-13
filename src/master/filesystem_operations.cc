@@ -447,9 +447,7 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 		return SAUNAFS_ERROR_EINVAL;
 	}
 
-	auto parentNode = static_cast<FSNodeDirectory *>(wd);
-	parentNode->case_insensitive = context.sesflags() & SESFLAG_CASEINSENSITIVE;
-	FSNode *child = fsnodes_lookup(parentNode, name);
+	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
 	if (!child) {
 		return SAUNAFS_ERROR_ENOENT;
 	}
@@ -960,6 +958,8 @@ uint8_t fs_mknod(const FsContext &context, uint32_t parent, const HString &name,
 	    fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}})) {
 		return SAUNAFS_ERROR_QUOTA;
 	}
+	static_cast<FSNodeDirectory *>(wd)->case_insensitive =
+	    context.sesflags() & SESFLAG_CASEINSENSITIVE;
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory*>(wd), name, type, mode, umask, context.uid(), context.gid(), 0,
 	                        AclInheritance::kInheritAcl);
 	if (type == FSNode::kBlockDev || type == FSNode::kCharDev) {
@@ -1005,6 +1005,8 @@ uint8_t fs_mkdir(const FsContext &context, uint32_t parent, const HString &name,
 	    fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}})) {
 		return SAUNAFS_ERROR_QUOTA;
 	}
+	static_cast<FSNodeDirectory *>(wd)->case_insensitive =
+	    context.sesflags() & SESFLAG_CASEINSENSITIVE;
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory *>(wd), name, FSNode::kDirectory, mode,
 	                        umask, context.uid(), context.gid(), copysgid, AclInheritance::kInheritAcl);
 	*inode = p->id;
