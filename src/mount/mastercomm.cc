@@ -1038,10 +1038,12 @@ void* fs_nop_thread(void *arg) {
 			if (fd>=0) {
 				fs_close_session();
 			}
+			fdLock.unlock();
 			return NULL;
 		}
 		if (gIsKilled) {
 			safs_pretty_syslog(LOG_NOTICE, "Received SIGUSR1, killing gently...");
+			fdLock.unlock();
 			exit(SAUNAFS_EXIT_STATUS_GENTLY_KILL);
 		}
 		if (disconnect == false && fd >= 0) {
