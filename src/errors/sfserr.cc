@@ -60,6 +60,8 @@ int saunafs_error_conv(uint8_t status) {
 			return ENOTEMPTY;
 		case SAUNAFS_ERROR_IO:
 			return EIO;
+		case SAUNAFS_ERROR_NOSPACE:
+			return ENOSPC;
 		case SAUNAFS_ERROR_EROFS:
 			return EROFS;
 		case SAUNAFS_ERROR_QUOTA:
