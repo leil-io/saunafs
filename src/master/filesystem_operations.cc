@@ -42,6 +42,7 @@
 #include "master/matomlserv.h"
 #include "master/recursive_remove_task.h"
 #include "master/task_manager.h"
+#include "metrics/metrics.h"
 #include "protocol/matocl.h"
 
 std::array<uint32_t, FsStats::Size> gFsStatsArray = {{}};
@@ -350,6 +351,7 @@ void fs_statfs(const FsContext &context, uint64_t *totalspace, uint64_t *availsp
 		}
 	}
 	++gFsStatsArray[FsStats::Statfs];
+	metrics::Counter::increment(metrics::Counter::Master::FS_STATFS);
 }
 #endif /* #ifndef METARESTORE */
 
@@ -417,6 +419,7 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 			}
 			fsnodes_fill_attr(wd, wd, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 			++gFsStatsArray[FsStats::Lookup];
+			metrics::Counter::increment(metrics::Counter::Master::FS_LOOKUP);
 			return SAUNAFS_STATUS_OK;
 		}
 		if (name.length() == 2 && name[1] == '.') {  // parent
@@ -440,6 +443,7 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 				}
 			}
 			++gFsStatsArray[FsStats::Lookup];
+			metrics::Counter::increment(metrics::Counter::Master::FS_LOOKUP);
 			return SAUNAFS_STATUS_OK;
 		}
 	}
@@ -456,6 +460,7 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 	*inode = child->id;
 	fsnodes_fill_attr(child, wd, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Lookup];
+	metrics::Counter::increment(metrics::Counter::Master::FS_LOOKUP);
 	return SAUNAFS_STATUS_OK;
 }
 
@@ -505,6 +510,7 @@ uint8_t fs_getattr(const FsContext &context, uint32_t inode, Attributes &attr) {
 
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Getattr];
+	metrics::Counter::increment(metrics::Counter::Master::FS_GETATTR);
 	return SAUNAFS_STATUS_OK;
 }
 
@@ -556,6 +562,7 @@ uint8_t fs_try_setlength(const FsContext &context, uint32_t inode, uint8_t opene
 	}
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Setattr];
+	metrics::Counter::increment(metrics::Counter::Master::FS_SETATTR);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -648,6 +655,7 @@ uint8_t fs_do_setlength(const FsContext &context, uint32_t inode, uint64_t lengt
 	fsnodes_update_checksum(p);
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Setattr];
+	metrics::Counter::increment(metrics::Counter::Master::FS_SETATTR);
 	return SAUNAFS_STATUS_OK;
 }
 
@@ -781,6 +789,7 @@ uint8_t fs_setattr(const FsContext &context, uint32_t inode, uint8_t setmask, ui
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	fsnodes_update_checksum(p);
 	++gFsStatsArray[FsStats::Setattr];
+	metrics::Counter::increment(metrics::Counter::Master::FS_SETATTR);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -857,6 +866,7 @@ uint8_t fs_readlink(const FsContext &context, uint32_t inode, std::string &path)
 	path = (std::string)static_cast<FSNodeSymlink*>(p)->path;
 	fs_update_atime(p, ts);
 	++gFsStatsArray[FsStats::Readlink];
+	metrics::Counter::increment(metrics::Counter::Master::FS_READLINK);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -920,6 +930,7 @@ uint8_t fs_symlink(const FsContext &context, uint32_t parent, const HString &nam
 	}
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Symlink];
+	metrics::Counter::increment(metrics::Counter::Master::FS_SYMLINK);
 #endif /* #ifndef METARESTORE */
 	return SAUNAFS_STATUS_OK;
 }
@@ -972,6 +983,7 @@ uint8_t fs_mknod(const FsContext &context, uint32_t parent, const HString &name,
 	             wd->id, fsnodes_escape_name(name).c_str(), type, p->mode & 07777, context.uid(), context.gid(),
 	             rdev, p->id);
 	++gFsStatsArray[FsStats::Mknod];
+	metrics::Counter::increment(metrics::Counter::Master::FS_MKNOD);
 	fsnodes_update_checksum(p);
 	return SAUNAFS_STATUS_OK;
 }
@@ -1013,6 +1025,7 @@ uint8_t fs_mkdir(const FsContext &context, uint32_t parent, const HString &name,
 	             wd->id, fsnodes_escape_name(name).c_str(), FSNode::kDirectory, p->mode & 07777,
 	             context.uid(), context.gid(), 0, p->id);
 	++gFsStatsArray[FsStats::Mkdir];
+	metrics::Counter::increment(metrics::Counter::Master::FS_MKDIR);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -1084,6 +1097,7 @@ uint8_t fs_unlink(const FsContext &context, uint32_t parent, const HString &name
 	             fsnodes_escape_name(name).c_str(), child->id);
 	fsnodes_unlink(ts, static_cast<FSNodeDirectory*>(wd), name, child);
 	++gFsStatsArray[FsStats::Unlink];
+	metrics::Counter::increment(metrics::Counter::Master::FS_UNLINK);
 	return SAUNAFS_STATUS_OK;
 }
 
@@ -1155,6 +1169,7 @@ uint8_t fs_rmdir(const FsContext &context, uint32_t parent, const HString &name)
 	             fsnodes_escape_name(name).c_str(), child->id);
 	fsnodes_unlink(ts, static_cast<FSNodeDirectory*>(wd), name, child);
 	++gFsStatsArray[FsStats::Rmdir];
+	metrics::Counter::increment(metrics::Counter::Master::FS_RMDIR);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -1283,6 +1298,7 @@ uint8_t fs_rename(const FsContext &context, uint32_t parent_src, const HString &
 	}
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Rename];
+	metrics::Counter::increment(metrics::Counter::Master::FS_RENAME);
 #endif
 	return SAUNAFS_STATUS_OK;
 }
@@ -1330,6 +1346,7 @@ uint8_t fs_link(const FsContext &context, uint32_t inode_src, uint32_t parent_ds
 	}
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Link];
+	metrics::Counter::increment(metrics::Counter::Master::FS_LINK);
 #endif
 	return SAUNAFS_STATUS_OK;
 }
@@ -1684,6 +1701,7 @@ void fs_readdir_data(const FsContext &context, uint8_t flags, void *dnode, uint8
 					   context.sesflags(), static_cast<FSNodeDirectory*>(p), dbuff,
 	                   flags & GETDIR_FLAG_WITHATTR);
 	++gFsStatsArray[FsStats::Readdir];
+	metrics::Counter::increment(metrics::Counter::Master::FS_READDIR);
 }
 
 template <typename SerializableDirentType>
@@ -1713,6 +1731,7 @@ uint8_t fs_readdir(const FsContext &context, uint32_t inode, uint64_t first_entr
 		       first_entry, number_of_entries, dir_entries);
 
 	++gFsStatsArray[FsStats::Readdir];
+	metrics::Counter::increment(metrics::Counter::Master::FS_READDIR);
 
 	return SAUNAFS_STATUS_OK;
 }
@@ -1769,6 +1788,7 @@ uint8_t fs_opencheck(const FsContext &context, uint32_t inode, uint8_t flags, At
 	}
 	fsnodes_fill_attr(p, NULL, context.uid(), context.gid(), context.auid(), context.agid(), context.sesflags(), attr);
 	++gFsStatsArray[FsStats::Open];
+	metrics::Counter::increment(metrics::Counter::Master::FS_OPEN);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -1898,6 +1918,7 @@ uint8_t fs_readchunk(uint32_t inode, uint32_t indx, uint64_t *chunkid, uint64_t 
 	*length = p->length;
 	fs_update_atime(p, ts);
 	++gFsStatsArray[FsStats::Read];
+	metrics::Counter::increment(metrics::Counter::Master::FS_READ);
 	return SAUNAFS_STATUS_OK;
 }
 #endif
@@ -1998,6 +2019,7 @@ uint8_t fs_writechunk(const FsContext &context, uint32_t inode, uint32_t indx, b
 	fsnodes_update_checksum(p);
 #ifndef METARESTORE
 	++gFsStatsArray[FsStats::Write];
+	metrics::Counter::increment(metrics::Counter::Master::FS_WRITE);
 #endif
 	return SAUNAFS_STATUS_OK;
 }
