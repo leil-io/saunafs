@@ -1,6 +1,24 @@
 This file lists noteworthy changes in SaunaFS.
 
+ * SaunaFS (4.7.0) (2024-12-18)
+ - fix(mount): Remove helgrind warning
+ - fix(mount): Reduce data race conditions in mount
+ - fix(chunkserver): Replace pthread_mutex_t by std in jobpool (#252)
+ - chore: Change how PACKAGE_VERSION string is build (#232)
+ - fix(pcqueue): Remove Helgrind warnings (#250)
+ - docs: Fix wrong default value in sfschunkserver.cfg (#246)
+ - feat(chunkserver): Stat chunks at scan optionally (#245)
+ - doc(master): Add man docs for caseinsensitive (#243)
+ - feat: Improve Judy related compiler directives
+ - fix: Unhandled exception in plugin_manager.cc
+ - feat(mount): Add ignoreflush to tweaks variables (#228)
+ - fix(chunkserver): Use option HDD_ADVISE_NO_CACHE (#227)
+ - feat(chunkserver): Use aligned memory for writes (#225)
+ - fix(tools): infinite recursion in sfstools.sh
+ - feat(master): Add case insensitiveness on system (#188)
+
  * SaunaFS (4.6.0) (2024-10-23)
+ - build: Add allowing to pass suffix to version
  - feat: Improve big sessions create/open speed
  - fix(mount): Enhance read cache handling and add tests (#202)
  - fix: Clarify error offset in file-validate (#218)
