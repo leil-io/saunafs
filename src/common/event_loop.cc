@@ -28,7 +28,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/exception.h"
 #include "common/massert.h"
 #include "errors/sfserr.h"
