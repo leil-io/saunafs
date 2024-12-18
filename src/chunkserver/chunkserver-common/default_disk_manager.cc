@@ -25,7 +25,7 @@
 #include "chunkserver-common/cmr_disk.h"
 #include "chunkserver-common/global_shared_resources.h"
 #include "chunkserver-common/plugin_manager.h"
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/exceptions.h"
 #include "devtools/TracePrinter.h"
 

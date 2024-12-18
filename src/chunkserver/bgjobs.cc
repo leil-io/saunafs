@@ -306,6 +306,9 @@ void* job_worker(void *th_arg) {
 				        wrargs->chunkType, wrargs->blocknum, wrargs->offset,
 				        wrargs->size, wrargs->crc, wrargs->buffer);
 				}
+				if (status != SAUNAFS_STATUS_OK) {
+						safs::log_err("Failed to write chunk id {}: {}", wrargs->chunkId, saunafs_error_string(status));
+				}
 				break;
 			}
 			case OP_GET_BLOCKS:

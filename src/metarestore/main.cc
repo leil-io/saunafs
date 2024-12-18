@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/metadata.h"
 #include "errors/sfserr.h"
 #include "common/rotate_files.h"
