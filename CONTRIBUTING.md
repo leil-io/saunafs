@@ -184,16 +184,15 @@ as co-authors.
 
 ### Contributing code/PR's for a feature/bug fix
 
-There is no procedure currently for outside contributions, but we still
-encourage you to engage with us if you want to contribute code.
+The best way to contribute is by creating a PR. However, before you start
+developing, ask us first if it's something we would accept (so to not waste your
+time or the team's).
 
 Currently, the preferred ways to indicate you want to contribute code are (in
 order):
 * Commenting on a specific Github issue
 * [Slack](https://join.slack.com/t/saunafs/shared_invite/zt-2dktkrdwm-1BHZje_DMX3NQdxO9HoYog),
 * [Email](mailto:contact@saunafs.com?subject=RFI),
-
-Through this, we can also tell whether it's something we would also accept.
 
 If you get an OK from us, please read below for more details.
 
@@ -296,6 +295,52 @@ must be satisfied before it is considered for peer review:
 - The new code should have some test coverage, either unit or integration tests.
 - All automated tests must pass.
 - The build job must be in a healthy state. <!-- omit in toc -->
+
+### Developer Certificate of Origin
+
+Before we accept your PR, we want you to sign-off your commit(s) with a valid
+GPG key. See the git manual for more info. This indicates that you accept the
+text below.
+
+```
+Developer Certificate of Origin
+Version 1.1
+
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+1 Letterman Drive
+Suite D4700
+San Francisco, CA, 94129
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+```
 
 ## Attribution
 
