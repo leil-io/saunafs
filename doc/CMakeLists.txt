@@ -53,7 +53,10 @@ set(MANPAGES
     sfsmetarestore.8
 )
 
-set(INSTALLED_MANPAGES)
+# Create custom directory to store the a2x logs
+set(A2X_LOGS_DIR ${CMAKE_CURRENT_BINARY_DIR}/a2x)
+execute_process(COMMAND mkdir -p ${A2X_LOGS_DIR})
+
 foreach(MANPAGE ${MANPAGES})
   get_filename_component(MANPAGE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE}.adoc ABSOLUTE)
   set(GENERATED_MANPAGE_PATH ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
@@ -66,7 +69,9 @@ foreach(MANPAGE ${MANPAGES})
     set(MANPAGE_SRC_SYMLINK ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE}.txt)
     add_custom_command(OUTPUT ${GENERATED_MANPAGE_PATH}
         COMMAND ln -s -f ${MANPAGE_SRC} ${MANPAGE_SRC_SYMLINK}
-        COMMAND a2x ${ASCIIDOC_VERBOSE} -L -f manpage ${MANPAGE_SRC_SYMLINK}
+        # Grepping out 'invalid escape sequence' warnings due to asciidoc bug
+        COMMAND a2x ${ASCIIDOC_VERBOSE} -L -f manpage ${MANPAGE_SRC_SYMLINK} 2>&1
+            | grep -v 'invalid escape sequence' | tee ${A2X_LOGS_DIR}/${MANPAGE}.log
         DEPENDS ${MANPAGE_SRC})
     set(GENERATED_MANPAGES ${GENERATED_MANPAGES} ${GENERATED_MANPAGE_PATH})
   endif()
