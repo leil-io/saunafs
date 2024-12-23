@@ -104,6 +104,7 @@
 #cmakedefine SAUNAFS_HAVE_SETITIMER
 #cmakedefine SAUNAFS_HAVE_STD_TO_STRING
 #cmakedefine SAUNAFS_HAVE_STD_STOULL
+#cmakedefine SAUNAFS_HAVE_MALLOPT
 
 /* [CMake] Optional functions #2 */
 #cmakedefine SAUNAFS_HAVE_DUP2
