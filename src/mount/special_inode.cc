@@ -65,3 +65,11 @@ const Inode InodeTweaks::inode_ = SPECIAL_INODE_TWEAKS;
 const Attributes InodeFileByInode::attr =
 	  {{'d', 0x01,0xED, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0}};
 const Inode InodeFileByInode::inode_ = SPECIAL_INODE_FILE_BY_INODE;
+
+// 0x01ED == 0b111101101 == 0755
+const Attributes InodePathByInode::attr =
+	  {{'d', 0x01,0xED, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0}};
+const Inode InodePathByInode::inode_ = SPECIAL_INODE_PATH_BY_INODE;
+namespace InodePathByInode {
+    InodePathInfo inodePathInfo = {nullptr, 0, std::mutex(), std::condition_variable(), false};
+}
