@@ -911,7 +911,7 @@ AttrReply getattr(Context &ctx, Inode ino) {
 	maxfleng = write_data_getmaxfleng(ino);
 	if (usedircache && gDirEntryCache.lookup(ctx,ino,attr)) {
 		if (debug_mode) {
-			safs::log_debug("getattr: sending data from dircache\n");
+			safs::log_debug("getattr: sending data from dircache");
 		}
 		stats_inc(OP_DIRCACHE_GETATTR);
 		status = SAUNAFS_STATUS_OK;
@@ -2076,7 +2076,7 @@ EntryParam create(Context &ctx, Inode parent, const char *name, mode_t mode,
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
 	if (debug_mode) {
-		safs::log_debug("create ({}) ok -> keep cache: {}\n", inode, (int)fi->keep_cache);
+		safs::log_debug("create ({}) ok -> keep cache: {}", inode, (int)fi->keep_cache);
 	}
 	gDirEntryCache.lockAndInvalidateParent(ctx, parent);
 	e.ino = inode;
@@ -2146,7 +2146,7 @@ void open(Context &ctx, Inode ino, FileInfo *fi) {
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
 	if (debug_mode) {
-		safs::log_debug("open ({}) ok -> keep cache: {}\n", ino, (int)fi->keep_cache);
+		safs::log_debug("open ({}) ok -> keep cache: {}", ino, (int)fi->keep_cache);
 	}
 	fi->direct_io = gDirectIo;
 	oplog_printf(ctx, "open (%lu): OK (%lu,%lu)",
