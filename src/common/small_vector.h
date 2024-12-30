@@ -22,10 +22,7 @@
 
 #include <algorithm>
 #include <array>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <boost/container/small_vector.hpp>
-#pragma GCC diagnostic pop
 #include <cassert>
 #include <cstddef>
 #include <memory>
