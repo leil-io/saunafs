@@ -162,7 +162,8 @@ static void fsnodes_getpath(uint32_t root_inode, FSNode *node, std::string &ret)
 	size = 0;
 	while (p != gMetadata->root && !p->parent.empty() && p->id != root_inode) {
 		// get first parent
-		FSNodeDirectory *parent = fsnodes_id_to_node_verify<FSNodeDirectory>(p->parent[0]);
+		FSNodeDirectory *parent =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(p->parent[0].first);
 		size += parent->getChildName(p).length() + 1;
 		p = parent;
 	}
@@ -175,7 +176,8 @@ static void fsnodes_getpath(uint32_t root_inode, FSNode *node, std::string &ret)
 
 	p = node;
 	while (p != gMetadata->root && !p->parent.empty()) {
-		FSNodeDirectory *parent = fsnodes_id_to_node_verify<FSNodeDirectory>(p->parent[0]);
+		FSNodeDirectory *parent =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(p->parent[0].first);
 		std::string name = parent->getChildName(p);
 		if (size >= name.length()) {
 			size -= name.length();
@@ -275,7 +277,7 @@ static int fsnodes_find_depth(FSNodeDirectory *a) {
 	assert(a);
 	int depth = 1;
 	while (!a->parent.empty()) {
-		a = fsnodes_id_to_node_verify<FSNodeDirectory>(a->parent[0]);
+		a = fsnodes_id_to_node_verify<FSNodeDirectory>(a->parent[0].first);
 		++depth;
 	}
 
@@ -302,12 +304,12 @@ static FSNode *fsnodes_find_common_ancestor(FSNodeDirectory *a, FSNodeDirectory 
 	if (depth_a > depth_b) {
 		for(;depth_a > depth_b;--depth_a) {
 			assert(a && !a->parent.empty());
-			a = fsnodes_id_to_node_verify<FSNodeDirectory>(a->parent[0]);
+			a = fsnodes_id_to_node_verify<FSNodeDirectory>(a->parent[0].first);
 		}
 	} else if (depth_b > depth_a) {
 		for(;depth_b > depth_a;--depth_b) {
 			assert(b && !b->parent.empty());
-			b = fsnodes_id_to_node_verify<FSNodeDirectory>(b->parent[0]);
+			b = fsnodes_id_to_node_verify<FSNodeDirectory>(b->parent[0].first);
 		}
 	}
 
@@ -318,8 +320,8 @@ static FSNode *fsnodes_find_common_ancestor(FSNodeDirectory *a, FSNodeDirectory 
 	while(!a->parent.empty()) {
 		assert(!b->parent.empty());
 
-		a = fsnodes_id_to_node_verify<FSNodeDirectory>(a->parent[0]);
-		b = fsnodes_id_to_node_verify<FSNodeDirectory>(b->parent[0]);
+		a = fsnodes_id_to_node_verify<FSNodeDirectory>(a->parent[0].first);
+		b = fsnodes_id_to_node_verify<FSNodeDirectory>(b->parent[0].first);
 
 		if (a == b) {
 			return a;
@@ -395,15 +397,18 @@ bool fsnodes_quota_exceeded_dir(FSNode *node,
 	if (node->type == FSNode::kDirectory) {
 		// Directory can have only one parent, so we get rid of recursion.
 		while(!node->parent.empty()) {
-			FSNodeDirectory *parent = fsnodes_id_to_node_verify<FSNodeDirectory>(node->parent[0]);
+			FSNodeDirectory *parent =
+			    fsnodes_id_to_node_verify<FSNodeDirectory>(
+			        node->parent[0].first);
 			if (fsnodes_test_dir_quota_noparents(parent, resource_list)) {
 				return true;
 			}
 			node = parent;
 		}
 	} else {
-		for(const auto parent_id : node->parent) {
-			FSNodeDirectory *parent = fsnodes_id_to_node_verify<FSNodeDirectory>(parent_id);
+		for (const auto &[parentId, _] : node->parent) {
+			FSNodeDirectory *parent =
+			    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 			if (fsnodes_quota_exceeded_dir(parent, resource_list)) {
 				return true;
 			}
@@ -428,7 +433,8 @@ bool fsnodes_quota_exceeded_dir(FSNodeDirectory *node, FSNodeDirectory* prev_nod
 
 	// node is directory so it has only one parent.
 	while(!node->parent.empty()) {
-		FSNodeDirectory *parent = fsnodes_id_to_node<FSNodeDirectory>(node->parent[0]);
+		FSNodeDirectory *parent =
+		    fsnodes_id_to_node<FSNodeDirectory>(node->parent[0].first);
 
 		if (parent == common) {
 			return false;

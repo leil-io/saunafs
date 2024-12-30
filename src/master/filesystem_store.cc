@@ -264,7 +264,6 @@ static bool fs_load_generic(const std::shared_ptr<MemoryMappedFile> &metadataFil
 
 void fs_storeedge(FSNodeDirectory *parent, FSNode *child,
                   const std::string &name, FILE *fd) {
-	uint8_t uedgebuff[4 + 4 + 2 + 65535];
 	uint8_t *ptr;
 	if (child == nullptr) {  // last edge
 		memset(gEdgeStoreBuffer, 0, kEdgeHeaderSize);
@@ -430,16 +429,20 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 			currentParentId = parentId;
 		}
 
-		auto it = parent->entries.insert({hstorage::Handle(name), child}).first;
-		parent->entries_hash ^= (*it).first.hash();
+		hstorage::Handle *handlePtr = new hstorage::Handle(name);
+		auto it = parent->entries.insert({handlePtr, child}).first;
+		parent->entries_hash ^= (*it).first->hash();
 
 		if (parent->case_insensitive) {
 			HString lowerCaseName = HString::hstringToLowerCase(HString(name));
-			auto it = parent->lowerCaseEntries.insert({hstorage::Handle(std::string(lowerCaseName.c_str())), child}).first;
-			parent->lowerCaseEntriesHash ^= (*it).first.hash();
+			auto lowercaseHandlePtr = new hstorage::Handle(lowerCaseName);
+			auto it =
+			    parent->lowerCaseEntries.insert({lowercaseHandlePtr, child})
+			        .first;
+			parent->lowerCaseEntriesHash ^= (*it).first->hash();
 		}
 
-		child->parent.push_back(parent->id);
+		child->parent.push_back({parent->id, handlePtr});
 		if (child->type == FSNode::kDirectory) {
 			parent->nlink++;
 		}
@@ -452,8 +455,6 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 }
 
 void fs_storenode(FSNode *f, FILE *fd) {
-	uint8_t unodebuff[1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 +
-	                  8 * 65536 + 4 * 65536 + 4];
 	uint8_t *ptr, *chptr;
 	uint32_t i, indx, ch, sessionids;
 	std::string name;
@@ -686,7 +687,7 @@ void fs_storenodes(FILE *fd) {
 
 void fs_storeedgelist(FSNodeDirectory *parent, FILE *fd) {
 	for (const auto &entry : parent->entries) {
-		fs_storeedge(parent, entry.second, (std::string)entry.first, fd);
+		fs_storeedge(parent, entry.second, (std::string)(*entry.first), fd);
 	}
 }
 
