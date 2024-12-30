@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <ios>
+#include <malloc.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -107,6 +108,10 @@ static pam_handle_t *gPAMHandle=NULL;
 #endif
 
 static bool gRunAsDaemon = true;
+
+constexpr uint8_t kDefaultLimitGlibcArenas = 0;
+constexpr const char *kEnvironmentVariableNotDefined = nullptr;
+static uint8_t gLimitGlibcArenas = kDefaultLimitGlibcArenas;
 
 /// When set to true, config will be reloaded after the current loop
 
@@ -812,6 +817,28 @@ void makePidFile(const std::string &name) {
 	ofs << std::to_string(getpid()) << std::endl;
 }
 
+/// (glibc specific) Tune glibc malloc arenas to avoid high virtual memory usage
+inline void tuneMalloc() {
+#if defined(SAUNAFS_HAVE_MALLOPT) && defined(M_ARENA_MAX) && \
+    defined(M_ARENA_TEST)
+	gLimitGlibcArenas =
+	    cfg_getuint8("LIMIT_GLIBC_MALLOC_ARENAS", kDefaultLimitGlibcArenas);
+
+	if (gLimitGlibcArenas > 0) {
+		if (::getenv("MALLOC_ARENA_MAX") == kEnvironmentVariableNotDefined) {
+			safs::log_info("Setting glibc malloc arena max to {}",
+			               gLimitGlibcArenas);
+			::mallopt(M_ARENA_MAX, static_cast<int>(gLimitGlibcArenas));
+		}
+		if (::getenv("MALLOC_ARENA_TEST") == kEnvironmentVariableNotDefined) {
+			safs::log_info("Setting glibc malloc arena test to {}",
+			               gLimitGlibcArenas);
+			::mallopt(M_ARENA_TEST, static_cast<int>(gLimitGlibcArenas));
+		}
+	}
+#endif
+}
+
 int main(int argc,char **argv) {
 	char *wrkdir;
 	char *appname;
@@ -1043,6 +1070,8 @@ int main(int argc,char **argv) {
 		safs_pretty_syslog(LOG_WARNING,"trying to lock memory, but memory lock not supported");
 	}
 #endif
+
+	tuneMalloc();
 
 	if (initialize()) {
 		if (getrlimit(RLIMIT_NOFILE,&rls)==0) {
