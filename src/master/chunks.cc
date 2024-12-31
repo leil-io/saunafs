@@ -79,8 +79,12 @@
 #define MINCHUNKSLOOPCPU    10
 #define MAXCHUNKSLOOPCPU    90
 
-#define HASHSIZE 0x100000
-#define HASHPOS(chunkid) (((uint32_t)chunkid)&0xFFFFF)
+constexpr uint8_t kChunkHashBits = 22;
+constexpr int32_t kChunkHashSize = (1 << kChunkHashBits);
+constexpr uint32_t kChunkHashMask = kChunkHashSize - 1;
+constexpr uint32_t chunkHashPos(uint64_t chunkid) {
+	return static_cast<uint32_t>(chunkid) & kChunkHashMask;
+}
 
 #define CHECKSUMSEED 78765491511151883ULL
 
@@ -518,7 +522,7 @@ struct ChunksMetadata {
 	// chunks
 	chunk_bucket *cbhead;
 	Chunk *chfreehead;
-	Chunk *chunkhash[HASHSIZE];
+	Chunk *chunkhash[kChunkHashSize];
 	uint64_t lastchunkid;
 	Chunk *lastchunkptr;
 
@@ -662,12 +666,13 @@ static void chunk_update_checksum(Chunk *ch) {
 	if (!ch) {
 		return;
 	}
-	if (HASHPOS(ch->chunkid) < gChunksMetadata->checksumRecalculationPosition) {
+	if (chunkHashPos(ch->chunkid) <
+	    gChunksMetadata->checksumRecalculationPosition) {
 		removeFromChecksum(gChunksMetadata->chunksChecksumRecalculated, ch->checksum);
 	}
 	removeFromChecksum(gChunksMetadata->chunksChecksum, ch->checksum);
 	ch->checksum = chunk_checksum(ch);
-	if (HASHPOS(ch->chunkid) < gChunksMetadata->checksumRecalculationPosition) {
+	if (chunkHashPos(ch->chunkid) < gChunksMetadata->checksumRecalculationPosition) {
 		safs::log_trace("master.fs.checksum.changing_recalculated_chunk");
 		addToChecksum(gChunksMetadata->chunksChecksumRecalculated, ch->checksum);
 	} else {
@@ -687,7 +692,7 @@ ChecksumRecalculationStatus chunks_update_checksum_a_bit(uint32_t speedLimit) {
 		gChunksMetadata->chunksChecksumRecalculated = CHECKSUMSEED;
 	}
 	uint32_t recalculated = 0;
-	while (gChunksMetadata->checksumRecalculationPosition < HASHSIZE) {
+	while (gChunksMetadata->checksumRecalculationPosition < kChunkHashSize) {
 		Chunk *c;
 		for (c = gChunksMetadata->chunkhash[gChunksMetadata->checksumRecalculationPosition]; c; c=c->next) {
 			chunk_checksum_add_to_background(c);
@@ -710,7 +715,7 @@ ChecksumRecalculationStatus chunks_update_checksum_a_bit(uint32_t speedLimit) {
 
 static void chunk_recalculate_checksum() {
 	gChunksMetadata->chunksChecksum = CHECKSUMSEED;
-	for (int i = 0; i < HASHSIZE; ++i) {
+	for (int i = 0; i < kChunkHashSize; ++i) {
 		for (Chunk *ch = gChunksMetadata->chunkhash[i]; ch; ch = ch->next) {
 			ch->checksum = chunk_checksum(ch);
 			addToChecksum(gChunksMetadata->chunksChecksum, ch->checksum);
@@ -758,7 +763,7 @@ static inline void chunk_free(Chunk *p) {
 #endif /* METARESTORE */
 
 Chunk *chunk_new(uint64_t chunkid, uint32_t chunkversion) {
-	uint32_t chunkpos = HASHPOS(chunkid);
+	uint32_t chunkpos = chunkHashPos(chunkid);
 	Chunk *newchunk;
 	newchunk = chunk_malloc();
 	newchunk->next = gChunksMetadata->chunkhash[chunkpos];
@@ -822,7 +827,7 @@ void chunk_handle_disconnected_copies(Chunk *c) {
 #endif
 
 Chunk *chunk_find(uint64_t chunkid) {
-	uint32_t chunkpos = HASHPOS(chunkid);
+	uint32_t chunkpos = chunkHashPos(chunkid);
 	Chunk *chunkit;
 	if (gChunksMetadata->lastchunkid==chunkid) {
 		return gChunksMetadata->lastchunkptr;
@@ -1643,14 +1648,14 @@ void chunk_server_label_changed(const MediaLabel &previousLabel, const MediaLabe
  */
 void chunk_clean_zombie_servers_a_bit() {
 	SignalLoopWatchdog watchdog;
-	static uint32_t current_position = HASHSIZE;
+	static uint32_t current_position = kChunkHashSize;
 
 	if (gDisconnectedCounter == 0) {
 		return;
 	}
 
 	watchdog.start();
-	while (current_position < HASHSIZE) {
+	while (current_position < kChunkHashSize) {
 		for (; gCurrentChunkInZombieLoop; gCurrentChunkInZombieLoop = gCurrentChunkInZombieLoop->next) {
 			chunk_handle_disconnected_copies(gCurrentChunkInZombieLoop);
 			if (watchdog.expired()) {
@@ -1659,11 +1664,11 @@ void chunk_clean_zombie_servers_a_bit() {
 			}
 		}
 		++current_position;
-		if (current_position < HASHSIZE) {
+		if (current_position < kChunkHashSize) {
 			gCurrentChunkInZombieLoop = gChunksMetadata->chunkhash[current_position];
 		}
 	}
-	if (current_position >= HASHSIZE) {
+	if (current_position >= kChunkHashSize) {
 		--gDisconnectedCounter;
 		current_position = 0;
 		gCurrentChunkInZombieLoop = gChunksMetadata->chunkhash[0];
@@ -2619,7 +2624,7 @@ void ChunkWorker::mainLoop() {
 			stack_.current_bucket +=
 			        123;  // if HASHSIZE is any power of 2 then any odd number is
 			              // good here
-			stack_.current_bucket %= HASHSIZE;
+			stack_.current_bucket %= kChunkHashSize;
 			++stack_.buckets_done_count;
 
 			if (stack_.work_limit.expired()) {
@@ -2658,7 +2663,7 @@ void chunk_dump(void) {
 	Chunk *c;
 	uint32_t i;
 
-	for (i=0 ; i<HASHSIZE ; i++) {
+	for (i=0 ; i<kChunkHashSize ; i++) {
 		for (c=gChunksMetadata->chunkhash[i] ; c ; c=c->next) {
 			printf("*|i:%016" PRIX64 "|v:%08" PRIX32 "|g:%" PRIu8 "|t:%10" PRIu32 "\n",c->chunkid,c->version,c->highestIdGoal(),c->lockedto);
 		}
@@ -2709,7 +2714,7 @@ void chunk_store(FILE *fd) {
 	}
 	j=0;
 	ptr = storebuff;
-	for (i=0 ; i<HASHSIZE ; i++) {
+	for (i=0 ; i<kChunkHashSize ; i++) {
 		for (c=gChunksMetadata->chunkhash[i] ; c ; c=c->next) {
 #ifndef METARESTORE
 			chunk_handle_disconnected_copies(c);
@@ -2832,13 +2837,13 @@ void chunk_reload(void) {
 	if (cfg_isdefined("CHUNKS_LOOP_TIME")) {
 		looptime = cfg_get_minmaxvalue<uint32_t>("CHUNKS_LOOP_TIME", 300, MINLOOPTIME, MAXLOOPTIME);
 		uint64_t scaled_looptime = std::max((uint64_t)1000 * looptime / ChunksLoopPeriod, (uint64_t)1);
-		HashSteps = 1 + ((HASHSIZE) / scaled_looptime);
+		HashSteps = 1 + ((kChunkHashSize) / scaled_looptime);
 		HashCPS   = 0xFFFFFFFF;
 	} else {
 		looptime = cfg_get_minmaxvalue<uint32_t>("CHUNKS_LOOP_MIN_TIME", 300, MINLOOPTIME, MAXLOOPTIME);
 		HashCPS = cfg_get_minmaxvalue<uint32_t>("CHUNKS_LOOP_MAX_CPS", 100000, MINCPS, MAXCPS);
 		uint64_t scaled_looptime = std::max((uint64_t)1000 * looptime / ChunksLoopPeriod, (uint64_t)1);
-		HashSteps = 1 + ((HASHSIZE) / scaled_looptime);
+		HashSteps = 1 + ((kChunkHashSize) / scaled_looptime);
 		HashCPS   = (uint64_t)ChunksLoopPeriod * HashCPS / 1000;
 	}
 	double endangeredChunksPriority = cfg_ranged_get("ENDANGERED_CHUNKS_PRIORITY", 0.0, 0.0, 1.0);
@@ -2913,13 +2918,13 @@ int chunk_strinit(void) {
 				cfg_filename().c_str());
 		looptime = cfg_get_minmaxvalue<uint32_t>("CHUNKS_LOOP_TIME", 300, MINLOOPTIME, MAXLOOPTIME);
 		uint64_t scaled_looptime = std::max((uint64_t)1000 * looptime / ChunksLoopPeriod, (uint64_t)1);
-		HashSteps = 1 + ((HASHSIZE) / scaled_looptime);
+		HashSteps = 1 + ((kChunkHashSize) / scaled_looptime);
 		HashCPS   = 0xFFFFFFFF;
 	} else {
 		looptime = cfg_get_minmaxvalue<uint32_t>("CHUNKS_LOOP_MIN_TIME", 300, MINLOOPTIME, MAXLOOPTIME);
 		HashCPS = cfg_get_minmaxvalue<uint32_t>("CHUNKS_LOOP_MAX_CPS", 100000, MINCPS, MAXCPS);
 		uint64_t scaled_looptime = std::max((uint64_t)1000 * looptime / ChunksLoopPeriod, (uint64_t)1);
-		HashSteps = 1 + ((HASHSIZE) / scaled_looptime);
+		HashSteps = 1 + ((kChunkHashSize) / scaled_looptime);
 		HashCPS   = (uint64_t)ChunksLoopPeriod * HashCPS / 1000;
 	}
 	double endangeredChunksPriority = cfg_ranged_get("ENDANGERED_CHUNKS_PRIORITY", 0.0, 0.0, 1.0);
