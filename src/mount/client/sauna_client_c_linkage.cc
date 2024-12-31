@@ -133,16 +133,19 @@ int saunafs_getattr(Context &ctx, Inode ino, AttrReply &reply) {
 	}
 }
 
-std::pair<int, SaunaClient::JobId> saunafs_makesnapshot(Context &ctx, Inode ino, Inode dst_parent,
-	                                       const std::string &dst_name, bool can_overwrite) {
+int saunafs_makesnapshot(Context &ctx, Inode ino, Inode dst_parent,
+                         const std::string &dst_name, bool can_overwrite,
+                         SaunaClient::JobId &job_id) {
 	try {
-		SaunaClient::JobId job_id = SaunaClient::makesnapshot(ctx, ino, dst_parent,
-		                                                        dst_name, can_overwrite);
-		return {SAUNAFS_STATUS_OK, job_id};
+		job_id = SaunaClient::makesnapshot(ctx, ino, dst_parent, dst_name,
+		                                   can_overwrite);
+		return SAUNAFS_STATUS_OK;
 	} catch (RequestException &e) {
-		return {e.saunafs_error_code, 0};
+		job_id = 0;
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, 0};
+		job_id = 0;
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
@@ -180,44 +183,47 @@ int saunafs_setgoal(Context &ctx, Inode ino, const std::string &goal_name, uint8
 	}
 }
 
-std::pair<int, ReadCache::Result> saunafs_read(Context &ctx, Inode ino, size_t size,
-	                                        off_t off, FileInfo *fi) {
+int saunafs_read(Context &ctx, Inode ino, size_t size, off_t off,
+                 FileInfo *fi, ReadCache::Result &result) {
 	try {
-		return std::pair<int, ReadCache::Result>(
-		        SAUNAFS_STATUS_OK, SaunaClient::read(ctx, ino, size, off, fi));
+		result = SaunaClient::read(ctx, ino, size, off, fi);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return std::pair<int, ReadCache::Result>(e.saunafs_error_code,
-		                                         ReadCache::Result());
+		result = ReadCache::Result();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return std::pair<int, ReadCache::Result>(SAUNAFS_ERROR_IO,
-		                                         ReadCache::Result());
+		result = ReadCache::Result();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
-std::pair<int, std::vector<uint8_t>> saunafs_read_special_inode(Context &ctx, Inode ino,
-		size_t size, off_t off, FileInfo *fi) {
+int saunafs_read_special_inode(Context &ctx, Inode ino, size_t size, off_t off,
+                               FileInfo *fi,
+                               std::vector<uint8_t> &special_inode) {
 	try {
-		return std::pair<int, std::vector<uint8_t>>(
-		        SAUNAFS_STATUS_OK,
-		        SaunaClient::read_special_inode(ctx, ino, size, off, fi));
+		special_inode =
+		    SaunaClient::read_special_inode(ctx, ino, size, off, fi);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return std::pair<int, std::vector<uint8_t>>(e.saunafs_error_code,
-		                                            std::vector<uint8_t>());
+		special_inode.clear();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return std::pair<int, std::vector<uint8_t>>(SAUNAFS_ERROR_IO,
-		                                            std::vector<uint8_t>());
+		special_inode.clear();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
-std::pair<int, ssize_t> saunafs_write(Context &ctx, Inode ino, const char *buf, size_t size,
-		off_t off, FileInfo *fi) {
+int saunafs_write(Context &ctx, Inode ino, const char *buf, size_t size,
+                  off_t off, FileInfo *fi, ssize_t &bytes_written) {
 	try {
-		auto write_ret = SaunaClient::write(ctx, ino, buf, size, off, fi);
-		return {SAUNAFS_STATUS_OK, write_ret};
+		bytes_written = SaunaClient::write(ctx, ino, buf, size, off, fi);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, 0};
+		bytes_written = 0;
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, 0};
+		bytes_written = 0;
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
@@ -276,17 +282,20 @@ bool saunafs_isSpecialInode(Inode ino) {
 	return SaunaClient::isSpecialInode(ino);
 }
 
-std::pair<int, std::vector<DirEntry>> saunafs_readdir(Context &ctx, uint64_t opendirSessionID,
-		Inode ino, off_t off, size_t max_entries) {
+int saunafs_readdir(Context &ctx, uint64_t opendirSessionID, Inode ino,
+                    off_t off, size_t max_entries,
+                    std::vector<DirEntry> &entries) {
 	try {
-		auto fsDirEntries = SaunaClient::readdir(ctx, opendirSessionID, ino, off, max_entries);
-		uint64_t nextEntryIno = (fsDirEntries.empty()) ? 0 : fsDirEntries.back().attr.st_ino;
+		entries = SaunaClient::readdir(ctx, opendirSessionID, ino, off, max_entries);
+		uint64_t nextEntryIno = (entries.empty()) ? 0 : entries.back().attr.st_ino;
 		SaunaClient::update_readdir_session(opendirSessionID, nextEntryIno);
-		return {SAUNAFS_STATUS_OK, fsDirEntries};
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, std::vector<DirEntry>()};
+		entries.clear();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, std::vector<DirEntry>()};
+		entries.clear();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
@@ -301,27 +310,33 @@ int saunafs_readlink(Context &ctx, Inode ino, std::string &link) {
 	}
 }
 
-std::pair<int, std::vector<NamedInodeEntry>> saunafs_readreserved(Context &ctx,
-		SaunaClient::NamedInodeOffset off, SaunaClient::NamedInodeOffset max_entries) {
+int saunafs_readreserved(Context &ctx, SaunaClient::NamedInodeOffset off,
+                         SaunaClient::NamedInodeOffset max_entries,
+                         std::vector<NamedInodeEntry> &inode_entries) {
 	try {
-		auto ret = SaunaClient::readreserved(ctx, off, max_entries);
-		return {SAUNAFS_STATUS_OK, ret};
+		inode_entries = SaunaClient::readreserved(ctx, off, max_entries);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, std::vector<NamedInodeEntry>()};
+		inode_entries.clear();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, std::vector<NamedInodeEntry>()};
+		inode_entries.clear();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
-std::pair<int, std::vector<NamedInodeEntry>> saunafs_readtrash(Context &ctx,
-		SaunaClient::NamedInodeOffset off, SaunaClient::NamedInodeOffset max_entries) {
+int saunafs_readtrash(Context &ctx, SaunaClient::NamedInodeOffset off,
+                      SaunaClient::NamedInodeOffset max_entries,
+                      std::vector<NamedInodeEntry> &trash_entries) {
 	try {
-		auto ret = SaunaClient::readtrash(ctx, off, max_entries);
-		return {SAUNAFS_STATUS_OK, ret};
+		trash_entries = SaunaClient::readtrash(ctx, off, max_entries);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, std::vector<NamedInodeEntry>()};
+		trash_entries.clear();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, std::vector<NamedInodeEntry>()};
+		trash_entries.clear();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
@@ -406,26 +421,31 @@ int saunafs_setxattr(Context ctx, Inode ino, const char *name, const char *value
 	}
 }
 
-std::pair<int,std::vector<ChunkWithAddressAndLabel>> saunafs_getchunksinfo(Context &ctx,
-	                          Inode ino, uint32_t chunk_index, uint32_t chunk_count) {
+int saunafs_getchunksinfo(Context &ctx, Inode ino, uint32_t chunk_index,
+                          uint32_t chunk_count,
+                          std::vector<ChunkWithAddressAndLabel> &chunks) {
 	try {
-		auto chunks = SaunaClient::getchunksinfo(ctx, ino, chunk_index, chunk_count);
-		return {SAUNAFS_STATUS_OK, chunks};
+		chunks = SaunaClient::getchunksinfo(ctx, ino, chunk_index, chunk_count);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, std::vector<ChunkWithAddressAndLabel>()};
+		chunks.clear();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, std::vector<ChunkWithAddressAndLabel>()};
+		chunks.clear();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
-std::pair<int, std::vector<ChunkserverListEntry>> saunafs_getchunkservers() {
+int saunafs_getchunkservers(std::vector<ChunkserverListEntry> &chunkservers) {
 	try {
-		auto chunkservers = SaunaClient::getchunkservers();
-		return {SAUNAFS_STATUS_OK, chunkservers};
+		chunkservers = SaunaClient::getchunkservers();
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, std::vector<ChunkserverListEntry>()};
+		chunkservers.clear();
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, std::vector<ChunkserverListEntry>()};
+		chunkservers.clear();
+		return SAUNAFS_ERROR_IO;
 	}
 }
 
@@ -442,15 +462,17 @@ int saunafs_getlk(Context &ctx, Inode ino,
 	}
 }
 
-std::pair<int, uint32_t> saunafs_setlk_send(Context &ctx, Inode ino,
-	                            SaunaClient::FileInfo *fi, safs_locks::FlockWrapper &lock) {
+int saunafs_setlk_send(Context &ctx, Inode ino, SaunaClient::FileInfo *fi,
+                       safs_locks::FlockWrapper &lock, uint32_t &reqid) {
 	try {
-		uint32_t reqid = SaunaClient::setlk_send(ctx, ino, fi, lock);
-		return {SAUNAFS_STATUS_OK, reqid};
+		reqid = SaunaClient::setlk_send(ctx, ino, fi, lock);
+		return SAUNAFS_STATUS_OK;
 	} catch (const RequestException &e) {
-		return {e.saunafs_error_code, 0};
+		reqid = 0;
+		return e.saunafs_error_code;
 	} catch (...) {
-		return {SAUNAFS_ERROR_IO, 0};
+		reqid = 0;
+		return SAUNAFS_ERROR_IO;
 	}
 }
 

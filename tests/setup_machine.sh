@@ -65,6 +65,7 @@ common_packages=(
 	bash-completion
 	bc
 	ccache
+	clang
 	cmake
 	curl
 	dbench
