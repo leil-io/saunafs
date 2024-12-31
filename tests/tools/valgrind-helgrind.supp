@@ -47,6 +47,19 @@
    fun:clone
 }
 
+{
+   # False positive about ipToString when converting ip address
+   # to a human readable format
+   ip_to_string
+   Helgrind:Race
+   ...
+   fun:operator<<
+   fun:_Z10ipToStringB5cxx11j
+   ...
+   fun:start_thread
+   fun:clone
+}
+
 # MAIN LOOP (used in metadata servers and chunkservers)
 
 {
