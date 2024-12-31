@@ -139,10 +139,8 @@ void ReadPlanTester::checkPlan(const std::unique_ptr<ReadPlan> &plan, uint8_t *b
 		}
 	}
 
-	int post_size = 0;
 	for (const auto &post : plan->postprocess_operations) {
 		assert(post.first >= 0);
-		post_size += post.first;
 	}
 
 	plan->buffer_start = buffer_start;

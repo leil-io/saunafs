@@ -46,7 +46,7 @@
 
 std::array<uint32_t, FsStats::Size> gFsStatsArray = {{}};
 
-static const char kAclXattrs[] = "system.richacl";
+[[maybe_unused]] static const char kAclXattrs[] = "system.richacl";
 
 void fs_retrieve_stats(std::array<uint32_t, FsStats::Size> &output_stats) {
 	output_stats = gFsStatsArray;

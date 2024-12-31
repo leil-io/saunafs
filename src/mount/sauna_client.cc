@@ -1815,7 +1815,7 @@ std::vector<DirEntry> readdir(Context &ctx, uint64_t fh, Inode ino, off_t off, s
 	/* Scope for lock guard. */ {
 		std::lock_guard<std::mutex> sessions_guard(gReaddirMutex);
 		ReaddirSessions::iterator sessionIt = gReaddirSessions.find(fh);
-		sassert(sessionIt != gReaddirSessions.end());
+		sassert(sessionIt != gReaddirSessions.end() || gReaddirSessions.empty());
 		readdirSession = &sessionIt->second;
 	}
 	do {

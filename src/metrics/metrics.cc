@@ -32,8 +32,6 @@
 #include "metrics.h"
 #include "slogger/slogger.h"
 
-constexpr auto THREAD_SLEEP_TIME_MS = 100;
-
 namespace metrics {
 
 std::unique_ptr<std::jthread>
@@ -53,6 +51,8 @@ void init(const char* /* unused */) {
 }
 }
 #else
+
+constexpr auto THREAD_SLEEP_TIME_MS = 100;
 
 prometheus::Family<prometheus::Counter> &setup_family(
     const char *name, const char *help,
