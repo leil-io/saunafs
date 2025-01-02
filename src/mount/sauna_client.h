@@ -62,6 +62,8 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultReportReservedPeriod = 60;
 	static constexpr const char *kDefaultUmaskDir = "002"; // means rwxrwxr-x permissions mask, 775 default permissions
 	static constexpr const char *kDefaultUmaskFile = "002"; // means rwxrwxr-x permissions mask, 775 default permissions
+	static constexpr const char *kDefaultLogLevel = "warn";
+	static constexpr const char *kDefaultLogFlushLevel = "err";
 #else
 	static constexpr unsigned kDefaultReportReservedPeriod = 30;
 #endif

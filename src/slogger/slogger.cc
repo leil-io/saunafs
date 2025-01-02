@@ -70,9 +70,6 @@ bool safs::add_log_file(const char *path, log_level::LogLevel level, int max_fil
 		logger->set_level((spdlog::level::level_enum)level);
 		// Format: DATE TIME [LEVEL] [PID:TID] : MESSAGE
 		logger->set_pattern("%D %H:%M:%S.%e [%l] [%P:%t] : %v");
-#ifdef _WIN32
-		logger->flush_on(spdlog::level::err);
-#endif
 		return true;
 	} catch (const spdlog::spdlog_ex &e) {
 		safs_pretty_syslog(LOG_ERR, "Adding %s log file failed: %s", path, e.what());
