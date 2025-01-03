@@ -1717,7 +1717,8 @@ void opendir(Context &ctx, Inode ino) {
 	if (debug_mode) {
 		oplog_printf(ctx, "opendir (%lu) ...", (unsigned long int)ino);
 	}
-	if (ino != SPECIAL_INODE_PATH_BY_INODE && IS_SPECIAL_INODE(ino)) {
+	if (ino != SPECIAL_INODE_PATH_BY_INODE &&
+	    ino != SPECIAL_INODE_FILE_BY_INODE && IS_SPECIAL_INODE(ino)) {
 		oplog_printf(ctx, "opendir (%lu): %s", (unsigned long int)ino,
 		             saunafs_error_string(SAUNAFS_ERROR_ENOTDIR));
 		throw RequestException(SAUNAFS_ERROR_ENOTDIR);
