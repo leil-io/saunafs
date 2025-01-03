@@ -103,7 +103,7 @@ namespace SaunaClient {
 #define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(SPECIAL_FILE_NAME_STATS,(name))==0 \
 		|| strcmp(SPECIAL_FILE_NAME_MASTERINFO,(name))==0 || strcmp(SPECIAL_FILE_NAME_OPLOG,(name))==0 \
 		|| strcmp(SPECIAL_FILE_NAME_OPHISTORY,(name))==0 || strcmp(SPECIAL_FILE_NAME_TWEAKS,(name))==0 \
-		|| strcmp(SPECIAL_FILE_NAME_FILE_BY_INODE,(name))==0))
+		|| strcmp(SPECIAL_FILE_NAME_FILE_BY_INODE,(name))==0 || strcmp(SPECIAL_FILE_NAME_PATH_BY_INODE,(name))==0))
 
 static GroupCache gGroupCache;
 
@@ -195,6 +195,8 @@ Inode getSpecialInodeByName(const char *name) {
 		return SPECIAL_INODE_OPHISTORY;
 	} else if (strcmp(name, SPECIAL_FILE_NAME_FILE_BY_INODE) == 0) {
 		return SPECIAL_INODE_FILE_BY_INODE;
+	} else if (strcmp(name, SPECIAL_FILE_NAME_PATH_BY_INODE) == 0) {
+		return SPECIAL_INODE_PATH_BY_INODE;
 	} else {
 		return MAX_REGULAR_INODE;
 	}
@@ -819,6 +821,30 @@ EntryParam lookup(Context &ctx, Inode parent, const char *name) {
 		}
 		RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, ctx,
 			fs_getattr(inode, ctx.uid, ctx.gid, attr));
+		icacheflag = 0;
+	} else if (parent == SPECIAL_INODE_PATH_BY_INODE) {
+		char *endptr = nullptr;
+		inode = strtol(name, &endptr, 10);
+		if (endptr == nullptr || *endptr != '\0') {
+			throw RequestException(SAUNAFS_ERROR_EINVAL);
+		}
+		std::unique_lock<std::mutex> lock(InodePathByInode::inodePathInfo.mtx);
+		InodePathByInode::inodePathInfo.cv.wait(lock, [inode] {
+			return !InodePathByInode::inodePathInfo.locked ||
+			       InodePathByInode::inodePathInfo.inode == inode;
+		});
+		InodePathByInode::inodePathInfo.locked = true;
+		InodePathByInode::inodePathInfo.inode = inode;
+		std::string fullPath = "";
+		RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, ctx,
+		fs_fullpath(inode, ctx.uid, ctx.gid, fullPath));
+		RETRY_ON_ERROR_WITH_UPDATED_CREDENTIALS(status, ctx,
+			fs_getattr(inode, ctx.uid, ctx.gid, attr));
+		InodePathByInode::inodePathInfo.pathByInode = new char[fullPath.length() + 1];
+		std::strcpy(InodePathByInode::inodePathInfo.pathByInode, fullPath.c_str());
+		attr[0] = TYPE_FILE;
+		inode = parent;
+		status = 0;
 		icacheflag = 0;
 	} else if (usedircache && gDirEntryCache.lookup(ctx,parent,std::string(name,nleng),inode,attr)) {
 		if (debug_mode) {
@@ -1691,10 +1717,9 @@ void opendir(Context &ctx, Inode ino) {
 	if (debug_mode) {
 		oplog_printf(ctx, "opendir (%lu) ...", (unsigned long int)ino);
 	}
-	if (IS_SPECIAL_INODE(ino)) {
-		oplog_printf(ctx, "opendir (%lu): %s",
-				(unsigned long int)ino,
-				saunafs_error_string(SAUNAFS_ERROR_ENOTDIR));
+	if (ino != SPECIAL_INODE_PATH_BY_INODE && IS_SPECIAL_INODE(ino)) {
+		oplog_printf(ctx, "opendir (%lu): %s", (unsigned long int)ino,
+		             saunafs_error_string(SAUNAFS_ERROR_ENOTDIR));
 		throw RequestException(SAUNAFS_ERROR_ENOTDIR);
 	}
 

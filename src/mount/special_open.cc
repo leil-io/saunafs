@@ -111,6 +111,23 @@ static void open(const Context &ctx, FileInfo *fi) {
 }
 } // InodeTweaks
 
+namespace InodePathByInode {
+static void open(const Context &ctx, FileInfo *fi) {
+	std::unique_lock<std::mutex> lock(inodePathInfo.mtx);
+	if ((fi->flags & O_ACCMODE) != O_RDONLY) {
+		oplog_printf(ctx, "open (%lu) (internal node: PATH_BY_INODE_FILE): %s",
+		            (unsigned long int)inode_,
+		            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+		throw RequestException(SAUNAFS_ERROR_EACCES);
+	}
+	fi->fh = reinterpret_cast<uintptr_t>(inodePathInfo.pathByInode);
+	fi->direct_io = 1;
+	fi->keep_cache = 0;
+	oplog_printf(ctx, "open (%lu) (internal node: PATH_BY_INODE_FILE): OK (1,0)",
+	            (unsigned long int)inode_);
+}
+} // InodePathByInode
+
 static const std::array<std::function<void
 	(const Context&, FileInfo*)>, 16> funcs = {{
 	 &InodeStats::open,             //0x0U
@@ -121,7 +138,7 @@ static const std::array<std::function<void
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
-	 nullptr,                       //0x8U
+	 &InodePathByInode::open,       //0x8U
 	 nullptr,                       //0x9U
 	 nullptr,                       //0xAU
 	 nullptr,                       //0xBU

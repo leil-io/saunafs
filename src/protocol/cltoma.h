@@ -350,6 +350,12 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(cltoma, wholePathLookup, SAU_CLTOMA_WHOLE_PA
 		uint32_t, uid,
 		uint32_t, gid)
 
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(cltoma, fullPathByInode, SAU_CLTOMA_FULL_PATH_BY_INODE, 0,
+		uint32_t, messageId,
+		uint32_t, inode,
+		uint32_t, uid,
+		uint32_t, gid)
+
 SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		cltoma, recursiveRemove, SAU_CLTOMA_RECURSIVE_REMOVE, 0,
 		uint32_t, msgid,

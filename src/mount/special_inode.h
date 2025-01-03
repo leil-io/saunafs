@@ -87,6 +87,20 @@ namespace InodeFileByInode {
 	extern const SaunaClient::Inode inode_;
 }
 
+namespace InodePathByInode {
+	typedef struct _inodePathInfo {
+		char *pathByInode;
+		uint32_t inode;
+		std::mutex mtx;
+		std::condition_variable cv;
+		bool locked = false;
+	} InodePathInfo;
+    extern InodePathInfo inodePathInfo;
+
+    extern const Attributes attr;
+	extern const SaunaClient::Inode inode_;
+}
+
 std::vector<uint8_t> special_read(SaunaClient::Inode ino, const SaunaClient::Context &ctx,
 	                          size_t size, off_t off, SaunaClient::FileInfo *fi, int debug_mode);
 

@@ -97,6 +97,19 @@ static BytesWritten write(const Context &ctx, const char *buf, size_t size,
 }
 } // InodeTweaks
 
+namespace InodePathByInode {
+static BytesWritten write(const Context &ctx, const char * /*buf*/, size_t size,
+	                           off_t off, FileInfo * /*fi*/) {
+	std::unique_lock<std::mutex> lock(inodePathInfo.mtx);
+	oplog_printf(ctx, "write (%lu,%" PRIu64 ",%" PRIu64 "): %s",
+	            (unsigned long int)inode_,
+	            (uint64_t)size,
+	            (uint64_t)off,
+	            saunafs_error_string(SAUNAFS_ERROR_EACCES));
+	throw RequestException(SAUNAFS_ERROR_EACCES);
+}
+} // InodePathByInode
+
 static const std::array<std::function<BytesWritten
 	(const Context&, const char *, size_t, off_t, FileInfo*)>, 16> funcs = {{
 	 &InodeStats::write,            //0x0U
@@ -107,7 +120,7 @@ static const std::array<std::function<BytesWritten
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
-	 nullptr,                       //0x8U
+	 &InodePathByInode::write,      //0x8U
 	 nullptr,                       //0x9U
 	 nullptr,                       //0xAU
 	 nullptr,                       //0xBU

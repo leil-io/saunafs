@@ -2767,6 +2767,46 @@ uint8_t fs_setacl(uint32_t inode, uint32_t uid, uint32_t gid, AclType type, cons
 	}
 }
 
+uint8_t fs_fullpath(uint32_t inode, uint32_t uid,
+                    uint32_t gid, std::string &fullPath) {
+	threc *rec = fs_get_my_threc();
+	auto message =
+	    cltoma::fullPathByInode::build(rec->packetId, inode, uid, gid);
+	if (!fs_saucreatepacket(rec, message)) { return SAUNAFS_ERROR_IO; }
+	if (!fs_sausendandreceive(rec, SAU_MATOCL_FULL_PATH_BY_INODE, message)) {
+		return SAUNAFS_ERROR_IO;
+	}
+	try {
+		uint32_t msgid;
+		PacketVersion packet_version;
+		deserializePacketVersionNoHeader(message, packet_version);
+		if (packet_version == matocl::fullPathByInode::kStatusPacketVersion) {
+			uint8_t status;
+			matocl::fullPathByInode::deserialize(message, msgid, status);
+			if (status == SAUNAFS_STATUS_OK) {
+				fs_got_inconsistent("SAU_MATOCL_FULL_PATH_BY_INODE",
+				                    message.size(),
+				                    "version 0 and SAUNAFS_STATUS_OK");
+				return SAUNAFS_ERROR_IO;
+			}
+			return status;
+		} else if (packet_version ==
+		           matocl::fullPathByInode::kResponsePacketVersion) {
+			matocl::fullPathByInode::deserialize(message, msgid, fullPath);
+			return SAUNAFS_STATUS_OK;
+		} else {
+			fs_got_inconsistent(
+			    "SAU_MATOCL_FULL_PATH_BY_INODE", message.size(),
+			    "unknown version " + std::to_string(packet_version));
+			return SAUNAFS_ERROR_IO;
+		}
+	} catch (Exception &ex) {
+		fs_got_inconsistent("SAU_MATOCL_FULL_PATH_BY_INODE", message.size(),
+		                    ex.what());
+		return SAUNAFS_ERROR_IO;
+	}
+}
+
 static uint32_t* msgIdPtr(const MessageBuffer& buffer) {
 	PacketHeader header;
 	deserializePacketHeader(buffer, header);
