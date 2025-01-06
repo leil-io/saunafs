@@ -20,12 +20,7 @@
 
 #include <cassert>
 
-// A fix for https://stackoverflow.com/q/77034039/10788155
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <system_error>
-#pragma GCC diagnostic pop
 
 #include "saunafs_c_api.h"
 #include "errors/saunafs_error_codes.h"

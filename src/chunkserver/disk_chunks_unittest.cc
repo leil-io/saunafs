@@ -1,10 +1,4 @@
-// A fix for https://stackoverflow.com/q/77034039/10788155
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <bitset>
-#pragma GCC diagnostic pop
-
 #include <numeric>
 
 #include <gtest/gtest.h>

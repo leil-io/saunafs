@@ -3,12 +3,7 @@
 #include <cstddef>
 #include <limits>
 
-// A fix for https://stackoverflow.com/q/77034039/10788155
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <vector>
-#pragma GCC diagnostic pop
 
 #define NO_CHUNKS_IN_COLLECTION nullptr
 
