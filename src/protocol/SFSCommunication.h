@@ -506,7 +506,7 @@ enum class SugidClearMode {
 /// version==0 chunkid:64 chunktype:8 status:8 chunkversion:32
 /// version==1 chunkid:64 chunktype:16 status:8 chunkversion:32
 
-// 0x0098
+// 0x0098 (no longer in use)
 #define MATOCS_CHUNKOP (PROTO_BASE+152)
 /// chunkid:64 chunkversion:32 newchunkversion:32 copychunkid:64 copychunkversion:32 chunklength:32
 // all chunk operations
@@ -518,7 +518,7 @@ enum class SugidClearMode {
 // newchunkversion==0 && chunklength==1                                        -> create
 // newchunkversion==0 && chunklength==2                                        -> test
 
-// 0x0099
+// 0x0099 (no longer in use)
 #define CSTOMA_CHUNKOP (PROTO_BASE+153)
 /// chunkid:64 chunkversion:32 newchunkversion:32 copychunkid:64 copychunkversion:32 chunklength:32 status:8
 
