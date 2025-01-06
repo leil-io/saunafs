@@ -126,7 +126,7 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultAclCacheSize = 1000;
 	static constexpr bool     kDefaultVerbose = false;
 	static constexpr bool     kDirectIO = false;
-
+	static constexpr unsigned kDefaultLimitGlibcMallocArenas = 0;
 	// Thank you, GCC 4.6, for no delegating constructors
 	FsInitParams()
 	             : bind_host(), host(), port(), meta(false), mountpoint(), subfolder(kDefaultSubfolder),
@@ -162,7 +162,9 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO)
+	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
+				 {	
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -199,7 +201,11 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) 
+#ifndef _WIN32
+	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
+#endif 
+				 {
 	}
 
 	std::string bind_host;
@@ -258,6 +264,7 @@ struct FsInitParams {
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;
+	unsigned limit_glibc_malloc_arenas;
 
 	std::string io_limits_config_file;
 };

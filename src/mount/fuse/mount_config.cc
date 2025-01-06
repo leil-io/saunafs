@@ -93,6 +93,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("sfsdirentrycachesize=%u", direntrycachesize, 0),
 	SFS_OPT("nostdmountoptions", nostdmountoptions, 1),
 	SFS_OPT("sfsignoreflush=%d", ignoreflush, 0),
+	SFS_OPT("limitglibcmallocarenas=%d", limitglibcmallocarenas, 0),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
 	SFS_OPT("nonempty", nonemptymount, 1),
@@ -235,6 +236,9 @@ void usage(const char *progname) {
 "    -o nonempty                 allow mounts over non-empty file/dir\n"
 "    -o sfsdebug                 print some debugging information\n"
 "    -o sfssubfolder=PATH        define subfolder to mount as root (default: %s)\n"
+"    -o limitglibcmallocarenas=N  limit glibc malloc arenas to given value - prevents "
+				"from using huge amount of virtual memory. Use it in constrained memory "
+				"environments (default: %u)\n"
 "\n",
 		SaunaClient::FsInitParams::kDefaultCacheExpirationTime,
 		SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize,
@@ -264,7 +268,8 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultAclCacheSize,
 		SaunaClient::FsInitParams::kDefaultIoRetries,
 		SaunaClient::FsInitParams::kDefaultSymlinkCacheTimeout,
-		SaunaClient::FsInitParams::kDefaultSubfolder
+		SaunaClient::FsInitParams::kDefaultSubfolder,
+		SaunaClient::FsInitParams::kDefaultLimitGlibcMallocArenas
 	);
 	printf(
 "CMODE can be set to:\n"
