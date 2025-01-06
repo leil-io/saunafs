@@ -2634,7 +2634,7 @@ void chunk_jobs_process_bit(void) {
 
 #endif
 
-constexpr uint32_t kSerializedChunkSizeNoLockId = 16;
+[[maybe_unused]] constexpr uint32_t kSerializedChunkSizeNoLockId = 16;
 constexpr uint32_t kSerializedChunkSizeWithLockId = 20;
 #define CHUNKCNT 1000
 

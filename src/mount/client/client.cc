@@ -247,9 +247,11 @@ Client::ReadDirReply Client::readdir(Context &ctx, FileInfo* fileinfo, off_t off
 
 Client::ReadDirReply Client::readdir(Context &ctx, FileInfo* fileinfo, off_t offset,
 		size_t max_entries, std::error_code &ec) {
-	auto ret = saunafs_readdir_(ctx, fileinfo->opendirSessionID, fileinfo->inode, offset, max_entries);
-	ec = make_error_code(ret.first);
-	return ret.second;
+	std::vector<SaunaClient::DirEntry> entries;
+	auto ret = saunafs_readdir_(ctx, fileinfo->opendirSessionID,
+	                            fileinfo->inode, offset, max_entries, entries);
+	ec = make_error_code(ret);
+	return entries;
 }
 
 std::string Client::readlink(Context &ctx, Inode inode) {
@@ -280,9 +282,10 @@ Client::ReadReservedReply Client::readreserved(Context &ctx, NamedInodeOffset of
 
 Client::ReadReservedReply Client::readreserved(Context &ctx, NamedInodeOffset offset,
 	                                       NamedInodeOffset max_entries, std::error_code &ec) {
-	auto ret = saunafs_readreserved_(ctx, offset, max_entries);
-	ec = make_error_code(ret.first);
-	return ret.second;
+	std::vector<NamedInodeEntry> inode_entries;
+	auto ret = saunafs_readreserved_(ctx, offset, max_entries, inode_entries);
+	ec = make_error_code(ret);
+	return inode_entries;
 }
 
 Client::ReadTrashReply Client::readtrash(Context &ctx, NamedInodeOffset offset,
@@ -297,9 +300,10 @@ Client::ReadTrashReply Client::readtrash(Context &ctx, NamedInodeOffset offset,
 
 Client::ReadTrashReply Client::readtrash(Context &ctx, NamedInodeOffset offset,
 	                                 NamedInodeOffset max_entries, std::error_code &ec) {
-	auto ret = saunafs_readtrash_(ctx, offset, max_entries);
-	ec = make_error_code(ret.first);
-	return ret.second;
+	std::vector<NamedInodeEntry> trash_entries;
+	auto ret = saunafs_readtrash_(ctx, offset, max_entries, trash_entries);
+	ec = make_error_code(ret);
+	return trash_entries;
 }
 
 Client::FileInfo *Client::opendir(Context &ctx, Inode inode) {
@@ -477,20 +481,20 @@ Client::ReadResult Client::read(Context &ctx, FileInfo *fileinfo,
 Client::ReadResult Client::read(Context &ctx, FileInfo *fileinfo,
 	                       off_t offset, std::size_t size, std::error_code &ec) {
 	if (saunafs_isSpecialInode_(fileinfo->inode)) {
-		auto ret = saunafs_read_special_inode_(ctx, fileinfo->inode, size, offset, fileinfo);
-		ec = make_error_code(ret.first);
-		if (ec) {
-			return ReadResult();
-		}
-		return ReadResult(std::move(ret.second));
-	} else {
-		auto ret = saunafs_read_(ctx, fileinfo->inode, size, offset, fileinfo);
-		ec = make_error_code(ret.first);
-		if (ec) {
-			return ReadResult();
-		}
-		return std::move(ret.second);
+		std::vector<uint8_t> special_inode;
+		auto ret = saunafs_read_special_inode_(ctx, fileinfo->inode, size,
+		                                       offset, fileinfo, special_inode);
+		ec = make_error_code(ret);
+		if (ec) { return {}; }
+		return {std::move(special_inode)};
 	}
+
+	ReadCache::Result result;
+	int ret =
+	    saunafs_read_(ctx, fileinfo->inode, size, offset, fileinfo, result);
+	ec = make_error_code(ret);
+	if (ec) { return {}; }
+	return result;
 }
 
 std::size_t Client::write(Context &ctx, FileInfo *fileinfo, off_t offset, std::size_t size,
@@ -505,10 +509,11 @@ std::size_t Client::write(Context &ctx, FileInfo *fileinfo, off_t offset, std::s
 
 std::size_t Client::write(Context &ctx, FileInfo *fileinfo, off_t offset, std::size_t size,
 		const char *buffer, std::error_code &ec) {
-	std::pair<int, ssize_t> ret =
-	        saunafs_write_(ctx, fileinfo->inode, buffer, size, offset, fileinfo);
-	ec = make_error_code(ret.first);
-	return ec ? (std::size_t)0 : (std::size_t)ret.second;
+	ssize_t bytes_written = 0;
+	int ret = saunafs_write_(ctx, fileinfo->inode, buffer, size, offset,
+	                         fileinfo, bytes_written);
+	ec = make_error_code(ret);
+	return ec ? (std::size_t)0 : (std::size_t)bytes_written;
 }
 
 void Client::release(FileInfo *fileinfo) {
@@ -566,9 +571,11 @@ SaunaClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode dst
 SaunaClient::JobId Client::makesnapshot(Context &ctx, Inode src_inode, Inode dst_inode,
 	                                 const std::string &dst_name, bool can_overwrite,
 	                                 std::error_code &ec) {
-	auto ret = saunafs_makesnapshot_(ctx, src_inode, dst_inode, dst_name, can_overwrite);
-	ec = make_error_code(ret.first);
-	return ret.second;
+	SaunaClient::JobId job_id = 0;
+	auto ret = saunafs_makesnapshot_(ctx, src_inode, dst_inode, dst_name,
+	                                 can_overwrite, job_id);
+	ec = make_error_code(ret);
+	return job_id;
 }
 
 std::string Client::getgoal(Context &ctx, Inode inode) {
@@ -746,9 +753,11 @@ std::vector<ChunkWithAddressAndLabel> Client::getchunksinfo(Context &ctx, Inode 
 
 std::vector<ChunkWithAddressAndLabel> Client::getchunksinfo(Context &ctx, Inode ino,
 	                             uint32_t chunk_index, uint32_t chunk_count, std::error_code &ec) {
-	auto ret = saunafs_getchunksinfo_(ctx, ino, chunk_index, chunk_count);
-	ec = make_error_code(ret.first);
-	return ret.second;
+	std::vector<ChunkWithAddressAndLabel> chunks;
+	auto ret =
+	    saunafs_getchunksinfo_(ctx, ino, chunk_index, chunk_count, chunks);
+	ec = make_error_code(ret);
+	return chunks;
 }
 
 std::vector<ChunkserverListEntry> Client::getchunkservers() {
@@ -761,9 +770,10 @@ std::vector<ChunkserverListEntry> Client::getchunkservers() {
 }
 
 std::vector<ChunkserverListEntry> Client::getchunkservers(std::error_code &ec) {
-	auto ret = saunafs_getchunkservers_();
-	ec = make_error_code(ret.first);
-	return ret.second;
+	std::vector<ChunkserverListEntry> chunkservers;
+	auto ret = saunafs_getchunkservers_(chunkservers);
+	ec = make_error_code(ret);
+	return chunkservers;
 }
 
 void Client::getlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock) {
@@ -792,12 +802,13 @@ void Client::setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lo
 void Client::setlk(Context &ctx, Inode ino, FileInfo *fileinfo, FlockWrapper &lock,
 	                    std::function<int(const safs_locks::InterruptData &)> handler,
 	                    std::error_code &ec) {
-	auto ret = saunafs_setlk_send_(ctx, ino, fileinfo, lock);
-	ec = make_error_code(ret.first);
+	uint32_t reqid = 0;
+	auto ret = saunafs_setlk_send_(ctx, ino, fileinfo, lock, reqid);
+	ec = make_error_code(ret);
 	if (ec) {
 		return;
 	}
-	safs_locks::InterruptData interrupt_data(fileinfo->lock_owner, ino, ret.second);
+	safs_locks::InterruptData interrupt_data(fileinfo->lock_owner, ino, reqid);
 	if (handler) {
 		int err = handler(interrupt_data);
 		if (err != SAUNAFS_STATUS_OK) {

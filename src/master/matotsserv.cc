@@ -32,5 +32,5 @@
 #include "protocol/input_packet.h"
 
 /// Maximum allowed length of a network packet
-static constexpr uint32_t kMaxPacketSize = 500000000;
+[[maybe_unused]] static constexpr uint32_t kMaxPacketSize = 500000000;
 

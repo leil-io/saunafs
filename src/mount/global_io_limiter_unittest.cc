@@ -330,7 +330,7 @@ TEST(LimiterProxyTests, ManyMountsSummaryThroughput) {
 
 		// Run N threads using LimiterProxy, each performing M subsequent reads
 		for (int i  = 0; i < N; i++) {
-			asyncs.push_back(std::async(std::launch::async, [&proxyLimiter, M, &deadline, &mutex,
+			asyncs.push_back(std::async(std::launch::async, [&proxyLimiter, &deadline, &mutex,
 					&someoneCompleted, &completed, &expectedToBeCompleted]() {
 						for (auto i = 0; i < M; ++i) {
 							ASSERT_EQ(SAUNAFS_STATUS_OK, proxyLimiter.waitForRead(
