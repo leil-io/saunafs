@@ -87,6 +87,7 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 	static constexpr unsigned kDefaultCleanAcquiredFilesPeriod = 0;
 	static constexpr unsigned kDefaultCleanAcquiredFilesTimeout = 0;
+	static constexpr int      kDefaultEnableStatusUpdaterThread = 0;
 #else
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
@@ -154,6 +155,7 @@ struct FsInitParams {
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 	             clean_acquired_files_period(kDefaultCleanAcquiredFilesPeriod), 
 	             clean_acquired_files_timeout(kDefaultCleanAcquiredFilesTimeout),
+	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 #endif
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
@@ -189,6 +191,7 @@ struct FsInitParams {
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
 				 clean_acquired_files_period(kDefaultCleanAcquiredFilesPeriod), 
 				 clean_acquired_files_timeout(kDefaultCleanAcquiredFilesTimeout),
+				 enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 #endif
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
@@ -242,6 +245,7 @@ struct FsInitParams {
 	std::unordered_set<uint32_t> allowed_users;
 	unsigned clean_acquired_files_period;
 	unsigned clean_acquired_files_timeout;
+	unsigned enable_status_updater_thread;
 #endif
 
 	bool ignore_flush;
