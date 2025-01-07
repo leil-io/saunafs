@@ -40,7 +40,7 @@
 #include <fstream>
 #include <memory>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/charts.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
@@ -1024,6 +1024,7 @@ uint8_t matoclserv_fuse_write_chunk_respond(matoclserventry *eptr,
 	if (status == SAUNAFS_STATUS_OK && !serializer->isSaunaFsPacketSerializer()) {
 		for (const ChunkTypeWithAddress& chunkCopy : allChunkCopies) {
 			if (!slice_traits::isStandard(chunkCopy.chunk_type)) {
+				safs::log_err("matoclserv_fuse_write_chunk_respond: client tried to modify standard copy of a xor chunk, chunkID {}", chunkId);
 				status = SAUNAFS_ERROR_NOCHUNK;
 				break;
 			}
@@ -1922,7 +1923,7 @@ void matoclserv_fuse_reserved_inodes(matoclserventry *eptr,const uint8_t *data,u
 	auto it = eptr->sesdata->openedfiles.begin();
 	while (it != eptr->sesdata->openedfiles.end()) {
 		uint32_t openFileIno = *it;
-		if (!inodes_to_reserve.contains(openFileIno)) { 
+		if (!inodes_to_reserve.contains(openFileIno)) {
 			// erase files not belonging to the reserve inodes list provided
 			fs_release(context, openFileIno, eptr->sesdata->sessionid);
 			it = eptr->sesdata->openedfiles.erase(it);
@@ -2274,6 +2275,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr, PacketHeader header, const 
 	if (status == SAUNAFS_STATUS_OK) {
 		serializer->serializeFuseTruncate(reply, type, messageId, attr);
 	} else {
+		safs::log_debug("matoclserv_fuse_truncate: Failed to truncate: {} (code {})", saunafs_error_string(status));
 		serializer->serializeFuseTruncate(reply, type, messageId, status);
 	}
 	matoclserv_createpacket(eptr, std::move(reply));
@@ -3876,7 +3878,7 @@ void matoclserv_fuse_getacl(matoclserventry *eptr, const uint8_t *data, uint32_t
 	uint32_t messageId, inode, uid, gid;
 	AclType type;
 	cltoma::fuseGetAcl::deserialize(data, length, messageId, inode, uid, gid, type);
-	safs_silent_syslog(LOG_DEBUG, "master.cltoma_fuse_getacl: %u", inode);
+	safs::log_trace("master.cltoma_fuse_getacl: {}", inode);
 
 	MessageBuffer reply;
 	RichACL acl;

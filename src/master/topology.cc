@@ -30,7 +30,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/event_loop.h"
 #include "common/massert.h"
 #include "errors/sfserr.h"

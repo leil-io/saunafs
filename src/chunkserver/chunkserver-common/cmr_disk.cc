@@ -1,6 +1,8 @@
 #include "cmr_disk.h"
 
+#include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <cstring>
 
 #include "chunkserver-common/chunk_interface.h"
 #include "chunkserver-common/cmr_chunk.h"
@@ -93,20 +95,30 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 
 	struct stat metaStat {};
 	if (stat(chunk->metaFilename().c_str(), &metaStat) < 0) {
+		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk metadata {}: {}",
+				chunk->metaFilename(), strerr(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
-	if ((metaStat.st_mode & S_IFMT) != S_IFREG) {
+	if (!S_ISREG(metaStat.st_mode)) {
+		safs::log_critical("CmrDisk::updateChunkAttributes: chunk metadata file {} not a regular file",
+					 chunk->metaFilename());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
 	struct stat dataStat {};
 	if (stat(chunk->dataFilename().c_str(), &dataStat) < 0) {
+		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk data {}: {}",
+				chunk->dataFilename(), strerr(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if ((dataStat.st_mode & S_IFMT) != S_IFREG) {
+		safs::log_critical("CmrDisk::updateChunkAttributes: chunk data file {} not a regular file",
+					 chunk->dataFilename());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (!chunk->isDataFileSizeValid(dataStat.st_size)) {
+		safs::log_critical("CmrDisk::updateChunkAttributes: chunk data file {} size is invalid, file size is {} and block size is {}, max blocks in chunk is {}",
+					 chunk->dataFilename(), dataStat.st_size, SFSBLOCKSIZE, chunk->maxBlocksInFile());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -160,10 +172,16 @@ void CmrDisk::creat(IChunk *chunk) {
 	chunk->setMetaFD(::open(chunk->metaFilename().c_str(),
 	                        O_RDWR | O_TRUNC | O_CREAT,
 	                        disk::kDefaultOpenMode));
+	if (chunk->metaFD() == -1) {
+		safs::log_err("failed to create chunk file: {}", strerr(errno));
+	}
 
 	chunk->setDataFD(::open(chunk->dataFilename().c_str(),
 	                        O_RDWR | O_TRUNC | O_CREAT,
 	                        disk::kDefaultOpenMode));
+	if (chunk->dataFD() == -1) {
+		safs::log_err("failed to create chunk file: {}", strerr(errno));
+	}
 }
 
 void CmrDisk::open(IChunk *chunk) {

@@ -47,7 +47,7 @@
 #include <list>
 #include <memory>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/cwrap.h"
 #include "common/event_loop.h"
@@ -156,7 +156,7 @@ bool initialize(const std::vector<RunTab> &tabs) {
 				break;
 			}
 		} catch (const std::exception &e) {
-			safs_pretty_syslog(LOG_ERR, "%s", e.what());
+			safs::log_err("unhandled exception ({}): {}", typeid(e).name(), e.what());
 			isOk = false;
 			break;
 		}
@@ -199,36 +199,6 @@ const std::string& set_syslog_ident() {
 	return logIdent;
 }
 
-static void main_configure_debug_log() {
-	std::string flush_on_str = cfg_getstring("LOG_FLUSH_ON", "CRITICAL");
-	int priority = LOG_CRIT;
-	if (flush_on_str == "ERROR") {
-		priority = LOG_ERR;
-	} else if (flush_on_str == "WARNING") {
-		priority = LOG_WARNING;
-	} else if (flush_on_str == "INFO") {
-		priority = LOG_INFO;
-	} else if (flush_on_str == "DEBUG") {
-		priority = LOG_DEBUG;
-	}
-	safs::drop_all_logs();
-	safs::add_log_syslog();
-	if (gRunAsDaemon) {
-		safs::add_log_stderr(safs::log_level::warn);
-	} else {
-		safs::add_log_stderr(safs::log_level::debug);
-	}
-	for (std::string suffix : {"", "_A", "_B", "_C"}) {
-		std::string configEntryName = "MAGIC_DEBUG_LOG" + suffix;
-		std::string value = cfg_get(configEntryName.c_str(), "");
-		if (value.empty()) {
-			continue;
-		}
-		safs_add_log_file(value.c_str(), LOG_DEBUG, 16*1024*1024, 8);
-	}
-	safs_set_log_flush_on(priority);
-}
-
 void main_reload() {
 	// Reload SYSLOG_IDENT
 	safs_pretty_syslog(LOG_NOTICE, "Changing SYSLOG_IDENT to %s",
@@ -236,7 +206,7 @@ void main_reload() {
 	set_syslog_ident();
 
 	// Reload MAGIC_DEBUG_LOG
-	main_configure_debug_log();
+	safs::setup_logs();
 	safs_silent_syslog(LOG_DEBUG, "main.reload");
 }
 
@@ -466,6 +436,7 @@ public:
 		kSuccess = 0,
 		kAlive = 1,
 		kAgain = 2,
+		kTest = 3,
 		kFail = -1
 	};
 
@@ -565,8 +536,11 @@ FileLock::LockStatus FileLock::wdlock(RunMode runmode, uint32_t timeout) {
 			return LockStatus::kAlive;
 		}
 		if (runmode==RunMode::kTest) {
+			// TODO(5.0.0): Fix this stupidity in a breaking change by changing it
+			// to stdout. It's not that hard, stderr for logs/errors, stdout
+			// for output
 			fprintf(stderr,STR(APPNAME) " pid: %ld\n",(long)ownerpid);
-			return LockStatus::kFail;
+			return LockStatus::kTest;
 		}
 		if (runmode==RunMode::kStart) {
 			safs_pretty_syslog(LOG_ERR,
@@ -691,18 +665,19 @@ void makedaemon() {
 	fflush(stdout);
 	fflush(stderr);
 	if (pipe(piped)<0) {
-		safs_pretty_syslog(LOG_ERR, "pipe error");
+		safs::log_err("pipe error: {}", strerr(errno));
 		exit(SAUNAFS_EXIT_STATUS_ERROR);
 	}
 	f = fork();
 	if (f<0) {
-		safs_pretty_errlog(LOG_ERR, "first fork error");
+		safs::log_err("pipe error: {}", strerr(errno));
 		exit(SAUNAFS_EXIT_STATUS_ERROR);
 	}
 	if (f>0) {
 		wait(&f);       // just get child status - prevents child from being zombie during initialization stage
 		if (f) {
 			safs_pretty_syslog(LOG_ERR, "child status: %d",f);
+			safs::log_err("{}", strerr(errno));
 			exit(SAUNAFS_EXIT_STATUS_ERROR);
 		}
 		close(piped[1]);
@@ -713,12 +688,13 @@ void makedaemon() {
 						happy = fwrite(pipebuff,1,r-1,stderr);
 						(void)happy;
 					}
+					safs::log_err("pipe error: {}", strerr(errno));
 					exit(SAUNAFS_EXIT_STATUS_ERROR);
 				}
 				happy = fwrite(pipebuff,1,r,stderr);
 				(void)happy;
 			} else {
-				safs_pretty_errlog(LOG_ERR,"error reading pipe");
+				safs::log_err("pipe error: {}", strerr(errno));
 				exit(SAUNAFS_EXIT_STATUS_ERROR);
 			}
 		}
@@ -728,9 +704,9 @@ void makedaemon() {
 	setpgid(0,getpid());
 	f = fork();
 	if (f<0) {
-		safs_pretty_errlog(LOG_ERR,"second fork error");
+		safs::log_err("second fork error: {}", strerr(errno));
 		if (write(piped[1],"fork error\n",11)!=11) {
-			safs_pretty_errlog(LOG_ERR,"pipe write error");
+			safs::log_err("pipe error: {}", strerr(errno));
 		}
 		close(piped[1]);
 		exit(SAUNAFS_EXIT_STATUS_ERROR);
@@ -943,10 +919,11 @@ int main(int argc,char **argv) {
 				"configuration)",
 				cfgfile.c_str());
 	} else if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
-		safs_pretty_syslog(LOG_INFO, "configuration file %s loaded", cfgfile.c_str());
+		// Setup logs before first log
+		safs::setup_logs();
+		safs::log_info("Configuration file {} loaded", cfgfile);
 	}
 
-	main_configure_debug_log();
 
 	if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
 		if (!open_pam_session()) {
@@ -982,7 +959,7 @@ int main(int argc,char **argv) {
 
 
 	if (chdir(wrkdir)<0) {
-		safs_pretty_syslog(LOG_ERR,"can't set working directory to %s",wrkdir);
+		safs::log_err("can't set working directory to {}: {}", wrkdir, strerr(errno));
 		if (gRunAsDaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
@@ -991,7 +968,7 @@ int main(int argc,char **argv) {
 		return SAUNAFS_EXIT_STATUS_ERROR;
 	} else {
 		if (runmode==RunMode::kStart || runmode==RunMode::kRestart) {
-			safs_pretty_syslog(LOG_INFO,"changed working directory to: %s",wrkdir);
+			safs::log_info("changed working directory to: {}", wrkdir);
 		}
 	}
 	free(wrkdir);
@@ -1001,6 +978,7 @@ int main(int argc,char **argv) {
 	eventloop_pollregister(signal_pipe_desc, signal_pipe_serv);
 
 	if (!initialize_early()) {
+		safs::log_err("couldn't initialize early functions");
 		if (gRunAsDaemon) {
 			fputc(0, stderr);
 			close_msg_channel();
@@ -1012,6 +990,7 @@ int main(int argc,char **argv) {
 	// Only kStart should check for lock file consistency
 	FileLock fl(runmode, locktimeout);
 	if (fl.lockstatus() == FileLock::LockStatus::kFail) {
+		safs::log_err("couldn't acquire lock on {}", fl.name());
 		if (gRunAsDaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
@@ -1020,8 +999,17 @@ int main(int argc,char **argv) {
 		return SAUNAFS_EXIT_STATUS_ERROR;
 	}
 
+	if (fl.lockstatus() == FileLock::LockStatus::kTest) {
+		if (gRunAsDaemon) {
+			fputc(0,stderr);
+			close_msg_channel();
+		}
+		closelog();
+		return SAUNAFS_STATUS_OK;
+	}
+
 	if (runmode==RunMode::kStop || runmode==RunMode::kKill || runmode==RunMode::kReload
-			|| runmode==RunMode::kTest || runmode==RunMode::kIsAlive) {
+			|| runmode==RunMode::kIsAlive) {
 		if (gRunAsDaemon) {
 			close_msg_channel();
 		}
@@ -1093,6 +1081,7 @@ int main(int argc,char **argv) {
 			ch=SAUNAFS_EXIT_STATUS_ERROR;
 		}
 	} else {
+		safs::log_err("couldn't initialize functions");
 		if (gRunAsDaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
