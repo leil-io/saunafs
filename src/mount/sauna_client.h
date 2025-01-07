@@ -83,6 +83,7 @@ struct FsInitParams {
 	static constexpr bool     kDefaultIgnoreFlush = false;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
+	static constexpr int      kDefaultEnableStatusUpdaterThread = 0;
 #else
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
@@ -148,6 +149,7 @@ struct FsInitParams {
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
+	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 #endif
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
@@ -181,6 +183,7 @@ struct FsInitParams {
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
+				 enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 #endif
 	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
 	}
@@ -232,6 +235,7 @@ struct FsInitParams {
 	int mounting_uid;
 	int mounting_gid;
 	std::unordered_set<uint32_t> allowed_users;
+	unsigned enable_status_updater_thread;
 #endif
 
 	bool ignore_flush;
