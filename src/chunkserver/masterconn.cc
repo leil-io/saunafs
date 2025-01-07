@@ -378,38 +378,6 @@ void masterconn_duptrunc(masterconn* /*eptr*/, const std::vector<uint8_t>& data)
 			chunkVersion, chunkVersion, chunkType, copyChunkId, copyChunkVersion, newLength);
 }
 
-void masterconn_chunkop(masterconn *eptr,const uint8_t *data,uint32_t length) {
-	uint64_t chunkid;
-	uint32_t version,newversion;
-	uint64_t copychunkid;
-	uint32_t copyversion;
-	uint32_t leng;
-	uint8_t *ptr;
-	void *packet;
-
-	if (length!=8+4+8+4+4+4) {
-		safs_pretty_syslog(LOG_NOTICE,"MATOCS_CHUNKOP - wrong size (%" PRIu32 "/32)",length);
-		eptr->mode = KILL;
-		return;
-	}
-	chunkid = get64bit(&data);
-	version = get32bit(&data);
-	newversion = get32bit(&data);
-	copychunkid = get64bit(&data);
-	copyversion = get32bit(&data);
-	leng = get32bit(&data);
-	packet = masterconn_create_detached_packet(CSTOMA_CHUNKOP,8+4+4+8+4+4+1);
-	ptr = masterconn_get_packet_data(packet);
-	put64bit(&ptr,chunkid);
-	put32bit(&ptr,version);
-	put32bit(&ptr,newversion);
-	put64bit(&ptr,copychunkid);
-	put32bit(&ptr,copyversion);
-	put32bit(&ptr,leng);
-	job_chunkop(jpool, masterconn_chunkopfinished, packet, chunkid, version,
-			slice_traits::standard::ChunkPartType(), newversion, copychunkid, copyversion, leng);
-}
-
 void masterconn_replicate(const std::vector<uint8_t>& data) {
 	uint64_t chunkId;
 	ChunkPartType chunkType = slice_traits::standard::ChunkPartType();
@@ -458,21 +426,12 @@ void masterconn_gotpacket(masterconn *eptr, PacketHeader header, const MessageBu
 		case SAU_MATOCS_REPLICATE_CHUNK:
 			masterconn_replicate(message);
 			break;
-		case MATOCS_CHUNKOP:
-			masterconn_chunkop(eptr, message.data(), message.size());
-			break;
 		case SAU_MATOCS_TRUNCATE:
 			masterconn_truncate(eptr, message);
 			break;
 		case SAU_MATOCS_DUPTRUNC_CHUNK:
 			masterconn_duptrunc(eptr, message);
 			break;
-//              case MATOCS_STRUCTURE_LOG:
-//                      masterconn_structure_log(eptr, message.data(), message.size());
-//                      break;
-//              case MATOCS_STRUCTURE_LOG_ROTATE:
-//                      masterconn_structure_log_rotate(eptr, message.data(), message.size());
-//                      break;
 		default:
 			safs_pretty_syslog(LOG_NOTICE,"got unknown message (type:%" PRIu32 ")", header.type);
 			eptr->mode = KILL;
