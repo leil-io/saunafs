@@ -49,6 +49,7 @@ cd "${info[mount0]}"
 
 generateFiles
 
-drop_caches
-
-validateFiles
+# FIX(Dave, Guillex): This validateFiles is causing timeouts on some machines. Sometimes it
+# finishes validating files and sometimes it gets stuck
+# drop_caches
+# validateFiles

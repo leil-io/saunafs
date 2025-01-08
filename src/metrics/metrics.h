@@ -19,11 +19,7 @@
 
 #pragma once
 #ifdef HAVE_PROMETHEUS
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <prometheus/counter.h>
-#pragma GCC diagnostic pop
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
 #include <prometheus/family.h>

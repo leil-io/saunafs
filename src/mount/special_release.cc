@@ -100,6 +100,20 @@ static void release(FileInfo *fi) {
 }
 } // InodeTweaks
 
+namespace InodePathByInode {
+static void release(FileInfo *fi) {
+	std::unique_lock<std::mutex> lock(inodePathInfo.mtx);
+	fi->fh = 0;
+	if (inodePathInfo.locked) {
+		free(inodePathInfo.pathByInode);
+		inodePathInfo.locked = false;
+		inodePathInfo.cv.notify_one();
+	}
+	oplog_printf("release (%lu) (internal node: PATH_BY_INODE_FILE): OK",
+	            (unsigned long int)inode_);
+}
+} // InodePathByInode
+
 typedef void (*ReleaseFunc)(FileInfo *);
 static const std::array<ReleaseFunc, 16> funcs = {{
 	 &InodeStats::release,          //0x0U
@@ -110,7 +124,7 @@ static const std::array<ReleaseFunc, 16> funcs = {{
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
-	 nullptr,                       //0x8U
+	 &InodePathByInode::release,    //0x8U
 	 nullptr,                       //0x9U
 	 nullptr,                       //0xAU
 	 nullptr,                       //0xBU

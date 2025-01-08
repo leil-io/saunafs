@@ -52,8 +52,8 @@
 
 
 // TODO (Baldor): Review the need for these constants below
-constexpr uint8_t kMetadataVersionLegacy = 0x15;
-constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
+[[maybe_unused]] constexpr uint8_t kMetadataVersionLegacy = 0x15;
+[[maybe_unused]] constexpr uint8_t kMetadataVersionSaunaFS = 0x16;
 constexpr uint8_t kMetadataVersionWithSections = 0x20;
 constexpr uint8_t kMetadataVersionWithLockIds = 0x29;
 constexpr int8_t kOpSuccess = 0;
@@ -1316,8 +1316,10 @@ void fs_load_changelog(const std::string &path) {
 #endif
 
 bool isNewMetadataFile([[maybe_unused]]const uint8_t *headerPtr) {
-	static constexpr std::string_view kMetadataHeaderNew(SFSSIGNATURE "M NEW");
-	static constexpr std::string_view kMetadataHeaderOld(SAUSIGNATURE "M NEW");
+	[[maybe_unused]] static constexpr std::string_view kMetadataHeaderNew(
+	    SFSSIGNATURE "M NEW");
+	[[maybe_unused]] static constexpr std::string_view kMetadataHeaderOld(
+	    SAUSIGNATURE "M NEW");
 	[[maybe_unused]]static constexpr uint8_t kMetadataHeaderSize = 8;
 #ifndef METARESTORE
 	if (metadataserver::isMaster()) {  // special case - create new file system

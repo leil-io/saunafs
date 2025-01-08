@@ -1985,7 +1985,7 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	gid = get32bit(&data);
 	modemask = get8bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == SAUNAFS_STATUS_OK) {
+	if (status == SAUNAFS_STATUS_OK && inode != SPECIAL_INODE_PATH_BY_INODE) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
 		status = fs_access(context,inode,modemask);
 	}
@@ -2014,6 +2014,29 @@ void matoclserv_sau_whole_path_lookup(matoclserventry *eptr, const uint8_t *data
 		matoclserv_createpacket(eptr, matocl::wholePathLookup::build(msgid, status));
 	} else {
 		matoclserv_createpacket(eptr, matocl::wholePathLookup::build(msgid, found_inode, attr));
+	}
+	eptr->sesdata->currentopstats[3]++;
+}
+
+void matoclserv_sau_full_path_by_inode(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
+	uint32_t msgid;
+	uint32_t inode;
+	std::string fullPath;
+	uint32_t uid, gid;
+	uint8_t status = SAUNAFS_STATUS_OK;
+
+	cltoma::fullPathByInode::deserialize(data, length, msgid, inode, uid, gid);
+
+	status = matoclserv_check_group_cache(eptr, gid);
+	if (status == SAUNAFS_STATUS_OK) {
+		FsContext context = matoclserv_get_context(eptr, uid, gid);
+		status = fs_full_path_by_inode(context, inode, fullPath);
+	}
+
+	if (status != SAUNAFS_STATUS_OK) {
+		matoclserv_createpacket(eptr, matocl::fullPathByInode::build(msgid, status));
+	} else {
+		matoclserv_createpacket(eptr, matocl::fullPathByInode::build(msgid, fullPath));
 	}
 	eptr->sesdata->currentopstats[3]++;
 }
@@ -5099,6 +5122,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					break;
 				case SAU_CLTOMA_WHOLE_PATH_LOOKUP:
 					matoclserv_sau_whole_path_lookup(eptr, data, length);
+					break;
+				case SAU_CLTOMA_FULL_PATH_BY_INODE:
+					matoclserv_sau_full_path_by_inode(eptr, data, length);
 					break;
 				case SAU_CLTOMA_CSERV_LIST:
 					matoclserv_sau_cserv_list(eptr, data, length);

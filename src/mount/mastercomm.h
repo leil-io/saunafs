@@ -97,6 +97,7 @@ uint8_t fs_deletacl(uint32_t inode, uint32_t uid, uint32_t gid, AclType type);
 uint8_t fs_getacl(uint32_t inode, uint32_t uid, uint32_t gid, RichACL& acl, uint32_t &owner_id);
 uint8_t fs_setacl(uint32_t inode, uint32_t uid, uint32_t gid, const RichACL& acl);
 uint8_t fs_setacl(uint32_t inode, uint32_t uid, uint32_t gid, AclType type, const AccessControlList& acl);
+uint8_t fs_fullpath(uint32_t inode, uint32_t uid, uint32_t gid, std::string &fullPath);
 
 uint8_t fs_getreserved(const uint8_t **dbuff,uint32_t *dbuffsize);
 uint8_t fs_getreserved(SaunaClient::NamedInodeOffset off, SaunaClient::NamedInodeOffset max_entries,

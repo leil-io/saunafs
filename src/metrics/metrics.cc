@@ -32,11 +32,7 @@
 // implementation for adding new metrics.
 
 #ifdef HAVE_PROMETHEUS
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include <prometheus/counter.h>
-#pragma GCC diagnostic pop
 #include <prometheus/detail/builder.h>
 #include <prometheus/family.h>
 #include <prometheus/registry.h>
@@ -50,9 +46,6 @@
 #include "metrics.h"
 #include "metrics/master.h"
 #include "slogger/slogger.h"
-
-
-constexpr auto THREAD_SLEEP_TIME_MS = 100;
 
 namespace metrics {
 
@@ -73,6 +66,8 @@ void init(const char* /* unused */) {
 }
 }
 #else
+
+constexpr auto THREAD_SLEEP_TIME_MS = 100;
 
 class PrometheusMetrics {
 public:

@@ -3,6 +3,17 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Allows to find libraries not installed by Hunter (like libcrcutil)
+list(APPEND CMAKE_PREFIX_PATH "/usr/local" "/usr")
+
+# Configure the Hunter package manager
+cmake_policy(SET CMP0144 NEW)
+include("cmake/HunterGate.cmake")
+HunterGate(
+    URL "https://github.com/cpp-pm/hunter/archive/v0.25.8.tar.gz"
+    SHA1 "26c79d587883ec910bce168e25f6ac4595f97033"
+)
+
 # Enable symbol export for loadable modules, ensuring same shared resource
 # references. Needed for the plugins, as they are shared libraries.
 set(CMAKE_ENABLE_EXPORTS ON)
@@ -191,7 +202,7 @@ endif()
 
 project(saunafs)
 
-set(DEFAULT_MIN_VERSION "4.6.0")
+set(DEFAULT_MIN_VERSION "4.7.0")
 
 string(TIMESTAMP BUILD_TIMESTAMP)
 add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")

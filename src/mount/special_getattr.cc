@@ -109,6 +109,21 @@ static AttrReply getattr(const Context &ctx, char (&attrstr)[256]) {
 }
 } // InodeFileByInode
 
+namespace InodePathByInode {
+static AttrReply getattr(const Context &ctx, char (&attrstr)[256]) {
+	std::unique_lock<std::mutex> lock(inodePathInfo.mtx);
+	struct stat o_stbuf;
+	memset(&o_stbuf, 0, sizeof(struct stat));
+	attr_to_stat(inode_, attr, &o_stbuf);
+	stats_inc(OP_GETATTR);
+	makeattrstr(attrstr, 256, &o_stbuf);
+	oplog_printf(ctx, "getattr (%lu) (internal node: PATH_BY_INODE_FILE): OK (3600,%s)",
+	            (unsigned long int)inode_,
+	            attrstr);
+	return AttrReply{o_stbuf, 3600.0};
+}
+} // InodePathByInode
+
 typedef AttrReply (*GetAttrFunc)(const Context&, char (&)[256]);
 static const std::array<GetAttrFunc, 16> funcs = {{
 	 &InodeStats::getattr,          //0x0U
@@ -119,7 +134,7 @@ static const std::array<GetAttrFunc, 16> funcs = {{
 	 nullptr,                       //0x5U
 	 nullptr,                       //0x6U
 	 nullptr,                       //0x7U
-	 nullptr,                       //0x8U
+	 &InodePathByInode::getattr,    //0x8U
 	 nullptr,                       //0x9U
 	 nullptr,                       //0xAU
 	 nullptr,                       //0xBU

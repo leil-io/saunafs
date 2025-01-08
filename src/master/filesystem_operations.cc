@@ -47,7 +47,7 @@
 
 std::array<uint32_t, FsStats::Size> gFsStatsArray = {{}};
 
-static const char kAclXattrs[] = "system.richacl";
+[[maybe_unused]] static const char kAclXattrs[] = "system.richacl";
 
 void fs_retrieve_stats(std::array<uint32_t, FsStats::Size> &output_stats) {
 	output_stats = gFsStatsArray;
@@ -451,9 +451,7 @@ uint8_t fs_lookup(const FsContext &context, uint32_t parent, const HString &name
 		return SAUNAFS_ERROR_EINVAL;
 	}
 
-	auto parentNode = static_cast<FSNodeDirectory *>(wd);
-	parentNode->case_insensitive = context.sesflags() & SESFLAG_CASEINSENSITIVE;
-	FSNode *child = fsnodes_lookup(parentNode, name);
+	FSNode *child = fsnodes_lookup(static_cast<FSNodeDirectory*>(wd), name);
 	if (!child) {
 		return SAUNAFS_ERROR_ENOENT;
 	}
@@ -489,6 +487,27 @@ uint8_t fs_whole_path_lookup(const FsContext &context, uint32_t parent, const st
 	if (tmp_inode == context.rootinode()) {
 		return fs_getattr(context, SPECIAL_INODE_ROOT, attr);
 	}
+	return SAUNAFS_STATUS_OK;
+}
+
+uint8_t fs_full_path_by_inode(const FsContext &context, uint32_t initial_inode,
+                              std::string &fullPath) {
+	uint32_t current_inode = initial_inode;
+	FSNode *current_node = fsnodes_id_to_node(current_inode);
+	std::string current_name = "";
+
+	while (current_inode != context.rootinode()) {
+		if (!current_node) { return SAUNAFS_ERROR_ENOENT; }
+		auto parent = current_node->parent[0];
+		auto parent_node =
+		    fsnodes_id_to_node<FSNodeDirectory>(parent);
+		current_name = parent_node->getChildName(current_node);
+		fullPath =
+		    current_inode == initial_inode ? current_name : current_name + "/" + fullPath;
+		current_inode = parent;
+		current_node = parent_node;
+	}
+
 	return SAUNAFS_STATUS_OK;
 }
 
@@ -971,6 +990,8 @@ uint8_t fs_mknod(const FsContext &context, uint32_t parent, const HString &name,
 	    fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}})) {
 		return SAUNAFS_ERROR_QUOTA;
 	}
+	static_cast<FSNodeDirectory *>(wd)->case_insensitive =
+	    context.sesflags() & SESFLAG_CASEINSENSITIVE;
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory*>(wd), name, type, mode, umask, context.uid(), context.gid(), 0,
 	                        AclInheritance::kInheritAcl);
 	if (type == FSNode::kBlockDev || type == FSNode::kCharDev) {
@@ -1017,6 +1038,8 @@ uint8_t fs_mkdir(const FsContext &context, uint32_t parent, const HString &name,
 	    fsnodes_quota_exceeded_dir(wd, {{QuotaResource::kInodes, 1}})) {
 		return SAUNAFS_ERROR_QUOTA;
 	}
+	static_cast<FSNodeDirectory *>(wd)->case_insensitive =
+	    context.sesflags() & SESFLAG_CASEINSENSITIVE;
 	p = fsnodes_create_node(ts, static_cast<FSNodeDirectory *>(wd), name, FSNode::kDirectory, mode,
 	                        umask, context.uid(), context.gid(), copysgid, AclInheritance::kInheritAcl);
 	*inode = p->id;

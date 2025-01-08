@@ -114,3 +114,5 @@ int fs_locks_unlock_inode(const FsContext &context, uint8_t type, uint32_t inode
 		std::vector<FileLocks::Owner> &applied);
 int fs_locks_remove_pending(const FsContext &context, uint8_t type, uint64_t ownerid,
 		uint32_t sessionid, uint32_t inode, uint64_t reqid);
+uint8_t fs_full_path_by_inode(const FsContext &context, uint32_t inode,
+                              std::string &fullPath);
