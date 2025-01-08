@@ -36,7 +36,7 @@
 #include <unistd.h>
 #include <string>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/cwrap.h"
 #include "common/datapack.h"

@@ -23,7 +23,7 @@
 
 #include <algorithm>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/exceptions.h"
 #include "common/event_loop.h"
 #include "common/main.h"

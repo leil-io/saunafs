@@ -21,7 +21,7 @@
 #include "common/platform.h"
 #include "master/filesystem.h"
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/event_loop.h"
 #include "common/lockfile.h"
 #include "common/main.h"

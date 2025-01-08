@@ -23,7 +23,7 @@
 #include <sys/syslog.h>
 #include <vector>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/event_loop.h"
 #include "common/random.h"
 #include "common/run_tab.h"
