@@ -184,7 +184,7 @@ void safs::drop_all_logs() {
 	spdlog::drop_all();
 }
 
-bool safs::add_log_syslog(log_level::LogLevel level) {
+bool safs::add_log_syslog([[maybe_unused]] log_level::LogLevel level) {
 #ifndef _WIN32
 	try {
 		LoggerPtr logger = spdlog::syslog_logger_mt("syslog");
