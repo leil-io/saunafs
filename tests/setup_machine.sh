@@ -157,6 +157,7 @@ apt_packages=(
 	libnfsidmap-dev
 	libnsl-dev
 	libsqlite3-dev
+	software-properties-common
 )
 noble_packages=(
 	prometheus-cpp-dev
@@ -250,6 +251,22 @@ case "${release}" in
 		echo "Installation of required packages SKIPPED, '${release}' isn't supported by this script"
 		;;
 esac
+
+case "${release}" in
+	LinuxMint/*|Ubuntu/*|Debian/*)
+		# Setup latest clang/llvm
+		wget https://apt.llvm.org/llvm.sh
+		echo "3080a6f961db6559698ea7692f0d5efa5ad9fde9ac6cf0758cfab134509b5bd6 llvm.sh" | sha256sum --check --status
+		chmod +x ./llvm.sh
+		./llvm.sh 19
+		rm llvm.sh
+		;;
+	*)
+		set +x
+		echo "Installation of clang19 SKIPPED, only in apt systems clang19 is installed automatically"
+		set -x
+esac
+
 gpg2 --list-keys
 #setup gtest from sources
 : "${GTEST_ROOT:=/usr/local}"

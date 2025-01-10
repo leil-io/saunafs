@@ -22,6 +22,6 @@ if git ls-remote --heads origin "${feature_branch}" | \
 fi
 
 assert_success cmake -B ./build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-	-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+	-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++-19 \
 	-DENABLE_TESTS=ON -DENABLE_NFS_GANESHA=ON -DENABLE_CLIENT_LIB=ON
 assert_success make -C ./build -j${PARALLEL_JOBS}
