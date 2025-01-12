@@ -51,6 +51,7 @@
 #include "common/sockets.h"
 #include "slogger/slogger.h"
 #include "mount/exports.h"
+#include "mount/notification_area_logging.h"
 #include "mount/stats.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
@@ -206,6 +207,7 @@ static inline void setDisconnect(bool value) {
 	if(value) {
 		SaunaClient::masterDisconnectedCallback();
 		safs_pretty_syslog(LOG_WARNING,"master: disconnected");
+		addNotificationMessage("SaunaFS master disconnected");
 	}
 }
 

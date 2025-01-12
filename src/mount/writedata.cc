@@ -56,6 +56,7 @@
 #include "mount/mastercomm.h"
 #include "mount/readdata.h"
 #include "mount/tweaks.h"
+#include "mount/notification_area_logging.h"
 #include "mount/write_cache_block.h"
 #include "protocol/cltocs.h"
 #include "protocol/SFSCommunication.h"
@@ -391,6 +392,9 @@ private:
 	static const uint32_t kMaximumTimeWhenJobsWaiting = 10;
 	// For the last 'kTimeToFinishOperations' seconds of maximumTime we won't start new operations
 	static const uint32_t kTimeToFinishOperations = 5;
+	// Minimum tries counter value before showing write error message on
+	// notifications area
+	static const uint32_t kMinTryCounterToShowWriteErrorMessage = 4;
 };
 
 void InodeChunkWriter::processJob(inodedata* inodeData) {
@@ -468,6 +472,8 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 			write_job_delayed_end(inodeData_, SAUNAFS_STATUS_OK, (canWait ? 1 : 0), lock);
 		} catch (Exception& e) {
 			std::string errorString = e.what();
+			addPathByInodeBasedNotificationMessage(
+			    "Write error: " + std::string(e.what()), inodeData_->inode);
 			Glock lock(gMutex);
 			if (e.status() != SAUNAFS_ERROR_LOCKED) {
 				inodeData_->trycnt++;
@@ -486,6 +492,7 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 
 			safs_pretty_syslog(LOG_WARNING, "write file error, inode: %" PRIu32 ", index: %" PRIu32 " - %s",
 					inodeData_->inode, chunkIndex_, errorString.c_str());
+
 			if (inodeData_->trycnt >= maxretries) {
 				// Convert error to an unrecoverable error
 				throw UnrecoverableWriteException(e.message(), e.status());
@@ -495,6 +502,8 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 			}
 		}
 	} catch (UnrecoverableWriteException& e) {
+		addPathByInodeBasedNotificationMessage(
+		    "Write error: " + std::string(e.what()), inodeData_->inode);
 		Glock lock(gMutex);
 		if (e.status() == SAUNAFS_ERROR_ENOENT) {
 			write_job_end(inodeData_, SAUNAFS_ERROR_EBADF, lock);
@@ -506,6 +515,10 @@ void InodeChunkWriter::processJob(inodedata* inodeData) {
 			write_job_end(inodeData_, SAUNAFS_ERROR_IO, lock);
 		}
 	} catch (Exception& e) {
+		if (inodeData_->trycnt > kMinTryCounterToShowWriteErrorMessage) {
+			addPathByInodeBasedNotificationMessage(
+			    "Write error: " + std::string(e.what()), inodeData_->inode);
+		}
 		Glock lock(gMutex);
 		int waitTime = 1;
 		if (inodeData_->trycnt > 10) {

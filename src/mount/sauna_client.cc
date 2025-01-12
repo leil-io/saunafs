@@ -64,6 +64,7 @@
 #include "mount/io_limit_group.h"
 #include "mount/mastercomm.h"
 #include "mount/masterproxy.h"
+#include "mount/notification_area_logging.h"
 #include "mount/oplog.h"
 #include "mount/readdata.h"
 #include "mount/special_inode.h"
@@ -3540,6 +3541,9 @@ void fs_init(FsInitParams &params) {
 	set_debug_mode(params.debug_mode);
 #endif
 
+	notifications_area_logging_init(params.log_notifications_area,
+	                               params.message_suppression_period);
+
 	init(params.debug_mode, params.keep_cache, params.direntry_cache_timeout, params.direntry_cache_size,
 		params.entry_cache_timeout, params.attr_cache_timeout, params.mkdir_copy_sgid,
 		params.sugid_clear_mode, params.use_rw_lock,
@@ -3559,6 +3563,7 @@ void fs_term() {
 	::fs_term();
 	symlink_cache_term();
 	socketrelease();
+	notifications_area_logging_term();
 }
 
 } // namespace SaunaClient

@@ -116,6 +116,8 @@ struct sfsopts_ {
 	bool directio;
 	int ignoreflush;
 	unsigned limitglibcmallocarenas;
+	int lognotificationarea;
+	unsigned messagesuppressionperiod;
 
 	sfsopts_()
 		: masterhost(NULL),
