@@ -27,13 +27,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+#endif
 
 #include "common/datapack.h"
-#include "errors/sfserr.h"
 #include "common/serialization.h"
 #include "common/special_inode_defs.h"
 #include "common/sockets.h"
+#include "common/stat_defs.h"
+#include "errors/sfserr.h"
 #include "tools/tools_common_functions.h"
 
 struct master_info_t {
@@ -101,6 +105,17 @@ static int master_connect(const master_info_t *info) {
 	return -1;
 }
 
+static bool contains_master_info_name_end(const char *name) {
+	auto end = name + strlen(name) - 1;
+	std::string extracted_name;
+
+	for (; end >= name && *end != '/' && *end != '\\'; --end) {
+		extracted_name = *end + extracted_name;
+	}
+
+	return (strcmp(extracted_name.c_str(), SPECIAL_FILE_NAME_MASTERINFO) == 0);
+}
+
 static int read_master_info(const char *name, master_info_t *info) {
 	static constexpr int kMasterInfoSize = 14;
 	uint8_t buffer[kMasterInfoSize];
@@ -111,8 +126,10 @@ static int read_master_info(const char *name, master_info_t *info) {
 		return -1;
 	}
 
-	if (stb.st_ino != SPECIAL_INODE_MASTERINFO || stb.st_nlink != 1 || stb.st_uid != 0 ||
-	    stb.st_gid != 0 || stb.st_size != kMasterInfoSize) {
+	if ((stb.st_ino != SPECIAL_INODE_MASTERINFO &&
+	     !contains_master_info_name_end(name)) ||
+	    stb.st_nlink != 1 || stb.st_uid != 0 || stb.st_gid != 0 ||
+	    stb.st_size != kMasterInfoSize) {
 		return -1;
 	}
 
@@ -133,15 +150,22 @@ static int read_master_info(const char *name, master_info_t *info) {
 	return 0;
 }
 
-int open_master_conn(const char *name, uint32_t *inode, mode_t *mode, bool needrwfs) {
+int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,[[maybe_unused]] bool needrwfs) {
 	char rpath[PATH_MAX + 1];
 	struct stat stb;
-	struct statvfs stvfsb;
+	[[maybe_unused]] struct statvfs stvfsb;
 	master_info_t master_info;
 
 	rpath[0] = 0;
+#ifdef _WIN32
+	if (GetFullPathName(name, PATH_MAX, rpath, NULL) == 0) {
+		printf("%s: GetFullPathName error: %lu\n", name, GetLastError());
+		return -1;
+	}
+#else
 	if (realpath(name, rpath) == NULL) {
-		printf("%s: realpath error on (%s): %s\n", name, rpath, strerr(errno));
+		printf("%s: realpath error on (%s): %s\n", name, rpath,
+		       strerror(errno));
 		return -1;
 	}
 	if (needrwfs) {
@@ -154,6 +178,7 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode, bool needr
 			return -1;
 		}
 	}
+#endif
 	if (stat(rpath, &stb) != 0) {
 		printf("%s: (%s) stat error: %s\n", name, rpath, strerr(errno));
 		return -1;
@@ -181,7 +206,12 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode, bool needr
 			printf("%s: path too long\n", name);
 			return -1;
 		}
-		strcpy(rpath + rpath_len, "/" SPECIAL_FILE_NAME_MASTERINFO);
+
+		if (rpath_len == 4 && rpath[2] == '\\' && rpath[3] == '.') {
+			strcpy(rpath + rpath_len - 1, SPECIAL_FILE_NAME_MASTERINFO);
+		} else {
+			strcpy(rpath + rpath_len, "/" SPECIAL_FILE_NAME_MASTERINFO);
+		}
 
 		int r = read_master_info(rpath, &master_info);
 		if (r == -2) {
@@ -190,8 +220,10 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode, bool needr
 		}
 
 		if (r == 0) {
-			if (master_info.ip == 0 || master_info.port == 0 || master_info.cuid == 0) {
-				printf("%s: incorrect '" SPECIAL_FILE_NAME_MASTERINFO "'\n", name);
+			if (master_info.ip == 0 || master_info.port == 0 ||
+			    master_info.cuid == 0) {
+				printf("%s: incorrect '" SPECIAL_FILE_NAME_MASTERINFO "'\n",
+				       name);
 				return -1;
 			}
 
@@ -219,10 +251,18 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode, bool needr
 		// remove .masterinfo from end of string
 		rpath[rpath_len] = 0;
 
+#ifdef _WIN32
+		if (strlen(rpath) < 3 || !std::isalpha(rpath[0]) || rpath[1] != ':' ||
+		    rpath[2] != '\\') {
+			printf("%s: not SaunaFS object\n", name);
+			return -1;
+		}
+#else
 		if (rpath[0] != '/' || rpath[1] == '\0') {
 			printf("%s: not SaunaFS object\n", name);
 			return -1;
 		}
+#endif
 		dirname_inplace(rpath);
 		if (stat(rpath, &stb) != 0) {
 			printf("%s: (%s) stat error: %s\n", name, rpath, strerr(errno));

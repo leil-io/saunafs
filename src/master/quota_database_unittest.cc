@@ -19,8 +19,7 @@
  */
 
 #include "common/platform.h"
-
-#include "master/quota_database.h"
+#include "common/quota_database.h"
 
 #include <gtest/gtest.h>
 

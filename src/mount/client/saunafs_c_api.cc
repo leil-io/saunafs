@@ -146,7 +146,14 @@ const char *sau_error_string(sau_err_t saunafs_error_code) {
 
 sau_context_t *sau_create_context() {
 	try {
-		Client::Context *ret = new Client::Context(getuid(), getgid(),
+#ifdef _WIN32
+		uint32_t uid = 0;
+		uint32_t gid = 0;
+#else
+		uint32_t uid = getuid();
+		uint32_t gid = getgid();
+#endif
+		Client::Context *ret = new Client::Context(uid, gid,
 		                                           getpid(), 0);
 		return (sau_context_t *)ret;
 	} catch (...) {

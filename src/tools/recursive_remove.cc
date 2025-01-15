@@ -28,6 +28,7 @@
 
 #include "common/lambda_guard.h"
 #include "common/server_connection.h"
+#include "common/signal_handling.h"
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
 #include "tools/tools_commands.h"
@@ -58,10 +59,17 @@ static int recursive_remove(const char *file_name, int long_wait) {
 	sigaddset(&set, SIGUSR1);
 	sigprocmask(SIG_BLOCK, &set, NULL);
 
+#ifdef _WIN32
+	if (GetFullPathName(file_name, PATH_MAX, path_buf, NULL) == 0) {
+		printf("%s: GetFullPathName error: %lu\n", file_name, GetLastError());
+		return -1;
+	}
+#else
 	if (realpath(file_name, path_buf) == nullptr) {
 		printf("%s: Resolving path returned error\n", file_name);
 		return -1;
 	}
+#endif
 	std::string parent_path(path_buf);
 	parent_path = parent_path.substr(0, parent_path.find_last_of("/"));
 
@@ -70,8 +78,13 @@ static int recursive_remove(const char *file_name, int long_wait) {
 		return -1;
 	}
 
+#ifdef _WIN32
+	uid = 0;
+	gid = 0;
+#else
 	uid = getuid();
 	gid = getgid();
+#endif
 
 	std::string fname(path_buf);
 	std::size_t pos = fname.find_last_of("/");

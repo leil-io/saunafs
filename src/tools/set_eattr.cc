@@ -62,7 +62,11 @@ static int set_eattr(const char *fname, uint8_t eattr, uint8_t mode) {
 	if (fd < 0) {
 		return -1;
 	}
+#ifdef _WIN32
+	uid = 0;
+#else
 	uid = getuid();
+#endif
 	wptr = reqbuff;
 	put32bit(&wptr, CLTOMA_FUSE_SETEATTR);
 	put32bit(&wptr, 14);

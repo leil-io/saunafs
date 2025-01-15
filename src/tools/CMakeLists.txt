@@ -30,8 +30,16 @@ install(FILES sfstools.sh DESTINATION ${BIN_SUBDIR} PERMISSIONS OWNER_EXECUTE OW
                     GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)
 
 foreach(LINK ${SFSTOOL_LINKS})
-  add_custom_target(${LINK} ALL
-      COMMAND ln -sf sfstools.sh ${LINK}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LINK} DESTINATION ${BIN_SUBDIR})
+    if(WIN32)
+        # Windows-specific command to create a symbolic link
+        add_custom_target(${LINK} ALL
+        COMMAND ${CMAKE_COMMAND} -E create_symlink sfstools.sh ${LINK}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    else()
+        # Unix-like systems command to create a symbolic link
+        add_custom_target(${LINK} ALL
+            COMMAND ln -sf sfstools.sh ${LINK}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    endif()
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${LINK} DESTINATION ${BIN_SUBDIR})
 endforeach()

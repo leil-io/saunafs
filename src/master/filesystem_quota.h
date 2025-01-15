@@ -25,6 +25,8 @@
 #include <utility>
 #include "protocol/quota.h"
 #include <master/filesystem_node_types.h>
+#include "common/quota_database.h"
+#include "master/filesystem_freenode.h"
 
 /*! \brief Test if resource change exceeds quota for users and groups.
  * \param uid User id.
