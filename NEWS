@@ -1,4 +1,24 @@
 This file lists noteworthy changes in SaunaFS.
+ 
+ * SaunaFS (4.8.0) (2025-01-16)
+ - fix(slogger): Set log level as `maybe_unused` (#278)
+ - fix(slogger): Use level to set syslog as well
+ - feat(slogger): Add setting up logging using env/config variables
+ - feat(mount): Enable status updater thread option (#276)
+ - fix: Addressing minor issues detected by Clang
+ - fix: Remove array-bounds and stringop-overflow warnings
+ - fix: Fix functions detection in CMake
+ - feat(mount): Add path by inode hidden file (#265)
+ - feat: Reduce malloc virtual memory usage (#266)
+ - fix(mount): Fix low level fuse options in help (#254)
+ - fix(build): suppress warnings in manpage generation (#264)
+ - fix: metarestore logging (#255)
+ - fix: Fix test_auto_recovery_incversion (Windows client tests) (#262)
+ - fix(mount): Fix case-insensitive test (#257)
+ - fix(mount): Fix helgrind issues on `fs_nop_thread`
+ - fix(mount): Fix consistent read cache release
+ - fix(mount): Fix readcache memory release (#241)
+ - feat(mount): Add option for open files on Windows (#230)
 
  * SaunaFS (4.7.0) (2024-12-18)
  - fix(mount): Remove helgrind warning
