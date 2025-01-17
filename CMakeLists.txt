@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_PREFIX_PATH "/usr/local" "/usr")
 
 # Configure the Hunter package manager
-cmake_policy(SET CMP0144 NEW)
+#cmake_policy(SET CMP0144 NEW)
 include("cmake/HunterGate.cmake")
 HunterGate(
     URL "https://github.com/cpp-pm/hunter/archive/v0.25.8.tar.gz"
