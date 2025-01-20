@@ -60,8 +60,8 @@ check_members("struct rusage" "ru_maxrss" "sys/resource.h")
 
 CHECK_FUNCTION_EXISTS(fork     SAUNAFS_HAVE_WORKING_FORK)
 CHECK_FUNCTION_EXISTS(vfork    SAUNAFS_HAVE_WORKING_VFORK)
-CHECK_TEMPLATE_FUNCTION_EXISTS("string" "auto foo = std::to_string(0); (void) foo" SAUNAFS_HAVE_STD_TO_STRING)
-CHECK_TEMPLATE_FUNCTION_EXISTS("string" "auto foo = std::stoull(\"0\"); (void) foo" SAUNAFS_HAVE_STD_STOULL)
+CHECK_TEMPLATE_FUNCTION_EXISTS("string" "std::to_string(0)" SAUNAFS_HAVE_STD_TO_STRING)
+CHECK_TEMPLATE_FUNCTION_EXISTS("string" "std::stoull(\"0\")" SAUNAFS_HAVE_STD_STOULL)
 
 set(REQUIRED_FUNCTIONS atexit ftruncate gettimeofday memmove memset mkdir strchr strdup strtol
     strtoul ftello fseeko)

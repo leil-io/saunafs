@@ -5,13 +5,9 @@ if(ENABLE_TESTS)
   find_package(GTest REQUIRED)
 endif()
 
-# Find fmt and spdlog
-
-hunter_add_package(fmt)
-find_package(FMT CONFIG REQUIRED)
-
-hunter_add_package(spdlog)
-find_package(spdlog CONFIG REQUIRED)
+# Find spdlog
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
 
 # Find standard libraries
 
@@ -52,7 +48,6 @@ message(STATUS "a2x: ${A2X_BINARY}")
 
 # Find Zlib
 
-hunter_add_package(ZLIB)
 find_package(ZLIB)
 if(ZLIB_FOUND)
   message(STATUS "Found Zlib ${ZLIB_VERSION_STRING}")
