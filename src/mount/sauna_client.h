@@ -470,4 +470,6 @@ std::vector<ChunkserverListEntry> getchunkservers();
 void fs_init(FsInitParams &params);
 void fs_term();
 
+Inode getSpecialInodeByName(const char *name);
+
 }

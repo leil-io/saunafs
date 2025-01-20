@@ -409,6 +409,20 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		uint32_t, messageId,
 		std::string, fullPath)
 
+// SAU_MATOCL_INODE_FROM_PATH
+SAUNAFS_DEFINE_PACKET_VERSION(matocl, inodeFromPath, kStatusPacketVersion, 0)
+SAUNAFS_DEFINE_PACKET_VERSION(matocl, inodeFromPath, kResponsePacketVersion, 1)
+
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(
+		matocl, inodeFromPath, SAU_MATOCL_INODE_FROM_PATH, kStatusPacketVersion,
+		uint32_t, messageId,
+		uint8_t, status)
+
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(
+		matocl, inodeFromPath, SAU_MATOCL_INODE_FROM_PATH, kResponsePacketVersion,
+		uint32_t, messageId,
+		uint32_t, inode)
+
 SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		matocl, recursiveRemove, SAU_MATOCL_RECURSIVE_REMOVE, 0,
 		uint32_t, msgid,

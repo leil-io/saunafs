@@ -116,3 +116,5 @@ int fs_locks_remove_pending(const FsContext &context, uint8_t type, uint64_t own
 		uint32_t sessionid, uint32_t inode, uint64_t reqid);
 uint8_t fs_full_path_by_inode(const FsContext &context, uint32_t inode,
                               std::string &fullPath);
+uint8_t fs_inode_from_path(const FsContext &context, std::string fullPath,
+                          uint32_t &inode);

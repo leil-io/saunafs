@@ -47,6 +47,7 @@
 #include "common/goal.h"
 #include "common/saunafs_version.h"
 #include "common/md5.h"
+#include "common/special_inode_defs.h"
 #include "errors/sfserr.h"
 #include "common/sockets.h"
 #include "slogger/slogger.h"
@@ -56,6 +57,12 @@
 #include "protocol/matocl.h"
 #include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
+
+#define IS_SPECIAL_INODE(ino) ((ino)>=SPECIAL_INODE_BASE)
+#define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(SPECIAL_FILE_NAME_STATS,(name))==0 \
+		|| strcmp(SPECIAL_FILE_NAME_MASTERINFO,(name))==0 || strcmp(SPECIAL_FILE_NAME_OPLOG,(name))==0 \
+		|| strcmp(SPECIAL_FILE_NAME_OPHISTORY,(name))==0 || strcmp(SPECIAL_FILE_NAME_TWEAKS,(name))==0 \
+		|| strcmp(SPECIAL_FILE_NAME_FILE_BY_INODE,(name))==0 || strcmp(SPECIAL_FILE_NAME_PATH_BY_INODE,(name))==0))
 
 struct threc {
 	pthread_t thid;
@@ -2802,6 +2809,58 @@ uint8_t fs_fullpath(uint32_t inode, uint32_t uid,
 		}
 	} catch (Exception &ex) {
 		fs_got_inconsistent("SAU_MATOCL_FULL_PATH_BY_INODE", message.size(),
+		                    ex.what());
+		return SAUNAFS_ERROR_IO;
+	}
+}
+
+uint8_t fs_inode_from_path(std::string fullPath, uint32_t uid, uint32_t gid,
+                           uint32_t &inode) {
+	uint32_t nleng;
+	nleng = strlen(fullPath.c_str());
+	if (nleng > SFS_NAME_MAX) {
+		return SAUNAFS_ERROR_ENAMETOOLONG;
+	}
+	
+	uint32_t ino = SaunaClient::getSpecialInodeByName(fullPath.c_str());
+	if (IS_SPECIAL_INODE(ino)) {
+		inode = ino;
+		return SAUNAFS_STATUS_OK;
+	}
+
+	threc *rec = fs_get_my_threc();
+	auto message =
+	    cltoma::inodeFromPath::build(rec->packetId, fullPath, uid, gid);
+	if (!fs_saucreatepacket(rec, message)) { return SAUNAFS_ERROR_IO; }
+	if (!fs_sausendandreceive(rec, SAU_MATOCL_INODE_FROM_PATH, message)) {
+		return SAUNAFS_ERROR_IO;
+	}
+	try {
+		uint32_t msgid;
+		PacketVersion packet_version;
+		deserializePacketVersionNoHeader(message, packet_version);
+		if (packet_version == matocl::inodeFromPath::kStatusPacketVersion) {
+			uint8_t status;
+			matocl::inodeFromPath::deserialize(message, msgid, status);
+			if (status == SAUNAFS_STATUS_OK) {
+				fs_got_inconsistent("SAU_MATOCL_INODE_FROM_PATH",
+				                    message.size(),
+				                    "version 0 and SAUNAFS_STATUS_OK");
+				return SAUNAFS_ERROR_IO;
+			}
+			return status;
+		} else if (packet_version ==
+		           matocl::inodeFromPath::kResponsePacketVersion) {
+			matocl::inodeFromPath::deserialize(message, msgid, inode);
+			return SAUNAFS_STATUS_OK;
+		} else {
+			fs_got_inconsistent(
+			    "SAU_MATOCL_INODE_FROM_PATH", message.size(),
+			    "unknown version " + std::to_string(packet_version));
+			return SAUNAFS_ERROR_IO;
+		}
+	} catch (Exception &ex) {
+		fs_got_inconsistent("SAU_MATOCL_INODE_FROM_PATH", message.size(),
 		                    ex.what());
 		return SAUNAFS_ERROR_IO;
 	}
