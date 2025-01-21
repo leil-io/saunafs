@@ -180,10 +180,10 @@ TEST(DirEntryCache, Basic) {
 	ASSERT_EQ(by_inode_it->attr[0], 9);
 	by_inode_it++;
 	ASSERT_NE(by_inode_it, cache.inode_end());
-	ASSERT_EQ(by_inode_it->inode, 15);
+	ASSERT_EQ(by_inode_it->inode, 15U);
 	by_inode_it++;
 	ASSERT_NE(by_inode_it, cache.inode_end());
-	ASSERT_EQ(by_inode_it->inode, 15);
+	ASSERT_EQ(by_inode_it->inode, 15U);
 	by_inode_it++;
 	ASSERT_EQ(by_inode_it, cache.inode_end());
 }
@@ -215,9 +215,9 @@ TEST(DirEntryCache, Repetitions) {
 	                                {6, 7, 13, "a6", dummy_attributes}},
 	    current_time);
 
-	ASSERT_EQ(cache.size(), 6);
+	ASSERT_EQ(cache.size(), 6U);
 	cache.removeOldest(5);
-	ASSERT_EQ(cache.size(), 1);
+	ASSERT_EQ(cache.size(), 1U);
 }
 
 TEST(DirEntryCache, RandomOrder) {
@@ -265,7 +265,7 @@ TEST(DirEntryCache, RandomOrder) {
 		std::make_tuple(4, 9, 8, "a5"),
 		std::make_tuple(3, 9, 9, "a6")
 	};
-	
+
 	check_expected_content(cache, index_output, lookup_output);
 
 	cache.insert(SaunaClient::Context(0, 0, 0, 0), 9, 10, 3, 100, "a7",
@@ -273,7 +273,7 @@ TEST(DirEntryCache, RandomOrder) {
 	// Check last entry was actually inserted
 	auto lookup_it = cache.lookup_end();
 	lookup_it--;
-	ASSERT_EQ(lookup_it->inode, 10);
+	ASSERT_EQ(lookup_it->inode, 10U);
 	// Should remove the sequence of entries starting from index 0, including the last one inserted
 	cache.invalidate(SaunaClient::Context(0, 0, 0, 0), 9, 0);
 

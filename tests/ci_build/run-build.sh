@@ -25,12 +25,12 @@ usage() {
 
 declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 	-G 'Unix Makefiles'
-	-DENABLE_DOCS=ON
 	-DENABLE_CLIENT_LIB=ON
-	-DENABLE_URAFT=ON
+	-DENABLE_DOCS=ON
 	-DENABLE_NFS_GANESHA=ON
-	-DGSH_CAN_HOST_LOCAL_FS=ON
 	-DENABLE_POLONAISE=OFF
+	-DENABLE_URAFT=ON
+	-DGSH_CAN_HOST_LOCAL_FS=ON
 )
 
 [ -n "${1:-}" ] || usage
@@ -55,6 +55,12 @@ esac
 
 declare build_dir
 declare -a make_extra_args=("${@}")
+if [ -n "${VCPKG_ROOT:-}" ]; then
+	CMAKE_SAUNAFS_ARGUMENTS+=(
+		-DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+	)
+fi
+
 case "${build_type,,}" in
 	debug)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
@@ -116,6 +122,6 @@ declare -a EXTRA_ARGUMENTS=("${@}")
 rm -r "${build_dir:?}"/{,.}* 2>/dev/null || true
 cmake -B "${build_dir}" \
 	"${CMAKE_SAUNAFS_ARGUMENTS[@]}" \
-	"${EXTRA_ARGUMENTS[@]}" "${PROJECT_DIR}"
+	"${EXTRA_ARGUMENTS[@]}" -S "${PROJECT_DIR}"
 
 nice make -C "${build_dir}" -j"$(nproc)" "${make_extra_args[@]}"

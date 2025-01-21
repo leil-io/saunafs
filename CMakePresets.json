@@ -1,0 +1,233 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 19
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/saunafs",
+            "installDir": "${sourceDir}/install/saunafs/",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CODE_COVERAGE": "OFF",
+                "ENABLE_CLIENT_LIB": "ON",
+                "ENABLE_DOCS": "ON",
+                "ENABLE_NFS_GANESHA": "ON",
+                "ENABLE_POLONAISE": "OFF",
+                "ENABLE_TESTS": "ON",
+                "ENABLE_URAFT": "ON",
+                "ENABLE_WERROR": "ON",
+                "GSH_CAN_HOST_LOCAL_FS": "ON",
+                "SAUNAFS_TEST_POINTER_OBFUSCATION": "ON"
+            },
+            "hidden": true
+        },
+        {
+            "name": "vcpkg",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "hidden": true
+        },
+        {
+            "name": "debug",
+            "binaryDir": "${sourceDir}/build/saunafs/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "inherits": "default"
+        },
+        {
+            "name": "coverage",
+            "binaryDir": "${sourceDir}/build/saunafs/coverage",
+            "cacheVariables": {
+                "CODE_COVERAGE": "ON"
+            },
+            "inherits": "default"
+        },
+        {
+            "name": "test",
+            "inherits": "default"
+        },
+        {
+            "name": "release",
+            "binaryDir": "${sourceDir}/build/saunafs/release",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "/",
+                "ENABLE_TESTS": "OFF",
+                "ENABLE_WERROR": "OFF",
+                "SAUNAFS_TEST_POINTER_OBFUSCATION": "OFF"
+            },
+            "inherits": "default"
+        },
+        {
+            "name": "debug-vcpkg",
+            "inherits": ["debug", "vcpkg"]
+        },
+        {
+            "name": "release-vcpkg",
+            "inherits": ["release", "vcpkg"]
+        },
+        {
+            "name": "coverage-vcpkg",
+            "inherits": ["coverage", "vcpkg"]
+        },
+        {
+            "name": "test-vcpkg",
+            "inherits": ["test", "vcpkg"]
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "hidden": true
+        },
+        {
+            "name": "test",
+            "configurePreset": "test",
+            "inherits": ["default"]
+        },
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "inherits": ["default"]
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage",
+            "inherits": ["default"]
+        },
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "inherits": ["default"]
+        },
+        {
+            "name": "debug-vcpkg",
+            "configurePreset": "debug-vcpkg",
+            "inherits": ["default"]
+        },
+        {
+            "name": "release-vcpkg",
+            "configurePreset": "release-vcpkg",
+            "inherits": ["default"]
+        },
+        {
+            "name": "coverage-vcpkg",
+            "configurePreset": "coverage-vcpkg",
+            "inherits": ["default"]
+        },
+        {
+            "name": "test-vcpkg",
+            "configurePreset": "test-vcpkg",
+            "inherits": ["default"]
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "debug",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "debug"
+                },
+                {
+                    "type": "build",
+                    "name": "debug"
+                }
+            ]
+        },
+        {
+            "name": "release",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "release"
+                },
+                {
+                    "type": "build",
+                    "name": "release"
+                }
+            ]
+        },
+        {
+            "name": "test",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "test"
+                },
+                {
+                    "type": "build",
+                    "name": "test"
+                }
+            ]
+        },
+        {
+            "name": "coverage",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "coverage"
+                },
+                {
+                    "type": "build",
+                    "name": "coverage"
+                }
+            ]
+        },
+        {
+            "name": "debug-vcpkg",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "debug-vcpkg"
+                },
+                {
+                    "type": "build",
+                    "name": "debug-vcpkg"
+                }
+            ]
+        },
+        {
+            "name": "release-vcpkg",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "release-vcpkg"
+                },
+                {
+                    "type": "build",
+                    "name": "release-vcpkg"
+                }
+            ]
+        },
+        {
+            "name": "coverage-vcpkg",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "coverage-vcpkg"
+                },
+                {
+                    "type": "build",
+                    "name": "coverage-vcpkg"
+                }
+            ]
+        },
+        {
+            "name": "test-vcpkg",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "test-vcpkg"
+                },
+                {
+                    "type": "build",
+                    "name": "test-vcpkg"
+                }
+            ]
+        }
+    ]
+}

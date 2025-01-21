@@ -1,16 +1,18 @@
 include(DownloadExternal)
 
-# Download GoogleTest
+# Find GoogleTest
+
 if(ENABLE_TESTS)
-  find_package(GTest REQUIRED)
+  enable_testing()
+  find_package(GTest CONFIG REQUIRED)
 endif()
 
 # Find fmt and spdlog
 
-hunter_add_package(fmt)
+#hunter_add_package(fmt)
 find_package(FMT CONFIG REQUIRED)
 
-hunter_add_package(spdlog)
+#hunter_add_package(spdlog)
 find_package(spdlog CONFIG REQUIRED)
 
 # Find standard libraries
@@ -19,7 +21,7 @@ find_package(Socket REQUIRED)
 find_package(Threads REQUIRED)
 
 # Find yaml-cpp
-find_package(yaml-cpp REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 
 if(NOT MINGW)
   find_package(FUSE3)
@@ -52,7 +54,7 @@ message(STATUS "a2x: ${A2X_BINARY}")
 
 # Find Zlib
 
-hunter_add_package(ZLIB)
+#hunter_add_package(ZLIB)
 find_package(ZLIB)
 if(ZLIB_FOUND)
   message(STATUS "Found Zlib ${ZLIB_VERSION_STRING}")
@@ -76,9 +78,8 @@ else()
 endif()
 
 # Find Boost
-
-set(BOOST_MIN_VERSION "1.48.0")
-find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem iostreams program_options system)
+#set(Boost_NO_SYSTEM_PATHS ON)
+find_package(Boost CONFIG REQUIRED COMPONENTS filesystem iostreams program_options system)
 
 # Find Thrift
 
@@ -133,12 +134,6 @@ if(NOT BIG_ENDIAN)
   endif()
 endif()
 
-# Find GoogleTest
-
-if(ENABLE_TESTS)
-  set(GTEST_INCLUDE_DIRS ${GTEST_INCLUDE_DIRS})
-  set(TEST_LIBRARIES "" CACHE INTERNAL "" FORCE)
-endif()
 
 # Find Judy
 
