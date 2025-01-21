@@ -123,8 +123,10 @@ struct FSNode {
 	uint32_t gid; /*!< Group id. */
 	uint32_t trashtime; /*!< Trash time. */
 
-	compact_vector<uint32_t, uint32_t> parent; /*!< Parent nodes ids. To reduce memory usage ids
-	                                                are stored instead of pointers to FSNode. */
+	compact_vector<std::pair<uint32_t, const hstorage::Handle *>, uint32_t>
+	    parent; /*!< Parent nodes ids + handles of entries of this node in those parents.
+	               To reduce memory usage ids are stored instead of pointers to
+	               FSNode. */
 
 	FSNode   *next; /*!< Next field used for storing FSNode in hash map. */
 	uint64_t checksum; /*!< Node checksum. */
@@ -203,17 +205,17 @@ struct FSNodeDevice : public FSNode {
  * Avg size (10 files) ~ 280B (28B per file)
  */
 struct FSNodeDirectory : public FSNode {
-#if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER)
-	typedef judy_map<hstorage::Handle, FSNode *> EntriesContainer;
-#else
 	struct HandleCompare {
-		bool operator()(const hstorage::Handle &a, const hstorage::Handle &b) const {
-			return a.data() < b.data();
+		bool operator()(const hstorage::Handle *a,
+		                const hstorage::Handle *b) const {
+			return a->data() < b->data();
 		}
 	};
-	typedef flat_map<hstorage::Handle, FSNode *, std::vector<std::pair<hstorage::Handle, FSNode *>>,
-	HandleCompare> EntriesContainer;
-#endif
+
+	typedef flat_map<hstorage::Handle *, FSNode *,
+	                 std::vector<std::pair<hstorage::Handle *, FSNode *>>,
+	                 HandleCompare>
+	    EntriesContainer;
 
 	typedef EntriesContainer::iterator iterator;
 	typedef EntriesContainer::const_iterator const_iterator;
@@ -251,28 +253,31 @@ struct FSNodeDirectory : public FSNode {
 		if (case_insensitive) {
 			HString lowerCaseNameHandle = HString::hstringToLowerCase(name);
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
-			auto lowerCaseIt =
-			    lowerCaseEntries.lower_bound(hstorage::Handle(
-			        name_hash << hstorage::Handle::kHashShift));
+			auto tmp_handle =
+			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(&tmp_handle);
+
 			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
-				if (((*lowerCaseIt).first.data() >>
-				     hstorage::Handle::kHashShift) != name_hash) {
+				if ((*lowerCaseIt).first->hash() != name_hash) {
 					break;
 				}
-				if ((*lowerCaseIt).first == lowerCaseNameHandle) {
+				if (*((*lowerCaseIt).first) == lowerCaseNameHandle) {
 					auto it = find((*lowerCaseIt).second);
 					return it;
 				}
 			}
 		} else {
-			auto it = entries.lower_bound(
-			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift));
+			auto tmp_handle =
+			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
+			auto it = entries.lower_bound(&tmp_handle);
+
 			for (; it != entries.end(); ++it) {
-				if (((*it).first.data() >> hstorage::Handle::kHashShift) !=
-				    name_hash) {
+				if ((*it).first->hash() != name_hash) {
 					break;
 				}
-				if ((*it).first == name) { return it; }
+				if (*((*it).first) == name) {
+					return it;
+				}
 			}
 		}
 
@@ -285,14 +290,15 @@ struct FSNodeDirectory : public FSNode {
 		if (case_insensitive) {
 			HString lowerCaseNameHandle = HString::hstringToLowerCase(name);
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
-			auto lowerCaseIt = lowerCaseEntries.lower_bound(
-			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift));
+			auto tmp_handle =
+			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(&tmp_handle);
+
 			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
-				if (((*lowerCaseIt).first.data() >>
-				     hstorage::Handle::kHashShift) != name_hash) {
+				if ((*lowerCaseIt).first->hash() != name_hash) {
 					break;
 				}
-				if ((*lowerCaseIt).first == lowerCaseNameHandle) {
+				if (*((*lowerCaseIt).first) == lowerCaseNameHandle) {
 					return lowerCaseIt;
 				}
 			}
@@ -308,14 +314,20 @@ struct FSNodeDirectory : public FSNode {
 	 *         otherwise entries.end().
 	 */
 	iterator find(const FSNode *node) {
-		auto it = entries.begin();
+		HString name = HString(getChildName(node));
+		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
+		auto tmp_handle =
+		    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
+		auto it = entries.lower_bound(&tmp_handle);
 		for (; it != entries.end(); ++it) {
-			if ((*it).second == node) {
+			if ((*it).first->hash() != name_hash) {
 				break;
 			}
+			if (*((*it).first) == name) {
+				return it;
+			}
 		}
-
-		return it;
+		return entries.end();
 	}
 
 	/*! \brief Find directory entry with given node.
@@ -325,14 +337,7 @@ struct FSNodeDirectory : public FSNode {
 	 *         otherwise entries.end().
 	 */
 	const_iterator find(const FSNode *node) const {
-		auto it = entries.begin();
-		for (; it != entries.end(); ++it) {
-			if ((*it).second == node) {
-				break;
-			}
-		}
-
-		return it;
+		return find(node);
 	}
 
 	iterator find_nth(EntriesContainer::size_type nth) {
@@ -350,9 +355,10 @@ struct FSNodeDirectory : public FSNode {
 	 *         otherwise returns empty string.
 	 */
 	std::string getChildName(const FSNode *node) const {
-		auto it = find(node);
-		if (it != entries.end()) {
-			return (std::string)(*it).first;
+		for (const auto &[parentId, hstring] : node->parent) {
+			if (parentId == this->id) {
+				return hstring->get();
+			}
 		}
 		return std::string();
 	}

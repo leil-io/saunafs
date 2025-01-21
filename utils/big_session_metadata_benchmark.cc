@@ -25,6 +25,8 @@
 #include <unistd.h>
 #include <vector>
 
+int kChunkSize = 10000;
+
 void showHelpMessageAndExit(char *progName, int status) {
 	std::cerr
 	    << "Usage:\n"
@@ -88,7 +90,7 @@ int main(int argc, char **argv) {
 	std::vector<int> testFilesFds(numberOfFiles);
 	std::vector<int> filesOrder(numberOfFiles);
 	auto start = std::chrono::high_resolution_clock::now();
-
+	auto chunkStart = start;
 	for (int i = 0; i < numberOfFiles; i++) {
 		std::string filePath = folderPath + "/file_" + std::to_string(i);
 		testFilesFds[i] =
@@ -99,6 +101,15 @@ int main(int argc, char **argv) {
 			std::cerr << "Failed to create/open file '" << filePath << "'."
 			          << std::endl;
 			return 1;
+		}
+		if ((i + 1) % kChunkSize == 0) {
+			auto chunkEnd = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double> elapsedTime = chunkEnd - chunkStart;
+			std::cout << "Time for creating/opening from " << i - kChunkSize + 2
+			          << "-th to " << i + 1 << "-th file, in total "
+			          << kChunkSize << " files: " << elapsedTime.count()
+			          << " seconds.\n";
+			chunkStart = chunkEnd;
 		}
 	}
 	auto afterOpen = std::chrono::high_resolution_clock::now();
@@ -132,7 +143,7 @@ int main(int argc, char **argv) {
 	elapsedTime = afterClose - afterOpen;
 	std::cout << "Time for closing " << numberOfFiles
 	          << " files: " << elapsedTime.count() << " seconds.\n";
-
+	chunkStart = afterClose;
 	for (int i = 0; i < numberOfFiles; i++) {
 		// deleting the filesOrder[i]-th file
 		std::string filePath =
@@ -142,6 +153,17 @@ int main(int argc, char **argv) {
 			std::cerr << "Failed to delete file '" << filePath << "'."
 			          << std::endl;
 			return 1;
+		}
+
+		if ((i + 1) % kChunkSize == 0) {
+			auto chunkEnd = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double> elapsedTime = chunkEnd - chunkStart;
+			std::cout << "Time for deleting from "
+			          << numberOfFiles - i + kChunkSize - 1 << "-th to "
+			          << numberOfFiles - i << "-th file, in total "
+			          << kChunkSize << " files: " << elapsedTime.count()
+			          << " seconds.\n";
+			chunkStart = chunkEnd;
 		}
 	}
 

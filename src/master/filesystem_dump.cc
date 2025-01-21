@@ -130,11 +130,11 @@ void fs_dumpnodes() {
 
 void fs_dumpedgelist(FSNodeDirectory *parent) {
 	for (const auto &entry : parent->entries) {
-		fs_dumpedge(parent, entry.second, (std::string)entry.first);
+		fs_dumpedge(parent, entry.second, (std::string)(*entry.first));
 	}
 	if (parent->case_insensitive) {
 		for (const auto &entry : parent->lowerCaseEntries) {
-			fs_dumpedge(parent, entry.second, (std::string)entry.first);
+			fs_dumpedge(parent, entry.second, (std::string)(*entry.first));
 		}
 	}
 }
