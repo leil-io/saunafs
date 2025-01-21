@@ -83,7 +83,9 @@ common_packages=(
 	nfs4-acl-tools
 	pkg-config
 	pylint
+	python3-gssapi      # required by Ganesha -> pynfs suite
 	python3-pip
+	python3-ply         # required by Ganesha -> pynfs suite
 	python3-setuptools
 	python3-wheel
 	psmisc
@@ -111,6 +113,7 @@ common_packages=(
 apt_packages=(
 	build-essential
 	iproute2
+	iozone3             # required by Ganesha -> iozone suite
 	libblkid-dev
 	libboost-filesystem-dev
 	libboost-iostreams-dev
@@ -175,6 +178,7 @@ dnf_packages=(
 	gperftools-libs
 	gtest-devel
 	iproute
+	iozone              # required by Ganesha -> iozone suite
 	isa-l-devel
 	Judy-devel
 	kernel-devel
