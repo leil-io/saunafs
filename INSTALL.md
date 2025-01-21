@@ -3,9 +3,9 @@
 You can install SaunaFS from pre-built packages or from source. The
 pre-built packages are currently available for the following platforms:
 
-- Linux (x86_64)
-  - Ubuntu 24.04 (Noble)
-  - Ubuntu 22.04 (Jammy)
+-   Linux (x86_64)
+    -   Ubuntu 24.04 (Noble)
+    -   Ubuntu 22.04 (Jammy)
 
 Please follow the instructions below to install SaunaFS on your
 system.
@@ -16,62 +16,62 @@ system.
 
 1. Import the public key used to sign the packages:
 
-   ```shell
-   gpg --no-default-keyring \
-       --keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
-       --keyserver hkps://keyserver.ubuntu.com \
-       --receive-keys 0xA80B96E2C79457D4
-   ```
+    ```shell
+    gpg --no-default-keyring \
+        --keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
+        --keyserver hkps://keyserver.ubuntu.com \
+        --receive-keys 0xA80B96E2C79457D4
+    ```
 
-   It will create a new keyring file `/usr/share/keyrings/saunafs-archive-keyring.gpg` and import the
-   public key used to sign the packages. Please, notice that at the time of writing, [the use of apt-key deprecated](https://opensource.com/article/22/9/deprecated-linux-apt-key)
+    It will create a new keyring file `/usr/share/keyrings/saunafs-archive-keyring.gpg` and import the
+    public key used to sign the packages. Please, notice that at the time of writing, [the use of apt-key deprecated](https://opensource.com/article/22/9/deprecated-linux-apt-key)
 
-   You can verify the keyring file by running the following command:
+    You can verify the keyring file by running the following command:
 
-   ```shell
-   gpg --no-default-keyring \
-       --keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
-       --list-keys
-   ```
+    ```shell
+    gpg --no-default-keyring \
+        --keyring /usr/share/keyrings/saunafs-archive-keyring.gpg \
+        --list-keys
+    ```
 
 2. Add the SaunaFS repository to your system:
 
-   The repository is available at
-   <https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/> for Ubuntu 24.04
-   or <https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/> for Ubuntu 22.04.
+    The repository is available at
+    <https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/> for Ubuntu 24.04
+    or <https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/> for Ubuntu 22.04.
 
-   For Ubuntu 24.04, use:
+    For Ubuntu 24.04, use:
 
-   ```shell
-   cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
-   deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/ noble main
-   EOF
-   ```
+    ```shell
+    cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
+    deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-24.04/ noble main
+    EOF
+    ```
 
-   For Ubuntu 22.04:
+    For Ubuntu 22.04:
 
-   ```shell
-   cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
-   deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/ jammy main
-   EOF
-   ```
+    ```shell
+    cat | sudo tee /etc/apt/sources.list.d/saunafs.list <<EOF
+    deb [arch=amd64 signed-by=/usr/share/keyrings/saunafs-archive-keyring.gpg] https://repo.saunafs.com/repository/saunafs-ubuntu-22.04/ jammy main
+    EOF
+    ```
 
 3. Update the package list:
 
-   ```shell
-   sudo apt update
-   ```
+    ```shell
+    sudo apt update
+    ```
 
 4. Install SaunaFS:
 
-   ```shell
-   sudo apt update
-   sudo apt install \
-       saunafs-adm \
-       saunafs-chunkserver \
-       saunafs-cgi \
-       saunafs-master
-   ```
+    ```shell
+    sudo apt update
+    sudo apt install \
+        saunafs-adm \
+        saunafs-chunkserver \
+        saunafs-cgi \
+        saunafs-master
+    ```
 
 ## Installing from source
 
@@ -115,6 +115,22 @@ In case you want to run again the scripts above, you can use the following comma
 
 As it is a destructive operation, it will ask for confirmation before removing the packages.
 
+#### VCPKG
+
+SaunaFS uses the VCPKG package manager to manage some of its dependencies that require fine version control. The following script can be used to install the VCPKG package manager:
+
+```shell
+./utils/vcpkg_setup.sh
+```
+
+Or follow the instructions from their [official documentation](https://vcpkg.io/en/getting-started.html).
+
+To install the dependencies using VCPKG, you can use the following command from the root of the repository:
+
+```shell
+vcpgk install
+```
+
 ### Building
 
 The following script can be used to build SaunaFS with appropriate flags to run the tests
@@ -134,17 +150,17 @@ If you want to build SaunaFS without the tests, you can use the following comman
 If you don't want to use the scripts above, you can use the following commands to build SaunaFS:
 
 ```shell
-mkdir build
+cmake --workflow --preset test
+# or
+cmake --workflow --preset test-vcpkg
+```
 
-cmake -B ./build \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -G 'Unix Makefiles' \
-    -DENABLE_DOCS=ON \
-    -DENABLE_CLIENT_LIB=ON \
-    -DENABLE_TESTS=ON \
-    -DENABLE_WERROR=ON
+You can list all available presets by running the following commands:
 
-nice make -C ./build -j$(nproc)
+```shell
+cmake --list-presets
+cmake --build --list-presets
+cmake --workflow --list-presets
 ```
 
 ### Installing

@@ -3,16 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Allows to find libraries not installed by Hunter (like libcrcutil)
 list(APPEND CMAKE_PREFIX_PATH "/usr/local" "/usr")
-
-# Configure the Hunter package manager
-cmake_policy(SET CMP0144 NEW)
-include("cmake/HunterGate.cmake")
-HunterGate(
-    URL "https://github.com/cpp-pm/hunter/archive/v0.25.8.tar.gz"
-    SHA1 "26c79d587883ec910bce168e25f6ac4595f97033"
-)
 
 # Enable symbol export for loadable modules, ensuring same shared resource
 # references. Needed for the plugins, as they are shared libraries.
@@ -74,6 +65,10 @@ if(ENABLE_CCACHE AND CCACHE_FOUND)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
   message(STATUS "Using ccache")
 endif()
+
+project(saunafs)
+
+set(DEFAULT_MIN_VERSION "4.7.0")
 
 enable_language(C)
 include(GNUInstallDirs)
@@ -199,9 +194,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "coverage" OR CODE_COVERAGE)
   endif()
 endif()
 
-project(saunafs)
-
-set(DEFAULT_MIN_VERSION "4.7.0")
 
 string(TIMESTAMP BUILD_TIMESTAMP)
 add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
@@ -378,9 +370,6 @@ include_directories(${CMAKE_BINARY_DIR}) # Here we have generated config.h
 # main.cc shared by some SaunaFS applications
 set(MAIN_SRC ${CMAKE_SOURCE_DIR}/src/main/main.cc)
 
-if(GTEST_FOUND)
-  include_directories(${GTEST_INCLUDE_DIRS})
-endif()
 
 if(ZLIB_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
@@ -447,3 +436,6 @@ if (ENABLE_URAFT)
 endif()
 
 include(Packing)
+
+
+include(GoogleTest)

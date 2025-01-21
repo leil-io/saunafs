@@ -1,6 +1,8 @@
 #include "disk_with_fd.h"
 
 #include <bitset>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <cstdio>
 
 #include "chunkserver-common/chunk_interface.h"

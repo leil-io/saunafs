@@ -94,3 +94,7 @@ create-win-release.bat
 # Test setup #
 ##############
 tests/hdd*
+
+# vcpkg #
+##############
+vcpkg_installed
