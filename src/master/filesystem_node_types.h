@@ -330,16 +330,6 @@ struct FSNodeDirectory : public FSNode {
 		return entries.end();
 	}
 
-	/*! \brief Find directory entry with given node.
-	 *
-	 * \param node Node to find.
-	 * \return If node is found returns iterator pointing to directory entry containing node,
-	 *         otherwise entries.end().
-	 */
-	const_iterator find(const FSNode *node) const {
-		return find(node);
-	}
-
 	iterator find_nth(EntriesContainer::size_type nth) {
 		return entries.find_nth(nth);
 	}
