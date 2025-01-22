@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eux -o pipefail
 PROJECT_DIR="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../..")"
-WORKSPACE=${WORKSPACE:-"${PROJECT_DIR}"}
+
 die() { echo "Error: $*" >&2; exit 1; }
 warn() { echo "Warning: $*" >&2; }
 
@@ -31,44 +31,44 @@ declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 
 [ -n "${1:-}" ] || usage
 declare build_type="${1}"
-declare build_dir
-declare -a make_extra_args=()
 shift
+declare build_dir
+declare -a make_extra_args=("${@}")
 case "${build_type,,}" in
 	debug)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
 			-DCMAKE_BUILD_TYPE=Debug
-			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
+			-DCMAKE_INSTALL_PREFIX="${PROJECT_DIR}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=OFF
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
 		)
-		build_dir="${WORKSPACE}/build/saunafs-debug"
+		build_dir="${PROJECT_DIR}/build/saunafs-debug"
 		make_extra_args+=( 'install' )
 		;;
 	coverage)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
-			-DCMAKE_BUILD_TYPE=Debug
-			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
+			-DCMAKE_BUILD_TYPE=RelWithDebInfo
+			-DCMAKE_INSTALL_PREFIX="${PROJECT_DIR}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=ON
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=OFF
 		)
-		build_dir="${WORKSPACE}/build/saunafs-coverage"
+		build_dir="${PROJECT_DIR}/build/saunafs-coverage"
 		make_extra_args+=( 'install' )
 		;;
 	test)
 		CMAKE_SAUNAFS_ARGUMENTS+=(
 			-DCMAKE_BUILD_TYPE=RelWithDebInfo
-			-DCMAKE_INSTALL_PREFIX="${WORKSPACE}/install/saunafs/"
+			-DCMAKE_INSTALL_PREFIX="${PROJECT_DIR}/install/saunafs/"
 			-DENABLE_TESTS=ON
 			-DCODE_COVERAGE=OFF
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=ON
 			-DENABLE_WERROR=ON
 		)
-		build_dir="${WORKSPACE}/build/saunafs"
+		build_dir="${PROJECT_DIR}/build/saunafs"
 		make_extra_args+=( 'install' )
 		;;
 	release)
@@ -80,7 +80,7 @@ case "${build_type,,}" in
 			-DSAUNAFS_TEST_POINTER_OBFUSCATION=OFF
 			-DENABLE_WERROR=OFF
 		)
-		build_dir="${WORKSPACE}/build/saunafs-release"
+		build_dir="${PROJECT_DIR}/build/saunafs-release"
 		;;
 	*) die "Unsupported build type: ${build_type}"
 		;;
@@ -95,12 +95,6 @@ declare -a EXTRA_ARGUMENTS=("${@}")
 rm -r "${build_dir:?}"/{,.}* 2>/dev/null || true
 cmake -B "${build_dir}" \
 	"${CMAKE_SAUNAFS_ARGUMENTS[@]}" \
-	"${EXTRA_ARGUMENTS[@]}" "${WORKSPACE}"
+	"${EXTRA_ARGUMENTS[@]}" "${PROJECT_DIR}"
 
-nice make -C "${build_dir}" -j "$(nproc)" "${make_extra_args[@]}"
-
-if [ -f "${build_dir}/CPackConfig.cmake" ]; then
-	nice cpack -B "${build_dir}" --config "${build_dir}/CPackConfig.cmake" -j "$(nproc)"
-else
-	warn "No CPack configuration found in ${build_dir}. Skipping packaging."
-fi
+nice make -C "${build_dir}" -j"$(nproc)" "${make_extra_args[@]}"
