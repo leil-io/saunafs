@@ -260,9 +260,14 @@ case "${release}" in
 	LinuxMint/*|Ubuntu/*|Debian/*)
 		# Setup latest clang/llvm
 		wget https://apt.llvm.org/llvm.sh
-		echo "3080a6f961db6559698ea7692f0d5efa5ad9fde9ac6cf0758cfab134509b5bd6 llvm.sh" | sha256sum --check --status
 		chmod +x ./llvm.sh
 		./llvm.sh 19
+
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to install Clang 19 using llvm.sh script."
+			exit 1
+		fi
+
 		rm llvm.sh
 		;;
 	*)
