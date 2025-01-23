@@ -59,7 +59,10 @@ NetworkWorkerThread::NetworkWorkerThread(uint32_t nrOfBgjobsWorkers,
 	TRACETHIS();
 	eassert(pipe(notify_pipe) != -1);
 #ifdef F_SETPIPE_SZ
-	eassert(fcntl(notify_pipe[1], F_SETPIPE_SZ, 4096 * 32));
+	// Increase the pipe size to 128 KiB to handle a larger number of jobs
+	// without backpressure. On modern linux, the default pipe size is 64 KiB.
+	static constexpr int kPageAlignedPipeSize = 4096 * 32;
+	eassert(fcntl(notify_pipe[1], F_SETPIPE_SZ, kPageAlignedPipeSize));
 #endif
 	bgJobPool_ =
 	    job_pool_new(nrOfBgjobsWorkers, bgjobsCount, &bgJobPoolWakeUpFd_);
