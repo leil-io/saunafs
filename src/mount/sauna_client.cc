@@ -3435,6 +3435,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 		double acl_cache_timeout_, unsigned acl_cache_size_, bool direct_io
 #ifdef _WIN32
 		, int mounting_uid_, int mounting_gid_, std::unordered_set<uint32_t> &allowed_users_
+		, bool ignore_utimens_update_
 #endif
 		, bool ignore_flush_
 		) {
@@ -3442,6 +3443,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 	mounting_uid = mounting_uid_;
 	mounting_gid = mounting_gid_;
 	allowed_users = allowed_users_;
+	gIgnoreUtimensUpdate = ignore_utimens_update_;
 #endif
 	gIgnoreFlush = ignore_flush_;
 	debug_mode = debug_mode_;
@@ -3476,6 +3478,9 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 
 	gTweaks.registerVariable("DirectIO", gDirectIo);
 	gTweaks.registerVariable("IgnoreFlush", gIgnoreFlush);
+#ifdef _WIN32
+	gTweaks.registerVariable("IgnoreUtimens", gIgnoreUtimensUpdate);
+#endif
 	gTweaks.registerVariable("AclCacheMaxTime", acl_cache->maxTime_ms);
 	gTweaks.registerVariable("AclCacheHit", acl_cache->cacheHit);
 	gTweaks.registerVariable("AclCacheExpired", acl_cache->cacheExpired);
@@ -3540,6 +3545,7 @@ void fs_init(FsInitParams &params) {
 		params.acl_cache_timeout, params.acl_cache_size, params.direct_io
 #ifdef _WIN32
 		, params.mounting_uid, params.mounting_gid, params.allowed_users
+		, params.ignore_utimens_update
 #endif
 		, params.ignore_flush
 		);
