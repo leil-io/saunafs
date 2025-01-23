@@ -36,7 +36,7 @@ function getVirtualMemoryForPid() {
 
 # Function to run fio commands and measure VSZ for a given mount point
 run_fio_and_measure_vsz() {
-	# Prepare measure the average virtual memory usage during the fio read command
+	# Prepare measure the virtual memory usage during the fio read command
 	local mount_point=$1
 	local pid=$2
 	local output_file="pidstat_output_$pid.txt"
@@ -58,17 +58,17 @@ run_fio_and_measure_vsz() {
 	# Wait for the fio command to complete
 	wait $fio_pid
 
-	# Calculate the average virtual memory usage
+	# Return the virtual memory usage
 	echo $virtualMemory
 }
 
 # Run the fio commands and measure VSZ for both mount points
 echo "Running fio commands and measuring VSZ for both mount points"
-avg_vsz_mount0=$(run_fio_and_measure_vsz "${info[mount0]}" $pid1)
-avg_vsz_mount1=$(run_fio_and_measure_vsz "${info[mount1]}" $pid2)
+vsz_mount0=$(run_fio_and_measure_vsz "${info[mount0]}" $pid1)
+vsz_mount1=$(run_fio_and_measure_vsz "${info[mount1]}" $pid2)
 
-# Print the average VSZ values
-echo "Average VSZ for ${info[mount0]}: ${avg_vsz_mount0}"
-echo "Average VSZ for ${info[mount1]}: ${avg_vsz_mount1}"
+# Print the VSZ values
+echo "VSZ for ${info[mount0]}: ${vsz_mount0}"
+echo "VSZ for ${info[mount1]}: ${vsz_mount1}"
 
-assert_less_than "${avg_vsz_mount1}" "${avg_vsz_mount0}"
+assert_less_than "${vsz_mount1}" "${vsz_mount0}"
