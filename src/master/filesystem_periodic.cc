@@ -24,7 +24,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/event_loop.h"
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_DEFECTIVENODESMAP)
 #  include "common/judy_map.h"
@@ -107,10 +107,10 @@ static std::string get_node_info(FSNode *node) {
 	} else if (node->type == FSNode::kFile) {
 		name = "file " + std::to_string(node->id) + ": ";
 		bool first = true;
-		for (const auto parent_inode : node->parent) {
+		for (const auto &[parentId, _] : node->parent) {
 			std::string path;
 			FSNodeDirectory *parent =
-			        fsnodes_id_to_node_verify<FSNodeDirectory>(parent_inode);
+			    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 			fsnodes_getpath(parent, node, path);
 			if (!first) {
 				name += "|" + path;
@@ -124,7 +124,8 @@ static std::string get_node_info(FSNode *node) {
 		std::string path;
 		FSNodeDirectory *parent = nullptr;
 		if (!node->parent.empty()) {
-			parent = fsnodes_id_to_node_verify<FSNodeDirectory>(node->parent.front());
+			parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
+			    node->parent.front().first);
 		}
 		fsnodes_getpath(parent, node, path);
 		name += path;
@@ -416,11 +417,23 @@ void fs_process_file_test() {
 				     static_cast<FSNodeDirectory *>(f)->entries) {
 					FSNode *node = entry.second;
 
-					if (!node ||
-					    std::find(node->parent.begin(), node->parent.end(),
-					              f->id) == node->parent.end()) {
+					if (!node) {
+						// the node points to invalid memory
 						node_error_flag |=
 						        static_cast<int>(kStructureError);
+					} else {
+						auto parentInChildPtr = std::find_if(
+						    node->parent.begin(), node->parent.end(),
+						    [f](const std::pair<uint32_t,
+						                        const hstorage::Handle *> &p) {
+							    return p.first == f->id;
+						    });
+						// the node doesn't have a parent entry pointing to the
+						// current directory
+						if (parentInChildPtr == node->parent.end()) {
+							node_error_flag |=
+							    static_cast<int>(kStructureError);
+						}
 					}
 				}
 			}

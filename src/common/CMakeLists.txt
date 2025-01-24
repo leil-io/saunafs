@@ -18,7 +18,6 @@ endif()
 
 
 shared_add_library(sfscommon ${COMMON_SOURCES})
-shared_target_link_libraries(sfscommon ${YAML_CPP_LIBRARIES})
 shared_target_link_libraries(sfscommon STATIC sfserr SHARED sfserr_pic)
 shared_target_link_libraries(sfscommon STATIC slogger SHARED slogger_pic)
 

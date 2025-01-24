@@ -169,7 +169,7 @@ void SnapshotTask::cloneDirectoryData(const FSNodeDirectory *src_node, FSNodeDir
 	data.reserve(src_node->entries.size());
 	for (const auto &entry : src_node->entries) {
 		auto local_id = entry.second->id;
-		data.emplace_back(std::move(local_id), (HString)entry.first);
+		data.emplace_back(std::move(local_id), (HString)(*entry.first));
 	}
 	if (!data.empty()) {
 		auto task = new SnapshotTask(std::move(data), orig_inode_,

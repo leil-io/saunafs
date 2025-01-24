@@ -50,6 +50,25 @@
 #include "master/restore.h"
 #include "metrics/metrics.h"
 
+constexpr uint16_t kEdgeNameMaxSize = 65535;
+constexpr uint8_t kEdgeHeaderSize =
+    sizeof(FSNode::id) + sizeof(FSNode::id) + sizeof(kEdgeNameMaxSize);
+uint8_t gEdgeStoreBuffer[kEdgeHeaderSize + kEdgeNameMaxSize];
+
+constexpr uint8_t kNodeHeaderSize =
+    sizeof(FSNode::type) + sizeof(FSNode::id) + sizeof(FSNode::goal) +
+    sizeof(FSNode::mode) + sizeof(FSNode::uid) + sizeof(FSNode::gid) +
+    sizeof(FSNode::atime) + sizeof(FSNode::mtime) + sizeof(FSNode::ctime) +
+    sizeof(FSNode::trashtime);
+// FSNodeFile is the longer type of FSNode, so we use it as the buffer size
+constexpr uint8_t kFileSpecificHeaderSize =
+    sizeof(FSNodeFile::length) + sizeof(uint32_t) + sizeof(uint16_t);
+constexpr uint32_t kChunksBucketSize = 65536;
+constexpr uint16_t kMaxSessionSize = 65535;
+constexpr uint32_t kFileSpecificExtraSize =
+    sizeof(uint64_t) * kChunksBucketSize + sizeof(uint32_t) * kMaxSessionSize;
+uint8_t gNodeStoreBuffer[kNodeHeaderSize + kFileSpecificHeaderSize +
+                         kFileSpecificExtraSize];
 
 // TODO (Baldor): Review the need for these constants below
 [[maybe_unused]] constexpr uint8_t kMetadataVersionLegacy = 0x15;
@@ -245,23 +264,23 @@ static bool fs_load_generic(const std::shared_ptr<MemoryMappedFile> &metadataFil
 
 void fs_storeedge(FSNodeDirectory *parent, FSNode *child,
                   const std::string &name, FILE *fd) {
-	uint8_t uedgebuff[4 + 4 + 2 + 65535];
 	uint8_t *ptr;
 	if (child == nullptr) {  // last edge
-		memset(uedgebuff, 0, 4 + 4 + 2);
-		if (fwrite(uedgebuff, 1, 4 + 4 + 2, fd) != (size_t)(4 + 4 + 2)) {
+		memset(gEdgeStoreBuffer, 0, kEdgeHeaderSize);
+		if (fwrite(gEdgeStoreBuffer, 1, kEdgeHeaderSize, fd) !=
+		    (size_t)(kEdgeHeaderSize)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 		return;
 	}
-	ptr = uedgebuff;
+	ptr = gEdgeStoreBuffer;
 	put32bit(&ptr, (parent == nullptr) ? 0 : parent->id);
 	put32bit(&ptr, child->id);
 	put16bit(&ptr, name.length());
 	memcpy(ptr, name.c_str(), name.length());
-	if (fwrite(uedgebuff, 1, 4 + 4 + 2 + name.length(), fd) !=
-	    (size_t)(4 + 4 + 2 + name.length())) {
+	if (fwrite(gEdgeStoreBuffer, 1, kEdgeHeaderSize + name.length(), fd) !=
+	    (size_t)(kEdgeHeaderSize + name.length())) {
 		safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 		return;
 	}
@@ -410,16 +429,20 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 			currentParentId = parentId;
 		}
 
-		auto it = parent->entries.insert({hstorage::Handle(name), child}).first;
-		parent->entries_hash ^= (*it).first.hash();
+		hstorage::Handle *handlePtr = new hstorage::Handle(name);
+		auto it = parent->entries.insert({handlePtr, child}).first;
+		parent->entries_hash ^= (*it).first->hash();
 
 		if (parent->case_insensitive) {
 			HString lowerCaseName = HString::hstringToLowerCase(HString(name));
-			auto it = parent->lowerCaseEntries.insert({hstorage::Handle(std::string(lowerCaseName.c_str())), child}).first;
-			parent->lowerCaseEntriesHash ^= (*it).first.hash();
+			auto lowercaseHandlePtr = new hstorage::Handle(lowerCaseName);
+			auto it =
+			    parent->lowerCaseEntries.insert({lowercaseHandlePtr, child})
+			        .first;
+			parent->lowerCaseEntriesHash ^= (*it).first->hash();
 		}
 
-		child->parent.push_back(parent->id);
+		child->parent.push_back({parent->id, handlePtr});
 		if (child->type == FSNode::kDirectory) {
 			parent->nlink++;
 		}
@@ -432,8 +455,6 @@ int8_t fs_parseEdge(const std::shared_ptr<MemoryMappedFile> &metadataFile, size_
 }
 
 void fs_storenode(FSNode *f, FILE *fd) {
-	uint8_t unodebuff[1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2 +
-	                  8 * 65536 + 4 * 65536 + 4];
 	uint8_t *ptr, *chptr;
 	uint32_t i, indx, ch, sessionids;
 	std::string name;
@@ -442,7 +463,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		fputc(0, fd);
 		return;
 	}
-	ptr = unodebuff;
+	ptr = gNodeStoreBuffer;
 	put8bit(&ptr, f->type);
 	put32bit(&ptr, f->id);
 	put8bit(&ptr, f->goal);
@@ -460,8 +481,8 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	case FSNode::kDirectory:
 	case FSNode::kSocket:
 	case FSNode::kFifo:
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4, fd) !=
-		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		if (fwrite(gNodeStoreBuffer, 1, kNodeHeaderSize, fd) !=
+		    (size_t)(kNodeHeaderSize)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
@@ -469,8 +490,8 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	case FSNode::kBlockDev:
 	case FSNode::kCharDev:
 		put32bit(&ptr, static_cast<FSNodeDevice *>(f)->rdev);
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
-		           fd) != (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		if (fwrite(gNodeStoreBuffer, 1, kNodeHeaderSize + 4, fd) !=
+		    (size_t)(kNodeHeaderSize + 4)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
@@ -478,8 +499,8 @@ void fs_storenode(FSNode *f, FILE *fd) {
 	case FSNode::kSymlink:
 		name = (std::string) static_cast<FSNodeSymlink *>(f)->path;
 		put32bit(&ptr, name.length());
-		if (fwrite(unodebuff, 1, 1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
-		           fd) != (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4)) {
+		if (fwrite(gNodeStoreBuffer, 1, kNodeHeaderSize + 4, fd) !=
+		    (size_t)(kNodeHeaderSize + 4)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
@@ -495,28 +516,30 @@ void fs_storenode(FSNode *f, FILE *fd) {
 		put64bit(&ptr, node_file->length);
 		ch = node_file->chunkCount();
 		put32bit(&ptr, ch);
-		sessionids = std::min<int>(node_file->sessionid.size(), 65535);
+		sessionids =
+		    std::min<int>(node_file->sessionid.size(), kMaxSessionSize);
 		put16bit(&ptr, sessionids);
 
-		if (fwrite(unodebuff, 1,
-		           1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2, fd) !=
-		    (size_t)(1 + 4 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 4 + 2)) {
+		if (fwrite(gNodeStoreBuffer, 1,
+		           kNodeHeaderSize + kFileSpecificHeaderSize,
+		           fd) != (size_t)(kNodeHeaderSize + kFileSpecificHeaderSize)) {
 			safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 			return;
 		}
 
 		indx = 0;
-		while (ch > 65536) {
+		while (ch > kChunksBucketSize) {
 			chptr = ptr;
-			for (i = 0; i < 65536; i++) {
+			for (i = 0; i < kChunksBucketSize; i++) {
 				put64bit(&chptr, node_file->chunks[indx]);
 				indx++;
 			}
-			if (fwrite(ptr, 1, 8 * 65536, fd) != (size_t)(8 * 65536)) {
+			if (fwrite(ptr, 1, 8 * kChunksBucketSize, fd) !=
+			    (size_t)(8 * kChunksBucketSize)) {
 				safs_pretty_syslog(LOG_NOTICE, "fwrite error");
 				return;
 			}
-			ch -= 65536;
+			ch -= kChunksBucketSize;
 		}
 
 		chptr = ptr;
@@ -527,7 +550,7 @@ void fs_storenode(FSNode *f, FILE *fd) {
 
 		sessionids = 0;
 		for (const auto &sid : node_file->sessionid) {
-			if (sessionids >= 65535) {
+			if (sessionids >= kMaxSessionSize) {
 				break;
 			}
 			put32bit(&chptr, sid);
@@ -664,7 +687,7 @@ void fs_storenodes(FILE *fd) {
 
 void fs_storeedgelist(FSNodeDirectory *parent, FILE *fd) {
 	for (const auto &entry : parent->entries) {
-		fs_storeedge(parent, entry.second, (std::string)entry.first, fd);
+		fs_storeedge(parent, entry.second, (std::string)(*entry.first), fd);
 	}
 }
 

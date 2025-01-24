@@ -50,6 +50,9 @@ namespace SaunaClient {
 typedef uint32_t Inode;
 typedef uint32_t JobId;
 typedef uint32_t NamedInodeOffset;
+#ifdef _WIN32
+inline std::atomic<bool> gIgnoreUtimensUpdate = false;
+#endif
 
 void update_readdir_session(uint64_t sessId, uint64_t entryIno);
 void drop_readdir_session(uint64_t opendirSessionID);
@@ -88,6 +91,7 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultCleanAcquiredFilesPeriod = 0;
 	static constexpr unsigned kDefaultCleanAcquiredFilesTimeout = 0;
 	static constexpr int      kDefaultEnableStatusUpdaterThread = 0;
+	static constexpr bool     kDefaultIgnoreUtimensUpdate = false;
 #else
 	static constexpr unsigned kDefaultWriteCacheSize = 0;
 #endif
@@ -122,7 +126,7 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultAclCacheSize = 1000;
 	static constexpr bool     kDefaultVerbose = false;
 	static constexpr bool     kDirectIO = false;
-
+	static constexpr unsigned kDefaultLimitGlibcMallocArenas = 0;
 	// Thank you, GCC 4.6, for no delegating constructors
 	FsInitParams()
 	             : bind_host(), host(), port(), meta(false), mountpoint(), subfolder(kDefaultSubfolder),
@@ -156,8 +160,11 @@ struct FsInitParams {
 	             clean_acquired_files_period(kDefaultCleanAcquiredFilesPeriod), 
 	             clean_acquired_files_timeout(kDefaultCleanAcquiredFilesTimeout),
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
+	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO)
+	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
+				 {	
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -189,11 +196,16 @@ struct FsInitParams {
 	             acl_cache_timeout(kDefaultAclCacheTimeout), acl_cache_size(kDefaultAclCacheSize),
 #ifdef _WIN32
 	             mounting_uid(USE_LOCAL_ID), mounting_gid(USE_LOCAL_ID),
-				 clean_acquired_files_period(kDefaultCleanAcquiredFilesPeriod), 
-				 clean_acquired_files_timeout(kDefaultCleanAcquiredFilesTimeout),
-				 enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
+	             clean_acquired_files_period(kDefaultCleanAcquiredFilesPeriod), 
+	             clean_acquired_files_timeout(kDefaultCleanAcquiredFilesTimeout),
+	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
+	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) {
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) 
+#ifndef _WIN32
+	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
+#endif 
+				 {
 	}
 
 	std::string bind_host;
@@ -246,11 +258,13 @@ struct FsInitParams {
 	unsigned clean_acquired_files_period;
 	unsigned clean_acquired_files_timeout;
 	unsigned enable_status_updater_thread;
+	unsigned ignore_utimens_update;
 #endif
 
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;
+	unsigned limit_glibc_malloc_arenas;
 
 	std::string io_limits_config_file;
 };

@@ -47,6 +47,9 @@ constexpr uint32_t kIOAlignedPacketSize = disk::kIoBlockSize + SFSBLOCKSIZE;
 constexpr uint32_t kIOAlignedOffset =
     disk::kIoBlockSize - cltocs::writeData::kPrefixSize;
 
+// Alias for better readability
+#define kInvalidPacket nullptr
+
 /**
  * @brief Encapsulates the data associated with a packet.
  *
@@ -109,6 +112,13 @@ struct ChunkserverEntry {
 		Closed      // ready to be deleted
 	};
 
+	// Some constants to improve readability
+	static constexpr int kInvalidSocket = -1;
+	static constexpr int kInitConnectionOK = 0;
+	static constexpr int kInitConnectionFailed = -1;
+	static constexpr uint32_t kGenerateChartExpectedPacketSize =
+	    sizeof(uint32_t);
+
 	void* workerJobPool; // Job pool assigned to a given network worker thread
 
 	ChunkserverEntry::State state = ChunkserverEntry::State::Idle;
@@ -116,7 +126,7 @@ struct ChunkserverEntry {
 	ChunkserverEntry::Mode fwdMode = ChunkserverEntry::Mode::Header;
 
 	int sock;
-	int fwdSocket = -1; ///< forwarding socket for writing
+	int fwdSocket = kInvalidSocket; ///< forwarding socket for writing
 	uint64_t connectStartTimeUSec = 0; ///< for timeout and retry (usec)
 	uint8_t connectRetryCounter = 0; ///< for timeout and retry
 	NetworkAddress fwdServer; // the next server in write chain

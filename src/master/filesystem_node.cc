@@ -71,6 +71,9 @@ FSNode *FSNode::create(uint8_t type) {
 }
 
 void FSNode::destroy(FSNode *node) {
+	for (auto const &[_, handlePtr] : node->parent) {
+		delete handlePtr;
+	}
 	switch (node->type) {
 	case kFile:
 	case kTrash:
@@ -224,8 +227,9 @@ int fsnodes_nameisused(FSNodeDirectory *node, const HString &name) {
 
 /*! \brief Returns true iff \param ancestor is ancestor of \param node. */
 bool fsnodes_isancestor(FSNodeDirectory *ancestor, FSNode *node) {
-	for(const auto &parent_inode : node->parent) {
-		FSNodeDirectory *dir_node = fsnodes_id_to_node_verify<FSNodeDirectory>(parent_inode);
+	for (const auto &[parentId, _] : node->parent) {
+		FSNodeDirectory *dir_node =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 
 		while(dir_node) {
 			if (ancestor == dir_node) {
@@ -235,7 +239,8 @@ bool fsnodes_isancestor(FSNodeDirectory *ancestor, FSNode *node) {
 			assert(dir_node->parent.size() <= 1);
 
 			if (!dir_node->parent.empty()) {
-				dir_node = fsnodes_id_to_node_verify<FSNodeDirectory>(dir_node->parent[0]);
+				dir_node = fsnodes_id_to_node_verify<FSNodeDirectory>(
+				    dir_node->parent[0].first);
 			} else {
 				dir_node = nullptr;
 			}
@@ -310,7 +315,8 @@ FSNodeDirectory *fsnodes_get_first_parent(FSNode *node) {
 	assert(node);
 	FSNodeDirectory *parent;
 	if (!node->parent.empty()) {
-		parent = fsnodes_id_to_node_verify<FSNodeDirectory>(node->parent[0]);
+		parent =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(node->parent[0].first);
 	} else {
 		parent = gMetadata->root;
 	}
@@ -330,8 +336,9 @@ static inline void fsnodes_sub_stats(FSNodeDirectory *parent, statsrecord *sr) {
 		psr->size -= sr->size;
 		psr->realsize -= sr->realsize;
 		if (parent != gMetadata->root) {
-			for (auto inode : parent->parent) {
-				FSNodeDirectory *node = fsnodes_id_to_node_verify<FSNodeDirectory>(inode);
+			for (auto const &[parentId, _] : parent->parent) {
+				FSNodeDirectory *node =
+				    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 				fsnodes_sub_stats(node, sr);
 			}
 		}
@@ -351,8 +358,9 @@ void fsnodes_add_stats(FSNodeDirectory *parent, statsrecord *sr) {
 		psr->size += sr->size;
 		psr->realsize += sr->realsize;
 		if (parent != gMetadata->root) {
-			for (auto inode : parent->parent) {
-				FSNodeDirectory *node = fsnodes_id_to_node_verify<FSNodeDirectory>(inode);
+			for (auto const &[parentId, _] : parent->parent) {
+				FSNodeDirectory *node =
+				    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 				fsnodes_add_stats(node, sr);
 			}
 		}
@@ -487,12 +495,14 @@ void fsnodes_remove_edge(uint32_t ts, FSNodeDirectory *parent, const HString &na
 	auto dir_it = parent->find(name);
 	assert(dir_it != parent->end());
 	assert((*dir_it).second == node);
+	auto handlePtrToErase = dir_it->first;
 	if (dir_it != parent->end()) {
 		parent->entries.erase(dir_it);
 		parent->entries_hash ^= name.hash();
 
 		if (parent->case_insensitive) {
 			auto lowerCaseIt = parent->find_lowercase_container(name);
+			delete lowerCaseIt->first;
 			parent->lowerCaseEntries.erase(lowerCaseIt);
 			HString lowerCaseName = HString::hstringToLowerCase(name);
 			parent->lowerCaseEntriesHash ^= lowerCaseName.hash();
@@ -509,11 +519,28 @@ void fsnodes_remove_edge(uint32_t ts, FSNodeDirectory *parent, const HString &na
 	}
 
 	fsnodes_update_checksum(parent);
+	HString currentName = name;
+	if (parent->case_insensitive) {
+		currentName = HString::hstringToLowerCase(name);
+	}
 
-	auto it = std::find(node->parent.begin(), node->parent.end(), parent->id);
+	auto it = std::find_if(
+	    node->parent.begin(), node->parent.end(),
+	    [parent,
+	     currentName](const std::pair<uint32_t, const hstorage::Handle *> &p) {
+		    return p.first == parent->id &&
+		           (parent->case_insensitive
+		                ? HString::hstringToLowerCase(p.second->get())
+		                : p.second->get()) == currentName;
+	    });
+
 	if (it != node->parent.end()) {
 		node->parent.erase(it);
 	}
+
+	// Delete the handle after the check in the parent vector in the son is
+	// done.
+	delete handlePtrToErase;
 
 	assert(node->type != FSNode::kTrash);
 	node->ctime = ts;
@@ -521,17 +548,21 @@ void fsnodes_remove_edge(uint32_t ts, FSNodeDirectory *parent, const HString &na
 }
 
 void fsnodes_link(uint32_t ts, FSNodeDirectory *parent, FSNode *child, const HString &name) {
-	parent->entries.insert({hstorage::Handle(name), child});
+	// Needs to be freed in fsnodes_remove_edge
+	hstorage::Handle *handlePtr = new hstorage::Handle(name);
+	parent->entries.insert({handlePtr, child});
 	parent->entries_hash ^= name.hash();
 
 	if (parent->case_insensitive) {
 		HString lowerCaseName = HString::hstringToLowerCase(name);
-		parent->lowerCaseEntries.insert(
-		    {hstorage::Handle(std::string(lowerCaseName.c_str())), child});
+		// Needs to be freed in fsnodes_remove_edge
+		auto lowercaseHandlePtr =
+		    new hstorage::Handle(std::string(lowerCaseName.c_str()));
+		parent->lowerCaseEntries.insert({lowercaseHandlePtr, child});
 		parent->lowerCaseEntriesHash ^= lowerCaseName.hash();
 	}
 
-	child->parent.push_back(parent->id);
+	child->parent.push_back({parent->id, handlePtr});
 
 	if (child->type == FSNode::kDirectory) {
 		parent->nlink++;
@@ -631,7 +662,8 @@ uint32_t fsnodes_getpath_size(FSNodeDirectory *parent, FSNode *child) {
 	while (parent != gMetadata->root && !parent->parent.empty()) {
 		child = parent;
 		assert(child->parent.size() == 1);
-		parent = fsnodes_id_to_node_verify<FSNodeDirectory>(child->parent[0]);
+		parent =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(child->parent[0].first);
 		name = parent->getChildName(child);
 		size += name.length() + 1;
 	}
@@ -661,7 +693,8 @@ void fsnodes_getpath_data(FSNodeDirectory *parent, FSNode *child, uint8_t *path,
 	while (parent != gMetadata->root && !parent->parent.empty()) {
 		child = parent;
 		assert(child->parent.size() == 1);
-		parent = fsnodes_id_to_node_verify<FSNodeDirectory>(child->parent[0]);
+		parent =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(child->parent[0].first);
 		name = parent->getChildName(child);
 		if (size >= name.length()) {
 			size -= name.length();
@@ -805,7 +838,7 @@ uint32_t fsnodes_getdirsize(const FSNodeDirectory *p, uint8_t withattr) {
 	uint32_t result = ((withattr) ? 40 : 6) * 2 + 3;  // for '.' and '..'
 	std::string name;
 	for (const auto &entry : p->entries) {
-		name = (std::string)entry.first;
+		name = (std::string)(*entry.first);
 		result += ((withattr) ? 40 : 6) + name.length();
 	}
 	return result;
@@ -846,14 +879,15 @@ void fsnodes_getdirdata(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t
 			put8bit(&dbuff, FSNode::kDirectory);
 		}
 	} else {
-		if (!p->parent.empty() && p->parent[0] != rootinode) {
-			put32bit(&dbuff, p->parent[0]);
+		if (!p->parent.empty() && p->parent[0].first != rootinode) {
+			put32bit(&dbuff, p->parent[0].first);
 		} else {
 			put32bit(&dbuff, SPECIAL_INODE_ROOT);
 		}
 		if (withattr) {
 			if (!p->parent.empty()) {
-				FSNode *parent = fsnodes_id_to_node_verify<FSNode>(p->parent[0]);
+				FSNode *parent =
+				    fsnodes_id_to_node_verify<FSNode>(p->parent[0].first);
 				fsnodes_fill_attr(parent, p, uid, gid, auid, agid,
 				                  sesflags, attr);
 				::memcpy(dbuff, attr.data(), attr.size());
@@ -882,7 +916,7 @@ void fsnodes_getdirdata(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t
 	// entries
 	std::string name;
 	for (const auto &entry : p->entries) {
-		name = (std::string)entry.first;
+		name = (std::string)(*entry.first);
 		dbuff[0] = name.size();
 		dbuff++;
 		memcpy(dbuff, name.c_str(), name.length());
@@ -916,7 +950,7 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 	if (first_entry == 0 && number_of_entries >= 1) {
 		inode = p->id != rootinode ? p->id : SPECIAL_INODE_ROOT;
 		parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-		        p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0]);
+		    p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0].first);
 		fsnodes_fill_attr(p, parent, uid, gid, auid, agid, sesflags, attr);
 		dir_entries.emplace_back(std::move(inode), std::string("."), std::move(attr));
 
@@ -928,20 +962,21 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 		if (p->id == rootinode) {
 			inode = SPECIAL_INODE_ROOT;
 			parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-			        p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0]);
+			    p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0].first);
 			fsnodes_fill_attr(p, parent, uid, gid, auid, agid, sesflags, attr);
 		} else {
-			if (!p->parent.empty() && p->parent[0] != rootinode) {
-				inode = p->parent[0];
+			if (!p->parent.empty() && p->parent[0].first != rootinode) {
+				inode = p->parent[0].first;
 			} else {
 				inode = SPECIAL_INODE_ROOT;
 			}
 
 			FSNodeDirectory *grandparent;
 			parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-			        p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0]);
+			    p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0].first);
 			grandparent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-			        parent->parent.empty() ? SPECIAL_INODE_ROOT : parent->parent[0]);
+			    parent->parent.empty() ? SPECIAL_INODE_ROOT
+			                           : parent->parent[0].first);
 			fsnodes_fill_attr(parent, grandparent, uid, gid, auid, agid, sesflags,
 			                  attr);
 		}
@@ -959,7 +994,7 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 	std::string name;
 	auto it = p->find_nth(first_entry - 2);
 	while (it != p->end() && number_of_entries > 0) {
-		name = (std::string)(*it).first;
+		name = (std::string)(*(*it).first);
 		inode = (*it).second->id;
 		fsnodes_fill_attr((*it).second, p, uid, gid, auid, agid, sesflags, attr);
 
@@ -1000,7 +1035,7 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 	if (first_entry == kDotEntryIndex && number_of_entries >= 1) {
 		inode = p->id != rootinode ? p->id : SPECIAL_INODE_ROOT;
 		parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-		        p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0]);
+		    p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0].first);
 		fsnodes_fill_attr(p, parent, uid, gid, auid, agid, sesflags, attr);
 		dir_entries.emplace_back(kDotEntryIndex, kDotDotEntryIndex, std::move(inode), std::string("."), std::move(attr));
 
@@ -1012,20 +1047,21 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 		if (p->id == rootinode) {
 			inode = SPECIAL_INODE_ROOT;
 			parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-			        p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0]);
+			    p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0].first);
 			fsnodes_fill_attr(p, parent, uid, gid, auid, agid, sesflags, attr);
 		} else {
-			if (!p->parent.empty() && p->parent[0] != rootinode) {
-				inode = p->parent[0];
+			if (!p->parent.empty() && p->parent[0].first != rootinode) {
+				inode = p->parent[0].first;
 			} else {
 				inode = SPECIAL_INODE_ROOT;
 			}
 
 			FSNodeDirectory *grandparent;
 			parent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-			        p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0]);
+			    p->parent.empty() ? SPECIAL_INODE_ROOT : p->parent[0].first);
 			grandparent = fsnodes_id_to_node_verify<FSNodeDirectory>(
-			        parent->parent.empty() ? SPECIAL_INODE_ROOT : parent->parent[0]);
+			    parent->parent.empty() ? SPECIAL_INODE_ROOT
+			                           : parent->parent[0].first);
 			fsnodes_fill_attr(parent, grandparent, uid, gid, auid, agid, sesflags,
 			                  attr);
 		}
@@ -1033,7 +1069,7 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 		uint64_t next_index = kUnusedEntryIndex;
 		if (!p->entries.empty()) {
 			auto first_dirent_it = p->find_nth(0);
-			next_index = (*first_dirent_it).first.data() & ~SIGN_BIT_64;
+			next_index = (*first_dirent_it).first->data() & ~SIGN_BIT_64;
 		}
 		dir_entries.emplace_back(kDotDotEntryIndex, next_index, std::move(inode), std::string(".."), std::move(attr));
 
@@ -1047,25 +1083,35 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 
 	std::string name;
 	hstorage::Handle first_index(first_entry);
-	auto it = p->entries.find(first_index);
-	if (it == p->entries.end()) {
-		// We assume that we received hash that had its most significant bit stripped
-		// so we try new find with this supposedly stripped bit set again.
-		first_index.unlink(); // do not try to unbind the resource under this possibly-fake handle in destructor
+
+	// We're trying to find the first entry in the directory that has index
+	// equal to first_entry. We don't know the second part of the pair, so we
+	// use kUnknownNode as a placeholder, and it is also the minimum possible.
+	auto it = p->entries.lower_bound(&first_index);
+	if (it != p->entries.end() && (*it).first->data() != first_entry) {
+		// We assume that we received hash that had its most significant bit
+		// stripped so we try new find with this supposedly stripped bit set
+		// again.
+		first_index.unlink();  // do not try to unbind the resource under this
+		                       // possibly-fake handle in destructor
 		first_index = hstorage::Handle(first_entry | SIGN_BIT_64);
-		it = p->entries.find(first_index);
+		it = p->entries.lower_bound(&first_index);
+		if (it != p->entries.end() &&
+		    (*it).first->data() != (first_entry | SIGN_BIT_64)) {
+			it = p->entries.end();
+		}
 	}
 	first_index.unlink(); // do not try to unbind the resource under this possibly-fake handle in destructor
 	while (it != p->entries.end() && number_of_entries > 0) {
-		name = static_cast<std::string>((*it).first);
+		name = static_cast<std::string>(*(*it).first);
 		inode = (*it).second->id;
 		fsnodes_fill_attr((*it).second, p, uid, gid, auid, agid, sesflags, attr);
 
-		first_entry = (*it).first.data() & ~SIGN_BIT_64;
+		first_entry = (*it).first->data() & ~SIGN_BIT_64;
 
 		uint64_t next_index = kUnusedEntryIndex;
 		if (++it != p->entries.end()) {
-			next_index = (*it).first.data() & ~SIGN_BIT_64;
+			next_index = (*it).first->data() & ~SIGN_BIT_64;
 		}
 
 		dir_entries.emplace_back(first_entry, next_index, std::move(inode), std::move(name), std::move(attr));
@@ -1145,8 +1191,9 @@ uint8_t fsnodes_appendchunks(uint32_t ts, FSNodeFile *dst, FSNodeFile *src) {
 	dst->length = length;
 	fsnodes_get_stats(dst, &nsr);
 	fsnodes_quota_update(dst, {{QuotaResource::kSize, nsr.size - psr.size}});
-	for (const auto &parent_inode : dst->parent) {
-		FSNodeDirectory *parent_node = fsnodes_id_to_node_verify<FSNodeDirectory>(parent_inode);
+	for (const auto &[parentId, _] : dst->parent) {
+		FSNodeDirectory *parent_node =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 		fsnodes_add_sub_stats(parent_node, &nsr, &psr);
 	}
 	dst->mtime = ts;
@@ -1165,8 +1212,9 @@ void fsnodes_changefilegoal(FSNodeFile *obj, uint8_t goal) {
 	obj->goal = goal;
 	nsr = psr;
 	nsr.realsize = file_realsize(obj, nsr.chunks, nsr.size);
-	for (const auto &parent_inode : obj->parent) {
-		FSNodeDirectory *parent_node = fsnodes_id_to_node_verify<FSNodeDirectory>(parent_inode);
+	for (const auto &[parentId, _] : obj->parent) {
+		FSNodeDirectory *parent_node =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 		fsnodes_add_sub_stats(parent_node, &nsr, &psr);
 	}
 	for (const auto &chunkid : obj->chunks) {
@@ -1211,8 +1259,9 @@ void fsnodes_setlength(FSNodeFile *obj, uint64_t length) {
 
 	fsnodes_get_stats(obj, &nsr);
 	fsnodes_quota_update(obj, {{QuotaResource::kSize, nsr.size - psr.size}});
-	for (const auto &parent_inode : obj->parent) {
-		FSNodeDirectory *parent_node = fsnodes_id_to_node_verify<FSNodeDirectory>(parent_inode);
+	for (const auto &[parentId, _] : obj->parent) {
+		FSNodeDirectory *parent_node =
+		    fsnodes_id_to_node_verify<FSNodeDirectory>(parentId);
 		fsnodes_add_sub_stats(parent_node, &nsr, &psr);
 	}
 	fsnodes_update_checksum(obj);

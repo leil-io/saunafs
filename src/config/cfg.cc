@@ -20,7 +20,7 @@
 
 #include "common/platform.h"
 
-#include "common/cfg.h"
+#include "cfg.h"
 
 #include <cinttypes>
 #include <cmath>

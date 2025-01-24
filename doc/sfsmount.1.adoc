@@ -222,6 +222,14 @@ during crashes when allegedly flushed data is still being processed (default: 0)
 Whether to use FUSE DirectIO. This may improve performance when reading large
 files under certain conditions.
 
+*-o limitglibcmallocarenas=*'N'::
+Linux only: limit glibc malloc arenas to given value - prevents from using
+huge amount of virtual memory. This can influence performance by reducing
+memory fragmentation and improving cache locality, but it may also lead to
+contention and reduced parallelism in multi-threaded applications.
+Use it in constrained memory environments, recommended values are 4 or 8.
+(default is 0: disabled or let glibc decide)
+
 General mount options (see *mount*(8) manual):
 
 *-o rw* | *-o ro*::

@@ -44,7 +44,7 @@
 #include "chunkserver/network_stats.h"
 #include "chunkserver/network_worker_thread.h"
 #include "chunkserver/chunk_replicator.h"
-#include "common/cfg.h"
+#include "config/cfg.h"
 #include "common/charts.h"
 #include "common/event_loop.h"
 #include "protocol/cltocs.h"

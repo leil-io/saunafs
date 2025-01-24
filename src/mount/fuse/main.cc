@@ -23,6 +23,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fstream>
+#include <malloc.h>
 #include <ostream>
 #include <fuse.h>
 #include <fuse_lowlevel.h>
@@ -46,9 +47,14 @@
 #include "mount/symlinkcache.h"
 #include "mount/writedata.h"
 #include "protocol/SFSCommunication.h"
+#include "slogger/slogger.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
+
+constexpr const char *kEnvironmentVariableNotDefined = nullptr;
+static uint8_t gLimitGlibcArenas =
+    SaunaClient::FsInitParams::kDefaultLimitGlibcMallocArenas;
 
 static void sfs_fsinit(void *userdata, struct fuse_conn_info *conn);
 
@@ -184,7 +190,7 @@ static int mainloop(struct fuse_args *args, struct fuse_cmdline_opts *fuse_opts,
 		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY, LOG_USER);
 #endif
 	}
-	safs::add_log_syslog();
+	safs::add_log_syslog(safs::log_level::info);
 	if (!foreground)
 		safs::add_log_stderr(safs::log_level::debug);
 
@@ -506,6 +512,26 @@ static int read_masterhost_if_present(struct fuse_args *args) {
 	return 0;
 }
 
+/// (glibc specific) Tune glibc malloc arenas to avoid high virtual memory usage
+inline void tuneMalloc() {
+#if defined(SAUNAFS_HAVE_MALLOPT) && defined(M_ARENA_MAX) && \
+    defined(M_ARENA_TEST)
+
+	if (gLimitGlibcArenas > 0) {
+		if (::getenv("MALLOC_ARENA_MAX") == kEnvironmentVariableNotDefined) {
+			safs::log_info("Setting glibc malloc arena max to {}",
+			               gLimitGlibcArenas);
+			::mallopt(M_ARENA_MAX, static_cast<int>(gLimitGlibcArenas));
+		}
+		if (::getenv("MALLOC_ARENA_TEST") == kEnvironmentVariableNotDefined) {
+			safs::log_info("Setting glibc malloc arena test to {}",
+			               gLimitGlibcArenas);
+			::mallopt(M_ARENA_TEST, static_cast<int>(gLimitGlibcArenas));
+		}
+	}
+#endif
+}
+
 int main(int argc, char *argv[]) try {
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_args defaultargs = FUSE_ARGS_INIT(0, NULL);
@@ -668,6 +694,9 @@ int main(int argc, char *argv[]) try {
 		        gMountOptions.direntrycachesize);
 		gMountOptions.direntrycachesize = 10000000;
 	}
+
+	gLimitGlibcArenas = gMountOptions.limitglibcmallocarenas;
+	tuneMalloc();
 
 	make_fsname(&args);
 

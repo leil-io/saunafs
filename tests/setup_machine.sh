@@ -83,7 +83,9 @@ common_packages=(
 	nfs4-acl-tools
 	pkg-config
 	pylint
+	python3-gssapi      # required by Ganesha -> pynfs suite
 	python3-pip
+	python3-ply         # required by Ganesha -> pynfs suite
 	python3-setuptools
 	python3-wheel
 	psmisc
@@ -111,6 +113,7 @@ common_packages=(
 apt_packages=(
 	build-essential
 	iproute2
+	iozone3             # required by Ganesha -> iozone suite
 	libblkid-dev
 	libboost-filesystem-dev
 	libboost-iostreams-dev
@@ -157,6 +160,7 @@ apt_packages=(
 	libnfsidmap-dev
 	libnsl-dev
 	libsqlite3-dev
+	software-properties-common
 )
 noble_packages=(
 	prometheus-cpp-dev
@@ -174,6 +178,7 @@ dnf_packages=(
 	gperftools-libs
 	gtest-devel
 	iproute
+	iozone              # required by Ganesha -> iozone suite
 	isa-l-devel
 	Judy-devel
 	kernel-devel
@@ -250,6 +255,27 @@ case "${release}" in
 		echo "Installation of required packages SKIPPED, '${release}' isn't supported by this script"
 		;;
 esac
+
+case "${release}" in
+	LinuxMint/*|Ubuntu/*|Debian/*)
+		# Setup latest clang/llvm
+		wget https://apt.llvm.org/llvm.sh
+		chmod +x ./llvm.sh
+		./llvm.sh 19
+
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to install Clang 19 using llvm.sh script."
+			exit 1
+		fi
+
+		rm llvm.sh
+		;;
+	*)
+		set +x
+		echo "Installation of clang19 SKIPPED, only in apt systems clang19 is installed automatically"
+		set -x
+esac
+
 gpg2 --list-keys
 #setup gtest from sources
 : "${GTEST_ROOT:=/usr/local}"
