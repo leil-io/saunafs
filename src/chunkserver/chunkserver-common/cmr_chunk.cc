@@ -1,4 +1,8 @@
+#include <common/platform.h>
+
 #include "cmr_chunk.h"
+
+#include "chunkserver-common/subfolder.h"
 #include "common/slice_traits.h"
 
 CmrChunk::CmrChunk(uint64_t chunkId, ChunkPartType type, ChunkState state)
@@ -9,27 +13,35 @@ std::string CmrChunk::generateDataFilenameForVersion(uint32_t _version) const {
 }
 
 int CmrChunk::renameChunkFile(uint32_t new_version) {
-	const std::string oldMetaFilename = metaFilename();
-	const std::string oldDataFilename = dataFilename();
+	const std::string oldMetaFilename = fullMetaFilename();
+	const std::string oldDataFilename = fullDataFilename();
+
+	std::string newMetaBasename =
+	    generateMetadataFilenameForVersion(new_version);
+	std::string newDataBasename = generateDataFilenameForVersion(new_version);
 
 	const std::string newMetaFilename =
-	    generateMetadataFilenameForVersion(new_version);
+	    owner()->metaPath() + Subfolder::getSubfolderNameGivenChunkId(id()) +
+	    "/" + newMetaBasename;
 	const std::string newDataFilename =
-	    generateDataFilenameForVersion(new_version);
+	    owner()->dataPath() + Subfolder::getSubfolderNameGivenChunkId(id()) +
+	    "/" + newDataBasename;
 
-	int status = rename(oldMetaFilename.c_str(), newMetaFilename.c_str());
+	int status = ::rename(oldMetaFilename.c_str(), newMetaFilename.c_str());
+
 	if (status < 0) {
 		return status;
 	}
 
-	status = rename(oldDataFilename.c_str(), newDataFilename.c_str());
+	status = ::rename(oldDataFilename.c_str(), newDataFilename.c_str());
+
 	if (status < 0) {
 		return status;
 	}
 
 	setVersion(new_version);
-	setMetaFilename(newMetaFilename);
-	setDataFilename(newDataFilename);
+	setMetaFilename(newMetaBasename);
+	setDataFilename(newDataBasename);
 
 	return 0;
 }

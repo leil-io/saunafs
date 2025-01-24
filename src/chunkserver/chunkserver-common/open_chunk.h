@@ -83,7 +83,7 @@ public:
 			if (closeError) {
 				hddAddErrorAndPreserveErrno(chunk_);
 				safs_silent_errlog(LOG_WARNING,"open_chunk: file:%s - close error",
-				                   chunk_->metaFilename().c_str());
+				                   chunk_->fullMetaFilename().c_str());
 				hddReportDamagedChunk(chunk_->id(), chunk_->type());
 			}
 
