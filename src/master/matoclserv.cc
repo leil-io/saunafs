@@ -1986,9 +1986,10 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	gid = get32bit(&data);
 	modemask = get8bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == SAUNAFS_STATUS_OK && inode != SPECIAL_INODE_PATH_BY_INODE) {
+	if (status == SAUNAFS_STATUS_OK && inode != SPECIAL_INODE_PATH_BY_INODE &&
+	    inode != SPECIAL_INODE_FILE_BY_INODE) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
-		status = fs_access(context,inode,modemask);
+		status = fs_access(context, inode, modemask);
 	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_ACCESS,5);
 	put32bit(&ptr,msgid);
