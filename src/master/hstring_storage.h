@@ -84,8 +84,8 @@ template<int N>
  */
 class Handle {
 public:
-	typedef uint64_t ValueType;
-	typedef uint16_t HashType;
+	using ValueType = uint64_t;
+	using HashType = uint16_t;
 
 	constexpr static ValueType kHashShift = 8 * (sizeof(ValueType) - sizeof(HashType));
 	constexpr static ValueType kMask = ((static_cast<ValueType>(1) << kHashShift) - static_cast<ValueType>(1));

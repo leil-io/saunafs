@@ -32,11 +32,11 @@ class SparseBitset {
 public:
 	class const_iterator {
 	public:
-		typedef std::forward_iterator_tag iterator_category;
-		typedef std::size_t               value_type;
-		typedef std::ptrdiff_t            difference_type;
-		typedef const value_type          &reference;
-		typedef const value_type          *pointer;
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = std::size_t;
+		using difference_type = std::ptrdiff_t;
+		using reference = const value_type &;
+		using pointer = const value_type *;
 
 	public:
 		const_iterator() : data_(), pos_() {
@@ -173,7 +173,7 @@ protected:
  */
 class SparseBitset {
 public:
-	typedef std::deque<uint32_t>::const_iterator const_iterator;
+	using const_iterator = std::deque<uint32_t>::const_iterator;
 
 public:
 	SparseBitset() : data_() {
@@ -248,7 +248,7 @@ protected:
  */
 template <typename IDT, typename TT>
 class IdPoolDetainer : protected IdPool<IDT> {
-	typedef IdPool<IDT> base;
+	using base = IdPool<IDT>;
 
 protected:
 	struct BucketType {
@@ -259,8 +259,8 @@ protected:
 public:
 	using base::nullId;
 
-	typedef TT                    TimeType;
-	typedef typename base::IdType IdType;
+	using TimeType = TT;
+	using IdType = typename base::IdType;
 
 	struct EntryType {
 		IdType   id;
@@ -270,24 +270,24 @@ public:
 	/*! \brief Iterator class that allows to walk through all detained ids. */
 	class const_iterator {
 	public:
-		typedef std::forward_iterator_tag iterator_category;
-		typedef EntryType value_type;
-		typedef std::ptrdiff_t difference_type;
-		typedef const value_type &reference;
-		typedef const value_type *pointer;
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = EntryType;
+		using difference_type = std::ptrdiff_t;
+		using reference = const value_type &;
+		using pointer = const value_type *;
 
 	protected:
-		typedef typename std::list<BucketType>::const_iterator const_iterator1;
-		typedef detail::SparseBitset::const_iterator const_iterator2;
+		using const_iterator1 = typename std::list<BucketType>::const_iterator;
+		using const_iterator2 = detail::SparseBitset::const_iterator;
 
 	public:
 		const_iterator() {
 		}
 
-		explicit const_iterator(const const_iterator1 &i1, const const_iterator1 &i1e,
+		explicit const_iterator(const const_iterator1 &i1,
+		                        const const_iterator1 &i1e,
 		                        const const_iterator2 &i2)
-		    : i1_(i1), i1e_(i1e), i2_(i2) {
-		}
+		    : i1_(i1), i1e_(i1e), i2_(i2) {}
 
 		const_iterator &operator++() {
 			assert(!i1_->data.empty());

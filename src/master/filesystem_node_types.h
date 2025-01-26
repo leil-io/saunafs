@@ -71,8 +71,8 @@ enum class SessionType { kNotMeta, kOnlyMeta, kAny };
 enum class OperationMode { kReadWrite, kReadOnly };
 enum class ExpectedNodeType { kFile, kDirectory, kNotDirectory, kFileOrDirectory, kAny };
 
-typedef std::unordered_map<uint32_t, uint32_t> TrashtimeMap;
-typedef std::array<uint32_t, GoalId::kMax + 1> GoalStatistics;
+using TrashtimeMap = std::unordered_map<uint32_t, uint32_t>;
+using GoalStatistics = std::array<uint32_t, GoalId::kMax + 1>;
 
 struct statsrecord {
 	uint32_t inodes;
@@ -212,13 +212,13 @@ struct FSNodeDirectory : public FSNode {
 		}
 	};
 
-	typedef flat_map<hstorage::Handle *, FSNode *,
-	                 std::vector<std::pair<hstorage::Handle *, FSNode *>>,
-	                 HandleCompare>
-	    EntriesContainer;
+	using EntriesContainer =
+	    flat_map<hstorage::Handle *, FSNode *,
+	             std::vector<std::pair<hstorage::Handle *, FSNode *>>,
+	             HandleCompare>;
 
-	typedef EntriesContainer::iterator iterator;
-	typedef EntriesContainer::const_iterator const_iterator;
+	using iterator = EntriesContainer::iterator;
+	using const_iterator = EntriesContainer::const_iterator;
 
 	EntriesContainer entries; /*!< Directory entries (entry: name + pointer to child node). */
 	EntriesContainer
@@ -249,7 +249,7 @@ struct FSNodeDirectory : public FSNode {
 	 */
 	iterator find(const HString& name) {
 		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
-		
+
 		if (case_insensitive) {
 			HString lowerCaseNameHandle = HString::hstringToLowerCase(name);
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
@@ -395,13 +395,13 @@ struct TrashPathKey {
 };
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER)
-typedef judy_map<TrashPathKey, hstorage::Handle> TrashPathContainer;
+using TrashPathContainer = judy_map<TrashPathKey, hstorage::Handle>;
 #else
-typedef std::map<TrashPathKey, hstorage::Handle> TrashPathContainer;
+using TrashPathContainer = std::map<TrashPathKey, hstorage::Handle>;
 #endif
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER)
-typedef judy_map<uint32_t, hstorage::Handle> ReservedPathContainer;
+using ReservedPathContainer = judy_map<uint32_t, hstorage::Handle>;
 #else
-typedef std::map<uint32_t, hstorage::Handle> ReservedPathContainer;
+using ReservedPathContainer = std::map<uint32_t, hstorage::Handle>;
 #endif

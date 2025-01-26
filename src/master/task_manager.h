@@ -51,7 +51,7 @@ public:
 		virtual bool isFinished() const = 0;
 	};
 
-	typedef typename intrusive_list<Task>::iterator TaskIterator;
+	using TaskIterator = typename intrusive_list<Task>::iterator;
 
 	/*! \brief Class representing the original task and all subtasks it created during execution*/
 	class Job {
@@ -115,9 +115,9 @@ public:
 		intrusive_list<Task> tasks_; /*!< List of tasks that belong to this Job*/
 	};
 
-	typedef typename std::list<Job> JobContainer;
-	typedef typename JobContainer::iterator JobIterator;
-	typedef typename std::vector<JobInfo> JobsInfoContainer;
+	using JobContainer = typename std::list<Job>;
+	using JobIterator = typename JobContainer::iterator;
+	using JobsInfoContainer = typename std::vector<JobInfo>;
 
 public:
 	TaskManager() : job_list_(), next_job_id_(0) {

@@ -45,7 +45,7 @@ public:
 	/*!
 	 * \brief Inode identifier type
 	 */
-	typedef uint32_t InodeId;
+	using InodeId = uint32_t;
 
 	/*!
 	 * \brief Find ACL for an inode.
@@ -83,9 +83,9 @@ private:
 		size_t operator()(const RichACL &acl) const;
 	};
 
-	typedef std::unordered_map<RichACL, unsigned long, Hash> AclToRefCountMap;
-	typedef AclToRefCountMap::value_type KeyValue;
-	typedef std::unordered_map<InodeId, std::reference_wrapper<KeyValue>> InodeToKVMap;
+	using AclToRefCountMap = std::unordered_map<RichACL, unsigned long, Hash>;
+	using KeyValue = AclToRefCountMap::value_type;
+	using InodeToKVMap = std::unordered_map<InodeId, std::reference_wrapper<KeyValue>>;
 
 	/*!
 	 * \brief Insert an ACL into permanent storage.

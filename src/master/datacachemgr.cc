@@ -37,13 +37,13 @@
 
 #define DCM_NIL 0xFFFFFFFF
 
-typedef struct _datacache_entry {
+struct datacache_entry {
 	uint32_t inode;
 	unsigned cacheok:1;
 	unsigned sessionid:31;
 	uint32_t iprev,inext;
 	uint32_t lruprev,lrunext;
-} datacache_entry;
+};
 
 static datacache_entry dcm_tab[DCM_TAB_LENG];
 static uint32_t dcm_inodehash[DCM_INODEHASH_LENG];

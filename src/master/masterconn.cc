@@ -75,12 +75,12 @@ enum class MasterConnectionState {
 	kLimbo /*!< Got response from master regarding its inability to dump metadata. */
 };
 
-typedef struct packetstruct {
+struct packetstruct {
 	struct packetstruct *next;
 	uint8_t *startptr;
 	uint32_t bytesleft;
 	uint8_t *packet;
-} packetstruct;
+};
 
 struct masterconn {
 	int mode;

@@ -25,11 +25,11 @@
 
 #include "common/massert.h"
 
-typedef struct _itnode {
-	uint32_t from,to;
+struct itnode {
+	uint32_t from, to;
 	uint32_t id;
-	struct _itnode *left,*right;
-} itnode;
+	struct itnode *left, *right;
+};
 
 static inline void itree_free(itnode *n) {
 	if (n) {

@@ -44,7 +44,7 @@
 #include "protocol/SFSCommunication.h"
 #include "slogger/slogger.h"
 
-typedef struct _exports {
+struct exports {
 	uint32_t pleng;
 	const uint8_t *path;    // without '/' at the begin and at the end
 	uint32_t fromip,toip;
@@ -63,8 +63,8 @@ typedef struct _exports {
 	uint32_t rootgid;
 	uint32_t mapalluid;
 	uint32_t mapallgid;
-	struct _exports *next;
-} exports;
+	struct exports *next;
+};
 
 static exports *exports_records;
 static char *ExportsFileName;

@@ -42,7 +42,7 @@
  */
 class SnapshotTask : public TaskManager::Task {
 public:
-	typedef std::vector<std::pair<uint32_t, HString>> SubtaskContainer;
+	using SubtaskContainer = std::vector<std::pair<uint32_t, HString>>;
 
 	SnapshotTask(SubtaskContainer &&subtask, uint32_t orig_inode, uint32_t dst_parent_inode,
 		     uint32_t dst_inode, uint8_t can_overwrite, uint8_t ignore_missing_src,

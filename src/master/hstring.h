@@ -2,7 +2,7 @@
 
 #include "common/platform.h"
 
-#include <algorithm> 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -16,7 +16,7 @@
  */
 class HString : public ::std::string {
 public:
-	typedef uint32_t HashType;
+	using HashType = uint32_t;
 
 	HString() : ::std::string() {
 		computeHash();

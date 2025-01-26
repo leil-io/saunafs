@@ -31,8 +31,8 @@
 
 class QuotaDatabase {
 public:
-	typedef std::array<std::array<uint64_t, 2>, 3> Limits;
-	typedef std::unordered_map<uint32_t, Limits> DataTable;
+	using Limits = std::array<std::array<uint64_t, 2>, 3>;
+	using DataTable = std::unordered_map<uint32_t, Limits>;
 
 public:
 	QuotaDatabase() = default;

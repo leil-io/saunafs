@@ -34,7 +34,7 @@ public:
 	  kNoAction
 	};
 
-	typedef std::array<uint32_t, kStatsSize> StatsArray;
+	using StatsArray = std::array<uint32_t, kStatsSize>;
 
 	SetGoalTask(std::vector<uint32_t> inode_list, uint32_t uid, uint8_t goal, uint8_t smode,
 		    const std::shared_ptr<StatsArray> &setgoal_stats) :

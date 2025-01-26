@@ -1830,7 +1830,7 @@ public:
 	void mainLoop();
 
 private:
-	typedef std::vector<ServerWithUsage> ServersWithUsage;
+	using ServersWithUsage = std::vector<ServerWithUsage>;
 
 	struct MainLoopStack {
 		uint32_t current_bucket;

@@ -41,7 +41,7 @@
  */
 class RemoveTask : public TaskManager::Task {
 public:
-	typedef std::vector<HString> SubtaskContainer;
+	using SubtaskContainer = std::vector<HString>;
 
 	RemoveTask(SubtaskContainer &&subtask, uint32_t parent,
 		   const std::shared_ptr<FsContext> &context) :
