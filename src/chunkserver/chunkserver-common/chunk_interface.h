@@ -84,13 +84,19 @@ public:
 	/// Virtual destructor needed for correct polymorphism
 	virtual ~IChunk() = default;
 
+	/// Returns the full path to the metadata file.
+	virtual std::string fullMetaFilename() const = 0;
+
 	/// Getter for the name of the metadata file.
-	virtual std::string metaFilename() const = 0;
+	virtual const std::string &metaFilename() const = 0;
 	/// Setter for the name of the metadata file.
 	virtual void setMetaFilename(const std::string& _metaFilename) = 0;
 
+	/// Returns the full path to the data file.
+	virtual std::string fullDataFilename() const = 0;
+
 	/// Getter for the name of the data file.
-	virtual std::string dataFilename() const = 0;
+	virtual const std::string &dataFilename() const = 0;
 	/// Setter for the name of the data file.
 	virtual void setDataFilename(const std::string &_dataFilename) = 0;
 

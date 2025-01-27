@@ -8,13 +8,23 @@
 FDChunk::FDChunk(uint64_t chunkId, ChunkPartType type, ChunkState state)
     : id_(chunkId), type_(type), state_(state) {}
 
-std::string FDChunk::metaFilename() const { return metaFilename_; }
+std::string FDChunk::fullMetaFilename() const {
+	return owner_->metaPath() + Subfolder::getSubfolderNameGivenChunkId(id_) +
+	       "/" + metaFilename_;
+}
+
+const std::string &FDChunk::metaFilename() const { return metaFilename_; }
 
 void FDChunk::setMetaFilename(const std::string &_metaFilename) {
 	metaFilename_ = _metaFilename;
 }
 
-std::string FDChunk::dataFilename() const { return dataFilename_; }
+std::string FDChunk::fullDataFilename() const {
+	return owner_->dataPath() + Subfolder::getSubfolderNameGivenChunkId(id_) +
+	       "/" + dataFilename_;
+}
+
+const std::string &FDChunk::dataFilename() const { return dataFilename_; }
 
 void FDChunk::setDataFilename(const std::string &_dataFilename) {
 	dataFilename_ = _dataFilename;
@@ -33,8 +43,7 @@ std::string FDChunk::generateMetadataFilenameForVersion(
 std::string FDChunk::generateFilenameForVersion(uint32_t _version,
                                                 bool isForMetadata) const {
 	std::stringstream result;
-	result << (isForMetadata ? owner_->metaPath() : owner_->dataPath());
-	result << Subfolder::getSubfolderNameGivenChunkId(id_) << "/chunk_";
+	result << "chunk_";
 
 	if (slice_traits::isXor(type_)) {
 		if (slice_traits::xors::isXorParity(type_)) {

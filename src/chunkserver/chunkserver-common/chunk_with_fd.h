@@ -59,13 +59,19 @@ public:
 	/// Virtual destructor needed for correct polymorphism
 	virtual ~FDChunk() = default;
 
+	/// Returns the full path to the metadata file.
+	std::string fullMetaFilename() const override;
+
 	/// Getter for the name of the metadata filename.
-	std::string metaFilename() const override;
+	const std::string &metaFilename() const override;
 	/// Setter for the name of the metadata filename.
 	void setMetaFilename(const std::string &_metaFilename) override;
 
+	/// Returns the full path to the data file.
+	std::string fullDataFilename() const override;
+
 	/// Getter for the name of the data filename.
-	std::string dataFilename() const override;
+	const std::string &dataFilename() const override;
 	/// Setter for the name of the data filename.
 	void setDataFilename(const std::string &_dataFilename) override;
 

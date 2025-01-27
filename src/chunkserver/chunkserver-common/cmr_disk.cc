@@ -93,31 +93,31 @@ int CmrDisk::updateChunkAttributes(IChunk *chunk, bool isFromScan) {
 	}
 
 	struct stat metaStat {};
-	if (stat(chunk->metaFilename().c_str(), &metaStat) < 0) {
+	if (::stat(chunk->fullMetaFilename().c_str(), &metaStat) < 0) {
 		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk metadata: chunk->metaFilename ({}), strerror ({})",
-				chunk->metaFilename(), strerror(errno));
+				chunk->fullMetaFilename(), strerror(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (!S_ISREG(metaStat.st_mode)) {
 		safs::log_critical("CmrDisk::updateChunkAttributes: chunk metadata file not a regular file: metaFilename ({})",
-					 chunk->metaFilename());
+					 chunk->fullMetaFilename());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
 	struct stat dataStat {};
-	if (stat(chunk->dataFilename().c_str(), &dataStat) < 0) {
+	if (::stat(chunk->fullDataFilename().c_str(), &dataStat) < 0) {
 		safs::log_err("CmrDisk::updateChunkAttributes: could not access chunk data {}: {}",
-				chunk->dataFilename(), strerror(errno));
+				chunk->fullDataFilename(), strerror(errno));
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if ((dataStat.st_mode & S_IFMT) != S_IFREG) {
 		safs::log_critical("CmrDisk::updateChunkAttributes: chunk data file not a regular file: dataFilename ({})",
-					 chunk->dataFilename());
+					 chunk->fullDataFilename());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 	if (!chunk->isDataFileSizeValid(dataStat.st_size)) {
 		safs::log_critical("CmrDisk::updateChunkAttributes: chunk data file size is invalid: data file ({}), file size ({}), block size ({}), max blocks in chunk ({})",
-					 chunk->dataFilename(), dataStat.st_size, SFSBLOCKSIZE, chunk->maxBlocksInFile());
+					 chunk->fullDataFilename(), dataStat.st_size, SFSBLOCKSIZE, chunk->maxBlocksInFile());
 		return SAUNAFS_ERROR_NOCHUNK;
 	}
 
@@ -168,31 +168,31 @@ void CmrDisk::updateAfterScan() {
 }
 
 void CmrDisk::creat(IChunk *chunk) {
-	chunk->setMetaFD(::open(chunk->metaFilename().c_str(),
+	chunk->setMetaFD(::open(chunk->fullMetaFilename().c_str(),
 	                        O_RDWR | O_TRUNC | O_CREAT,
 	                        disk::kDefaultOpenMode));
 
-	chunk->setDataFD(::open(chunk->dataFilename().c_str(),
+	chunk->setDataFD(::open(chunk->fullDataFilename().c_str(),
 	                        O_RDWR | O_TRUNC | O_CREAT,
 	                        disk::kDefaultOpenMode));
 }
 
 void CmrDisk::open(IChunk *chunk) {
-	chunk->setMetaFD(::open(chunk->metaFilename().c_str(),
+	chunk->setMetaFD(::open(chunk->fullMetaFilename().c_str(),
 	                        isReadOnly() ? O_RDONLY : O_RDWR));
 
-	chunk->setDataFD(::open(chunk->dataFilename().c_str(),
+	chunk->setDataFD(::open(chunk->fullDataFilename().c_str(),
 	                        isReadOnly() ? O_RDONLY : O_RDWR));
 }
 
 int CmrDisk::unlinkChunk(IChunk *chunk) {
 	int result = 0;
 
-	if (::unlink(chunk->metaFilename().c_str()) != 0) {
+	if (::unlink(chunk->fullMetaFilename().c_str()) != 0) {
 		result = -1;
 	}
 
-	if (::unlink(chunk->dataFilename().c_str()) != 0) {
+	if (::unlink(chunk->fullDataFilename().c_str()) != 0) {
 		result = -1;
 	}
 
@@ -239,7 +239,7 @@ int CmrDisk::readBlockAndCrc(IChunk *chunk, uint8_t *blockBuffer,
 		if (bytesRead != SFSBLOCKSIZE) {
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_silent_errlog(LOG_WARNING, "%s: file:%s - read error",
-			                   errorMsg, chunk->metaFilename().c_str());
+			                   errorMsg, chunk->fullMetaFilename().c_str());
 			hddReportDamagedChunk(chunk->id(), chunk->type());
 			updater.markReadAsFailed();
 
@@ -291,7 +291,7 @@ int CmrDisk::writePartialBlockAndCrc(IChunk *chunk, const uint8_t *buffer,
 		if (ret != size) {
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_silent_errlog(LOG_WARNING, "%s: file:%s - write error",
-			                   errorMsg, chunk->metaFilename().c_str());
+			                   errorMsg, chunk->fullMetaFilename().c_str());
 			hddReportDamagedChunk(chunk->id(), chunk->type());
 			updater.markWriteAsFailed();
 			return -1;
@@ -449,7 +449,7 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 				hddAddErrorAndPreserveErrno(chunk);
 				safs_pretty_syslog(LOG_WARNING,
 				                   "writeChunkBlock: file:%s - crc error",
-				                   chunk->metaFilename().c_str());
+				                   chunk->fullMetaFilename().c_str());
 				hddReportDamagedChunk(chunk->id(), chunk->type());
 				return SAUNAFS_ERROR_CRC;
 			}
@@ -459,7 +459,7 @@ int CmrDisk::writeChunkBlock(IChunk *chunk, uint32_t version, uint16_t blocknum,
 				hddAddErrorAndPreserveErrno(chunk);
 				safs_silent_errlog(LOG_WARNING,
 				                   "writeChunkBlock: file:%s - ftruncate error",
-				                   chunk->metaFilename().c_str());
+				                   chunk->fullMetaFilename().c_str());
 				hddReportDamagedChunk(chunk->id(), chunk->type());
 				return SAUNAFS_ERROR_IO;
 			}

@@ -248,9 +248,9 @@ public:
 	virtual void setLastRefresh(uint32_t newLastRefresh) = 0;
 
 	/// Returns the path of the metadata directory
-	virtual std::string metaPath() const = 0;
+	virtual const std::string &metaPath() const = 0;
 	/// Returns the path of the data directory
-	virtual std::string dataPath() const = 0;
+	virtual const std::string &dataPath() const = 0;
 
 	/// Returns the reserved space in bytes defined by configuration
 	virtual uint64_t leaveFreeSpace() const = 0;
