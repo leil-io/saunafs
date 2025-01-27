@@ -105,7 +105,8 @@ struct matoclserventry;
 
 // locked chunks
 class PacketSerializer;
-typedef struct chunklist {
+
+struct chunklist {
 	uint64_t chunkid;
 	uint64_t fleng;     // file length
 	uint32_t lockid;    // lock ID
@@ -118,10 +119,10 @@ typedef struct chunklist {
 	uint8_t type;
 	const PacketSerializer* serializer;
 	struct chunklist *next;
-} chunklist;
+};
 
 struct session {
-	typedef GenericLruCache<uint32_t, FsContext::GroupsContainer, 1024> GroupCache;
+	using GroupCache = GenericLruCache<uint32_t, FsContext::GroupsContainer, 1024>;
 
 	using OpenedFilesSet = std::set<uint32_t>;
 
@@ -174,12 +175,12 @@ struct session {
 	}
 };
 
-typedef struct packetstruct {
+struct packetstruct {
 	struct packetstruct *next;
 	uint8_t *startptr;
 	uint32_t bytesleft;
 	uint8_t *packet;
-} packetstruct;
+};
 
 /** This looks to be the client type. This is set in matoclserv_serve and matoclserv_fuse_register, and there are 3 possible values:
  *

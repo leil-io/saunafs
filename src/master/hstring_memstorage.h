@@ -19,8 +19,8 @@ public:
 	/* On 32bit it is possible to use 32 bits, but we limit ourselves to 16 bits
 	 * to be consistent with other storage implementations.
 	 */
-	typedef Handle::HashType HashType;
-	typedef Handle::ValueType ValueType;
+	using HashType = Handle::HashType;
+	using ValueType = Handle::ValueType;
 
 	bool compare(const Handle &handle, const HString &str) override;
 	::std::string get(const Handle &handle) override;

@@ -34,7 +34,7 @@ struct CountersHasher {
 };
 
 struct CountersComparator {
-	typedef ChunkGoalCounters::GoalCounter GoalCounter;
+	using GoalCounter = ChunkGoalCounters::GoalCounter;
 	bool operator()(const ChunkGoalCounters &c1, const ChunkGoalCounters &c2) const {
 		return c1.size() == c2.size() && std::equal(c1.begin(), c1.end(), c2.begin(),
 				[](const GoalCounter &g1, const GoalCounter &g2){
@@ -43,4 +43,4 @@ struct CountersComparator {
 	}
 };
 
-typedef GenericLruCache<ChunkGoalCounters, Goal, 0x10000, CountersHasher, CountersComparator> GoalCache;
+using GoalCache = GenericLruCache<ChunkGoalCounters, Goal, 0x10000, CountersHasher, CountersComparator>;

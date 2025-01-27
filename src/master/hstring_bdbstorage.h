@@ -14,8 +14,8 @@ class BDBStorage : public Storage {
 	static_assert(sizeof(db_pgno_t) == 4, "BDBStorage does not support this version of libdb");
 	static_assert(sizeof(db_indx_t) == 2, "BDBStorage does not support this version of libdb");
 public:
-	typedef uint16_t HashType;
-	typedef Handle::ValueType ValueType;
+	using HashType = uint16_t;
+	using ValueType = Handle::ValueType;
 
 	BDBStorage(const ::std::string &path, uint64_t cachesize, int ncache, uint32_t pagesize = 0);
 

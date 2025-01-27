@@ -58,12 +58,12 @@
 // matomlserventry.mode
 enum{KILL,HEADER,DATA};
 
-typedef struct packetstruct {
+struct packetstruct {
 	struct packetstruct *next;
 	uint8_t *startptr;
 	uint32_t bytesleft;
 	uint8_t *packet;
-} packetstruct;
+};
 
 using matomlserventry = struct matomlserventry {
 	uint8_t mode;
@@ -100,19 +100,19 @@ static uint32_t gMinMetadataSaveRequestPeriod_s;
 /// Timestamp of the last metadata save request
 static uint32_t gLastMetadataSaveRequestTimestamp = 0;
 
-typedef struct old_changes_entry {
+struct old_changes_entry {
 	uint64_t version;
 	uint32_t length;
 	uint8_t *data;
-} old_changes_entry;
+};
 
-typedef struct old_changes_block {
+struct old_changes_block {
 	old_changes_entry old_changes_block [OLD_CHANGES_BLOCK_SIZE];
 	uint32_t entries;
 	uint32_t mintimestamp;
 	uint64_t minversion;
 	struct old_changes_block *next;
-} old_changes_block;
+};
 
 void matomlserv_createpacket(matomlserventry *eptr, std::vector<uint8_t> data);
 
@@ -150,7 +150,7 @@ public:
 		shadowRequests_.clear();
 	}
 private:
-	typedef std::set<matomlserventry*> ShadowRequests;
+	using ShadowRequests = std::set<matomlserventry *>;
 	ShadowRequests shadowRequests_;
 } gShadowQueue;
 

@@ -37,7 +37,7 @@
  */
 class FsContext {
 public:
-	typedef cltoma::updateCredentials::GroupsContainer GroupsContainer;
+	using GroupsContainer = cltoma::updateCredentials::GroupsContainer;
 
 	/**
 	 * Returns object suitable for use by metarestore or the shadow master.
