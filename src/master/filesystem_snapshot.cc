@@ -20,10 +20,9 @@
 #include "common/platform.h"
 
 #include "config/cfg.h"
-#include "common/main.h"
 #include "master/filesystem_checksum_updater.h"
 #include "master/filesystem_metadata.h"
-#include "master/filesystem_quota.h"
+#include "master/filesystem_node.h"
 #include "master/snapshot_task.h"
 #include "master/task_manager.h"
 

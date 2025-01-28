@@ -23,10 +23,10 @@
 #include <sys/syslog.h>
 #include <vector>
 
-#include "config/cfg.h"
 #include "common/event_loop.h"
 #include "common/random.h"
 #include "common/run_tab.h"
+#include "config/cfg.h"
 #include "master/chartsdata.h"
 #include "master/datacachemgr.h"
 #include "master/exports.h"

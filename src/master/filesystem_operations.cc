@@ -20,6 +20,7 @@
  */
 
 #include "common/platform.h"
+
 #include "master/filesystem_operations.h"
 
 #include <cstdarg>

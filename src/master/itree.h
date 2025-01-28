@@ -22,7 +22,7 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 
 void* itree_rebalance(void *o);
 void* itree_add_interval(void *o,uint32_t f,uint32_t t,uint32_t id);

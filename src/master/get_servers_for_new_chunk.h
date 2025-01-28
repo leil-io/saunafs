@@ -22,7 +22,6 @@
 #include "common/platform.h"
 
 #include <cstdint>
-#include <map>
 #include <vector>
 
 #include "common/goal.h"

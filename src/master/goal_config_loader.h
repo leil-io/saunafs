@@ -19,11 +19,11 @@
  */
 
 #pragma once
+
 #include "common/platform.h"
 
 #include <cctype>
 #include <cstring>
-#include <list>
 #include <map>
 
 #include "common/goal.h"

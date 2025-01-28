@@ -21,8 +21,8 @@
 
 #include "common/platform.h"
 
-#include "master/filesystem.h"
 #include "master/fs_context.h"
+#include "master/hstring.h"
 
 void fs_read_snapshot_config_file();
 

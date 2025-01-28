@@ -19,15 +19,16 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "master/chunkserver_db.h"
 #include "common/platform.h"
 
-#include "config/cfg.h"
-#include "common/integer_sequence.h"
-#include "common/saunafs_version.h"
-#include "master/matocsserv.h"
+#include "master/chunkserver_db.h"
 
 #include <unordered_map>
+
+#include "common/integer_sequence.h"
+#include "common/saunafs_version.h"
+#include "config/cfg.h"
+#include "master/matocsserv.h"
 
 struct csdb_hash {
 	std::size_t operator()(const std::pair<uint32_t, uint16_t> &key) const {

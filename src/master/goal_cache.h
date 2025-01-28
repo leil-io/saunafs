@@ -19,7 +19,9 @@
  */
 
 #include "common/platform.h"
+
 #include "common/generic_lru_cache.h"
+#include "common/goal.h"
 #include "master/chunk_goal_counters.h"
 
 struct CountersHasher {

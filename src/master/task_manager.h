@@ -23,7 +23,6 @@
 
 #include <functional>
 #include <list>
-#include <memory>
 #include <string>
 
 #include "common/intrusive_list.h"

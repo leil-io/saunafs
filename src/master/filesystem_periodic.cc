@@ -19,10 +19,10 @@
  */
 
 #include "common/platform.h"
+
 #include "master/filesystem_periodic.h"
 
 #include <cstdint>
-#include <type_traits>
 
 #include "config/cfg.h"
 #include "common/event_loop.h"
@@ -32,6 +32,7 @@
 #  include "common/flat_map.h"
 #endif
 #include "common/loop_watchdog.h"
+#include "master/chunks.h"
 #include "master/filesystem_checksum.h"
 #include "master/filesystem_checksum_updater.h"
 #include "master/filesystem_metadata.h"

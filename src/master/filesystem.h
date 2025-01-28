@@ -22,24 +22,23 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
-#include <string.h>
 #include <cstdint>
 #include <map>
 
 #include "common/access_control_list.h"
-#include "common/attributes.h"
 #include "common/acl_type.h"
+#include "common/attributes.h"
+#include "common/chunk_with_address_and_label.h"
 #include "common/exception.h"
 #include "common/goal.h"
 #include "common/richacl.h"
 #include "master/checksum.h"
-#include "master/filesystem_node.h"
 #include "master/fs_context.h"
 #include "master/hstring.h"
 #include "master/metadata_dumper.h"
 #include "master/setgoal_task.h"
 #include "master/settrashtime_task.h"
+#include "protocol/directory_entry.h"
 #include "protocol/named_inode_entry.h"
 #include "protocol/quota.h"
 

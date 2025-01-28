@@ -22,9 +22,6 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
-#include <stdio.h>
-
 int masterconn_init(void);
 
 bool masterconn_is_connected();

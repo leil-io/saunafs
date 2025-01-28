@@ -1,4 +1,5 @@
 #include "common/platform.h"
+
 #include "master/id_pool_detainer.h"
 
 #include <gtest/gtest.h>

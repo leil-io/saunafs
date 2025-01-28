@@ -19,14 +19,17 @@
  */
 
 #include "common/platform.h"
+
 #include "master/filesystem.h"
 
-#include "config/cfg.h"
+#include <fstream>
+
 #include "common/event_loop.h"
 #include "common/lockfile.h"
 #include "common/main.h"
 #include "common/metadata.h"
 #include "common/scoped_timer.h"
+#include "config/cfg.h"
 #include "master/changelog.h"
 #include "master/chunks.h"
 #include "master/datacachemgr.h"
@@ -38,11 +41,8 @@
 #include "master/filesystem_store.h"
 #include "master/goal_config_loader.h"
 #include "master/matoclserv.h"
-#include "master/matomlserv.h"
 #include "master/metadata_dumper.h"
 #include "master/restore.h"
-
-#include <fstream>
 
 FilesystemMetadata* gMetadata = nullptr;
 

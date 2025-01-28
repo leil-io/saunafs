@@ -21,8 +21,10 @@
 
 #include "master/snapshot_task.h"
 
+#include "master/chunks.h"
 #include "master/filesystem_checksum.h"
 #include "master/filesystem_metadata.h"
+#include "master/filesystem_node.h"
 #include "master/filesystem_operations.h"
 #include "master/filesystem_quota.h"
 

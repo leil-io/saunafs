@@ -4,6 +4,8 @@
 
 #include "master/hstring.h"
 
+#include <memory>
+
 namespace hstorage {
 /*! \brief Class representing type of String storage
  *

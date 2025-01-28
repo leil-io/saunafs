@@ -19,23 +19,23 @@
  */
 
 #include "common/platform.h"
+
 #include "master/topology.h"
 
-#include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
-#include "config/cfg.h"
 #include "common/event_loop.h"
-#include "common/massert.h"
+#include "config/cfg.h"
 #include "errors/sfserr.h"
-#include "slogger/slogger.h"
 #include "master/itree.h"
+#include "slogger/slogger.h"
 
 static void *racktree;
 static char *TopologyFileName;

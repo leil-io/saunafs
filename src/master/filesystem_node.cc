@@ -19,6 +19,7 @@
  */
 
 #include "common/platform.h"
+
 #include "filesystem_node.h"
 
 #include <cassert>

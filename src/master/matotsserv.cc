@@ -20,16 +20,7 @@
 
 #include "common/platform.h"
 
-
-#include <list>
-
-#include "common/event_loop.h"
-#include "common/media_label.h"
-#include "common/network_address.h"
-#include "common/output_packet.h"
-#include "common/sockets.h"
-#include "common/time_utils.h"
-#include "protocol/input_packet.h"
+#include <cstdint>
 
 /// Maximum allowed length of a network packet
 [[maybe_unused]] static constexpr uint32_t kMaxPacketSize = 500000000;

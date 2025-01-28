@@ -22,14 +22,12 @@
 
 #include "common/platform.h"
 
-#include <errno.h>
 #include <poll.h>
 #include <syslog.h>
 #include <unistd.h>
 #include <string>
 #include <vector>
 
-#include "slogger/slogger.h"
 #include "common/time_utils.h"
 
 class MetadataDumper {

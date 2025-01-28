@@ -25,13 +25,10 @@
 #include <array>
 #include <cstdint>
 #include <unordered_map>
-#include <memory>
 
-#include "common/access_control_list.h"
-#include "common/acl_type.h"
-#include "common/attributes.h"
 #include "common/goal.h"
 #include "common/compact_vector.h"
+#include "protocol/SFSCommunication.h"
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) &&               \
     (!defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
@@ -47,7 +44,6 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/tree_policy.hpp>
 
-#include "master/fs_context.h"
 #include "master/hstring_storage.h"
 
 #define NODEHASHBITS (22)

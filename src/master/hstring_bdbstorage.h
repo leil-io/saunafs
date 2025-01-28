@@ -2,11 +2,9 @@
 
 #include "common/platform.h"
 
-#include "common/exception.h"
 #include "master/hstring_storage.h"
 
 #include <db.h>
-#include <vector>
 
 namespace hstorage {
 

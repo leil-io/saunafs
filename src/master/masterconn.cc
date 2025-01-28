@@ -19,40 +19,40 @@
  */
 
 #include "common/platform.h"
+
 #include "master/masterconn.h"
 
-#include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <syslog.h>
-#include <time.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <string>
 
-#include "config/cfg.h"
 #include "common/crc.h"
-#include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
-#include "slogger/slogger.h"
+#include "common/saunafs_version.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
+#include "config/cfg.h"
 #include "master/changelog.h"
-#include "protocol/matoml.h"
 #include "protocol/SFSCommunication.h"
+#include "protocol/matoml.h"
 #include "protocol/mltoma.h"
+#include "slogger/slogger.h"
 
 #ifndef METALOGGER
 #include "master/filesystem.h"

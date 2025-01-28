@@ -22,7 +22,7 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 
 void matoclserv_stats(uint64_t stats[5]);
 /*

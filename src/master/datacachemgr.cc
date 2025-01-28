@@ -19,10 +19,8 @@
  */
 
 #include "common/platform.h"
-#include "master/datacachemgr.h"
 
-#include <inttypes.h>
-#include <stdio.h>
+#include "master/datacachemgr.h"
 
 /*
   open(inode,sessionid) -> isset? (inode,sessionid)

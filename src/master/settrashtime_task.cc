@@ -23,6 +23,7 @@
 #include "master/settrashtime_task.h"
 
 #include "master/filesystem_checksum.h"
+#include "master/filesystem_node.h"
 #include "master/filesystem_operations.h"
 
 int SetTrashtimeTask::execute(uint32_t ts, intrusive_list<Task> &work_queue) {

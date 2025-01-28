@@ -21,8 +21,10 @@
 #pragma once
 
 #include "common/platform.h"
-#include "master/filesystem_node_types.h"
+
 #include "master/filesystem_metadata.h"
+#include "master/filesystem_node_types.h"
+#include "master/fs_context.h"
 #include "protocol/directory_entry.h"
 #include "protocol/named_inode_entry.h"
 

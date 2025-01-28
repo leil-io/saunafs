@@ -24,11 +24,9 @@
 #include <cassert>
 #include <cstdint>
 
-#include "common/small_vector.h"
 #include "common/special_inode_defs.h"
-#include "protocol/cltoma.h"
-#include "protocol/SFSCommunication.h"
 #include "master/personality.h"
+#include "protocol/cltoma.h"
 
 /**
  * A class which represents objects describing how to perform filesystem operations

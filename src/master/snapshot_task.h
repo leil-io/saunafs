@@ -22,13 +22,11 @@
 #include "common/platform.h"
 
 #include <cassert>
-#include <functional>
-#include <list>
 #include <string>
 
-#include "master/task_manager.h"
-#include "master/filesystem_node.h"
+#include "master/filesystem_node_types.h"
 #include "master/hstring.h"
+#include "master/task_manager.h"
 
 /*! \brief Implementation of Snapshot Task to work with Task Manager.
  *

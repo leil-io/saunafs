@@ -22,8 +22,6 @@
 
 #include <cstdio>
 
-#include "common/exceptions.h"
-#include "master/metadata_dumper.h"
 #include "master/metadata_loader.h"
 
 bool fs_load_legacy_acls(MetadataLoader::Options);
