@@ -22,11 +22,10 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 #include <vector>
 
 #include "common/chunk_part_type.h"
-#include "common/goal.h"
 #include "common/media_label.h"
 #include "master/get_servers_for_new_chunk.h"
 #include "protocol/chunkserver_list_entry.h"

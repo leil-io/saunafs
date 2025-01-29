@@ -21,7 +21,8 @@
 #pragma once
 
 #include "common/platform.h"
-#include "master/filesystem_node_types.h"
+
+#include <cstdint>
 
 /*! \brief Get next free inode number.
  *

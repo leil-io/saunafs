@@ -19,7 +19,7 @@
  */
 
 #include "common/platform.h"
-#include "common/sessions_file.h"
+
 #include "master/matoclserv.h"
 
 #include <errno.h>
@@ -40,7 +40,6 @@
 #include <fstream>
 #include <memory>
 
-#include "config/cfg.h"
 #include "common/charts.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
@@ -62,8 +61,10 @@
 #include "common/saunafs_statistics.h"
 #include "common/saunafs_version.h"
 #include "common/serialized_goal.h"
+#include "common/sessions_file.h"
 #include "common/sockets.h"
 #include "common/user_groups.h"
+#include "config/cfg.h"
 #include "master/changelog.h"
 #include "master/chartsdata.h"
 #include "master/chunks.h"
@@ -71,6 +72,7 @@
 #include "master/datacachemgr.h"
 #include "master/exports.h"
 #include "master/filesystem.h"
+#include "master/filesystem_node.h"
 #include "master/filesystem_operations.h"
 #include "master/filesystem_periodic.h"
 #include "master/filesystem_snapshot.h"

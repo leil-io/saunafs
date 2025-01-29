@@ -19,9 +19,10 @@
  */
 
 #include "common/platform.h"
+
 #include "master/itree.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "common/massert.h"
 

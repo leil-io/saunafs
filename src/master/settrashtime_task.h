@@ -21,7 +21,7 @@
 
 #include "common/platform.h"
 
-#include "master/filesystem_node.h"
+#include "master/filesystem_node_types.h"
 #include "master/task_manager.h"
 
 class SetTrashtimeTask : public TaskManager::Task {

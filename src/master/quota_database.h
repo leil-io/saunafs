@@ -23,7 +23,6 @@
 #include "common/platform.h"
 
 #include <cstdint>
-#include <memory>
 #include <unordered_map>
 
 #include "common/hashfn.h"

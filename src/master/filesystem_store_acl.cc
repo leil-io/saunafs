@@ -19,6 +19,7 @@
 */
 
 #include "common/platform.h"
+
 #include "master/filesystem_store_acl.h"
 
 #include <cstdio>

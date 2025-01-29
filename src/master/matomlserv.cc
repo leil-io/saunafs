@@ -20,6 +20,7 @@
  */
 
 #include "common/platform.h"
+
 #include "master/matomlserv.h"
 
 #include <errno.h>
@@ -36,21 +37,21 @@
 #include <unistd.h>
 #include <set>
 
-#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/metadata.h"
-#include "slogger/slogger.h"
+#include "common/saunafs_version.h"
 #include "common/sockets.h"
+#include "config/cfg.h"
 #include "master/filesystem.h"
 #include "master/personality.h"
-#include "protocol/matoml.h"
 #include "protocol/SFSCommunication.h"
+#include "protocol/matoml.h"
 #include "protocol/mltoma.h"
+#include "slogger/slogger.h"
 
 #define MaxPacketSize 1500000
 #define OLD_CHANGES_BLOCK_SIZE 5000

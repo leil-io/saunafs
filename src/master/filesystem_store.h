@@ -21,6 +21,7 @@
 #pragma once
 
 #include "common/platform.h"
+
 #include "common/exceptions.h"
 
 SAUNAFS_CREATE_EXCEPTION_CLASS(MetadataException, Exception);

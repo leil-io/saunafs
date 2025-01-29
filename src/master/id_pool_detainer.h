@@ -1,13 +1,14 @@
 #pragma once
 
 #include "common/platform.h"
+
 #include "common/id_pool.h"
 
 #if defined(SAUNAFS_HAVE_JUDY) && defined(SAUNAFS_HAVE_WORKING_JUDY1)
 #include <Judy.h>
 #include <iterator>
 #else
-#include <stdint.h>
+#include <cstdint>
 #include <algorithm>
 #include <deque>
 #endif

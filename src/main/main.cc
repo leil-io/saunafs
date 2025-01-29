@@ -19,18 +19,13 @@
  */
 
 #include "common/platform.h"
+
 #include "init.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <ios>
 #include <malloc.h>
 #include <pwd.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <strings.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -38,27 +33,27 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <syslog.h>
-#include <time.h>
 #include <unistd.h>
-#include <algorithm>
-#include <atomic>
+#include <cerrno>
+#include <csignal>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <fstream>
+#include <ios>
 #include <iostream>
-#include <list>
-#include <memory>
 
-#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/cwrap.h"
 #include "common/event_loop.h"
-#include "common/exceptions.h"
 #include "common/exit_status.h"
 #include "common/main.h"
 #include "common/massert.h"
 #include "common/setup.h"
-#include "common/time_utils.h"
 #include "common/version.h"
-#include "protocol/SFSCommunication.h"
+#include "config/cfg.h"
 #include "slogger/slogger.h"
 
 #if defined(SAUNAFS_HAVE_MLOCKALL)

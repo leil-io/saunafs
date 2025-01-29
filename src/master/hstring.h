@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <memory>
 #include <string>
 
 /*! \brief String class keeping an additional field - precomputed hash.

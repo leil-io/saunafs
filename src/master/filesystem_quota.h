@@ -20,8 +20,11 @@
 
 #include "common/platform.h"
 
-#include "master/filesystem_freenode.h"
-#include "master/quota_database.h"
+#include <cstdint>
+#include <initializer_list>
+#include <utility>
+#include "protocol/quota.h"
+#include <master/filesystem_node_types.h>
 
 /*! \brief Test if resource change exceeds quota for users and groups.
  * \param uid User id.

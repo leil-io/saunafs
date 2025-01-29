@@ -19,13 +19,13 @@
  */
 
 #include "common/platform.h"
-#include "common/goal.h"
-#include "master/chunk_goal_counters.h"
-#include "master/goal_cache.h"
-#include "master/goal_config_loader.h"
 
 #include <algorithm>
 #include <map>
+
+#include "common/goal.h"
+#include "master/chunk_goal_counters.h"
+#include "master/goal_cache.h"
 
 #include <gtest/gtest.h>
 

@@ -19,6 +19,7 @@
 */
 
 #include "common/platform.h"
+
 #include "master/filesystem_store.h"
 
 #include <algorithm>
@@ -29,13 +30,14 @@
 
 #include "common/cwrap.h"
 #include "common/event_loop.h"
+#include "common/memory_mapped_file.h"
 #include "common/metadata.h"
 #include "common/rotate_files.h"
 #include "common/saunafs_version.h"
 #include "common/setup.h"
-#include "common/memory_mapped_file.h"
 
 #include "master/changelog.h"
+#include "master/chunks.h"
 #include "master/filesystem.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_node.h"

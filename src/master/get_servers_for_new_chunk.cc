@@ -22,7 +22,6 @@
 
 #include "master/get_servers_for_new_chunk.h"
 
-#include "common/massert.h"
 #include "common/random.h"
 #include "master/chunks.h"
 #include "master/matocsserv.h"

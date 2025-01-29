@@ -19,21 +19,20 @@
  */
 
 #include "common/platform.h"
+
 #include "master/chartsdata.h"
 
-#include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <syslog.h>
-#include <time.h>
 #include <unistd.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 
 #include "common/charts.h"
 #include "common/event_loop.h"
 #include "master/chunks.h"
-#include "master/filesystem.h"
 #include "master/filesystem_operations.h"
 #include "master/matoclserv.h"
 

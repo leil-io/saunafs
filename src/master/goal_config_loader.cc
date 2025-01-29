@@ -19,10 +19,10 @@
  */
 
 #include "common/platform.h"
+
 #include "master/goal_config_loader.h"
 
-#include <iterator>
-#include <sstream>
+#include <list>
 #include <string>
 
 #include "common/exceptions.h"

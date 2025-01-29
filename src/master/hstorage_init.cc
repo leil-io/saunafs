@@ -20,8 +20,8 @@
 
 #include "common/platform.h"
 
-#include "config/cfg.h"
 #include "common/event_loop.h"
+#include "config/cfg.h"
 #include "master/hstring_memstorage.h"
 #ifdef SAUNAFS_HAVE_DB
   #include "master/hstring_bdbstorage.h"

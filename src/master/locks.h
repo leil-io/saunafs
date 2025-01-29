@@ -22,11 +22,11 @@
 
 #include "common/platform.h"
 
+#include <unordered_map>
+
 #include "common/compact_vector.h"
 #include "common/memory_mapped_file.h"
 #include "protocol/lock_info.h"
-
-#include <unordered_map>
 
 /*! \brief Representation of half-open interval [a, b) with it's type and owner */
 struct LockRange {

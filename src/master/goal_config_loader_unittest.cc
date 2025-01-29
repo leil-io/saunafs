@@ -19,6 +19,7 @@
  */
 
 #include "common/platform.h"
+
 #include "master/goal_config_loader.h"
 
 #include <gtest/gtest.h>

@@ -23,16 +23,13 @@
 #include "common/platform.h"
 
 #include <map>
-#include <unordered_map>
 
 #include "common/special_inode_defs.h"
 #include "master/acl_storage.h"
-#include "master/chunks.h"
-#include "master/id_pool_detainer.h"
 #include "master/filesystem_checksum_background_updater.h"
-#include "master/filesystem_freenode.h"
 #include "master/filesystem_node_types.h"
 #include "master/filesystem_xattr.h"
+#include "master/id_pool_detainer.h"
 #include "master/locks.h"
 #include "master/metadata_dumper.h"
 #include "master/quota_database.h"

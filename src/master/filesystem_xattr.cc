@@ -20,9 +20,9 @@
 
 #include "common/platform.h"
 
-#include "common/hashfn.h"
-#include "master/filesystem_checksum.h"
-#include "master/filesystem_xattr.h"
+#include <common/hashfn.h>
+#include <master/filesystem_metadata.h>
+#include <master/filesystem_xattr.h>
 
 static uint64_t xattr_checksum(const xattr_data_entry *xde) {
 	if (!xde) {

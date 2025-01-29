@@ -23,9 +23,8 @@
 
 #include <memory>
 
-#include "common/special_inode_defs.h"
-#include "master/filesystem_node.h"
-#include "master/filesystem_operations.h"
+#include "master/filesystem_node_types.h"
+#include "master/fs_context.h"
 #include "master/hstring.h"
 #include "master/task_manager.h"
 

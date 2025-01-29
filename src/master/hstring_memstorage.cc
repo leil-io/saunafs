@@ -3,7 +3,6 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <algorithm>
 
 #include "master/hstring_memstorage.h"
 

@@ -19,13 +19,10 @@
 */
 
 #include "common/platform.h"
+
 #include "master/filesystem_checksum_background_updater.h"
 
-#include "common/saunafs_version.h"
-#include "master/filesystem_checksum.h"
 #include "master/filesystem_metadata.h"
-#include "master/filesystem_operations.h"
-#include "master/personality.h"
 
 ChecksumBackgroundUpdater::ChecksumBackgroundUpdater()
 	: speedLimit_(0) {  // Not important, redefined in fs_read_config_file()

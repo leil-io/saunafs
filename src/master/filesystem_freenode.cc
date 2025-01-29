@@ -19,6 +19,7 @@
 */
 
 #include "common/platform.h"
+
 #include "master/filesystem_freenode.h"
 
 #include "master/filesystem_metadata.h"
