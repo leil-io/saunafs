@@ -58,3 +58,9 @@ sfssetquota -d 1000000 2000 1000000 2000 dir
 
 quota=$(sfsrepquota -d dir)
 assert_equals "$quota" "$(saunafs repquota -d dir)"
+
+# Create a 25 chunks file and make a 4x snapshot of it
+FILE_SIZE=1600M file-generate test3
+sfsappendchunks 4xtest3 test3 test3 test3 test3
+assert_equals $((4*25)) $(sfsfileinfo 4xtest3 | grep "chunk" | wc -l)
+assert_equals $((4*25*64*1024*1024)) $(sfsdirinfo 4xtest3 | grep "length:" | awk '{print $2}')
