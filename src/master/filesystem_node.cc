@@ -1156,19 +1156,7 @@ uint8_t fsnodes_appendchunks(uint32_t ts, FSNodeFile *dst, FSNodeFile *src) {
 	fsnodes_get_stats(dst, &psr);
 
 	uint32_t result_chunks = src_chunks + dst_chunks;
-
-	if (result_chunks > dst->chunks.size()) {
-		uint32_t new_size;
-		if (result_chunks <= 8) {
-			new_size = result_chunks;
-		} else if (result_chunks <= 64) {
-			new_size = ((result_chunks - 1) & 0xFFFFFFF8) + 8;
-		} else {
-			new_size = ((result_chunks - 1) & 0xFFFFFFC0) + 64;
-		}
-		assert(new_size >= result_chunks);
-		dst->chunks.resize(new_size, 0);
-	}
+	dst->chunks.resize(result_chunks, 0);
 
 	std::copy(src->chunks.begin(), src->chunks.begin() + src_chunks, dst->chunks.begin() + dst_chunks);
 
