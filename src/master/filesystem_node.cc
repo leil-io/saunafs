@@ -1183,7 +1183,8 @@ uint8_t fsnodes_appendchunks(uint32_t ts, FSNodeFile *dst, FSNodeFile *src) {
 		}
 	}
 
-	uint64_t length = (dst_chunks << SFSCHUNKBITS) + src->length;
+	uint64_t length =
+	    (static_cast<uint64_t>(dst_chunks) << SFSCHUNKBITS) + src->length;
 	if (dst->type == FSNode::kTrash) {
 		gMetadata->trashspace -= dst->length;
 		gMetadata->trashspace += length;
