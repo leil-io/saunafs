@@ -34,8 +34,7 @@
 #include "common/compact_vector.h"
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) &&               \
-    (!defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER) ||   \
-     !defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
+    (!defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
      !defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER))
 #include "common/judy_map.h"
 #endif
@@ -44,10 +43,9 @@
     defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER)
 #include <map>
 #endif
-#if !defined(SAUNAFS_HAVE_64BIT_JUDY) || \
-    defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER)
-#include "common/flat_map.h"
-#endif
+
+#include <ext/pb_ds/assoc_container.hpp>
+#include <ext/pb_ds/tree_policy.hpp>
 
 #include "master/fs_context.h"
 #include "master/hstring_storage.h"
@@ -151,6 +149,8 @@ struct FSNode {
 	static void destroy(FSNode *node);
 };
 
+constexpr FSNode* kUnknownNode = nullptr;
+
 /*! \brief Node used for storing file object.
  *
  * Node size = 64B + 40B + 8 * chunks_count + 4 * session_count
@@ -206,16 +206,18 @@ struct FSNodeDevice : public FSNode {
  */
 struct FSNodeDirectory : public FSNode {
 	struct HandleCompare {
-		bool operator()(const hstorage::Handle *a,
-		                const hstorage::Handle *b) const {
-			return a->data() < b->data();
+		bool operator()(const std::pair<hstorage::Handle *, FSNode *> &a,
+		                const std::pair<hstorage::Handle *, FSNode *> &b) const {
+			return std::make_pair(a.first->data(), a.second) <
+			       std::make_pair(b.first->data(), b.second);
 		}
 	};
 
 	using EntriesContainer =
-	    flat_map<hstorage::Handle *, FSNode *,
-	             std::vector<std::pair<hstorage::Handle *, FSNode *>>,
-	             HandleCompare>;
+	    __gnu_pbds::tree<std::pair<hstorage::Handle *, FSNode *>,
+	                     __gnu_pbds::null_type, HandleCompare,
+	                     __gnu_pbds::rb_tree_tag,
+	                     __gnu_pbds::tree_order_statistics_node_update>;
 
 	using iterator = EntriesContainer::iterator;
 	using const_iterator = EntriesContainer::const_iterator;
@@ -255,7 +257,8 @@ struct FSNodeDirectory : public FSNode {
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
 			auto tmp_handle =
 			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-			auto lowerCaseIt = lowerCaseEntries.lower_bound(&tmp_handle);
+			auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(pair_to_find);
 
 			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
 				if ((*lowerCaseIt).first->hash() != name_hash) {
@@ -269,7 +272,8 @@ struct FSNodeDirectory : public FSNode {
 		} else {
 			auto tmp_handle =
 			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-			auto it = entries.lower_bound(&tmp_handle);
+			auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+			auto it = entries.lower_bound(pair_to_find);
 
 			for (; it != entries.end(); ++it) {
 				if ((*it).first->hash() != name_hash) {
@@ -292,7 +296,8 @@ struct FSNodeDirectory : public FSNode {
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
 			auto tmp_handle =
 			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-			auto lowerCaseIt = lowerCaseEntries.lower_bound(&tmp_handle);
+			auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(pair_to_find);
 
 			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
 				if ((*lowerCaseIt).first->hash() != name_hash) {
@@ -318,7 +323,8 @@ struct FSNodeDirectory : public FSNode {
 		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
 		auto tmp_handle =
 		    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-		auto it = entries.lower_bound(&tmp_handle);
+		auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+		auto it = entries.lower_bound(pair_to_find);
 		for (; it != entries.end(); ++it) {
 			if ((*it).first->hash() != name_hash) {
 				break;
@@ -331,11 +337,11 @@ struct FSNodeDirectory : public FSNode {
 	}
 
 	iterator find_nth(EntriesContainer::size_type nth) {
-		return entries.find_nth(nth);
+		return entries.find_by_order(nth);
 	}
 
 	const_iterator find_nth(EntriesContainer::size_type nth) const {
-		return entries.find_nth(nth);
+		return entries.find_by_order(nth);
 	}
 
 	/*! \brief Returns name for specified node.

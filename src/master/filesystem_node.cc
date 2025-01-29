@@ -1077,7 +1077,7 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 		--number_of_entries;
 	}
 
-	if (number_of_entries == 0) {
+	if (number_of_entries == 0 || p->entries.empty()) {
 		return;
 	}
 
@@ -1087,7 +1087,8 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 	// We're trying to find the first entry in the directory that has index
 	// equal to first_entry. We don't know the second part of the pair, so we
 	// use kUnknownNode as a placeholder, and it is also the minimum possible.
-	auto it = p->entries.lower_bound(&first_index);
+	auto pair_to_find = std::make_pair(&first_index, kUnknownNode);
+	auto it = p->entries.lower_bound(pair_to_find);
 	if (it != p->entries.end() && (*it).first->data() != first_entry) {
 		// We assume that we received hash that had its most significant bit
 		// stripped so we try new find with this supposedly stripped bit set
@@ -1095,12 +1096,14 @@ void fsnodes_getdir(uint32_t rootinode, uint32_t uid, uint32_t gid, uint32_t aui
 		first_index.unlink();  // do not try to unbind the resource under this
 		                       // possibly-fake handle in destructor
 		first_index = hstorage::Handle(first_entry | SIGN_BIT_64);
-		it = p->entries.lower_bound(&first_index);
+		pair_to_find = std::make_pair(&first_index, kUnknownNode);
+		it = p->entries.lower_bound(pair_to_find);
 		if (it != p->entries.end() &&
 		    (*it).first->data() != (first_entry | SIGN_BIT_64)) {
 			it = p->entries.end();
 		}
 	}
+	pair_to_find.first->unlink();
 	first_index.unlink(); // do not try to unbind the resource under this possibly-fake handle in destructor
 	while (it != p->entries.end() && number_of_entries > 0) {
 		name = static_cast<std::string>(*(*it).first);
