@@ -30,6 +30,28 @@
             "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
             "hidden": true
         },
+		{
+			"name": "windows",
+            "inherits": ["default", "vcpkg"],
+			"generator": "MinGW Makefiles",
+			"cacheVariables": {
+				"SOCKET_LIBRARIES": "C:/msys64/mingw64/lib/libws2_32.a",
+				"VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"ENABLE_DOCS": "OFF",
+				"ENABLE_CLIENT_LIB": "OFF",
+				"ENABLE_URAFT": "OFF",
+				"ENABLE_NFS_GANESHA": "OFF",
+				"GSH_CAN_HOST_LOCAL_FS": "OFF",
+				"ENABLE_POLONAISE": "OFF",
+				"ENABLE_TESTS": "OFF",
+				"ENABLE_PROMETHEUS": "OFF",
+				"ENABLE_NFS_ACL_SUPPORT": "OFF",
+				"CODE_COVERAGE": "OFF",
+				"SAUNAFS_TEST_POINTER_OBFUSCATION": "OFF",
+				"ENABLE_WERROR": "ON"
+			}
+		},
         {
             "name": "debug",
             "binaryDir": "${sourceDir}/build/saunafs/debug",
