@@ -11,23 +11,23 @@ def buildImage(imageName) {
     sh """
         cd $WORKSPACE
         mkdir build
-        docker buildx build --build-arg BASE_IMAGE=${imageName} --tag saunafs-test:latest -f sfstests/Dockerfile.ci $WORKSPACE
-        docker save saunafs-test:latest -o ./build/sfstests.tar
+        docker buildx build --build-arg BASE_IMAGE=${imageName} --tag saunafs-test:latest -f tests/docker/Dockerfile.test $WORKSPACE
+        docker save saunafs-test:latest -o ./build/sfstests.${imageName}.tar
         """
     archiveArtifacts artifacts: 'build/*.tar', fingerprint: true
 }
 
 def runSanity() {
-    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --workers 28 --cpus 1'''
+    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --workers 28 --multiplier 4 --cpus 1'''
 }
 def runShort() {
-    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite ShortSystemTests --workers 16 --multiplier 2 --cpus 2'''
+    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite ShortSystemTests --workers 16 --multiplier 5 --cpus 2'''
 }
 def runMachine() {
-    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite SingleMachineTests --workers 1 --multiplier 2'''
+    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite SingleMachineTests --workers 1 --multiplier 5'''
 }
 def runLong() {
-    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite LongSystemTests --workers 12 --multiplier 2 --cpus 2'''
+    sh ''' ./sfstests/sfstests --auth /etc/apt/auth.conf.d/ --suite LongSystemTests --workers 12 --multiplier 5 --cpus 2'''
 }
 
 pipeline {
