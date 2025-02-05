@@ -87,13 +87,17 @@ struct FsInitParams {
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 	static constexpr bool     kDefaultIgnoreFlush = false;
 #ifdef _WIN32
-	static constexpr unsigned kDefaultWriteCacheSize = 50;
 	static constexpr unsigned kDefaultCleanAcquiredFilesPeriod = 0;
 	static constexpr unsigned kDefaultCleanAcquiredFilesTimeout = 0;
 	static constexpr int      kDefaultEnableStatusUpdaterThread = 0;
 	static constexpr bool     kDefaultIgnoreUtimensUpdate = false;
+#endif
+	static constexpr bool     kDefaultUseInodeBasedWriteAlgorithm = false;
+	static constexpr unsigned kDefaultWriteCacheSize = 128;
+#ifdef _WIN32
+	static constexpr unsigned kDefaultWriteWaveTo = 10;
 #else
-	static constexpr unsigned kDefaultWriteCacheSize = 0;
+	static constexpr unsigned kDefaultWriteWaveTo = 50;
 #endif
 	static constexpr unsigned kDefaultCachePerInodePercentage = 25;
 	static constexpr unsigned kDefaultWriteWorkers = 10;
@@ -145,6 +149,7 @@ struct FsInitParams {
 	             prefetch_xor_stripes(kDefaultPrefetchXorStripes),
 	             bandwidth_overuse(kDefaultBandwidthOveruse),
 	             write_cache_size(kDefaultWriteCacheSize),
+	             write_wave_timeout_ms(kDefaultWriteWaveTo),
 	             write_workers(kDefaultWriteWorkers), write_window_size(kDefaultWriteWindowSize),
 	             chunkserver_write_timeout_ms(kDefaultChunkserverWriteTo),
 	             cache_per_inode_percentage(kDefaultCachePerInodePercentage),
@@ -162,9 +167,9 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO)
-	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
-				 {	
+	             use_inode_based_write_algorithm(kDefaultUseInodeBasedWriteAlgorithm),
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO),
+	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) {
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -184,6 +189,7 @@ struct FsInitParams {
 	             prefetch_xor_stripes(kDefaultPrefetchXorStripes),
 	             bandwidth_overuse(kDefaultBandwidthOveruse),
 	             write_cache_size(kDefaultWriteCacheSize),
+	             write_wave_timeout_ms(kDefaultWriteWaveTo),
 	             write_workers(kDefaultWriteWorkers), write_window_size(kDefaultWriteWindowSize),
 	             chunkserver_write_timeout_ms(kDefaultChunkserverWriteTo),
 	             cache_per_inode_percentage(kDefaultCachePerInodePercentage),
@@ -201,9 +207,10 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) 
+	             use_inode_based_write_algorithm(kDefaultUseInodeBasedWriteAlgorithm),
+	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO),
 #ifndef _WIN32
-	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
+	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
 #endif 
 				 {
 	}
@@ -233,6 +240,7 @@ struct FsInitParams {
 	double bandwidth_overuse;
 
 	unsigned write_cache_size;
+	unsigned write_wave_timeout_ms;
 	unsigned write_workers;
 	unsigned write_window_size;
 	unsigned chunkserver_write_timeout_ms;
@@ -261,6 +269,7 @@ struct FsInitParams {
 	unsigned ignore_utimens_update;
 #endif
 
+	bool use_inode_based_write_algorithm;
 	bool ignore_flush;
 	bool verbose;
 	bool direct_io;
