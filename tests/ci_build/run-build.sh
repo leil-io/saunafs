@@ -9,12 +9,16 @@ usage() {
 	cat <<-EOT
 	Builds saunafs with different configurations
 
-	Usage: run-build.sh [OPTION]
+	Usage: run-build.sh [OPTION] [COMPILER]
 
 	Options:
 	  coverage   Build with parameters for coverage report
 	  test       Build for test
 	  release    Build with no debug info
+
+	Compiler:
+	  gcc        Use GCC (default)
+	  clang      Use Clang
 	EOT
 	exit 1
 }
@@ -32,6 +36,23 @@ declare -a CMAKE_SAUNAFS_ARGUMENTS=(
 [ -n "${1:-}" ] || usage
 declare build_type="${1}"
 shift
+
+declare compiler="${1:-gcc}"
+shift || true
+
+case "${compiler,,}" in
+	gcc)
+		;;
+	clang)
+		CMAKE_SAUNAFS_ARGUMENTS+=(
+			-DCMAKE_C_COMPILER=clang
+			-DCMAKE_CXX_COMPILER=clang++
+		)
+		;;
+	*) die "Unsupported compiler: ${compiler}"
+		;;
+esac
+
 declare build_dir
 declare -a make_extra_args=("${@}")
 case "${build_type,,}" in
