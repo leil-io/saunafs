@@ -118,6 +118,7 @@ struct sfsopts_ {
 	unsigned limitglibcmallocarenas;
 	int lognotificationarea;
 	unsigned messagesuppressionperiod;
+	int usequotainvolumesize;
 
 	sfsopts_()
 		: masterhost(NULL),
@@ -175,7 +176,8 @@ struct sfsopts_ {
 		nonemptymount(SaunaClient::FsInitParams::kDefaultNonEmptyMounts),
 		directio(SaunaClient::FsInitParams::kDirectIO),
 		ignoreflush(SaunaClient::FsInitParams::kDefaultIgnoreFlush),
-		limitglibcmallocarenas(SaunaClient::FsInitParams::kDefaultLimitGlibcMallocArenas)
+		limitglibcmallocarenas(SaunaClient::FsInitParams::kDefaultLimitGlibcMallocArenas),
+		usequotainvolumesize(SaunaClient::FsInitParams::kDefaultUseQuotaInVolumeSize)
 	{ }
 };
 

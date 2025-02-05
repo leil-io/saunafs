@@ -96,6 +96,7 @@ struct fuse_opt gSfsOptsStage2[] = {
 	SFS_OPT("limitglibcmallocarenas=%d", limitglibcmallocarenas, 0),
 	SFS_OPT("sfslognotificationarea=%d", lognotificationarea, 0),
 	SFS_OPT("sfsmessagesuppressionperiod=%u", messagesuppressionperiod, 0),
+	SFS_OPT("usequotainvolumesize=%d", usequotainvolumesize, 0),
 
 	SFS_OPT("enablefilelocks=%u", filelocks, 0),
 	SFS_OPT("nonempty", nonemptymount, 1),
@@ -244,6 +245,8 @@ void usage(const char *progname) {
 "    -o sfslognotificationarea=0|1  enable/disable logging to Linux notification area (default: %d)\n"
 "    -o sfsmessagesuppressionperiod=N  set period of message suppression in seconds for logging on "
 				"notification area (default: %u)\n"
+"    -o usequotainvolumesize=0|1  when set to 1, use the user and group specific quota hard "
+				"limit to calculate the volume size (default: %u)\n"
 "\n",
 		SaunaClient::FsInitParams::kDefaultCacheExpirationTime,
 		SaunaClient::FsInitParams::kDefaultReadaheadMaxWindowSize,
@@ -276,7 +279,8 @@ void usage(const char *progname) {
 		SaunaClient::FsInitParams::kDefaultSubfolder,
 		SaunaClient::FsInitParams::kDefaultLimitGlibcMallocArenas,
 		SaunaClient::FsInitParams::kDefaultLogNotificationArea,
-		SaunaClient::FsInitParams::kDefaultMessageSuppressionPeriod
+		SaunaClient::FsInitParams::kDefaultMessageSuppressionPeriod,
+		SaunaClient::FsInitParams::kDefaultUseQuotaInVolumeSize
 	);
 	printf(
 "CMODE can be set to:\n"

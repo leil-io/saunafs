@@ -88,6 +88,7 @@ struct FsInitParams {
 	static constexpr bool     kDefaultIgnoreFlush = false;
 	static constexpr int      kDefaultLogNotificationArea = 0;
 	static constexpr unsigned kDefaultMessageSuppressionPeriod = 10;
+	static constexpr bool     kDefaultUseQuotaInVolumeSize = false;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 	static constexpr unsigned kDefaultCleanAcquiredFilesPeriod = 0;
@@ -164,7 +165,7 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), 
+	             ignore_flush(kDefaultIgnoreFlush), use_quota_in_volume_size(kDefaultUseQuotaInVolumeSize),
 	             verbose(kDefaultVerbose), 
 	             direct_io(kDirectIO),
 	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas),
@@ -207,11 +208,11 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), 
-	             verbose(kDefaultVerbose), 
+	             ignore_flush(kDefaultIgnoreFlush), use_quota_in_volume_size(kDefaultUseQuotaInVolumeSize),
+	             verbose(kDefaultVerbose),
 	             direct_io(kDirectIO),
 	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas),
-	             log_notifications_area(kDefaultLogNotificationArea), 
+	             log_notifications_area(kDefaultLogNotificationArea),
 	             message_suppression_period(kDefaultMessageSuppressionPeriod) {
 
 	}
@@ -270,6 +271,7 @@ struct FsInitParams {
 #endif
 
 	bool ignore_flush;
+	bool use_quota_in_volume_size;
 	bool verbose;
 	bool direct_io;
 	unsigned limit_glibc_malloc_arenas;
