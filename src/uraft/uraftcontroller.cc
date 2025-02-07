@@ -230,8 +230,8 @@ void uRaftController::checkNodeStatus(const boost::system::error_code &error) {
 			node_alive_ = is_alive;
 		}
 
-		if (!isFloatingIpAlive()) {
-			if (state_.president) {
+		if (state_.president) {
+			if (!isFloatingIpAlive()) {
 				syslog(LOG_ERR, "Floating IP is not alive. Demoting leader.");
 				demoteLeader(); // Demote current leader and trigger a new election
 				nodeDemote();   // Restart metadata server and sync metadata version
