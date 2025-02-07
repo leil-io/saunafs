@@ -35,7 +35,6 @@
 #include "master/checksum.h"
 #include "master/fs_context.h"
 #include "master/hstring.h"
-#include "master/metadata_dumper.h"
 #include "master/setgoal_task.h"
 #include "master/settrashtime_task.h"
 #include "protocol/directory_entry.h"
@@ -62,13 +61,6 @@ void fs_load_changelogs();
 
 /// Load whole filesystem information.
 int fs_loadall();
-
-/*! \brief Dump current state of file system metadata.
- *
- * \param dumpType - choose between foreground and background dumping.
- * \return SAUNAFS_STATUS_OK iff dump started/completed successfully, otherwise cause of the failure.
- */
-uint8_t fs_storeall(MetadataDumper::DumpType dumpType);
 
 // Functions which create/apply (depending on the given context) changes to the metadata.
 // Common for metarestore and master server (both personalities)
@@ -190,8 +182,6 @@ void fs_unlock();
 // Number of changelog file versions
 const uint32_t kDefaultStoredPreviousBackMetaCopies = 1;
 const uint32_t kMaxStoredPreviousBackMetaCopies = 99;
-
-extern uint32_t gStoredPreviousBackMetaCopies;
 
 #ifdef METARESTORE
 

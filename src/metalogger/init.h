@@ -24,13 +24,28 @@
 
 #include "common/run_tab.h"
 #include "master/masterconn.h"
+#include <master/metadata_backend_file.h>
+
+inline int metadata_backend_init() {
+	if (gMetadataBackend == nullptr) {
+		gMetadataBackend = std::make_unique<MetadataBackendFile>();
+
+		if (!gMetadataBackend) {
+			safs::log_err("Failed to initialize metadata backend");
+			throw Exception("Failed to initialize metadata backend");
+		}
+	}
+
+	return 0;
+}
 
 /// Functions to call before normal startup
 inline const std::vector<RunTab> earlyRunTabs = {};
 
 /// Functions to call during normal startup
 inline const std::vector<RunTab> runTabs = {
-    RunTab{masterconn_init, "connection with master"}};
+    RunTab{.function = metadata_backend_init, .name = "metadata backend"},
+    RunTab{.function = masterconn_init, .name = "connection with master"}};
 
 /// Functions to call delayed after the initialization is correct
 inline const std::vector<RunTab> lateRunTabs = {};

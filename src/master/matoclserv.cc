@@ -44,6 +44,7 @@
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
+#include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
 #include "common/generic_lru_cache.h"
@@ -55,7 +56,6 @@
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/md5.h"
-#include "common/metadata.h"
 #include "common/network_address.h"
 #include "common/random.h"
 #include "common/saunafs_statistics.h"
@@ -79,6 +79,8 @@
 #include "master/masterconn.h"
 #include "master/matocsserv.h"
 #include "master/matomlserv.h"
+#include "master/metadata_backend_common.h"
+#include "master/metadata_backend_interface.h"
 #include "master/personality.h"
 #include "master/settrashtime_task.h"
 #include "metrics/metrics.h"
@@ -4526,7 +4528,8 @@ void matoclserv_admin_save_metadata(matoclserventry* eptr, const uint8_t* data, 
 	if (eptr->registered == ClientState::kAdmin) {
 		safs_pretty_syslog(LOG_NOTICE, "saving metadata image requested using saunafs-admin by %s",
 				ipToString(eptr->peerip).c_str());
-		uint8_t status = fs_storeall(MetadataDumper::DumpType::kBackgroundDump);
+		uint8_t status = gMetadataBackend->fs_storeall(
+		    MetadataDumper::DumpType::kBackgroundDump);
 		if (status != SAUNAFS_STATUS_OK || asynchronous) {
 			matoclserv_createpacket(eptr, matocl::adminSaveMetadata::build(status));
 		} else {

@@ -23,13 +23,14 @@
 #include "master/filesystem.h"
 
 #include <fstream>
+#include <memory>
 
 #include "common/event_loop.h"
 #include "common/lockfile.h"
 #include "common/main.h"
-#include "common/metadata.h"
 #include "common/scoped_timer.h"
 #include "config/cfg.h"
+#include "errors/saunafs_error_codes.h"
 #include "master/changelog.h"
 #include "master/chunks.h"
 #include "master/datacachemgr.h"
@@ -38,20 +39,23 @@
 #include "master/filesystem_operations.h"
 #include "master/filesystem_periodic.h"
 #include "master/filesystem_snapshot.h"
-#include "master/filesystem_store.h"
 #include "master/goal_config_loader.h"
 #include "master/matoclserv.h"
+#include "master/metadata_backend_common.h"
+#include "master/metadata_backend_file.h"
+#include "master/metadata_backend_interface.h"
 #include "master/metadata_dumper.h"
 #include "master/restore.h"
+#include "slogger/slogger.h"
 
 FilesystemMetadata* gMetadata = nullptr;
+std::unique_ptr<Lockfile> gMetadataLockfile;
 
 #ifndef METARESTORE
 
 static bool gAutoRecovery = false;
 bool gMagicAutoFileRepair = false;
 bool gAtimeDisabled = false;
-MetadataDumper metadataDumper(kMetadataFilename, kMetadataTmpFilename);
 
 uint32_t gTestStartTime;
 
@@ -63,9 +67,6 @@ static uint32_t gOperationsDelayDisconnect;
 std::map<int, Goal> gGoalDefinitions;
 
 #endif // ifndef METARESTORE
-
-// Number of changelog file versions
-uint32_t gStoredPreviousBackMetaCopies;
 
 // Checksum validation
 bool gDisableChecksumVerification = false;
@@ -87,22 +88,25 @@ void fs_unlock() {
 #ifndef METARESTORE
 
 static void metadataPollDesc(std::vector<pollfd> &pdesc) {
-	metadataDumper.pollDesc(pdesc);
+	gMetadataBackend->dumper()->pollDesc(pdesc);
 }
 
 static void metadataPollServe(const std::vector<pollfd> &pdesc) {
-	bool metadataDumpInProgress = metadataDumper.inProgress();
-	metadataDumper.pollServe(pdesc);
-	if (metadataDumpInProgress && !metadataDumper.inProgress()) {
-		if (metadataDumper.dumpSucceeded()) {
-			if (fs_commit_metadata_dump()) {
-				fs_broadcast_metadata_saved(SAUNAFS_STATUS_OK);
+	auto *dumper = gMetadataBackend->dumper();
+
+	bool metadataDumpInProgress = dumper->inProgress();
+	dumper->pollServe(pdesc);
+
+	if (metadataDumpInProgress && !dumper->inProgress()) {
+		if (dumper->dumpSucceeded()) {
+			if (gMetadataBackend->commit_metadata_dump()) {
+				gMetadataBackend->broadcast_metadata_saved(SAUNAFS_STATUS_OK);
 			} else {
-				fs_broadcast_metadata_saved(SAUNAFS_ERROR_IO);
+				gMetadataBackend->broadcast_metadata_saved(SAUNAFS_ERROR_IO);
 			}
 		} else {
-			fs_broadcast_metadata_saved(SAUNAFS_ERROR_IO);
-			if (metadataDumper.useMetarestore()) {
+			gMetadataBackend->broadcast_metadata_saved(SAUNAFS_ERROR_IO);
+			if (dumper->useMetarestore()) {
 				// master should recalculate its checksum
 				safs_pretty_syslog(LOG_WARNING, "dumping metadata failed, recalculating checksum");
 				fs_start_checksum_recalculation();
@@ -113,20 +117,25 @@ static void metadataPollServe(const std::vector<pollfd> &pdesc) {
 }
 
 void fs_periodic_storeall() {
-	auto result = fs_storeall(MetadataDumper::kBackgroundDump); // ignore error
+	auto result = gMetadataBackend->fs_storeall(
+	    MetadataDumper::kBackgroundDump);  // ignore error
 
 	safs_silent_syslog(LOG_DEBUG, "periodic metadata dump: %s",
 	                   (SAUNAFS_STATUS_OK == result) ? "success" : "failure");
 }
 
 void fs_term(void) {
-	if (metadataDumper.inProgress()) {
-		metadataDumper.waitUntilFinished();
+	auto *dumper = gMetadataBackend->dumper();
+
+	if (dumper->inProgress()) {
+		dumper->waitUntilFinished();
 	}
 	bool metadataStored = false;
 	if (gMetadata != nullptr && gSaveMetadataAtExit) {
 		for (;;) {
-			metadataStored = (fs_storeall(MetadataDumper::kForegroundDump) == SAUNAFS_STATUS_OK);
+			metadataStored =
+			    (gMetadataBackend->fs_storeall(
+			         MetadataDumper::kForegroundDump) == SAUNAFS_STATUS_OK);
 			if (metadataStored) {
 				break;
 			}
@@ -161,7 +170,7 @@ void fs_disable_metadata_dump_on_exit() {
 	gSaveMetadataAtExit = false;
 }
 
-#else
+#else  // #ifndef METARESTORE
 void fs_storeall(const char *fname) {
 	FILE *fd;
 	fd = fopen(fname,"w");
@@ -169,7 +178,7 @@ void fs_storeall(const char *fname) {
 		safs_pretty_syslog(LOG_ERR, "can't open metadata file");
 		return;
 	}
-	fs_store_fd(fd);
+	gMetadataBackend->store_fd(fd);
 
 	if (ferror(fd)!=0) {
 		safs_pretty_syslog(LOG_ERR, "can't write metadata");
@@ -213,7 +222,7 @@ void fs_erase_message_from_lockfile() {
 int fs_loadall(void) {
 	fs_strinit();
 	chunk_strinit();
-	changelogsMigrateFrom_1_6_29("changelog");
+	gMetadataBackend->changelogsMigrateFrom_1_6_29("changelog");
 	if (fs::exists(kMetadataTmpFilename)) {
 		throw MetadataFsConsistencyException(
 		    "temporary metadata file (" + std::string(kMetadataTmpFilename) + ") exists,"
@@ -248,7 +257,7 @@ int fs_loadall(void) {
 
 	{
 		auto scopedTimer = util::ScopedTimer("metadata load time");
-		fs_loadall(metadataFile, 0);
+		gMetadataBackend->loadall(metadataFile, 0);
 	}
 
 	bool autoRecovery = fs_can_do_auto_recovery();
@@ -256,7 +265,7 @@ int fs_loadall(void) {
 		safs_pretty_syslog_attempt(LOG_INFO, "%s - applying changelogs from %s",
 				(autoRecovery ? "AUTO_RECOVERY enabled" : "running in shadow mode"),
 				fs::getCurrentWorkingDirectoryNoThrow().c_str());
-		fs_load_changelogs();
+		gMetadataBackend->load_changelogs();
 		safs_pretty_syslog(LOG_INFO, "all needed changelogs applied successfully");
 	}
 	return 0;
@@ -335,9 +344,10 @@ static void fs_read_config_file() {
 	ChecksumUpdater::setPeriod(cfg_getint32("METADATA_CHECKSUM_INTERVAL", 50));
 	gChecksumBackgroundUpdater.setSpeedLimit(
 			cfg_getint32("METADATA_CHECKSUM_RECALCULATION_SPEED", 100));
-	metadataDumper.setMetarestorePath(
-			cfg_get("SFSMETARESTORE_PATH", std::string(SBIN_PATH "/sfsmetarestore")));
-	metadataDumper.setUseMetarestore(cfg_getint32("MAGIC_PREFER_BACKGROUND_DUMP", 0));
+	auto *dumper = gMetadataBackend->dumper();
+	dumper->setMetarestorePath(cfg_get(
+	    "SFSMETARESTORE_PATH", std::string(SBIN_PATH "/sfsmetarestore")));
+	dumper->setUseMetarestore(cfg_getint32("MAGIC_PREFER_BACKGROUND_DUMP", 0));
 
 	// Set deprecated values first, then override them if newer version is found
 	gOperationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT", 300);
@@ -375,6 +385,15 @@ void fs_unload() {
 }
 
 int fs_init(bool doLoad) {
+	if (gMetadataBackend == nullptr) {
+		gMetadataBackend = std::make_unique<MetadataBackendFile>();
+
+		if (!gMetadataBackend) {
+			safs::log_err("Failed to initialize metadata backend");
+			throw Exception("Failed to initialize metadata backend");
+		}
+	}
+
 	fs_read_config_file();
 	if (!gMetadataLockfile) {
 		gMetadataLockfile.reset(new Lockfile(kMetadataFilename + std::string(".lock")));
@@ -419,15 +438,17 @@ int fs_init() {
 	return fs_init(false);
 }
 
-#else
+#else   // METARESTORE mode
 int fs_init(const char *fname,int ignoreflag, bool noLock) {
+	gMetadataBackend = std::make_unique<MetadataBackendFile>();
+
 	if (!noLock) {
 		gMetadataLockfile.reset(new Lockfile(fs::dirname(fname) + "/" + kMetadataFilename + ".lock"));
 		gMetadataLockfile->lock(Lockfile::StaleLock::kSwallow);
 	}
 	fs_strinit();
 	chunk_strinit();
-	fs_loadall(fname,ignoreflag);
+	gMetadataBackend->loadall(fname,ignoreflag);
 	return 0;
 }
-#endif
+#endif  // #ifndef METARESTORE

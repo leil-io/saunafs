@@ -4,7 +4,9 @@ add_definitions(-DAPPNAME=sfsmetalogger -DAPP_EXAMPLES_SUBDIR="${METALOGGER_EXAM
 
 collect_sources(METALOGGER)
 
-add_library(metalogger ${METALOGGER_SOURCES} ../master/changelog.cc ../master/masterconn.cc)
+add_library(metalogger ${METALOGGER_SOURCES} ../master/changelog.cc ../master/masterconn.cc
+	../master/metadata_backend_file.cc
+)
 target_link_libraries(metalogger sfscommon)
 
 create_unittest(metalogger ${METALOGGER_TESTS})

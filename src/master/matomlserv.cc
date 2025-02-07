@@ -42,12 +42,14 @@
 #include "common/event_loop.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "common/metadata.h"
 #include "common/saunafs_version.h"
 #include "common/sockets.h"
 #include "config/cfg.h"
 #include "master/filesystem.h"
+#include "master/metadata_backend_common.h"
+#include <master/metadata_backend_interface.h>
 #include "master/personality.h"
+#include "metadata_backend_interface.h"
 #include "protocol/SFSCommunication.h"
 #include "protocol/matoml.h"
 #include "protocol/mltoma.h"
@@ -605,7 +607,7 @@ void matomlserv_changelog_apply_error(matomlserventry *eptr, const uint8_t *data
 				"SAU_MLTOMA_CHANGELOG_APPLY_ERROR, status: %s - storing metadata",
 				saunafs_error_string(recvStatus));
 		gShadowQueue.addRequest(eptr);
-		fs_storeall(MetadataDumper::kBackgroundDump);
+		gMetadataBackend->fs_storeall(MetadataDumper::kBackgroundDump);
 		if (recvStatus == SAUNAFS_ERROR_BADMETADATACHECKSUM) {
 			fs_start_checksum_recalculation();
 		}
