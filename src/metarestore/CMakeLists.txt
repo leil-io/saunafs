@@ -20,13 +20,13 @@ add_library(metarestore ${METARESTORE_SOURCES} ${METARESTORE_MASTER_SOURCES} ${M
   ../master/restore.cc ../master/locks.cc ../master/task_manager.cc ../master/snapshot_task.cc
   ../master/metadata_loader.cc ../master/setgoal_task.cc ../master/settrashtime_task.cc)
 
-target_link_libraries(metarestore sfscommon)
+target_link_libraries(metarestore PRIVATE sfscommon)
 if(JUDY_LIBRARY)
-  target_link_libraries(metarestore ${JUDY_LIBRARY})
+  target_link_libraries(metarestore PRIVATE ${JUDY_LIBRARY})
 endif()
 
 create_unittest(metarestore ${METARESTORE_TESTS})
 
 add_executable(sfsmetarestore ${METARESTORE_MAIN})
-target_link_libraries(sfsmetarestore metarestore sfscommon ${PAM_LIBRARIES})
+target_link_libraries(sfsmetarestore PRIVATE metarestore sfscommon ${PAM_LIBRARIES})
 install(TARGETS sfsmetarestore RUNTIME DESTINATION ${SBIN_SUBDIR})

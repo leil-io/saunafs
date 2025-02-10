@@ -22,5 +22,5 @@ collect_sources(METRICS)
 add_library(metrics ${METRICS_SOURCES})
 
 if (PROMETHEUS_CPP_ENABLE_PULL)
-  target_link_libraries(metrics slogger prometheus-cpp::pull)
+  target_link_libraries(metrics PRIVATE slogger prometheus-cpp::pull)
 endif()

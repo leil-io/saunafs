@@ -60,7 +60,7 @@ add_library(saunafs ${LINK_MODE_MODULE}
 set_target_properties(saunafs PROPERTIES PREFIX "")
 set_target_properties(saunafs PROPERTIES LINK_FLAGS "${WS_LINK_FLAGS}")
 
-target_link_libraries(saunafs epan)
+target_link_libraries(saunafs PRIVATE epan)
 
 install(TARGETS saunafs
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/@CPACK_PACKAGE_NAME@/plugins/${CPACK_PACKAGE_VERSION} NAMELINK_SKIP
