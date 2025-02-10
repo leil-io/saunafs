@@ -27,7 +27,7 @@ jobs:
               with:
                   python-version: "3.x"
 
-            - name: Install SaunaFS dependencies and setup environment
+            - name: Install SaunaFS dependencies, setup environment and build
               run: |
                   sudo mkdir /mnt/hd{b,c,d}
                   cd $GITHUB_WORKSPACE/tests
@@ -35,11 +35,8 @@ jobs:
                   cd $GITHUB_WORKSPACE
                   $GITHUB_WORKSPACE/utils/vcpkg_setup.sh
                   vcpkg install --triplet x64-linux
-
-            - name: Activate virtual environment and build SaunaFS
-              run: |
                   source /var/lib/saunafs_setup_machine_venv/bin/activate
-                  cmake --workflow --preset=test-vcpkg
+                  VCPKG_ROOT="$HOME/vcpkg/" cmake --workflow --preset=test-vcpkg
 
             - name: Run Unit Tests suite
               run: |
