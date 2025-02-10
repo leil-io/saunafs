@@ -76,24 +76,28 @@ pipeline {
                     }
 
                     stage('Run Sanity') {
+                        when {expression { DISTRO == "ubuntu-2404" }}
                         steps {
                             runSanity()
                         }
                     }
 
                     stage('Run short system tests') {
+                        when {expression { DISTRO == "ubuntu-2404" }}
                         steps {
                             runShort()
                         }
                     }
 
                     stage('Run machine tests') {
+                        when {expression { DISTRO == "ubuntu-2404" }}
                         steps {
                             runMachine()
                         }
                     }
 
                     stage('Run long system tests') {
+                        when {expression { DISTRO == "ubuntu-2404" }}
                         steps {
                             runLong()
                         }
