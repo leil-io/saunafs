@@ -1,28 +1,23 @@
 include(DownloadExternal)
 
 # Find GoogleTest
-
 if(ENABLE_TESTS)
   enable_testing()
   find_package(GTest CONFIG REQUIRED)
 endif()
 
 # Find fmt and spdlog
-
-#hunter_add_package(fmt)
-find_package(FMT CONFIG REQUIRED)
-
-#hunter_add_package(spdlog)
+find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 # Find standard libraries
-
 find_package(Socket REQUIRED)
 find_package(Threads REQUIRED)
 
 # Find yaml-cpp
 find_package(yaml-cpp CONFIG REQUIRED)
 
+# Find FUSE3
 if(NOT MINGW)
   find_package(FUSE3)
   if(NOT (FUSE3_FOUND))
@@ -30,31 +25,28 @@ if(NOT MINGW)
   endif()
 endif()
 
+# Find rt
 find_library(RT_LIBRARY rt)
 message(STATUS "RT_LIBRARY: ${RT_LIBRARY}")
 
+# Find JEMALLOC or TCMALLOC
 if(ENABLE_TCMALLOC AND ENABLE_JEMALLOC)
     message(FATAL_ERROR "You cannot enable both TCMALLOC and JEMALLOC simultaneously")
 endif()
-
 if(ENABLE_TCMALLOC)
   find_library(TCMALLOC_LIBRARY NAMES tcmalloc_minimal)
   message(STATUS "TCMALLOC_LIBRARY: ${TCMALLOC_LIBRARY}")
 endif()
-
 if(ENABLE_JEMALLOC)
   find_library(JEMALLOC_LIBRARY NAMES jemalloc)
   message(STATUS "JEMALLOC_LIBRARY: ${JEMALLOC_LIBRARY}")
 endif()
 
 # Find extra binaries
-
 find_program(A2X_BINARY a2x)
 message(STATUS "a2x: ${A2X_BINARY}")
 
 # Find Zlib
-
-#hunter_add_package(ZLIB)
 find_package(ZLIB)
 if(ZLIB_FOUND)
   message(STATUS "Found Zlib ${ZLIB_VERSION_STRING}")
@@ -67,7 +59,6 @@ else()
 endif()
 
 # Find Systemd
-
 INCLUDE(FindPkgConfig)
 pkg_check_modules(SYSTEMD libsystemd)
 if(SYSTEMD_FOUND)
@@ -82,7 +73,6 @@ endif()
 find_package(Boost CONFIG REQUIRED COMPONENTS filesystem iostreams program_options system)
 
 # Find Thrift
-
 find_package(Thrift COMPONENTS library)
 if(THRIFT_FOUND)
   message(STATUS "Found Thrift")
@@ -93,7 +83,6 @@ else()
 endif()
 
 # Find Polonaise
-
 set(POLONAISE_REQUIRED_VERSION 0.3.1)
 find_package(Polonaise ${POLONAISE_REQUIRED_VERSION} EXACT QUIET NO_MODULE NO_CMAKE_BUILDS_PATH)
 if(POLONAISE_FOUND)
@@ -109,7 +98,6 @@ else()
 endif()
 
 # Find crcutil
-
 if(NOT BIG_ENDIAN)
   INCLUDE(FindPkgConfig)
   pkg_check_modules(CRCUTIL libcrcutil)
@@ -136,7 +124,6 @@ endif()
 
 
 # Find Judy
-
 find_package(Judy)
 if(JUDY_FOUND)
   set(SAUNAFS_HAVE_JUDY YES)
@@ -144,18 +131,15 @@ if(JUDY_FOUND)
 endif()
 
 # Find PAM libraries
-
 find_package(PAM)
 if(PAM_FOUND)
   set(SAUNAFS_HAVE_PAM YES)
 endif()
 
 # Find BerkeleyDB
-
 find_package(DB 11.2.5.2)
 
 # Find Intel Storage Acceleration library
-
 find_library(ISAL_LIBRARY isal)
 if(APPLE)
   find_library(ISAL_PIC_LIBRARY libisal.dylib)
@@ -172,7 +156,6 @@ message(STATUS "ISAL(Intel Storage Acceleration) LIBRARY: ${ISAL_LIBRARY}")
 message(STATUS "ISAL PIC LIBRARY: ${ISAL_PIC_LIBRARY}")
 
 # Download nfs-ganesha
-
 if(ENABLE_NFS_GANESHA)
   download_external(NFS_GANESHA "nfs-ganesha-4.3"
                     "https://github.com/nfs-ganesha/nfs-ganesha/archive/V4.3.zip")
@@ -180,6 +163,7 @@ if(ENABLE_NFS_GANESHA)
                     "https://github.com/nfs-ganesha/ntirpc/archive/v4.3.zip")
 endif()
 
+# Find Prometheus
 find_package(prometheus-cpp CONFIG)
 if (PROMETHEUS_CPP_ENABLE_PULL)
     message(STATUS "Found Prometheus C++ Client Library")

@@ -5,24 +5,24 @@ install(PROGRAMS cpp-interpreter.sh DESTINATION ${BIN_SUBDIR})
 # a library which causes pread/pwrite/close on chunks to return EIO
 add_library(chunk_operations_eio SHARED chunk_operations_eio.c)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  target_link_libraries(chunk_operations_eio dl)
+  target_link_libraries(chunk_operations_eio PRIVATE dl)
 endif()
 install(TARGETS chunk_operations_eio DESTINATION ${LIB_SUBDIR})
 
 # converter to xor chunks
 add_executable(chunk_converter chunk_converter.cc)
-target_link_libraries(chunk_converter ${ZLIB_LIBRARY})
+target_link_libraries(chunk_converter PRIVATE ${ZLIB_LIBRARY})
 install(TARGETS chunk_converter RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # crc converter
 add_executable(crc_converter crc_converter.cc)
-target_link_libraries(crc_converter ${ZLIB_LIBRARY})
+target_link_libraries(crc_converter PRIVATE ${ZLIB_LIBRARY})
 install(TARGETS crc_converter RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # redirecting bind library
 add_library(redirect_bind SHARED redirect_bind.c)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  target_link_libraries(redirect_bind dl)
+  target_link_libraries(redirect_bind PRIVATE dl)
 endif()
 install(TARGETS redirect_bind DESTINATION ${LIB_SUBDIR})
 
@@ -52,12 +52,12 @@ install(TARGETS posixlockcmd RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # ping client
 add_executable(sfsping sfs_ping.cc)
-target_link_libraries(sfsping sfscommon)
+target_link_libraries(sfsping PRIVATE sfscommon)
 install(TARGETS sfsping RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # ping server
 add_executable(sfspingserv sfs_pingserv.cc)
-target_link_libraries(sfspingserv sfscommon)
+target_link_libraries(sfspingserv PRIVATE sfscommon)
 install(TARGETS sfspingserv RUNTIME DESTINATION ${BIN_SUBDIR})
 
 # ping pong fcntl lock test
@@ -74,6 +74,6 @@ install(TARGETS big-session-metadata-benchmark RUNTIME DESTINATION ${BIN_SUBDIR}
 
 add_library(slow_chunk_scan SHARED slow_chunk_scan.c)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  target_link_libraries(slow_chunk_scan dl)
+  target_link_libraries(slow_chunk_scan PRIVATE dl)
 endif()
 install(TARGETS slow_chunk_scan DESTINATION ${LIB_SUBDIR})

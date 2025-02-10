@@ -97,7 +97,6 @@ set(METALOGGER_EXAMPLES_SUBDIR  "${USR_SHARE_DOC_NO_SLASH}/${METALOGGER_NAME}/${
 set(SFSMASTER_EXAMPLES_SUBDIR   "${USR_SHARE_DOC_NO_SLASH}/${MASTER_NAME}/${EXAMPLES_SUBDIR}")
 set(URAFT_EXAMPLES_SUBDIR       "${USR_SHARE_DOC_NO_SLASH}/${URAFT_NAME}/${EXAMPLES_SUBDIR}")
 
-
 # Aliases
 set(SBIN_PATH                   "${SBIN_SUBDIR}")
 set(LIB_PATH                    "${LIB_SUBDIR}")
@@ -194,10 +193,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "coverage" OR CODE_COVERAGE)
   endif()
 endif()
 
-
 string(TIMESTAMP BUILD_TIMESTAMP)
 add_compile_definitions(BUILD_TIME="${BUILD_TIMESTAMP}")
-
 
 if(VERSION_SUFFIX)
   set(PACKAGE_VERSION "${DEFAULT_MIN_VERSION}${VERSION_SUFFIX}")
@@ -370,7 +367,6 @@ include_directories(${CMAKE_BINARY_DIR}) # Here we have generated config.h
 # main.cc shared by some SaunaFS applications
 set(MAIN_SRC ${CMAKE_SOURCE_DIR}/src/main/main.cc)
 
-
 if(ZLIB_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
 endif()
@@ -436,6 +432,5 @@ if (ENABLE_URAFT)
 endif()
 
 include(Packing)
-
 
 include(GoogleTest)
