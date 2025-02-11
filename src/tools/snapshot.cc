@@ -138,6 +138,16 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 	int status;
 	uint32_t i, l;
 
+#ifdef _WIN32
+	for (i = 0; i < srcelements; i++) {
+		int srcname_len = strlen(srcnames[i]);
+		if (srcnames[i][srcname_len - 1] == '/' ||
+		    srcnames[i][srcname_len - 1] == '\\') {
+			srcnames[i][srcname_len - 1] = 0;
+		}
+	}
+#endif
+
 	if (stat(dstname, &dst) < 0) {  // dst does not exist
 		if (errno != ENOENT) {
 			printf("%s: stat error: %s\n", dstname, strerr(errno));
@@ -147,7 +157,13 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 			printf("can snapshot multiple elements only into existing directory\n");
 			return -1;
 		}
-#ifndef _WIN32
+#ifdef _WIN32
+		if (stat(srcnames[0], &sst) < 0) {
+			printf("%s: stat error: %s\n", srcnames[0], strerr(errno));
+			return -1;
+		}
+
+#else
 		if (lstat(srcnames[0], &sst) < 0) {
 			printf("%s: lstat error: %s\n", srcnames[0], strerr(errno));
 			return -1;
@@ -184,6 +200,13 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 			printf("directory %s does not exist\n", dstname);
 			return -1;
 		}
+
+#ifdef _WIN32
+		uint32_t srcinode;
+		int fd = open_master_conn(srcnames[0], &srcinode, NULL, true);
+		if (fd < 0) { return -1; }
+		sst.st_ino = srcinode;
+#endif
 		return make_snapshot(to, base, srcnames[0], sst.st_ino, canowerwrite, long_wait, ignore_missing_src, initial_batch_size);
 	} else {  // dst exists
 #ifdef _WIN32
@@ -202,7 +225,13 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 				printf("can snapshot multiple elements only into existing directory\n");
 				return -1;
 			}
-#ifndef _WIN32
+#ifdef _WIN32
+			if (stat(srcnames[0], &sst) < 0) {
+				printf("%s: stat error: %s\n", srcnames[0], strerr(errno));
+				return -1;
+			}
+
+#else
 			if (lstat(srcnames[0], &sst) < 0) {
 				printf("%s: lstat error: %s\n", srcnames[0], strerr(errno));
 				return -1;
@@ -218,11 +247,25 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 				printf("%s: basename error\n", to);
 				return -1;
 			}
+#ifdef _WIN32
+			uint32_t srcinode;
+			int fd = open_master_conn(srcnames[0], &srcinode, NULL, true);
+			if (fd < 0) { return -1; }
+			sst.st_ino = srcinode;
+#endif
 			return make_snapshot(dir, base, srcnames[0], sst.st_ino, canowerwrite, long_wait, ignore_missing_src, initial_batch_size);
 		} else {  // dst is a directory
 			status = 0;
 			for (i = 0; i < srcelements; i++) {
-#ifndef _WIN32
+#ifdef _WIN32
+				if (stat(srcnames[i], &sst) < 0) {
+					printf("%s: stat error: %lu\n", srcnames[i],
+					       GetLastError());
+					status = -1;
+					continue;
+				}
+
+#else
 				if (lstat(srcnames[i], &sst) < 0) {
 					printf("%s: lstat error: %s\n", srcnames[i], strerr(errno));
 					status = -1;
@@ -264,6 +307,13 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 							continue;
 						}
 					}
+#ifdef _WIN32
+					uint32_t srcinode;
+					int fd =
+					    open_master_conn(srcnames[i], &srcinode, NULL, true);
+					if (fd < 0) { return -1; }
+					sst.st_ino = srcinode;
+#endif
 					if (make_snapshot(to, base, srcnames[i], sst.st_ino, canowerwrite, long_wait,
 					                  ignore_missing_src, initial_batch_size) < 0) {
 						status = -1;
@@ -293,6 +343,13 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 							status = -1;
 							continue;
 						}
+#ifdef _WIN32
+						uint32_t srcinode;
+						int fd = open_master_conn(srcnames[i], &srcinode, NULL,
+						                          true);
+						if (fd < 0) { return -1; }
+						sst.st_ino = srcinode;
+#endif
 						if (make_snapshot(to, base, srcnames[i], sst.st_ino, canowerwrite,
 						                  long_wait, ignore_missing_src, initial_batch_size) < 0) {
 							status = -1;
@@ -305,6 +362,13 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 							status = -1;
 							continue;
 						}
+#ifdef _WIN32
+						uint32_t srcinode;
+						int fd = open_master_conn(srcnames[i], &srcinode, NULL,
+						                          true);
+						if (fd < 0) { return -1; }
+						sst.st_ino = srcinode;
+#endif
 						if (make_snapshot(dir, base, srcnames[i], sst.st_ino, canowerwrite,
 						                  long_wait, ignore_missing_src, initial_batch_size) < 0) {
 							status = -1;
