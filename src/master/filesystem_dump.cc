@@ -18,13 +18,13 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef METARESTORE
+
 #include "common/platform.h"
 
 #include "master/filesystem_freenode.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_node.h"
-
-#ifdef METARESTORE
 
 void fs_dumpedge(FSNodeDirectory *parent, FSNode *child, const std::string &name) {
 	if (parent == NULL) {

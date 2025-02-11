@@ -18,9 +18,10 @@
 
 #include "common/platform.h"
 
-#include "master/metadata_loader.h"
+#include <master/metadata_loader.h>
 
-#include "master/filesystem_store.h"
+#include <master/metadata_backend_interface.h>
+#include <slogger/slogger.h>
 
 bool MetadataLoader::loadSection(const MetadataSection &section,
                                  Options options) {

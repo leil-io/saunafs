@@ -42,13 +42,14 @@
 #include "common/event_loop.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "common/metadata.h"
 #include "common/rotate_files.h"
 #include "common/saunafs_version.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
 #include "config/cfg.h"
 #include "master/changelog.h"
+#include "master/metadata_backend_common.h"
+#include "master/metadata_backend_interface.h"
 #include "protocol/SFSCommunication.h"
 #include "protocol/matoml.h"
 #include "protocol/mltoma.h"
@@ -506,7 +507,7 @@ void masterconn_sessionsdownloadinit(void) {
 
 int masterconn_metadata_check(const std::string& name) {
 	try {
-		metadataGetVersion(name);
+		gMetadataBackend->getVersion(name);
 		return 0;
 	} catch (MetadataCheckException& ex) {
 		safs_pretty_syslog(LOG_NOTICE, "Verification of the downloaded metadata file failed: %s", ex.what());
@@ -1233,7 +1234,7 @@ int masterconn_init(void) {
 	eptr->sock  = -1;
 	eptr->state = MasterConnectionState::kNone;
 #ifdef METALOGGER
-	changelogsMigrateFrom_1_6_29("changelog_ml");
+	gMetadataBackend->changelogsMigrateFrom_1_6_29("changelog_ml");
 	masterconn_findlastlogversion();
 #endif /* #ifdef METALOGGER */
 	if (masterconn_initconnect(eptr)<0) {
