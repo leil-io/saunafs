@@ -2048,6 +2048,31 @@ void matoclserv_sau_full_path_by_inode(matoclserventry *eptr, const uint8_t *dat
 	eptr->sesdata->currentopstats[3]++;
 }
 
+void matoclserv_sau_inode_by_path(matoclserventry *eptr, const uint8_t *data,
+                                  uint32_t length) {
+	uint32_t msgid;
+	std::string path;
+	uint32_t uid, gid;
+	uint32_t inode;
+	uint8_t status = SAUNAFS_STATUS_OK;
+
+	cltoma::inodeByPath::deserialize(data, length, msgid, path, uid, gid);
+
+	status = matoclserv_check_group_cache(eptr, gid);
+	if (status == SAUNAFS_STATUS_OK) {
+		FsContext context = matoclserv_get_context(eptr, uid, gid);
+		status = fs_inode_by_path(context, path, inode);
+	}
+
+	if (status != SAUNAFS_STATUS_OK) {
+		matoclserv_createpacket(eptr,
+		                        matocl::inodeByPath::build(msgid, status));
+	} else {
+		matoclserv_createpacket(eptr, matocl::inodeByPath::build(msgid, inode));
+	}
+	eptr->sesdata->currentopstats[3]++;
+}
+
 void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode,uid,gid;
 	uint8_t nleng;
@@ -5134,6 +5159,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 					break;
 				case SAU_CLTOMA_FULL_PATH_BY_INODE:
 					matoclserv_sau_full_path_by_inode(eptr, data, length);
+					break;
+				case SAU_CLTOMA_INODE_BY_PATH:
+					matoclserv_sau_inode_by_path(eptr, data, length);
 					break;
 				case SAU_CLTOMA_CSERV_LIST:
 					matoclserv_sau_cserv_list(eptr, data, length);

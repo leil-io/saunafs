@@ -34,10 +34,13 @@
 
 #include "common/datapack.h"
 #include "common/serialization.h"
+#include "common/server_connection.h"	
 #include "common/special_inode_defs.h"
 #include "common/sockets.h"
 #include "common/stat_defs.h"
 #include "errors/sfserr.h"
+#include "protocol/cltoma.h"
+#include "protocol/matocl.h"
 #include "tools/tools_common_functions.h"
 
 struct master_info_t {
@@ -150,7 +153,34 @@ static int read_master_info(const char *name, master_info_t *info) {
 	return 0;
 }
 
-int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,[[maybe_unused]] bool needrwfs) {
+#ifdef _WIN32
+int get_inode_by_path(int sd, std::string path, uint32_t &inode) {
+	try {
+		uint32_t messageId = 0;
+		MessageBuffer request;
+		cltoma::inodeByPath::serialize(request, messageId, path, 0, 0);
+		MessageBuffer response = ServerConnection::sendAndReceive(
+		    sd, request, SAU_MATOCL_INODE_BY_PATH);
+		PacketVersion version;
+		deserializePacketVersionNoHeader(response, version);
+		if (version == matocl::inodeByPath::kStatusPacketVersion) {
+			uint8_t status;
+			matocl::inodeByPath::deserialize(response, messageId, status);
+			throw Exception(std::string(path) + ": failed", status);
+		}
+		matocl::inodeByPath::deserialize(response, messageId, inode);
+	} catch (Exception &e) {
+		fprintf(stderr, "%s\n", e.what());
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	return 0;
+}
+#endif
+
+int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,
+                     [[maybe_unused]] bool needrwfs) {
 	char rpath[PATH_MAX + 1];
 	struct stat stb;
 	[[maybe_unused]] struct statvfs stvfsb;
@@ -158,7 +188,11 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,[[maybe_unu
 
 	rpath[0] = 0;
 #ifdef _WIN32
-	if (GetFullPathName(name, PATH_MAX, rpath, NULL) == 0) {
+	std::string name_to_use = std::string(name);
+	if (name[strlen(name) - 1] == '\\' || name[strlen(name) - 1] == '/') {
+		name_to_use = std::string(name).substr(0, strlen(name) - 1);
+	}
+	if (GetFullPathName(name_to_use.c_str(), PATH_MAX, rpath, NULL) == 0) {
 		printf("%s: GetFullPathName error: %lu\n", name, GetLastError());
 		return -1;
 	}
@@ -184,6 +218,15 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,[[maybe_unu
 		return -1;
 	}
 	*inode = stb.st_ino;
+#ifdef _WIN32
+	std::string lookup_rpath;
+	if (strlen(rpath) > 3) {
+		lookup_rpath = std::string(rpath).substr(2);
+		std::replace(lookup_rpath.begin(), lookup_rpath.end(), '\\', '/');
+	} else {
+		lookup_rpath = "/";
+	}
+#endif
 	if (mode) {
 		*mode = stb.st_mode;
 	}
@@ -209,6 +252,8 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,[[maybe_unu
 
 		if (rpath_len == 4 && rpath[2] == '\\' && rpath[3] == '.') {
 			strcpy(rpath + rpath_len - 1, SPECIAL_FILE_NAME_MASTERINFO);
+		} else if (rpath_len == 3 && rpath[2] == '\\') {
+			strcpy(rpath + rpath_len, SPECIAL_FILE_NAME_MASTERINFO);
 		} else {
 			strcpy(rpath + rpath_len, "/" SPECIAL_FILE_NAME_MASTERINFO);
 		}
@@ -243,6 +288,19 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,[[maybe_unu
 				tcpclose(sd);
 				return -1;
 			}
+
+#ifdef _WIN32
+			if (lookup_rpath == "/") {
+				*inode = SPECIAL_INODE_ROOT;
+			} else {
+				auto err = get_inode_by_path(sd, lookup_rpath, *inode);
+				if (err != SAUNAFS_STATUS_OK) {
+					printf("%s: can't get inode from path\n", name);
+					tcpclose(sd);
+					return -1;
+				}
+			}
+#endif
 
 			gCurrentMaster = sd;
 			return sd;

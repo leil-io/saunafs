@@ -507,6 +507,34 @@ uint8_t fs_full_path_by_inode(const FsContext &context, uint32_t initial_inode,
 	return SAUNAFS_STATUS_OK;
 }
 
+uint8_t fs_inode_by_path(const FsContext &context, const std::string path,
+                         uint32_t &inode) {
+	uint32_t current_inode = context.rootinode();
+	FSNode *current_node = fsnodes_id_to_node(current_inode);
+	std::string current_name = "";
+	size_t name_position = 1;
+
+	while (name_position <= path.length()) {
+		if (name_position == path.length() || path[name_position] == '/') {
+			HString hname = HString(current_name);
+			current_node = fsnodes_lookup(
+			    static_cast<FSNodeDirectory *>(current_node), hname);
+			if (!current_node) {
+				inode = 0;
+				return SAUNAFS_ERROR_ENOENT;
+			}
+			current_inode = current_node->id;
+			current_name = "";
+		} else {
+			current_name += path[name_position];
+		}
+		name_position++;
+	}
+
+	inode = current_inode;
+	return SAUNAFS_STATUS_OK;
+}
+
 uint8_t fs_getattr(const FsContext &context, uint32_t inode, Attributes &attr) {
 	FSNode *p;
 

@@ -362,6 +362,10 @@ void dirname_inplace(char *path) {
 		path[0] = '.';
 		path[1] = '\0';
 		return;
+	} else if (strlen(path) == 3 && path[1] == ':' && path[2] == '\\') {
+		path[3] = '.';
+		path[4] = '\0';
+		return;
 	}
 
 	/* Strip trailing slashes */
