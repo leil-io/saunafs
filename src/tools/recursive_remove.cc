@@ -59,8 +59,30 @@ static int recursive_remove(const char *file_name, int long_wait) {
 	sigaddset(&set, SIGUSR1);
 	sigprocmask(SIG_BLOCK, &set, NULL);
 
+	auto find_last_delimiter_pos = [](const std::string &parent_path) {
+		std::size_t last_pos_delimiter1 = parent_path.find_last_of("/");
+		std::size_t last_pos_delimiter2 = parent_path.find_last_of("\\");
+		std::size_t last_pos_delimiter = std::string::npos;
+
+		if (last_pos_delimiter1 != std::string::npos &&
+		    last_pos_delimiter2 != std::string::npos) {
+			last_pos_delimiter =
+			    std::max(last_pos_delimiter1, last_pos_delimiter2);
+		} else {
+			last_pos_delimiter = (last_pos_delimiter1 == std::string::npos)
+			                         ? last_pos_delimiter2
+			                         : last_pos_delimiter1;
+		}
+
+		return last_pos_delimiter;
+	};
+
 #ifdef _WIN32
-	if (GetFullPathName(file_name, PATH_MAX, path_buf, NULL) == 0) {
+	std::string name_to_use = std::string(file_name);
+	if (file_name[strlen(file_name) - 1] == '\\' || file_name[strlen(file_name) - 1] == '/') {
+		name_to_use = std::string(file_name).substr(0, strlen(file_name) - 1);
+	}
+	if (GetFullPathName(name_to_use.c_str(), PATH_MAX, path_buf, NULL) == 0) {
 		printf("%s: GetFullPathName error: %lu\n", file_name, GetLastError());
 		return -1;
 	}
@@ -71,7 +93,7 @@ static int recursive_remove(const char *file_name, int long_wait) {
 	}
 #endif
 	std::string parent_path(path_buf);
-	parent_path = parent_path.substr(0, parent_path.find_last_of("/"));
+	parent_path = parent_path.substr(0, find_last_delimiter_pos(parent_path));
 
 	fd = open_master_conn(parent_path.c_str(), &parent, nullptr, false);
 	if (fd < 0) {
@@ -87,7 +109,7 @@ static int recursive_remove(const char *file_name, int long_wait) {
 #endif
 
 	std::string fname(path_buf);
-	std::size_t pos = fname.find_last_of("/");
+	std::size_t pos = find_last_delimiter_pos(fname);
 	if (pos != std::string::npos) {
 		fname = fname.substr(pos + 1);
 	}
