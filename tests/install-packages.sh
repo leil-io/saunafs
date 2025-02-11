@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 
 readonly self="$(readlink -f "${BASH_SOURCE[0]}")"
 readonly script_dir="$(dirname "$self")"
@@ -207,7 +208,7 @@ esac
 
 case "${release}" in
 	LinuxMint/*|Ubuntu/*|Debian/*)
-		if "$script_dir/llvm.sh 19"; then
+		if ! "$script_dir/llvm.sh" 19; then
 			echo "Error: Failed to install Clang 19 using llvm.sh script."
 			exit 1
 		fi
