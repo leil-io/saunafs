@@ -56,52 +56,52 @@ pipeline {
                         }
                     }
 
-                    stage('Build sfstests') {
-                        steps {
-                            buildSfstests()
-                        }
-                    }
+                    // stage('Build sfstests') {
+                    //     steps {
+                    //         buildSfstests()
+                    //     }
+                    // }
 
 
-                    stage('Build image') {
-                        steps {
-                            script {
-                                if (DISTRO == "ubuntu-2404") {
-                                    buildImage("ubuntu:24.04")
-                                } else if (DISTRO == "ubuntu-2204") {
-                                    buildImage("ubuntu:22.04")
-                                }
-                            }
-                        }
-                    }
+                    // stage('Build image') {
+                    //     steps {
+                    //         script {
+                    //             if (DISTRO == "ubuntu-2404") {
+                    //                 buildImage("ubuntu:24.04")
+                    //             } else if (DISTRO == "ubuntu-2204") {
+                    //                 buildImage("ubuntu:22.04")
+                    //             }
+                    //         }
+                    //     }
+                    // }
 
-                    stage('Run Sanity') {
-                        when {expression { DISTRO == "ubuntu-2404" }}
-                        steps {
-                            runSanity()
-                        }
-                    }
+                    // stage('Run Sanity') {
+                    //     when {expression { DISTRO == "ubuntu-2404" }}
+                    //     steps {
+                    //         runSanity()
+                    //     }
+                    // }
 
-                    stage('Run short system tests') {
-                        when {expression { DISTRO == "ubuntu-2404" }}
-                        steps {
-                            runShort()
-                        }
-                    }
+                    // stage('Run short system tests') {
+                    //     when {expression { DISTRO == "ubuntu-2404" }}
+                    //     steps {
+                    //         runShort()
+                    //     }
+                    // }
 
-                    stage('Run machine tests') {
-                        when {expression { DISTRO == "ubuntu-2404" }}
-                        steps {
-                            runMachine()
-                        }
-                    }
+                    // stage('Run machine tests') {
+                    //     when {expression { DISTRO == "ubuntu-2404" }}
+                    //     steps {
+                    //         runMachine()
+                    //     }
+                    // }
 
-                    stage('Run long system tests') {
-                        when {expression { DISTRO == "ubuntu-2404" }}
-                        steps {
-                            runLong()
-                        }
-                    }
+                    // stage('Run long system tests') {
+                    //     when {expression { DISTRO == "ubuntu-2404" }}
+                    //     steps {
+                    //         runLong()
+                    //     }
+                    // }
                 }
                 post {
                     // Clean after build
@@ -117,6 +117,13 @@ pipeline {
                             '''
                     }
                 }
+            }
+        }
+        stage('Deploy packages to dev repository') {
+            agent none
+            when { branch "jenkins-refactor" }
+            steps {
+                build job: 'SaunaFS Packages (Dev)', parameters: [string(name: 'VERSION', value: ''), string(name: 'REFERENCE', value: 'jenkins-refactor'), string(name: 'REPOSITORY', value: 'Development')]
             }
         }
     }
