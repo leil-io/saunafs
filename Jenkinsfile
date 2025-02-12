@@ -119,5 +119,12 @@ pipeline {
                 }
             }
         }
+        stage('Deploy packages to dev repository') {
+            agent none
+            when { branch "dev" }
+            steps {
+                build job: 'SaunaFS Packages (Dev)', parameters: [string(name: 'VERSION', value: ''), string(name: 'REFERENCE', value: 'dev'), string(name: 'REPOSITORY', value: 'Development')]
+            }
+        }
     }
 }
