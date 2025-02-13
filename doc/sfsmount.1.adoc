@@ -237,6 +237,10 @@ Enable/disable logging to Linux notification area (default: 0).
 Set period of message suppression in seconds for logging on notification area 
 (default: 10).
 
+*-o statfscachetimeout=*'MSEC'::
+Set statfs cache timeout in milliseconds. When equal to 0 the cache is 
+disabled (default: 0).
+
 *-o usequotainvolumesize=*'0|1'::
 When set to 1, use the user and group specific quota hard limit to calculate
 the volume size (default: 0).

@@ -238,6 +238,12 @@ static std::atomic<bool> gDirectIo(false);
 static uint32_t lock_request_counter = 0;
 static std::mutex lock_request_mutex;
 
+static std::mutex statfsCacheMutex;
+static std::atomic<uint32_t> gStatfsCacheTimeout(0);
+// uid -> (timer, statvfs)
+static std::unordered_map<uint32_t, Timer> gStatfsCacheTimer;
+static std::unordered_map<uint32_t, struct statvfs> gStatfsCache;
+
 #ifdef _WIN32
 uint8_t session_flags;
 
@@ -683,6 +689,19 @@ struct statvfs statfs(Context &ctx, Inode ino) {
 	struct statvfs stfsbuf;
 	memset(&stfsbuf,0,sizeof(stfsbuf));
 
+	if (gStatfsCacheTimeout > 0) {
+		std::unique_lock<std::mutex> gStatfsCacheLock(statfsCacheMutex);
+		auto timer = gStatfsCacheTimer.find(ctx.uid);
+		if (timer != gStatfsCacheTimer.end() &&
+		    timer->second.elapsed_ms() < gStatfsCacheTimeout &&
+		    gStatfsCache.contains(ctx.uid)) {
+			stfsbuf = gStatfsCache[ctx.uid];
+			gStatfsCacheLock.unlock();
+			oplog_printf(ctx, "statfs: sending data from statfscache");
+			return stfsbuf;
+		}
+	}
+
 	stats_inc(OP_STATFS);
 	if (debug_mode) {
 		oplog_printf(ctx, "statfs (%lu)", (unsigned long int)ino);
@@ -773,6 +792,12 @@ struct statvfs statfs(Context &ctx, Inode ino) {
 	stfsbuf.f_ffree = MAX_REGULAR_INODE - inodes;
 	stfsbuf.f_favail = MAX_REGULAR_INODE - inodes;
 	//stfsbuf.f_flag = ST_RDONLY;
+
+	if (gStatfsCacheTimeout > 0) {
+		std::lock_guard<std::mutex> gStatfsCacheLock(statfsCacheMutex);
+		gStatfsCache[ctx.uid] = stfsbuf;
+		gStatfsCacheTimer[ctx.uid] = Timer();
+	}
 	oplog_printf(ctx, "statfs (%lu): OK (%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu32 ")",
 			(unsigned long int)ino,
 			totalspace,
@@ -3485,7 +3510,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 		int mounting_uid_, int mounting_gid_, std::unordered_set<uint32_t> &allowed_users_,
 		bool ignore_utimens_update_,
 #endif
-		bool ignore_flush_, bool use_quota_in_volume_size_
+		bool ignore_flush_, unsigned statfs_cache_timeout_, bool use_quota_in_volume_size_
 		) {
 #ifdef _WIN32
 	mounting_uid = mounting_uid_;
@@ -3494,6 +3519,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 	gIgnoreUtimensUpdate = ignore_utimens_update_;
 #endif
 	gIgnoreFlush = ignore_flush_;
+	gStatfsCacheTimeout = statfs_cache_timeout_;
 	gUseQuotaInVolumeSize = use_quota_in_volume_size_;
 	debug_mode = debug_mode_;
 	keep_cache = keep_cache_;
@@ -3527,6 +3553,7 @@ void init(int debug_mode_, int keep_cache_, double direntry_cache_timeout_, unsi
 
 	gTweaks.registerVariable("DirectIO", gDirectIo);
 	gTweaks.registerVariable("IgnoreFlush", gIgnoreFlush);
+	gTweaks.registerVariable("StatfsCacheTimeout", gStatfsCacheTimeout);
 	gTweaks.registerVariable("UseQuotaInVolumeSize", gUseQuotaInVolumeSize);
 #ifdef _WIN32
 	gTweaks.registerVariable("IgnoreUtimens", gIgnoreUtimensUpdate);
@@ -3600,7 +3627,7 @@ void fs_init(FsInitParams &params) {
 		params.mounting_uid, params.mounting_gid, params.allowed_users,
 		params.ignore_utimens_update,
 #endif
-		params.ignore_flush, params.use_quota_in_volume_size
+		params.ignore_flush, params.statfs_cache_timeout, params.use_quota_in_volume_size
 		);
 }
 
