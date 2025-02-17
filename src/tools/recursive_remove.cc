@@ -60,38 +60,33 @@ static int recursive_remove(const char *file_name, int long_wait) {
 	sigprocmask(SIG_BLOCK, &set, NULL);
 
 	auto find_last_delimiter_pos = [](const std::string &parent_path) {
-		std::size_t last_pos_delimiter1 = parent_path.find_last_of("/");
-		std::size_t last_pos_delimiter2 = parent_path.find_last_of("\\");
+		std::size_t last_pos_delimiter_unix = parent_path.find_last_of("/");
+		std::size_t last_pos_delimiter_win = parent_path.find_last_of("\\");
 		std::size_t last_pos_delimiter = std::string::npos;
 
-		if (last_pos_delimiter1 != std::string::npos &&
-		    last_pos_delimiter2 != std::string::npos) {
+		if (last_pos_delimiter_unix != std::string::npos &&
+		    last_pos_delimiter_win != std::string::npos) {
 			last_pos_delimiter =
-			    std::max(last_pos_delimiter1, last_pos_delimiter2);
+			    std::max(last_pos_delimiter_unix, last_pos_delimiter_win);
 		} else {
-			last_pos_delimiter = (last_pos_delimiter1 == std::string::npos)
-			                         ? last_pos_delimiter2
-			                         : last_pos_delimiter1;
+			last_pos_delimiter = (last_pos_delimiter_unix == std::string::npos)
+			                         ? last_pos_delimiter_win
+			                         : last_pos_delimiter_unix;
 		}
 
 		return last_pos_delimiter;
 	};
 
+std::string name_to_use = std::string(file_name);
 #ifdef _WIN32
-	std::string name_to_use = std::string(file_name);
 	if (file_name[strlen(file_name) - 1] == '\\' || file_name[strlen(file_name) - 1] == '/') {
 		name_to_use = std::string(file_name).substr(0, strlen(file_name) - 1);
 	}
-	if (GetFullPathName(name_to_use.c_str(), PATH_MAX, path_buf, NULL) == 0) {
-		printf("%s: GetFullPathName error: %lu\n", file_name, GetLastError());
-		return -1;
-	}
-#else
-	if (realpath(file_name, path_buf) == nullptr) {
-		printf("%s: Resolving path returned error\n", file_name);
-		return -1;
-	}
 #endif
+	if (!get_full_path(name_to_use.c_str(), path_buf)) {
+		printf("%s: get_full_path error\n", file_name);
+		return -1;
+	}
 	std::string parent_path(path_buf);
 	parent_path = parent_path.substr(0, find_last_delimiter_pos(parent_path));
 

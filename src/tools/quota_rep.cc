@@ -124,16 +124,9 @@ static void quota_print_rep(const std::string &path, uint32_t path_inode,
 
 	char rpath[PATH_MAX + 1];
 	std::string real_path;
-#ifdef _WIN32
-	if (GetFullPathName(path.c_str(), PATH_MAX, rpath, NULL) != 0) {
+	if (get_full_path(path.c_str(), rpath)) {
 		real_path = rpath;
-	}
-#else
-	if (realpath(path.c_str(), rpath)) {
-		real_path = rpath;
-	}
-#endif
-	else {
+	} else {
 		real_path = path;
 	}
 

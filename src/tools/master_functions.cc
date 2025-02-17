@@ -157,25 +157,42 @@ static int read_master_info(const char *name, master_info_t *info) {
 int get_inode_by_path(int sd, std::string path, uint32_t &inode) {
 	try {
 		uint32_t messageId = 0;
+		uint32_t rootInodeParent = 1;
+		uint32_t parentUid = 0;
+		uint32_t parentGid = 0;
+		Attributes attr;
 		MessageBuffer request;
-		cltoma::inodeByPath::serialize(request, messageId, path, 0, 0);
+		cltoma::wholePathLookup::serialize(request, messageId, rootInodeParent,
+		                                   path, parentUid, parentGid);
 		MessageBuffer response = ServerConnection::sendAndReceive(
-		    sd, request, SAU_MATOCL_INODE_BY_PATH);
-		PacketVersion version;
-		deserializePacketVersionNoHeader(response, version);
-		if (version == matocl::inodeByPath::kStatusPacketVersion) {
+		    sd, request, SAU_MATOCL_WHOLE_PATH_LOOKUP);
+		PacketVersion packet_version;
+		deserializePacketVersionNoHeader(response, packet_version);
+		if (packet_version == matocl::wholePathLookup::kStatusPacketVersion) {
 			uint8_t status;
-			matocl::inodeByPath::deserialize(response, messageId, status);
-			throw Exception(std::string(path) + ": failed", status);
+			matocl::wholePathLookup::deserialize(response, messageId, status);
+			if (status == SAUNAFS_STATUS_OK) {
+				fprintf(stderr,
+				        "SAU_MATOCL_WHOLE_PATH_LOOKUP: version 0 and "
+				        "SAUNAFS_STATUS_OK \n");
+				return SAUNAFS_ERROR_IO;
+			}
+			return status;
+		} else if (packet_version ==
+		           matocl::wholePathLookup::kResponsePacketVersion) {
+			matocl::wholePathLookup::deserialize(response, messageId, inode,
+			                                     attr);
+			return SAUNAFS_STATUS_OK;
+		} else {
+			fprintf(stderr,
+			        "SAU_MATOCL_WHOLE_PATH_LOOKUP: unknown version: %s \n",
+			        std::to_string(packet_version).c_str());
+			return SAUNAFS_ERROR_IO;
 		}
-		matocl::inodeByPath::deserialize(response, messageId, inode);
-	} catch (Exception &e) {
-		fprintf(stderr, "%s\n", e.what());
-		close_master_conn(1);
-		return -1;
+	} catch (Exception &ex) {
+		fprintf(stderr, "SAU_MATOCL_WHOLE_PATH_LOOKUP: %s\n", ex.what());
+		return SAUNAFS_ERROR_IO;
 	}
-	close_master_conn(0);
-	return 0;
 }
 #endif
 
@@ -187,21 +204,18 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,
 	master_info_t master_info;
 
 	rpath[0] = 0;
+
+std::string name_to_use = std::string(name);
 #ifdef _WIN32
-	std::string name_to_use = std::string(name);
 	if (name[strlen(name) - 1] == '\\' || name[strlen(name) - 1] == '/') {
 		name_to_use = std::string(name).substr(0, strlen(name) - 1);
 	}
-	if (GetFullPathName(name_to_use.c_str(), PATH_MAX, rpath, NULL) == 0) {
-		printf("%s: GetFullPathName error: %lu\n", name, GetLastError());
+#endif
+	if (!get_full_path(name_to_use.c_str(), rpath)) {
+		printf("%s: get_full_path error\n", name);
 		return -1;
 	}
-#else
-	if (realpath(name, rpath) == NULL) {
-		printf("%s: realpath error on (%s): %s\n", name, rpath,
-		       strerror(errno));
-		return -1;
-	}
+#ifndef _WIN32
 	if (needrwfs) {
 		if (statvfs(rpath, &stvfsb) != 0) {
 			printf("%s: (%s) statvfs error: %s\n", name, rpath, strerr(errno));
@@ -295,13 +309,13 @@ int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,
 			} else {
 				auto err = get_inode_by_path(sd, lookup_rpath, *inode);
 				if (err != SAUNAFS_STATUS_OK) {
-					printf("%s: can't get inode from path\n", name);
+					printf("%s: can't get inode from path: %s\n", name,
+					       saunafs_error_string(err));
 					tcpclose(sd);
 					return -1;
 				}
 			}
 #endif
-
 			gCurrentMaster = sd;
 			return sd;
 		}

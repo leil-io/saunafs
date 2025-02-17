@@ -39,7 +39,9 @@
 
 static int kDefaultTimeout = 60 * 1000;              // default timeout (60 seconds)
 static int kInfiniteTimeout = 10 * 24 * 3600 * 1000; // simulate infinite timeout (10 days)
-
+#ifdef _WIN32
+static struct stat kDefaultEmptyStat = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#endif
 
 static void snapshot_usage() {
 	fprintf(stderr,
@@ -130,8 +132,8 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 	char to[PATH_MAX + 1], base[PATH_MAX + 1], dir[PATH_MAX + 1];
 	char src[PATH_MAX + 1];
 #ifdef _WIN32
-	struct stat sst = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	            dst = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct stat sst = kDefaultEmptyStat;
+	struct stat dst = kDefaultEmptyStat;
 #else
 	struct stat sst, dst;
 #endif
@@ -143,7 +145,7 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 		int srcname_len = strlen(srcnames[i]);
 		if (srcnames[i][srcname_len - 1] == '/' ||
 		    srcnames[i][srcname_len - 1] == '\\') {
-			srcnames[i][srcname_len - 1] = 0;
+			srcnames[i][srcname_len - 1] = '\0';
 		}
 	}
 #endif
@@ -162,7 +164,6 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 			printf("%s: stat error: %s\n", srcnames[0], strerr(errno));
 			return -1;
 		}
-
 #else
 		if (lstat(srcnames[0], &sst) < 0) {
 			printf("%s: lstat error: %s\n", srcnames[0], strerr(errno));
@@ -181,17 +182,10 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 			printf("(%s,%s): both elements must be on the same device\n", dstname, srcnames[0]);
 			return -1;
 		}
-#ifdef _WIN32
-		if (GetFullPathName(dir, PATH_MAX, to, NULL) == 0) {
-			printf("%s: GetFullPathName error: %lu\n", dir, GetLastError());
+		if (!get_full_path(dir, to)) {
+			printf("%s: get_full_path error\n", dir);
 			return -1;
 		}
-#else
-		if (realpath(dir, to) == NULL) {
-			printf("%s: realpath error on %s: %s\n", dir, to, strerr(errno));
-			return -1;
-		}
-#endif
 		if (bsd_basename(dstname, base) < 0) {
 			printf("%s: basename error\n", dstname);
 			return -1;
@@ -209,17 +203,10 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 #endif
 		return make_snapshot(to, base, srcnames[0], sst.st_ino, canowerwrite, long_wait, ignore_missing_src, initial_batch_size);
 	} else {  // dst exists
-#ifdef _WIN32
-		if (GetFullPathName(dstname, PATH_MAX, to, NULL) == 0) {
-			printf("%s: GetFullPathName error: %lu\n", dstname, GetLastError());
+		if (!get_full_path(dstname, to)) {
+			printf("%s: get_full_path error\n", dstname);
 			return -1;
 		}
-#else
-		if (realpath(dstname, to) == NULL) {
-			printf("%s: realpath error on %s: %s\n", dstname, to, strerr(errno));
-			return -1;
-		}
-#endif
 		if (!S_ISDIR(dst.st_mode)) {  // dst id not a directory
 			if (srcelements > 1) {
 				printf("can snapshot multiple elements only into existing directory\n");
@@ -230,7 +217,6 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 				printf("%s: stat error: %s\n", srcnames[0], strerr(errno));
 				return -1;
 			}
-
 #else
 			if (lstat(srcnames[0], &sst) < 0) {
 				printf("%s: lstat error: %s\n", srcnames[0], strerr(errno));
@@ -264,7 +250,6 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 					status = -1;
 					continue;
 				}
-
 #else
 				if (lstat(srcnames[i], &sst) < 0) {
 					printf("%s: lstat error: %s\n", srcnames[i], strerr(errno));
@@ -280,21 +265,11 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 				}
 				if (!S_ISDIR(sst.st_mode)) {      // src is not a directory
 					if (!S_ISLNK(sst.st_mode)) {  // src is not a symbolic link
-#ifdef _WIN32
-						if (GetFullPathName(srcnames[i], PATH_MAX, src, NULL) ==
-						    0) {
-							printf("%s: GetFullPathName error: %lu\n",
-							       srcnames[i], GetLastError());
-							return -1;
-						}
-#else
-						if (realpath(srcnames[i], src) == NULL) {
-							printf("%s: realpath error on %s: %s\n", srcnames[i], src,
-							       strerr(errno));
+						if (!get_full_path(srcnames[i], src)) {
+							printf("%s: get_full_path error\n", src);
 							status = -1;
 							continue;
 						}
-#endif
 						if (bsd_basename(src, base) < 0) {
 							printf("%s: basename error\n", src);
 							status = -1;
@@ -323,21 +298,11 @@ static int snapshot(const char *dstname, char *const *srcnames, uint32_t srcelem
 					if (l > 0 &&
 					    srcnames[i][l - 1] !=
 					        '/') {  // src is a directory and name has trailing slash
-#ifdef _WIN32
-						if (GetFullPathName(srcnames[i], PATH_MAX, src, NULL) ==
-						    0) {
-							printf("%s: GetFullPathName error: %lu\n",
-							       srcnames[i], GetLastError());
-							return -1;
-						}
-#else
-						if (realpath(srcnames[i], src) == NULL) {
-							printf("%s: realpath error on %s: %s\n", srcnames[i], src,
-							       strerr(errno));
+						if (!get_full_path(srcnames[i], src)) {
+							printf("%s: get_full_path error\n", src);
 							status = -1;
 							continue;
 						}
-#endif
 						if (bsd_basename(src, base) < 0) {
 							printf("%s: basename error\n", src);
 							status = -1;

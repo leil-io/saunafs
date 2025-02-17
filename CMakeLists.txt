@@ -438,7 +438,6 @@ if(NOT MINGW)
   endif()
 endif()
 
-
 if(BUILD_TESTS)
   add_subdirectory(src/unittests)
   add_subdirectory(tests)
