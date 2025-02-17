@@ -22,8 +22,6 @@ function(create_unittest TEST_NAME)
   list(REMOVE_AT ARGV 0)
   set(TEST_LIBRARY_NAME ${TEST_NAME}_unittest)
 
-  include_directories(${GTEST_INCLUDE_DIRS})
-
   add_library(${TEST_LIBRARY_NAME} ${ARGV})
 
   list(FIND UNITTEST_TEST_NAMES ${TEST_NAME} result)

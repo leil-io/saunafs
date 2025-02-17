@@ -9,7 +9,7 @@ USE_RAMDISK="YES" \
 master_port="${saunafs_info_[matocl]}"
 shadow_port="${saunafs_info_[masterauto_matocl]}"
 
-# There ahould be no reloads after starting the system
+# There should be no reloads after starting the system
 assert_equals 0 $(grep main.reload "$reload_log" | wc -l)
 
 # Make sure that wrong password doesn't work

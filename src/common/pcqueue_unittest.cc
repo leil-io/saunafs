@@ -18,6 +18,7 @@
 
 #include "common/pcqueue.h"
 #include <gtest/gtest.h>
+#include <cstdint>
 #include <thread>
 #include <vector>
 
@@ -25,8 +26,8 @@
 void customDeleter(uint8_t *data) { delete[] data; }
 
 const int kMaxSize = 10;
-const int kMaxLength = 10;
-const int kMaxQueueSize = 100;
+const uint32_t kMaxLength = 10;
+const uint32_t kMaxQueueSize = 100;
 
 // Test adding and removing a single element
 TEST(ProducerConsumerQueueTests, SingleElement) {
@@ -40,8 +41,8 @@ TEST(ProducerConsumerQueueTests, SingleElement) {
 	uint8_t *retrievedData = nullptr;
 
 	EXPECT_TRUE(queue.get(&jobId, &jobType, &retrievedData, &length));
-	EXPECT_EQ(jobId, 1);
-	EXPECT_EQ(jobType, 1);
+	EXPECT_EQ(jobId, 1U);
+	EXPECT_EQ(jobType, 1U);
 	EXPECT_EQ(length, kMaxLength);
 	EXPECT_EQ(retrievedData, data);
 }
@@ -54,7 +55,7 @@ TEST(ProducerConsumerQueueTests, MultipleElements) {
 		EXPECT_TRUE(queue.put(i, i, data, kMaxLength));
 	}
 
-	for (int i = 0; i < kMaxSize; ++i) {
+	for (uint32_t i = 0; i < kMaxSize; ++i) {
 		uint32_t jobId = 0;
 		uint32_t jobType = 0;
 		uint32_t length = 0;
@@ -117,7 +118,7 @@ TEST(ProducerConsumerQueueTests, MultipleConsumers) {
 	const int kMaxRemovalsPerThread = 10;
 
 	ProducerConsumerQueue queue(kMaxQueueSize, customDeleter);
-	for (int i = 0; i < kMaxQueueSize; ++i) {
+	for (uint32_t i = 0; i < kMaxQueueSize; ++i) {
 		auto *data = new uint8_t[kMaxLength];
 		queue.put(i, i, data, 1);
 	}

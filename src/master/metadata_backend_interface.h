@@ -130,7 +130,7 @@ public:
 	/// Load and apply given changelog file.
 	virtual void load_changelog(const std::string &path) = 0;
 
-	/// Commits the metadata dump by rotating the metadata accoding the the
+	/// Commits the metadata dump by rotating the metadata according the the
 	/// concrete implementation.
 	///
 	/// If the process fails, it tries to create an emergency metadata with an
@@ -138,7 +138,7 @@ public:
 	/// @return true if the metadata dump was successfully committed.
 	virtual bool commit_metadata_dump() = 0;
 
-	/// An error ocurred during the metadata dump, save the metadata to an
+	/// An error occurred during the metadata dump, save the metadata to an
 	/// emergency location according to the concrete implementation.
 	virtual int emergency_saves() = 0;
 

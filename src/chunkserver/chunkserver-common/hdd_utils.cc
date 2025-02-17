@@ -2,6 +2,7 @@
 
 #include "hdd_utils.h"
 
+#include <fcntl.h>
 #include <sys/time.h>
 
 #include "chunkserver-common/global_shared_resources.h"
