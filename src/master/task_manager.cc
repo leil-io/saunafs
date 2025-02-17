@@ -22,9 +22,6 @@
 #include "master/task_manager.h"
 
 #include "common/loop_watchdog.h"
-#include "master/filesystem_metadata.h"
-#include "master/filesystem_node.h"
-#include "protocol/SFSCommunication.h"
 
 void TaskManager::Job::finalize(int status) {
 	if (finish_callback_) {

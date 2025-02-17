@@ -19,7 +19,7 @@
  */
 
 #include "common/platform.h"
-#include "common/sessions_file.h"
+
 #include "master/matoclserv.h"
 
 #include <errno.h>
@@ -40,11 +40,11 @@
 #include <fstream>
 #include <memory>
 
-#include "config/cfg.h"
 #include "common/charts.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
+#include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
 #include "common/generic_lru_cache.h"
@@ -56,14 +56,15 @@
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
 #include "common/md5.h"
-#include "common/metadata.h"
 #include "common/network_address.h"
 #include "common/random.h"
 #include "common/saunafs_statistics.h"
 #include "common/saunafs_version.h"
 #include "common/serialized_goal.h"
+#include "common/sessions_file.h"
 #include "common/sockets.h"
 #include "common/user_groups.h"
+#include "config/cfg.h"
 #include "master/changelog.h"
 #include "master/chartsdata.h"
 #include "master/chunks.h"
@@ -71,12 +72,15 @@
 #include "master/datacachemgr.h"
 #include "master/exports.h"
 #include "master/filesystem.h"
+#include "master/filesystem_node.h"
 #include "master/filesystem_operations.h"
 #include "master/filesystem_periodic.h"
 #include "master/filesystem_snapshot.h"
 #include "master/masterconn.h"
 #include "master/matocsserv.h"
 #include "master/matomlserv.h"
+#include "master/metadata_backend_common.h"
+#include "master/metadata_backend_interface.h"
 #include "master/personality.h"
 #include "master/settrashtime_task.h"
 #include "metrics/metrics.h"
@@ -105,7 +109,8 @@ struct matoclserventry;
 
 // locked chunks
 class PacketSerializer;
-typedef struct chunklist {
+
+struct chunklist {
 	uint64_t chunkid;
 	uint64_t fleng;     // file length
 	uint32_t lockid;    // lock ID
@@ -118,10 +123,10 @@ typedef struct chunklist {
 	uint8_t type;
 	const PacketSerializer* serializer;
 	struct chunklist *next;
-} chunklist;
+};
 
 struct session {
-	typedef GenericLruCache<uint32_t, FsContext::GroupsContainer, 1024> GroupCache;
+	using GroupCache = GenericLruCache<uint32_t, FsContext::GroupsContainer, 1024>;
 
 	using OpenedFilesSet = std::set<uint32_t>;
 
@@ -174,12 +179,12 @@ struct session {
 	}
 };
 
-typedef struct packetstruct {
+struct packetstruct {
 	struct packetstruct *next;
 	uint8_t *startptr;
 	uint32_t bytesleft;
 	uint8_t *packet;
-} packetstruct;
+};
 
 /** This looks to be the client type. This is set in matoclserv_serve and matoclserv_fuse_register, and there are 3 possible values:
  *
@@ -1986,9 +1991,10 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	gid = get32bit(&data);
 	modemask = get8bit(&data);
 	status = matoclserv_check_group_cache(eptr, gid);
-	if (status == SAUNAFS_STATUS_OK && inode != SPECIAL_INODE_PATH_BY_INODE) {
+	if (status == SAUNAFS_STATUS_OK && inode != SPECIAL_INODE_PATH_BY_INODE &&
+	    inode != SPECIAL_INODE_FILE_BY_INODE) {
 		FsContext context = matoclserv_get_context(eptr, uid, gid);
-		status = fs_access(context,inode,modemask);
+		status = fs_access(context, inode, modemask);
 	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_ACCESS,5);
 	put32bit(&ptr,msgid);
@@ -4522,7 +4528,8 @@ void matoclserv_admin_save_metadata(matoclserventry* eptr, const uint8_t* data, 
 	if (eptr->registered == ClientState::kAdmin) {
 		safs_pretty_syslog(LOG_NOTICE, "saving metadata image requested using saunafs-admin by %s",
 				ipToString(eptr->peerip).c_str());
-		uint8_t status = fs_storeall(MetadataDumper::DumpType::kBackgroundDump);
+		uint8_t status = gMetadataBackend->fs_storeall(
+		    MetadataDumper::DumpType::kBackgroundDump);
 		if (status != SAUNAFS_STATUS_OK || asynchronous) {
 			matoclserv_createpacket(eptr, matocl::adminSaveMetadata::build(status));
 		} else {

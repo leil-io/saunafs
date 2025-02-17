@@ -21,31 +21,32 @@
 #include "common/platform.h"
 
 #include <dirent.h>
-#include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "config/cfg.h"
-#include "common/metadata.h"
-#include "errors/sfserr.h"
+#include "common/cwrap.h"
 #include "common/rotate_files.h"
 #include "common/setup.h"
-#include "slogger/slogger.h"
 #include "master/chunks.h"
 #include "master/filesystem.h"
 #include "master/hstring_memstorage.h"
 #include "master/hstring_storage.h"
+#include "master/metadata_backend_common.h"
+#include "master/metadata_backend_file.h"
+#include "master/metadata_backend_interface.h"
 #include "master/restore.h"
 #include "metarestore/merger.h"
+#include "slogger/slogger.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
@@ -138,7 +139,8 @@ void meta_version_on_disk(std::string path) {
 	uint64_t metadata_version;
 
 	try {
-		metadata_version = metadataGetVersion(path + "/" + kMetadataFilename);
+		metadata_version =
+		    gMetadataBackend->getVersion(path + "/" + kMetadataFilename);
 		// check if it is a new installation
 		if (metadata_version == 0) {
 			printf("1\n");
@@ -158,8 +160,8 @@ void meta_version_on_disk(std::string path) {
 		try {
 			if (fs::exists(fullFileName)) {
 				oldExists = true;
-				uint64_t first = changelogGetFirstLogVersion(fullFileName);
-				uint64_t last = changelogGetLastLogVersion(fullFileName);
+				uint64_t first = gMetadataBackend->changelogGetFirstLogVersion(fullFileName);
+				uint64_t last = gMetadataBackend->changelogGetLastLogVersion(fullFileName);
 				if (last >= first  && first <= metadata_version) {
 					if (last >= metadata_version) {
 						metadata_version = last + 1;
@@ -199,6 +201,7 @@ int main(int argc,char **argv) {
 	bool noLock = false;
 
 	hstorage::Storage::reset(new hstorage::MemStorage());
+	gMetadataBackend = std::make_unique<MetadataBackendFile>();
 
 	prepareEnvironment();
 	safs::add_log_syslog(safs::log_level::info);
@@ -318,7 +321,7 @@ int main(int argc,char **argv) {
 				continue;
 			}
 			try {
-				uint64_t version = metadataGetVersion(metadata_candidate.c_str());
+				uint64_t version = gMetadataBackend->getVersion(metadata_candidate);
 				if (version >= bestversion) {
 					bestversion = version;
 					bestmetadata = metadata_candidate;
@@ -365,9 +368,9 @@ int main(int argc,char **argv) {
 		while ((dp = readdir(dd)) != NULL) {
 			if (changelog_checkname(dp->d_name)) {
 				filenames.push_back(datapath + "/" + dp->d_name);
-				firstlv = changelogGetFirstLogVersion(filenames.back());
+				firstlv = gMetadataBackend->changelogGetFirstLogVersion(filenames.back());
 				try {
-					lastlv = changelogGetLastLogVersion(filenames.back());
+					lastlv = gMetadataBackend->changelogGetLastLogVersion(filenames.back());
 				} catch (const Exception& ex) {
 					safs_pretty_syslog(LOG_WARNING, "%s", ex.what());
 					lastlv = 0;
@@ -414,9 +417,9 @@ int main(int argc,char **argv) {
 		std::vector<std::string> filenames;
 
 		for (pos=0 ; (int32_t)pos<argc ; pos++) {
-			firstlv = changelogGetFirstLogVersion(argv[pos]);
+			firstlv = gMetadataBackend->changelogGetFirstLogVersion(argv[pos]);
 			try {
-				lastlv = changelogGetLastLogVersion(argv[pos]);
+				lastlv = gMetadataBackend->changelogGetLastLogVersion(argv[pos]);
 			} catch (const Exception& ex) {
 				safs_pretty_syslog(LOG_WARNING, "%s", ex.what());
 				lastlv = 0;

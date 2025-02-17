@@ -25,17 +25,13 @@
 #include <array>
 #include <cstdint>
 #include <unordered_map>
-#include <memory>
 
-#include "common/access_control_list.h"
-#include "common/acl_type.h"
-#include "common/attributes.h"
 #include "common/goal.h"
 #include "common/compact_vector.h"
+#include "protocol/SFSCommunication.h"
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) &&               \
-    (!defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER) ||   \
-     !defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
+    (!defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER) || \
      !defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER))
 #include "common/judy_map.h"
 #endif
@@ -44,12 +40,10 @@
     defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER)
 #include <map>
 #endif
-#if !defined(SAUNAFS_HAVE_64BIT_JUDY) || \
-    defined(DISABLE_JUDY_FOR_ENTRIESCONTAINER)
-#include "common/flat_map.h"
-#endif
 
-#include "master/fs_context.h"
+#include <ext/pb_ds/assoc_container.hpp>
+#include <ext/pb_ds/tree_policy.hpp>
+
 #include "master/hstring_storage.h"
 
 #define NODEHASHBITS (22)
@@ -71,8 +65,8 @@ enum class SessionType { kNotMeta, kOnlyMeta, kAny };
 enum class OperationMode { kReadWrite, kReadOnly };
 enum class ExpectedNodeType { kFile, kDirectory, kNotDirectory, kFileOrDirectory, kAny };
 
-typedef std::unordered_map<uint32_t, uint32_t> TrashtimeMap;
-typedef std::array<uint32_t, GoalId::kMax + 1> GoalStatistics;
+using TrashtimeMap = std::unordered_map<uint32_t, uint32_t>;
+using GoalStatistics = std::array<uint32_t, GoalId::kMax + 1>;
 
 struct statsrecord {
 	uint32_t inodes;
@@ -151,6 +145,8 @@ struct FSNode {
 	static void destroy(FSNode *node);
 };
 
+constexpr FSNode* kUnknownNode = nullptr;
+
 /*! \brief Node used for storing file object.
  *
  * Node size = 64B + 40B + 8 * chunks_count + 4 * session_count
@@ -206,19 +202,21 @@ struct FSNodeDevice : public FSNode {
  */
 struct FSNodeDirectory : public FSNode {
 	struct HandleCompare {
-		bool operator()(const hstorage::Handle *a,
-		                const hstorage::Handle *b) const {
-			return a->data() < b->data();
+		bool operator()(const std::pair<hstorage::Handle *, FSNode *> &a,
+		                const std::pair<hstorage::Handle *, FSNode *> &b) const {
+			return std::make_pair(a.first->data(), a.second) <
+			       std::make_pair(b.first->data(), b.second);
 		}
 	};
 
-	typedef flat_map<hstorage::Handle *, FSNode *,
-	                 std::vector<std::pair<hstorage::Handle *, FSNode *>>,
-	                 HandleCompare>
-	    EntriesContainer;
+	using EntriesContainer =
+	    __gnu_pbds::tree<std::pair<hstorage::Handle *, FSNode *>,
+	                     __gnu_pbds::null_type, HandleCompare,
+	                     __gnu_pbds::rb_tree_tag,
+	                     __gnu_pbds::tree_order_statistics_node_update>;
 
-	typedef EntriesContainer::iterator iterator;
-	typedef EntriesContainer::const_iterator const_iterator;
+	using iterator = EntriesContainer::iterator;
+	using const_iterator = EntriesContainer::const_iterator;
 
 	EntriesContainer entries; /*!< Directory entries (entry: name + pointer to child node). */
 	EntriesContainer
@@ -249,13 +247,14 @@ struct FSNodeDirectory : public FSNode {
 	 */
 	iterator find(const HString& name) {
 		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
-		
+
 		if (case_insensitive) {
 			HString lowerCaseNameHandle = HString::hstringToLowerCase(name);
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
 			auto tmp_handle =
 			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-			auto lowerCaseIt = lowerCaseEntries.lower_bound(&tmp_handle);
+			auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(pair_to_find);
 
 			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
 				if ((*lowerCaseIt).first->hash() != name_hash) {
@@ -269,7 +268,8 @@ struct FSNodeDirectory : public FSNode {
 		} else {
 			auto tmp_handle =
 			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-			auto it = entries.lower_bound(&tmp_handle);
+			auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+			auto it = entries.lower_bound(pair_to_find);
 
 			for (; it != entries.end(); ++it) {
 				if ((*it).first->hash() != name_hash) {
@@ -292,7 +292,8 @@ struct FSNodeDirectory : public FSNode {
 			name_hash = (hstorage::Handle::HashType)lowerCaseNameHandle.hash();
 			auto tmp_handle =
 			    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-			auto lowerCaseIt = lowerCaseEntries.lower_bound(&tmp_handle);
+			auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+			auto lowerCaseIt = lowerCaseEntries.lower_bound(pair_to_find);
 
 			for (; lowerCaseIt != lowerCaseEntries.end(); ++lowerCaseIt) {
 				if ((*lowerCaseIt).first->hash() != name_hash) {
@@ -318,7 +319,8 @@ struct FSNodeDirectory : public FSNode {
 		uint64_t name_hash = (hstorage::Handle::HashType)name.hash();
 		auto tmp_handle =
 		    hstorage::Handle(name_hash << hstorage::Handle::kHashShift);
-		auto it = entries.lower_bound(&tmp_handle);
+		auto pair_to_find = std::make_pair(&tmp_handle, kUnknownNode);
+		auto it = entries.lower_bound(pair_to_find);
 		for (; it != entries.end(); ++it) {
 			if ((*it).first->hash() != name_hash) {
 				break;
@@ -331,11 +333,11 @@ struct FSNodeDirectory : public FSNode {
 	}
 
 	iterator find_nth(EntriesContainer::size_type nth) {
-		return entries.find_nth(nth);
+		return entries.find_by_order(nth);
 	}
 
 	const_iterator find_nth(EntriesContainer::size_type nth) const {
-		return entries.find_nth(nth);
+		return entries.find_by_order(nth);
 	}
 
 	/*! \brief Returns name for specified node.
@@ -395,13 +397,13 @@ struct TrashPathKey {
 };
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_TRASHPATHCONTAINER)
-typedef judy_map<TrashPathKey, hstorage::Handle> TrashPathContainer;
+using TrashPathContainer = judy_map<TrashPathKey, hstorage::Handle>;
 #else
-typedef std::map<TrashPathKey, hstorage::Handle> TrashPathContainer;
+using TrashPathContainer = std::map<TrashPathKey, hstorage::Handle>;
 #endif
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_RESERVEDPATHCONTAINER)
-typedef judy_map<uint32_t, hstorage::Handle> ReservedPathContainer;
+using ReservedPathContainer = judy_map<uint32_t, hstorage::Handle>;
 #else
-typedef std::map<uint32_t, hstorage::Handle> ReservedPathContainer;
+using ReservedPathContainer = std::map<uint32_t, hstorage::Handle>;
 #endif

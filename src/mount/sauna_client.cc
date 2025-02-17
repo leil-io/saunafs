@@ -64,6 +64,7 @@
 #include "mount/io_limit_group.h"
 #include "mount/mastercomm.h"
 #include "mount/masterproxy.h"
+#include "mount/notification_area_logging.h"
 #include "mount/oplog.h"
 #include "mount/readdata.h"
 #include "mount/special_inode.h"
@@ -1717,7 +1718,8 @@ void opendir(Context &ctx, Inode ino) {
 	if (debug_mode) {
 		oplog_printf(ctx, "opendir (%lu) ...", (unsigned long int)ino);
 	}
-	if (ino != SPECIAL_INODE_PATH_BY_INODE && IS_SPECIAL_INODE(ino)) {
+	if (ino != SPECIAL_INODE_PATH_BY_INODE &&
+	    ino != SPECIAL_INODE_FILE_BY_INODE && IS_SPECIAL_INODE(ino)) {
 		oplog_printf(ctx, "opendir (%lu): %s", (unsigned long int)ino,
 		             saunafs_error_string(SAUNAFS_ERROR_ENOTDIR));
 		throw RequestException(SAUNAFS_ERROR_ENOTDIR);
@@ -3539,6 +3541,9 @@ void fs_init(FsInitParams &params) {
 	set_debug_mode(params.debug_mode);
 #endif
 
+	notifications_area_logging_init(params.log_notifications_area,
+	                               params.message_suppression_period);
+
 	init(params.debug_mode, params.keep_cache, params.direntry_cache_timeout, params.direntry_cache_size,
 		params.entry_cache_timeout, params.attr_cache_timeout, params.mkdir_copy_sgid,
 		params.sugid_clear_mode, params.use_rw_lock,
@@ -3558,6 +3563,7 @@ void fs_term() {
 	::fs_term();
 	symlink_cache_term();
 	socketrelease();
+	notifications_area_logging_term();
 }
 
 } // namespace SaunaClient

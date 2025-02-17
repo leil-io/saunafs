@@ -19,14 +19,14 @@
 */
 
 #include "common/platform.h"
+
 #include "master/filesystem_checksum.h"
 
 #include <cstdint>
 
 #include "common/event_loop.h"
 #include "common/hashfn.h"
-#include "common/platform.h"
-#include "master/filesystem_checksum_updater.h"
+#include "master/chunks.h"
 #include "master/filesystem_metadata.h"
 #include "master/filesystem_xattr.h"
 

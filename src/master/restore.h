@@ -22,7 +22,7 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 
 enum class RestoreRigor { kIgnoreParseErrors, kDontIgnoreAnyErrors };
 

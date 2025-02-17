@@ -19,14 +19,15 @@
  */
 
 #include "common/platform.h"
+
 #include "master/metadata_dumper.h"
 
-#include <string.h>
+#include <string>
 
-#include "common/massert.h"
-#include "common/metadata.h"
-#include "master/filesystem.h"
-#include "master/personality.h"
+#include <common/massert.h>
+#include <master/filesystem.h>
+#include <master/metadata_backend_common.h>
+#include <master/metadata_backend_interface.h>
 
 static bool createPipe(int pipefds[2]) {
 	if (pipe(pipefds) != 0) {

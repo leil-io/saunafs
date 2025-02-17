@@ -19,20 +19,21 @@
  */
 
 #include "common/platform.h"
+
 #include "master/chunks.h"
 
 #include <fcntl.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <unordered_map>
 #include <algorithm>
+#include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <deque>
+#include <unordered_map>
 
 #include "common/chunk_copies_calculator.h"
 #include "common/chunk_version_with_todel_flag.h"
@@ -61,7 +62,7 @@
 #include "protocol/SFSCommunication.h"
 
 #ifdef METARESTORE
-#  include <time.h>
+#  include <ctime>
 #else
 #  include "config/cfg.h"
 #  include "common/main.h"
@@ -1832,7 +1833,7 @@ public:
 	void mainLoop();
 
 private:
-	typedef std::vector<ServerWithUsage> ServersWithUsage;
+	using ServersWithUsage = std::vector<ServerWithUsage>;
 
 	struct MainLoopStack {
 		uint32_t current_bucket;

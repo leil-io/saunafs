@@ -22,7 +22,7 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 
 uint64_t chartsdata_memusage(void);
 int chartsdata_init (void);

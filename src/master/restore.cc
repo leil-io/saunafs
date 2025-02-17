@@ -19,19 +19,20 @@
  */
 
 #include "common/platform.h"
+
 #include "master/restore.h"
 
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
-#include "protocol/SFSCommunication.h"
 #include "errors/saunafs_error_codes.h"
-#include "slogger/slogger.h"
 #include "master/filesystem.h"
-#include "master/filesystem_snapshot.h"
 #include "master/filesystem_operations.h"
+#include "master/filesystem_snapshot.h"
+#include "protocol/SFSCommunication.h"
+#include "slogger/slogger.h"
 
 #define EAT(clptr,fn,vno,c) { \
 	if (*(clptr)!=(c)) { \

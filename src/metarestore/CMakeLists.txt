@@ -12,7 +12,10 @@ else()
   file(GLOB METARESTORE_HSTRING_SOURCES ../master/hstring_memstorage.cc)
 endif()
 
+file(GLOB METARESTORE_BACKEND_SOURCES ../master/metadata_backend*.cc)
+
 add_library(metarestore ${METARESTORE_SOURCES} ${METARESTORE_MASTER_SOURCES} ${METARESTORE_HSTRING_SOURCES}
+  ${METARESTORE_BACKEND_SOURCES}
   ../master/acl_storage.cc ../master/chunks.cc ../master/quota_database.cc ../master/chunk_goal_counters.cc
   ../master/restore.cc ../master/locks.cc ../master/task_manager.cc ../master/snapshot_task.cc
   ../master/metadata_loader.cc ../master/setgoal_task.cc ../master/settrashtime_task.cc)

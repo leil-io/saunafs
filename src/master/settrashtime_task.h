@@ -21,7 +21,7 @@
 
 #include "common/platform.h"
 
-#include "master/filesystem_node.h"
+#include "master/filesystem_node_types.h"
 #include "master/task_manager.h"
 
 class SetTrashtimeTask : public TaskManager::Task {
@@ -34,7 +34,7 @@ public:
 	  kNoAction
 	};
 
-	typedef std::array<uint32_t, kStatsSize> StatsArray;
+	using StatsArray = std::array<uint32_t, kStatsSize>;
 
 	SetTrashtimeTask(std::vector<uint32_t> inode_list, uint32_t uid, uint32_t trashtime, uint8_t smode,
 		         const std::shared_ptr<StatsArray> &settrashtime_stats) :

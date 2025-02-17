@@ -92,12 +92,12 @@ public:
 	int writeChunkHeader(IChunk *chunk) override;
 
 	/// Returns the path of the metadata directory
-	std::string metaPath() const override;
+	const std::string &metaPath() const override;
 	/// Sets the path of the metadata directory
 	void setMetaPath(const std::string &newMetaPath);
 
 	/// Returns the path of the data directory
-	std::string dataPath() const override;
+	const std::string &dataPath() const override;
 	/// Sets the path of the data directory
 	void setDataPath(const std::string &newDataPath);
 

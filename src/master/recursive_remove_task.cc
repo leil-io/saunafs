@@ -21,6 +21,9 @@
 
 #include "master/recursive_remove_task.h"
 
+#include "master/filesystem_node.h"
+#include "master/filesystem_operations.h"
+
 bool RemoveTask::isFinished() const {
 	return current_subtask_ == subtask_.end();
 }

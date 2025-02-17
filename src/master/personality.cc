@@ -19,15 +19,15 @@
  */
 
 #include "common/platform.h"
+
 #include "personality.h"
 
 #include <algorithm>
 
-#include "config/cfg.h"
-#include "common/exceptions.h"
 #include "common/event_loop.h"
+#include "common/exceptions.h"
 #include "common/main.h"
-#include "common/massert.h"
+#include "config/cfg.h"
 #include "slogger/slogger.h"
 
 namespace metadataserver {

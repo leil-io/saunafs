@@ -22,11 +22,11 @@
 
 #include "common/platform.h"
 
+#include <unordered_map>
+
 #include "common/compact_vector.h"
 #include "common/memory_mapped_file.h"
 #include "protocol/lock_info.h"
-
-#include <unordered_map>
 
 /*! \brief Representation of half-open interval [a, b) with it's type and owner */
 struct LockRange {
@@ -68,7 +68,7 @@ struct LockRange {
 		kExclusive = safs_locks::kExclusive
 	};
 
-	typedef compact_vector<Owner> Owners;
+	using Owners = compact_vector<Owner>;
 
 	LockRange() : type(Type::kInvalid), start(), end(), owners() {}
 
@@ -153,9 +153,9 @@ struct LockRange {
 /*! \brief Set of ranges, allows to insert, delete and overwrite existing ranges */
 class LockRanges {
 public:
-	typedef compact_vector<LockRange> Container;
-	typedef Container::iterator iterator;
-	typedef Container::const_iterator const_iterator;
+	using Container = compact_vector<LockRange>;
+	using iterator = Container::iterator;
+	using const_iterator = Container::const_iterator;
 
 	/*! \brief Checks if range is suitable for insertion */
 	bool fits(const LockRange &range) const;
@@ -217,12 +217,12 @@ inline bool operator==(const LockRange &range, const LockRange &other) {
 
 class FileLocks {
 public:
-	typedef LockRange::Owner Owner;
-	typedef LockRange Lock;
+	using Owner = LockRange::Owner;
+	using Lock = LockRange;
 	/*! \brief Set of all applied locks */
-	typedef LockRanges Locks;
+	using Locks = LockRanges;
 	/*! \brief Queue of all pending locks */
-	typedef compact_vector<Lock> LockQueue;
+	using LockQueue = compact_vector<Lock>;
 
 	FileLocks() : active_locks_(), pending_locks_() {
 	}

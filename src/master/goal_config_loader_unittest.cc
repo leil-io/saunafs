@@ -19,6 +19,7 @@
  */
 
 #include "common/platform.h"
+
 #include "master/goal_config_loader.h"
 
 #include <gtest/gtest.h>
@@ -37,7 +38,7 @@
 		EXPECT_EQ((expected_slice), *(goals[(expected_id)].begin())); \
 	}
 
-typedef decltype(goal_config::load(std::istringstream(""))) Goals;
+using Goals = decltype(goal_config::load(std::istringstream("")));
 
 Goal::Slice createSlice(int type,
 		std::vector<std::map<std::string, int>> part_list) {

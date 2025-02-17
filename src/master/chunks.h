@@ -22,7 +22,6 @@
 
 #include "common/platform.h"
 
-#include <cinttypes>
 #include <cstdio>
 
 #include "common/chunk_part_type.h"

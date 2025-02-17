@@ -22,7 +22,6 @@
 #include "common/platform.h"
 
 #include <cstdint>
-#include <map>
 #include <vector>
 
 #include "common/goal.h"
@@ -64,7 +63,7 @@ struct ChunkserverChunkCounter {
 	uint8_t load_factor;
 };
 
-typedef std::vector<ChunkserverChunkCounter> ChunkCreationHistory;
+using ChunkCreationHistory = std::vector<ChunkserverChunkCounter>;
 
 /*! \brief Class implementing algorithm which chooses servers for a new chunk. */
 class GetServersForNewChunk {

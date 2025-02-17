@@ -19,12 +19,13 @@
  */
 
 #include "common/platform.h"
+
 #include "master/locks.h"
+
+#include <functional>
 
 #include "common/memory_mapped_file.h"
 #include "slogger/slogger.h"
-
-#include <functional>
 
 bool LockRanges::fits(const LockRange &range) const {
 	return findCollision(range) == nullptr;

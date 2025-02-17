@@ -22,9 +22,8 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 #include <string>
-
 
 constexpr uint32_t kMaxLogLineSize = 200000;
 

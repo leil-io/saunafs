@@ -19,50 +19,48 @@
  */
 
 #include "common/platform.h"
+
 #include "master/matocsserv.h"
 
-#include <errno.h>
-#include <inttypes.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <syslog.h>
-#include <time.h>
 #include <unistd.h>
 #include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <list>
-#include <set>
 #include <vector>
 
-#include "config/cfg.h"
 #include "common/counting_sort.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
 #include "common/goal.h"
-#include "common/hashfn.h"
-#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "errors/sfserr.h"
 #include "common/output_packet.h"
 #include "common/random.h"
+#include "common/saunafs_version.h"
 #include "common/slice_traits.h"
-#include "slogger/slogger.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
+#include "config/cfg.h"
 #include "master/chunks.h"
 #include "master/chunkserver_db.h"
 #include "master/filesystem.h"
 #include "master/get_servers_for_new_chunk.h"
 #include "master/personality.h"
+#include "protocol/SFSCommunication.h"
 #include "protocol/cstoma.h"
 #include "protocol/input_packet.h"
 #include "protocol/matocs.h"
-#include "protocol/SFSCommunication.h"
 #include "protocol/packet.h"
+#include "slogger/slogger.h"
 
 #define MaxPacketSize 500000000
 

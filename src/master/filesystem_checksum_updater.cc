@@ -19,6 +19,7 @@
  */
 
 #include "common/platform.h"
+
 #include "master/filesystem_checksum_updater.h"
 
 #ifndef METARESTORE

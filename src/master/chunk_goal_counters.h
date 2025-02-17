@@ -53,8 +53,8 @@ public:
 		}
 	};
 
-	typedef compact_vector<GoalCounter> Counters;
-	typedef Counters::const_iterator const_iterator;
+	using Counters = compact_vector<GoalCounter>;
+	using const_iterator = Counters::const_iterator;
 
 	SAUNAFS_CREATE_EXCEPTION_CLASS(InvalidOperation, Exception);
 

@@ -22,6 +22,7 @@
 
 #include "common/platform.h"
 
+#include "common/massert.h"
 #include "master/filesystem_node_types.h"
 #include "master/filesystem_xattr.h"
 

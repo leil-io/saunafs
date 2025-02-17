@@ -19,12 +19,14 @@
 
 #include "common/platform.h"
 
+#include <master/filesystem_quota.h>
+
 #include <cassert>
 
 #include "common/event_loop.h"
-#include "common/small_vector.h"
 #include "master/filesystem_checksum_updater.h"
 #include "master/filesystem_metadata.h"
+#include "master/filesystem_node.h"
 #include "master/quota_database.h"
 
 template <class T>

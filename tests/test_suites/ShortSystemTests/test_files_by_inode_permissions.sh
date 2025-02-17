@@ -32,6 +32,6 @@ assert_success dd if=/dev/random of="$INODE_PATH/6" bs=1 count=1
 assert_success printf "#/bin/bash\necho 'Hello!\n' > /dev/null" > "$INODE_PATH/7"
 assert_success "$INODE_PATH/7"
 
-# ls on .saunafs_file_by_inode should fail, or we can end up
-# with very long listing.
-assert_failure ls $INODE_PATH
+# ls on .saunafs_file_by_inode should pass, as it is treated
+# a directory by its definition.
+assert_success ls $INODE_PATH

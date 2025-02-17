@@ -19,6 +19,7 @@
  */
 
 #include "common/platform.h"
+
 #include "common/media_label.h"
 #include "master/get_servers_for_new_chunk.h"
 
@@ -37,7 +38,7 @@ Goal::Slice::ConstPartProxy createProxy(Goal::Slice::Labels &label) {
 class GetServersForNewChunkTests : public ::testing::Test {
 protected:
 	// A map 'server_name' -> 'server_label' used in these tests
-	typedef std::map<std::string, MediaLabel> AllServers;
+	using AllServers = std::map<std::string, MediaLabel>;
 
 	// A function which returns a GetServersForNewChunk object for the given (by name) servers
 	static GetServersForNewChunk createGetServersForNewChunk(std::vector<std::string> servers) {

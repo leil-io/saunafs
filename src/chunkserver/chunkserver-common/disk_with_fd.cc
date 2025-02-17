@@ -241,14 +241,14 @@ int FDDisk::readChunkCrc(IChunk *chunk, uint32_t chunkVersion,
 	                                        chunk->getSignatureOffset())) {
 		const int errmem = errno;
 		safs_silent_errlog(LOG_WARNING, "readChunkCrc: file:%s - read error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		errno = errmem;
 		return SAUNAFS_ERROR_IO;
 	}
 
 	if (!chunkSignature->hasValidSignatureId()) {
 		safs_pretty_syslog(LOG_WARNING, "readChunkCrc: file:%s - wrong header",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		errno = 0;
 		return SAUNAFS_ERROR_IO;
 	}
@@ -264,7 +264,7 @@ int FDDisk::readChunkCrc(IChunk *chunk, uint32_t chunkVersion,
 		    LOG_WARNING,
 		    "readChunkCrc: file:%s - wrong id/version/type in header "
 		    "(%016" PRIX64 "_%08" PRIX32 ", typeId %" PRIu8 ")",
-		    chunk->metaFilename().c_str(), chunkSignature->chunkId(),
+		    chunk->fullMetaFilename().c_str(), chunkSignature->chunkId(),
 		    chunkSignature->chunkVersion(),
 		    chunkSignature->chunkType().getId());
 		errno = 0;
@@ -284,7 +284,7 @@ int FDDisk::readChunkCrc(IChunk *chunk, uint32_t chunkVersion,
 			const int errmem = errno;
 			safs_silent_errlog(LOG_WARNING,
 			                   "readChunkCrc: file:%s - read error",
-			                   chunk->metaFilename().c_str());
+			                   chunk->fullMetaFilename().c_str());
 			errno = errmem;
 			updater.markReadAsFailed();
 			return SAUNAFS_ERROR_IO;
@@ -315,7 +315,7 @@ int FDDisk::fsyncFD(IChunk *chunk, bool isForMetadata) {
 	const auto fileDescriptor =
 	    isForMetadata ? chunk->metaFD() : chunk->dataFD();
 	const auto filename =
-	    isForMetadata ? chunk->metaFilename() : chunk->dataFilename();
+	    isForMetadata ? chunk->fullMetaFilename() : chunk->fullDataFilename();
 
 	if (filename.empty() || fileDescriptor < 0) {
 		return SAUNAFS_STATUS_OK;
@@ -440,13 +440,13 @@ void FDDisk::setLeaveFreeSpace(uint64_t newLeaveFreeSpace) {
 	leaveFreeSpace_ = newLeaveFreeSpace;
 }
 
-std::string FDDisk::dataPath() const { return dataPath_; }
+const std::string &FDDisk::dataPath() const { return dataPath_; }
 
 void FDDisk::setDataPath(const std::string &newDataPath) {
 	dataPath_ = newDataPath;
 }
 
-std::string FDDisk::metaPath() const { return metaPath_; }
+const std::string &FDDisk::metaPath() const { return metaPath_; }
 
 void FDDisk::setMetaPath(const std::string &newMetaPath) {
 	metaPath_ = newMetaPath;

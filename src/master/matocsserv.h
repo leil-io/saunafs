@@ -22,11 +22,10 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 #include <vector>
 
 #include "common/chunk_part_type.h"
-#include "common/goal.h"
 #include "common/media_label.h"
 #include "master/get_servers_for_new_chunk.h"
 #include "protocol/chunkserver_list_entry.h"
@@ -37,7 +36,7 @@ struct matocsserventry;
 struct csdbentry;
 
 /// A list of chunkservers.
-typedef std::vector<matocsserventry*> Chunkservers;
+using Chunkservers = std::vector<matocsserventry*>;
 
 /// A struct used in matocsserv_getservers_sorted
 struct ServerWithUsage {
@@ -55,7 +54,7 @@ struct ServerWithUsage {
 	MediaLabel label;
 };
 
-typedef flat_map<uint32_t, int, small_vector<std::pair<uint32_t, int>, 16> > IpCounter;
+using IpCounter = flat_map<uint32_t, int, small_vector<std::pair<uint32_t, int>, 16>>;
 
 /*! \brief Get list of chunkservers for replication with the given label.
  *

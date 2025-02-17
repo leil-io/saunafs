@@ -591,7 +591,7 @@ int hddReadCrcAndBlock(IChunk *chunk, uint16_t blockNumber,
 			safs_silent_errlog(LOG_WARNING,
 			                   "hddReadCrcAndBlock: file:%s"
 			                   " - read error on block: %d",
-			                   chunk->dataFilename().c_str(), blockNumber);
+			                   chunk->fullDataFilename().c_str(), blockNumber);
 			hddReportDamagedChunk(chunk->id(), chunk->type());
 			return SAUNAFS_ERROR_IO;
 		}
@@ -874,7 +874,7 @@ std::pair<int, IChunk *> hddInternalCreateChunk(uint64_t chunkId,
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "create_newchunk: file:%s - write error",
-			                   chunk->metaFilename().c_str());
+			                   chunk->fullMetaFilename().c_str());
 			hddIOEnd(chunk);
 			disk->unlinkChunk(chunk);
 			hddDeleteChunkFromRegistry(chunk);
@@ -966,7 +966,7 @@ static int hddInternalTestChunk(uint64_t chunkId, uint32_t version,
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_pretty_syslog(LOG_WARNING,
 			                   "testChunk: file:%s - crc error on block: %d",
-			                   chunk->metaFilename().c_str(), block);
+			                   chunk->fullMetaFilename().c_str(), block);
 			status = SAUNAFS_ERROR_CRC;
 			break;
 		}
@@ -1048,7 +1048,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 		if (dupChunk->renameChunkFile(chunkNewVersion) < 0) {
 			hddAddErrorAndPreserveErrno(originalChunk);
 			safs_silent_errlog(LOG_WARNING, "duplicate: file:%s - rename error",
-			                   originalChunk->metaFilename().c_str());
+			                   originalChunk->fullMetaFilename().c_str());
 			hddDeleteChunkFromRegistry(dupChunk);
 			hddChunkRelease(originalChunk);
 			return SAUNAFS_ERROR_IO;
@@ -1067,7 +1067,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 		if (status != SAUNAFS_STATUS_OK) {
 			hddAddErrorAndPreserveErrno(originalChunk);
 			safs_silent_errlog(LOG_WARNING, "duplicate: file:%s - write error",
-			                   dupChunk->metaFilename().c_str());
+			                   dupChunk->fullMetaFilename().c_str());
 			hddDeleteChunkFromRegistry(dupChunk);
 			hddIOEnd(originalChunk);
 			hddChunkRelease(originalChunk);
@@ -1120,7 +1120,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 			hddAddErrorAndPreserveErrno(dupChunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "duplicate: file:%s - hdr write error",
-			                   dupChunk->metaFilename().c_str());
+			                   dupChunk->fullMetaFilename().c_str());
 			hddIOEnd(dupChunk);
 			dupDisk->unlinkChunk(dupChunk);
 			hddDeleteChunkFromRegistry(dupChunk);
@@ -1148,7 +1148,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 				hddAddErrorAndPreserveErrno(originalChunk);
 				safs_silent_errlog(LOG_WARNING,
 				                   "duplicate: file:%s - data read error",
-				                   dupChunk->metaFilename().c_str());
+				                   dupChunk->fullMetaFilename().c_str());
 				hddIOEnd(dupChunk);
 				dupDisk->unlinkChunk(dupChunk);
 				hddDeleteChunkFromRegistry(dupChunk);
@@ -1183,7 +1183,7 @@ static int hddInternalDuplicate(uint64_t chunkId, uint32_t chunkVersion,
 				hddAddErrorAndPreserveErrno(dupChunk);
 				safs_silent_errlog(LOG_WARNING,
 				                   "duplicate: file:%s - data write error",
-				                   dupChunk->metaFilename().c_str());
+				                   dupChunk->fullMetaFilename().c_str());
 				hddIOEnd(dupChunk);
 				dupDisk->unlinkChunk(dupChunk);
 				hddDeleteChunkFromRegistry(dupChunk);
@@ -1236,7 +1236,7 @@ int hddInternalUpdateVersion(IChunk *chunk, uint32_t version,
 		hddAddErrorAndPreserveErrno(chunk);
 		safs_silent_errlog(LOG_WARNING,
 		                   "hddInternalUpdateVersion: file:%s - rename error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		return SAUNAFS_ERROR_IO;
 	}
 	status = hddIOBegin(chunk, 0, version);
@@ -1244,7 +1244,7 @@ int hddInternalUpdateVersion(IChunk *chunk, uint32_t version,
 		hddAddErrorAndPreserveErrno(chunk);
 		safs_silent_errlog(LOG_WARNING,
 		                   "hddInternalUpdateVersion: file:%s - open error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		return status;
 	}
 	status = chunk->owner()->overwriteChunkVersion(chunk, newversion);
@@ -1252,7 +1252,7 @@ int hddInternalUpdateVersion(IChunk *chunk, uint32_t version,
 		hddAddErrorAndPreserveErrno(chunk);
 		safs_silent_errlog(LOG_WARNING,
 		                   "hddInternalUpdateVersion: file:%s - write error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		hddIOEnd(chunk);
 		return SAUNAFS_ERROR_IO;
 	}
@@ -1316,7 +1316,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 		hddAddErrorAndPreserveErrno(chunk);
 		safs_silent_errlog(LOG_WARNING,
 		                   "truncate: file:%s - rename error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		hddChunkRelease(chunk);
 		return SAUNAFS_ERROR_IO;
 	}
@@ -1333,7 +1333,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 		hddAddErrorAndPreserveErrno(chunk);
 		safs_silent_errlog(LOG_WARNING,
 		                   "truncate: file:%s - write error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		hddIOEnd(chunk);
 		hddChunkRelease(chunk);
 		return SAUNAFS_ERROR_IO;
@@ -1356,7 +1356,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "truncate: file:%s - ftruncate error",
-			                   chunk->dataFilename().c_str());
+			                   chunk->fullDataFilename().c_str());
 			hddIOEnd(chunk);
 			hddChunkRelease(chunk);
 			return SAUNAFS_ERROR_IO;
@@ -1372,7 +1372,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 				hddAddErrorAndPreserveErrno(chunk);
 				safs_silent_errlog(LOG_WARNING,
 				    "truncate: file:%s - ftruncate error",
-				    chunk->metaFilename().c_str());
+				    chunk->fullMetaFilename().c_str());
 				hddIOEnd(chunk);
 				hddChunkRelease(chunk);
 				return SAUNAFS_ERROR_IO;
@@ -1384,7 +1384,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 			hddAddErrorAndPreserveErrno(chunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "truncate: file:%s - ftruncate error",
-			                   chunk->dataFilename().c_str());
+			                   chunk->fullDataFilename().c_str());
 			hddIOEnd(chunk);
 			hddChunkRelease(chunk);
 			return SAUNAFS_ERROR_IO;
@@ -1410,7 +1410,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 					hddAddErrorAndPreserveErrno(chunk);
 					safs_silent_errlog(LOG_WARNING,
 					                   "truncate: file:%s - read error",
-					                   chunk->metaFilename().c_str());
+					                   chunk->fullMetaFilename().c_str());
 					hddIOEnd(chunk);
 					hddChunkRelease(chunk);
 					updater.markReadAsFailed();
@@ -1461,7 +1461,7 @@ static int hddInternalTruncate(uint64_t chunkId, ChunkPartType chunkType,
 						hddAddErrorAndPreserveErrno(chunk);
 						safs_silent_errlog(LOG_WARNING,
 						    "truncate: file:%s - data write error",
-						    chunk->metaFilename().c_str());
+						    chunk->fullMetaFilename().c_str());
 						hddIOEnd(chunk);
 						hddChunkRelease(chunk);
 						updater.markWriteAsFailed();
@@ -1556,7 +1556,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 			hddAddErrorAndPreserveErrno(originalChunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "duptrunc: file:%s - rename error",
-			                   originalChunk->metaFilename().c_str());
+			                   originalChunk->fullMetaFilename().c_str());
 			hddDeleteChunkFromRegistry(dupChunk);
 			hddChunkRelease(originalChunk);
 			return SAUNAFS_ERROR_IO;
@@ -1576,7 +1576,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 			hddAddErrorAndPreserveErrno(originalChunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "duptrunc: file:%s - write error",
-			                   dupChunk->metaFilename().c_str());
+			                   dupChunk->fullMetaFilename().c_str());
 			hddDeleteChunkFromRegistry(dupChunk);
 			hddIOEnd(originalChunk);
 			hddChunkRelease(originalChunk);
@@ -1646,7 +1646,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 					hddAddErrorAndPreserveErrno(originalChunk);
 					safs_silent_errlog(LOG_WARNING,
 					    "duptrunc: file:%s - data read error",
-					    originalChunk->metaFilename().c_str());
+					    originalChunk->fullMetaFilename().c_str());
 					hddIOEnd(dupChunk);
 					dupDisk->unlinkChunk(dupChunk);
 					hddDeleteChunkFromRegistry(dupChunk);
@@ -1683,7 +1683,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 					hddAddErrorAndPreserveErrno(dupChunk);
 					safs_silent_errlog(LOG_WARNING,
 					    "duptrunc: file:%s - data write error",
-					    dupChunk->metaFilename().c_str());
+					    dupChunk->fullMetaFilename().c_str());
 					hddIOEnd(dupChunk);
 					dupDisk->unlinkChunk(dupChunk);
 					hddDeleteChunkFromRegistry(dupChunk);
@@ -1708,7 +1708,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 			hddAddErrorAndPreserveErrno(dupChunk);
 			safs_silent_errlog(LOG_WARNING,
 			                   "duptrunc: file:%s - ftruncate error",
-			                   dupChunk->metaFilename().c_str());
+			                   dupChunk->fullMetaFilename().c_str());
 			hddIOEnd(dupChunk);
 			dupDisk->unlinkChunk(dupChunk);
 			hddDeleteChunkFromRegistry(dupChunk);
@@ -1733,7 +1733,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 						hddAddErrorAndPreserveErrno(originalChunk);
 						safs_silent_errlog(LOG_WARNING,
 						    "duptrunc: file:%s - data read error",
-						    originalChunk->metaFilename().c_str());
+						    originalChunk->fullMetaFilename().c_str());
 						hddIOEnd(dupChunk);
 						dupDisk->unlinkChunk(dupChunk);
 						hddDeleteChunkFromRegistry(dupChunk);
@@ -1770,7 +1770,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 						hddAddErrorAndPreserveErrno(dupChunk);
 						safs_silent_errlog(LOG_WARNING,
 						    "duptrunc: file:%s - data write error",
-						    dupChunk->metaFilename().c_str());
+						    dupChunk->fullMetaFilename().c_str());
 						hddIOEnd(dupChunk);
 						dupDisk->unlinkChunk(dupChunk);
 						hddDeleteChunkFromRegistry(dupChunk);
@@ -1795,7 +1795,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 						hddAddErrorAndPreserveErrno(originalChunk);
 						safs_silent_errlog(LOG_WARNING,
 						    "duptrunc: file:%s - data read error",
-						    originalChunk->metaFilename().c_str());
+						    originalChunk->fullMetaFilename().c_str());
 						hddIOEnd(dupChunk);
 						dupDisk->unlinkChunk(dupChunk);
 						hddDeleteChunkFromRegistry(dupChunk);
@@ -1832,7 +1832,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 						hddAddErrorAndPreserveErrno(dupChunk);
 						safs_silent_errlog(LOG_WARNING,
 						    "duptrunc: file:%s - data write error",
-						    dupChunk->metaFilename().c_str());
+						    dupChunk->fullMetaFilename().c_str());
 						hddIOEnd(dupChunk);
 						dupDisk->unlinkChunk(dupChunk);
 						hddDeleteChunkFromRegistry(dupChunk);
@@ -1859,7 +1859,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 					hddAddErrorAndPreserveErrno(originalChunk);
 					safs_silent_errlog(LOG_WARNING,
 					    "duptrunc: file:%s - data read error",
-					    originalChunk->metaFilename().c_str());
+					    originalChunk->fullMetaFilename().c_str());
 					hddIOEnd(dupChunk);
 					dupDisk->unlinkChunk(dupChunk);
 					hddDeleteChunkFromRegistry(dupChunk);
@@ -1903,7 +1903,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 					hddAddErrorAndPreserveErrno(dupChunk);
 					safs_silent_errlog(LOG_WARNING,
 					    "duptrunc: file:%s - data write error",
-					    dupChunk->metaFilename().c_str());
+					    dupChunk->fullMetaFilename().c_str());
 					hddIOEnd(dupChunk);
 					dupDisk->unlinkChunk(dupChunk);
 					hddDeleteChunkFromRegistry(dupChunk);
@@ -1931,7 +1931,7 @@ static int hddInternalDuplicateTruncate(uint64_t chunkId, uint32_t chunkVersion,
 				hddAddErrorAndPreserveErrno(dupChunk);
 				safs_silent_errlog(LOG_WARNING,
 				                   "duptrunc: file:%s - hdr write error",
-				                   dupChunk->metaFilename().c_str());
+				                   dupChunk->fullMetaFilename().c_str());
 				hddIOEnd(dupChunk);
 				dupDisk->unlinkChunk(dupChunk);
 				hddDeleteChunkFromRegistry(dupChunk);
@@ -1985,7 +1985,7 @@ int hddInternalDelete(IChunk *chunk, uint32_t version) {
 		hddAddErrorAndPreserveErrno(chunk);
 		safs_silent_errlog(LOG_WARNING,
 		                   "hddInternalDelete: file: %s - unlink error",
-		                   chunk->metaFilename().c_str());
+		                   chunk->fullMetaFilename().c_str());
 		if (err == ENOENT) {
 			hddDeleteChunkFromRegistry(chunk);
 		} else {
@@ -2147,7 +2147,7 @@ void hddTesterThread() {
 				                   "%s: tested (OK)",
 				                   chunkId, version,
 				                   chunkType.toString().c_str(),
-				                   chunk->dataFilename().c_str());
+				                   chunk->fullDataFilename().c_str());
 			}
 		}
 
@@ -2214,7 +2214,7 @@ static inline void hddAddChunkFromDiskScan(IDisk *disk,
 
 	chunk->setVersion(version);
 	chunk->updateFilenamesFromVersion(version);
-	sassert(chunk->metaFilename() == fullname);
+	sassert(chunk->fullMetaFilename() == fullname);
 
 	{
 		disk->updateChunkAttributes(chunk, true);
@@ -2464,7 +2464,7 @@ void hddTerminate(void) {
 				if (chunkWriteCrc(chunk) != SAUNAFS_STATUS_OK) {
 					safs_silent_errlog(LOG_WARNING,
 					                   "hddTerminate: file: %s - write error",
-					                   chunk->metaFilename().c_str());
+					                   chunk->fullMetaFilename().c_str());
 				}
 			}
 			gOpenChunks.purge(chunk->metaFD());

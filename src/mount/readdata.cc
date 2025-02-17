@@ -46,6 +46,7 @@
 #include "mount/chunk_locator.h"
 #include "mount/chunk_reader.h"
 #include "mount/mastercomm.h"
+#include "mount/notification_area_logging.h"
 #include "mount/readahead_adviser.h"
 #include "mount/readdata_cache.h"
 #include "mount/memory_info.h"
@@ -66,6 +67,7 @@ uint64_t successfulTimesRequestedMemory = 0;
 constexpr double kTimesRequestedMemoryLowerSuccessRate = 0.3;
 constexpr double kTimesRequestedMemoryUpperSuccessRate = 0.8;
 constexpr uint32_t kMinCacheExpirationTime = 1;
+constexpr uint32_t kMinTryCounterToShowReadErrorMessage = 9;
 
 std::unique_ptr<IMemoryInfo> createMemoryInfo() {
     std::unique_ptr<IMemoryInfo> memoryInfo;
@@ -753,6 +755,9 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			try_counter = 0;
 		} catch (UnrecoverableReadException &ex) {
 			print_error_msg(reader, try_counter, ex);
+			addPathByInodeBasedNotificationMessage(
+			    "Unrecoverable read error: " + std::string(ex.what()),
+			    rrec->inode);
 			std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 			decreaseUsedReadCacheMemory(total_read_cache_bytes_to_reserve);
 			usedMemoryLock.unlock();
@@ -767,11 +772,19 @@ int read_to_buffer(ReadRecord *rrec, uint64_t current_offset,
 			}
 			force_prepare = true;
 			if (try_counter > maxRetries) {
+				addPathByInodeBasedNotificationMessage(
+				    "Read error: Exceeded max retries:" +
+				        std::string(ex.what()),
+				    rrec->inode);
 				std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 				decreaseUsedReadCacheMemory(total_read_cache_bytes_to_reserve);
 				usedMemoryLock.unlock();
 				return SAUNAFS_ERROR_IO;
 			} else {
+				if (try_counter > kMinTryCounterToShowReadErrorMessage) {
+					addPathByInodeBasedNotificationMessage(
+					    "Read error: " + std::string(ex.what()), rrec->inode);
+				}
 				std::unique_lock usedMemoryLock(gReadCacheMemoryMutex);
 				decreaseUsedReadCacheMemory(last_read_cache_bytes_to_reserve);
 				total_read_cache_bytes_to_reserve -= last_read_cache_bytes_to_reserve;

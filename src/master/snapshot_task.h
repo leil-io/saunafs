@@ -22,13 +22,11 @@
 #include "common/platform.h"
 
 #include <cassert>
-#include <functional>
-#include <list>
 #include <string>
 
-#include "master/task_manager.h"
-#include "master/filesystem_node.h"
+#include "master/filesystem_node_types.h"
 #include "master/hstring.h"
+#include "master/task_manager.h"
 
 /*! \brief Implementation of Snapshot Task to work with Task Manager.
  *
@@ -42,7 +40,7 @@
  */
 class SnapshotTask : public TaskManager::Task {
 public:
-	typedef std::vector<std::pair<uint32_t, HString>> SubtaskContainer;
+	using SubtaskContainer = std::vector<std::pair<uint32_t, HString>>;
 
 	SnapshotTask(SubtaskContainer &&subtask, uint32_t orig_inode, uint32_t dst_parent_inode,
 		     uint32_t dst_inode, uint8_t can_overwrite, uint8_t ignore_missing_src,

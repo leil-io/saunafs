@@ -86,6 +86,8 @@ struct FsInitParams {
 	static constexpr float    kDefaultBandwidthOveruse = 1.0;
 	static constexpr unsigned kDefaultChunkserverWriteTo = 5000;
 	static constexpr bool     kDefaultIgnoreFlush = false;
+	static constexpr int      kDefaultLogNotificationArea = 0;
+	static constexpr unsigned kDefaultMessageSuppressionPeriod = 10;
 #ifdef _WIN32
 	static constexpr unsigned kDefaultWriteCacheSize = 50;
 	static constexpr unsigned kDefaultCleanAcquiredFilesPeriod = 0;
@@ -162,9 +164,13 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO)
-	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
-				 {	
+	             ignore_flush(kDefaultIgnoreFlush), 
+	             verbose(kDefaultVerbose), 
+	             direct_io(kDirectIO),
+	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas),
+	             log_notifications_area(kDefaultLogNotificationArea), 
+	             message_suppression_period(kDefaultMessageSuppressionPeriod) {
+
 	}
 
 	FsInitParams(const std::string &bind_host, const std::string &host, const std::string &port, const std::string &mountpoint)
@@ -201,11 +207,13 @@ struct FsInitParams {
 	             enable_status_updater_thread(kDefaultEnableStatusUpdaterThread),
 	             ignore_utimens_update(kDefaultIgnoreUtimensUpdate),
 #endif
-	             ignore_flush(kDefaultIgnoreFlush), verbose(kDefaultVerbose), direct_io(kDirectIO) 
-#ifndef _WIN32
-	             ,limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas) 
-#endif 
-				 {
+	             ignore_flush(kDefaultIgnoreFlush), 
+	             verbose(kDefaultVerbose), 
+	             direct_io(kDirectIO),
+	             limit_glibc_malloc_arenas(kDefaultLimitGlibcMallocArenas),
+	             log_notifications_area(kDefaultLogNotificationArea), 
+	             message_suppression_period(kDefaultMessageSuppressionPeriod) {
+
 	}
 
 	std::string bind_host;
@@ -265,6 +273,8 @@ struct FsInitParams {
 	bool verbose;
 	bool direct_io;
 	unsigned limit_glibc_malloc_arenas;
+	int log_notifications_area;
+	unsigned message_suppression_period;
 
 	std::string io_limits_config_file;
 };

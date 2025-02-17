@@ -19,18 +19,17 @@
  */
 
 #include "common/platform.h"
+
 #include "master/changelog.h"
 
-#include <stdarg.h>
-#include <stdio.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <cstdio>
 
-#include "config/cfg.h"
+#include <common/exceptions.h>
 #include "common/event_loop.h"
-#include "common/main.h"
-#include "common/metadata.h"
 #include "common/rotate_files.h"
+#include "config/cfg.h"
 #include "slogger/slogger.h"
 
 /// Base name of a changelog file.

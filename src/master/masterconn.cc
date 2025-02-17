@@ -19,40 +19,41 @@
  */
 
 #include "common/platform.h"
+
 #include "master/masterconn.h"
 
-#include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <syslog.h>
-#include <time.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <string>
 
-#include "config/cfg.h"
 #include "common/crc.h"
-#include "common/cwrap.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "common/metadata.h"
 #include "common/rotate_files.h"
-#include "slogger/slogger.h"
+#include "common/saunafs_version.h"
 #include "common/sockets.h"
 #include "common/time_utils.h"
+#include "config/cfg.h"
 #include "master/changelog.h"
-#include "protocol/matoml.h"
+#include "master/metadata_backend_common.h"
+#include "master/metadata_backend_interface.h"
 #include "protocol/SFSCommunication.h"
+#include "protocol/matoml.h"
 #include "protocol/mltoma.h"
+#include "slogger/slogger.h"
 
 #ifndef METALOGGER
 #include "master/filesystem.h"
@@ -75,12 +76,12 @@ enum class MasterConnectionState {
 	kLimbo /*!< Got response from master regarding its inability to dump metadata. */
 };
 
-typedef struct packetstruct {
+struct packetstruct {
 	struct packetstruct *next;
 	uint8_t *startptr;
 	uint32_t bytesleft;
 	uint8_t *packet;
-} packetstruct;
+};
 
 struct masterconn {
 	int mode;
@@ -506,7 +507,7 @@ void masterconn_sessionsdownloadinit(void) {
 
 int masterconn_metadata_check(const std::string& name) {
 	try {
-		metadataGetVersion(name);
+		gMetadataBackend->getVersion(name);
 		return 0;
 	} catch (MetadataCheckException& ex) {
 		safs_pretty_syslog(LOG_NOTICE, "Verification of the downloaded metadata file failed: %s", ex.what());
@@ -1233,7 +1234,7 @@ int masterconn_init(void) {
 	eptr->sock  = -1;
 	eptr->state = MasterConnectionState::kNone;
 #ifdef METALOGGER
-	changelogsMigrateFrom_1_6_29("changelog_ml");
+	gMetadataBackend->changelogsMigrateFrom_1_6_29("changelog_ml");
 	masterconn_findlastlogversion();
 #endif /* #ifdef METALOGGER */
 	if (masterconn_initconnect(eptr)<0) {

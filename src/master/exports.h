@@ -22,7 +22,7 @@
 
 #include "common/platform.h"
 
-#include <inttypes.h>
+#include <cstdint>
 
 uint32_t exports_info_size(uint8_t versmode);
 void exports_info_data(uint8_t versmode, uint8_t *buff);

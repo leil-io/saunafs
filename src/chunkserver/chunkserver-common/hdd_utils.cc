@@ -123,7 +123,7 @@ int chunkWriteCrc(IChunk *chunk) {
 			int errmem = errno;
 			safs_silent_errlog(LOG_WARNING,
 			                   "chunk_writecrc: file: %s - write error",
-			                   chunk->metaFilename().c_str());
+			                   chunk->fullMetaFilename().c_str());
 			errno = errmem;
 			updater.markWriteAsFailed();
 			return SAUNAFS_ERROR_IO;
@@ -157,7 +157,7 @@ int hddIOEnd(IChunk *chunk) {
 			// FIXME(hazeman): We are probably leaking fd here.
 			int errmem = errno;
 			safs_silent_errlog(LOG_WARNING, "hddIOEnd: file:%s - write error",
-			                   chunk->metaFilename().c_str());
+			                   chunk->fullMetaFilename().c_str());
 			errno = errmem;
 			return status;
 		}
@@ -170,7 +170,7 @@ int hddIOEnd(IChunk *chunk) {
 				int errmem = errno;
 				safs_silent_errlog(LOG_WARNING,
 				                   "hddIOEnd: file:%s - fsync error",
-				                   chunk->metaFilename().c_str());
+				                   chunk->fullMetaFilename().c_str());
 				errno = errmem;
 				return status;
 			}
@@ -238,7 +238,7 @@ int hddIOBegin(IChunk *chunk, int newFlag, uint32_t chunkVersion) {
 				if (chunk->metaFD() < 0 && errno != ENFILE) {
 					safs_silent_errlog(LOG_WARNING,
 					                   "hddIOBegin: file:%s - open error",
-					                   chunk->metaFilename().c_str());
+					                   chunk->fullMetaFilename().c_str());
 					return SAUNAFS_ERROR_IO;
 				} else if (chunk->metaFD() >= 0) {
 					gOpenChunks.acquire(chunk->metaFD(), OpenChunk(chunk));
@@ -255,7 +255,7 @@ int hddIOBegin(IChunk *chunk, int newFlag, uint32_t chunkVersion) {
 			if (chunk->metaFD() < 0) {
 				safs_silent_errlog(LOG_WARNING,
 				                   "hddIOBegin: file: %s - open error",
-				                   chunk->metaFilename().c_str());
+				                   chunk->fullMetaFilename().c_str());
 				return SAUNAFS_ERROR_IO;
 			}
 		}
@@ -274,7 +274,7 @@ int hddIOBegin(IChunk *chunk, int newFlag, uint32_t chunkVersion) {
 				gOpenChunks.release(chunk->metaFD(), eventloop_time());
 				safs_silent_errlog(LOG_WARNING,
 				                   "hddIOBegin: file:%s - read error",
-				                   chunk->metaFilename().c_str());
+				                   chunk->fullMetaFilename().c_str());
 				errno = errmem;
 				return status;
 			}

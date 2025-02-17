@@ -230,6 +230,13 @@ contention and reduced parallelism in multi-threaded applications.
 Use it in constrained memory environments, recommended values are 4 or 8.
 (default is 0: disabled or let glibc decide)
 
+*-o sfslognotificationarea=*'0|1'::  
+Enable/disable logging to Linux notification area (default: 0).
+
+*-o sfsmessagesuppressionperiod=*'N'::
+Set period of message suppression in seconds for logging on notification area 
+(default: 10)
+
 General mount options (see *mount*(8) manual):
 
 *-o rw* | *-o ro*::

@@ -19,10 +19,10 @@
  */
 
 #include "common/platform.h"
+
 #include "master/filesystem_periodic.h"
 
 #include <cstdint>
-#include <type_traits>
 
 #include "config/cfg.h"
 #include "common/event_loop.h"
@@ -32,6 +32,7 @@
 #  include "common/flat_map.h"
 #endif
 #include "common/loop_watchdog.h"
+#include "master/chunks.h"
 #include "master/filesystem_checksum.h"
 #include "master/filesystem_checksum_updater.h"
 #include "master/filesystem_metadata.h"
@@ -74,9 +75,9 @@ enum NodeErrorFlag {
 };
 
 #if defined(SAUNAFS_HAVE_64BIT_JUDY) && !defined(DISABLE_JUDY_FOR_DEFECTIVENODESMAP)
-	typedef judy_map<uint32_t, uint8_t> DefectiveNodesMap;
+	using DefectiveNodesMap = judy_map<uint32_t, uint8_t>;
 #else
-	typedef flat_map<uint32_t, uint8_t> DefectiveNodesMap;
+	using DefectiveNodesMap = flat_map<uint32_t, uint8_t>;
 #endif
 
 static const size_t kMaxNodeEntries = 1000000;

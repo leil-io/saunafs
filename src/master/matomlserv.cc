@@ -20,6 +20,7 @@
  */
 
 #include "common/platform.h"
+
 #include "master/matomlserv.h"
 
 #include <errno.h>
@@ -36,21 +37,23 @@
 #include <unistd.h>
 #include <set>
 
-#include "config/cfg.h"
 #include "common/crc.h"
 #include "common/datapack.h"
 #include "common/event_loop.h"
-#include "common/saunafs_version.h"
 #include "common/loop_watchdog.h"
 #include "common/massert.h"
-#include "common/metadata.h"
-#include "slogger/slogger.h"
+#include "common/saunafs_version.h"
 #include "common/sockets.h"
+#include "config/cfg.h"
 #include "master/filesystem.h"
+#include "master/metadata_backend_common.h"
+#include <master/metadata_backend_interface.h>
 #include "master/personality.h"
-#include "protocol/matoml.h"
+#include "metadata_backend_interface.h"
 #include "protocol/SFSCommunication.h"
+#include "protocol/matoml.h"
 #include "protocol/mltoma.h"
+#include "slogger/slogger.h"
 
 #define MaxPacketSize 1500000
 #define OLD_CHANGES_BLOCK_SIZE 5000
@@ -58,12 +61,12 @@
 // matomlserventry.mode
 enum{KILL,HEADER,DATA};
 
-typedef struct packetstruct {
+struct packetstruct {
 	struct packetstruct *next;
 	uint8_t *startptr;
 	uint32_t bytesleft;
 	uint8_t *packet;
-} packetstruct;
+};
 
 using matomlserventry = struct matomlserventry {
 	uint8_t mode;
@@ -100,19 +103,19 @@ static uint32_t gMinMetadataSaveRequestPeriod_s;
 /// Timestamp of the last metadata save request
 static uint32_t gLastMetadataSaveRequestTimestamp = 0;
 
-typedef struct old_changes_entry {
+struct old_changes_entry {
 	uint64_t version;
 	uint32_t length;
 	uint8_t *data;
-} old_changes_entry;
+};
 
-typedef struct old_changes_block {
+struct old_changes_block {
 	old_changes_entry old_changes_block [OLD_CHANGES_BLOCK_SIZE];
 	uint32_t entries;
 	uint32_t mintimestamp;
 	uint64_t minversion;
 	struct old_changes_block *next;
-} old_changes_block;
+};
 
 void matomlserv_createpacket(matomlserventry *eptr, std::vector<uint8_t> data);
 
@@ -150,7 +153,7 @@ public:
 		shadowRequests_.clear();
 	}
 private:
-	typedef std::set<matomlserventry*> ShadowRequests;
+	using ShadowRequests = std::set<matomlserventry *>;
 	ShadowRequests shadowRequests_;
 } gShadowQueue;
 
@@ -604,7 +607,7 @@ void matomlserv_changelog_apply_error(matomlserventry *eptr, const uint8_t *data
 				"SAU_MLTOMA_CHANGELOG_APPLY_ERROR, status: %s - storing metadata",
 				saunafs_error_string(recvStatus));
 		gShadowQueue.addRequest(eptr);
-		fs_storeall(MetadataDumper::kBackgroundDump);
+		gMetadataBackend->fs_storeall(MetadataDumper::kBackgroundDump);
 		if (recvStatus == SAUNAFS_ERROR_BADMETADATACHECKSUM) {
 			fs_start_checksum_recalculation();
 		}
