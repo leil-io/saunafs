@@ -34,6 +34,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}) # test_cases.h is located here
 add_definitions(-DTEST_DATA_PATH=${CMAKE_CURRENT_SOURCE_DIR})
 add_executable(saunafs-tests saunafs-tests.cc)
 add_dependencies(saunafs-tests list_of_test_cases)
-target_link_libraries(saunafs-tests PRIVATE GTest::gtest GTest::gtest_main)
-target_link_libraries(saunafs-tests PRIVATE ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
+target_link_libraries(saunafs-tests GTest::gtest GTest::gtest_main)
+target_link_libraries(saunafs-tests ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
 install(TARGETS saunafs-tests RUNTIME DESTINATION ${BIN_SUBDIR})

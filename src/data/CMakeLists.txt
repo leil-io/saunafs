@@ -40,6 +40,6 @@ if(BUILD_TESTS)
     ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_c_api.h
     ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_error_codes.h)
   target_include_directories(c-client-example PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
-  target_link_libraries(c-client-example PRIVATE saunafs-client stdc++ m)
+  target_link_libraries(c-client-example saunafs-client stdc++ m)
   install(TARGETS c-client-example RUNTIME DESTINATION ${BIN_SUBDIR})
 endif()

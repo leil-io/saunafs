@@ -11,17 +11,17 @@ add_subdirectory(plugins)
 
 collect_sources(CHUNKSERVER)
 add_library(chunkserver ${CHUNKSERVER_SOURCES})
-target_link_libraries(chunkserver PRIVATE chunkserver-common safsprotocol sfscommon
+target_link_libraries(chunkserver chunkserver-common safsprotocol sfscommon
 #    ${Boost_LIBRARIES}
     ${ADDITIONAL_LIBS})
 create_unittest(chunkserver ${CHUNKSERVER_TESTS})
 link_unittest(chunkserver chunkserver sfscommon)
 
 add_executable(sfschunkserver ${MAIN_SRC})
-target_link_libraries(sfschunkserver PRIVATE chunkserver ${PAM_LIBRARIES})
+target_link_libraries(sfschunkserver chunkserver ${PAM_LIBRARIES})
 
 if(SYSTEMD_FOUND)
-  target_link_libraries(sfschunkserver PRIVATE ${SYSTEMD_LIBRARIES})
+  target_link_libraries(sfschunkserver ${SYSTEMD_LIBRARIES})
 endif()
 
 install(TARGETS sfschunkserver RUNTIME DESTINATION ${SBIN_SUBDIR})

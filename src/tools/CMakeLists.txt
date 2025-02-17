@@ -23,7 +23,7 @@ set(SFSTOOL_LINKS
 collect_sources(TOOLS)
 
 add_executable(saunafs ${TOOLS_MAIN} ${TOOLS_SOURCES})
-target_link_libraries(saunafs PRIVATE sfscommon)
+target_link_libraries(saunafs sfscommon)
 install(TARGETS saunafs DESTINATION ${BIN_SUBDIR})
 
 install(FILES sfstools.sh DESTINATION ${BIN_SUBDIR} PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ

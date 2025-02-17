@@ -13,7 +13,7 @@ endif()
 
 foreach(unittest_name ${UNITTEST_TEST_NAMES})
   add_executable(unittest_${unittest_name} ${UNITTESTS_MAIN})
-  target_link_libraries(unittest_${unittest_name} PRIVATE
+  target_link_libraries(unittest_${unittest_name}
         ${ENABLE_WHOLE_ARCHIVE} ${unittest_name}_unittest ${DISABLE_WHOLE_ARCHIVE} ${${unittest_name}_UNITTEST_LINKLIST}
         unittests-helpers unittest-mocks ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} GTest::gtest GTest::gtest_main pthread)
   add_test(NAME ${unittest_name} COMMAND unittest_${unittest_name})
