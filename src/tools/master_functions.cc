@@ -196,6 +196,21 @@ int get_inode_by_path(int sd, std::string path, uint32_t &inode) {
 }
 #endif
 
+void get_next_path_iteration(std::string &path) {
+	size_t pos = path.find_first_of('/');
+	if (pos != std::string::npos) {
+		path = path.substr(pos + 1);
+		pos = path.find_first_of('/');
+		if (pos != std::string::npos) {
+			path = path.substr(pos);
+		} else {
+			path.clear();
+		}
+	} else {
+		path.clear();
+	}
+}
+
 int open_master_conn(const char *name, uint32_t *inode, mode_t *mode,
                      [[maybe_unused]] bool needrwfs) {
 	char rpath[PATH_MAX + 1];
@@ -307,10 +322,18 @@ std::string name_to_use = std::string(name);
 			if (lookup_rpath == "/") {
 				*inode = SPECIAL_INODE_ROOT;
 			} else {
-				auto err = get_inode_by_path(sd, lookup_rpath, *inode);
-				if (err != SAUNAFS_STATUS_OK) {
+				std::string iteration_lookup_rpath = lookup_rpath;
+				int inode_by_path_result = SAUNAFS_ERROR_EPERM;
+				while (!iteration_lookup_rpath.empty() ||
+				       inode_by_path_result != SAUNAFS_STATUS_OK) {
+					inode_by_path_result =
+					    get_inode_by_path(sd, iteration_lookup_rpath, *inode);
+
+					get_next_path_iteration(iteration_lookup_rpath);
+				}
+				if (inode_by_path_result != SAUNAFS_STATUS_OK) {
 					printf("%s: can't get inode from path: %s\n", name,
-					       saunafs_error_string(err));
+					       saunafs_error_string(inode_by_path_result));
 					tcpclose(sd);
 					return -1;
 				}
