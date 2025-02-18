@@ -22,9 +22,10 @@
 
 #include "master/metadata_backend_file.h"
 
-#include <sys/mman.h>
+#include <fcntl.h> // for open and O_RDONLY
 #include <fstream>
 #include <memory>
+#include <sys/mman.h>
 
 #include <common/cwrap.h>
 #include <common/event_loop.h>

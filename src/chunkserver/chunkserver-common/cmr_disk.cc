@@ -1,7 +1,9 @@
 #include "cmr_disk.h"
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <linux/falloc.h>
 
 #include "chunkserver-common/chunk_interface.h"
 #include "chunkserver-common/cmr_chunk.h"

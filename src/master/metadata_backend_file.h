@@ -81,7 +81,7 @@ public:
 	/// @return true if the metadata dump was successfully committed.
 	bool commit_metadata_dump() override;
 
-	/// Save metadata to an emergency location (most likely an error ocurred
+	/// Save metadata to an emergency location (most likely an error occurred
 	/// during the metadata dump).
 	int emergency_saves() override;
 

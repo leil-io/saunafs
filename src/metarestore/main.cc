@@ -200,12 +200,14 @@ int main(int argc,char **argv) {
 	int storedPreviousBackMetaCopies = kMaxStoredPreviousBackMetaCopies;
 	bool noLock = false;
 
+	safs::drop_all_logs();
+	safs::add_log_syslog(safs::log_level::info);
+	safs::add_log_stderr(safs::log_level::info);
+
 	hstorage::Storage::reset(new hstorage::MemStorage());
 	gMetadataBackend = std::make_unique<MetadataBackendFile>();
 
 	prepareEnvironment();
-	safs::add_log_syslog(safs::log_level::info);
-	safs::add_log_stderr(safs::log_level::info);
 
 	while ((ch = getopt(argc, argv, "gfck:vm:o:d:abB:xih:z#?")) != -1) {
 		switch (ch) {
