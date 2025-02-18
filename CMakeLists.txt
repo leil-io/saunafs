@@ -3,8 +3,6 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-list(APPEND CMAKE_PREFIX_PATH "/usr/local" "/usr")
-
 # Enable symbol export for loadable modules, ensuring same shared resource
 # references. Needed for the plugins, as they are shared libraries.
 set(CMAKE_ENABLE_EXPORTS ON)

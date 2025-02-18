@@ -69,7 +69,6 @@ else()
 endif()
 
 # Find Boost
-#set(Boost_NO_SYSTEM_PATHS ON)
 find_package(Boost CONFIG REQUIRED COMPONENTS filesystem iostreams program_options system)
 
 # Find Thrift
