@@ -421,12 +421,13 @@ if(NOT MINGW)
   endif()
 endif()
 
+if (ENABLE_URAFT)
+  add_subdirectory(src/uraft)
+endif()
+
 if(BUILD_TESTS)
   add_subdirectory(src/unittests)
   add_subdirectory(tests)
-endif()
-if (ENABLE_URAFT)
-  add_subdirectory(src/uraft)
 endif()
 
 include(Packing)
