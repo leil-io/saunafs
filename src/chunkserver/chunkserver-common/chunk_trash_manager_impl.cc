@@ -153,8 +153,15 @@ fs::path ChunkTrashManagerImpl::getTrashDir(const fs::path &diskPath) {
 int ChunkTrashManagerImpl::init(const std::string &diskPath) {
 	reloadConfig();
 	const fs::path trashDir = getTrashDir(diskPath);
+
 	if (!fs::exists(trashDir)) {
-		fs::create_directories(trashDir);
+		std::error_code errorCode_;
+		fs::create_directories(trashDir, errorCode_);
+		if (errorCode_) {
+			safs_pretty_syslog(LOG_ERR, "Failed to create trash directory: %s",
+			                   trashDir.string().c_str());
+			return SAUNAFS_ERROR_NOTDONE;
+		}
 	}
 
 	trashIndex->reset(diskPath);
@@ -274,7 +281,6 @@ void ChunkTrashManagerImpl::collectGarbage() {
 	removeExpiredFiles(expirationTime, kTrashGarbageCollectorBulkSize);
 	makeSpace(kAvailableThresholdGB,
 	          kGarbageCollectorSpaceRecoveryStep);
-//	cleanEmptyFolders();
 }
 
 bool ChunkTrashManagerImpl::isTrashPath(const std::string &filePath) {

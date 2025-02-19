@@ -54,15 +54,15 @@ public:
  */
 class ChunkTrashManager {
 public:
-	using Implentation = IChunkTrashManagerImpl;
-	using ImplentationPtr = std::shared_ptr<Implentation>;
+	using Implementation = IChunkTrashManagerImpl;
+	using ImplementationPtr = std::shared_ptr<Implementation>;
 
 	/**
 	 * @brief Gets the singleton instance of the ChunkTrashManager.
 	 *
 	 * @return Reference to the singleton instance of ChunkTrashManager.
 	 */
-	static ChunkTrashManager &instance(ImplentationPtr newImpl = nullptr);
+	static ChunkTrashManager &instance(ImplementationPtr newImpl = nullptr);
 
 	/**
 	 * @brief The name of the trash directory.
@@ -113,6 +113,6 @@ private:
 	ChunkTrashManager() = default;
 
 	/// Pointer to the singleton instance of the trash manager implementation.
-	static ChunkTrashManager::ImplentationPtr pImpl;
+	static ImplementationPtr pImpl;
 
 };
