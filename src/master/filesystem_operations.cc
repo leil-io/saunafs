@@ -488,14 +488,26 @@ uint8_t fs_whole_path_lookup(const FsContext &context, uint32_t parent, const st
 
 uint8_t fs_full_path_by_inode(const FsContext &context, uint32_t initial_inode,
                               std::string &fullPath) {
+	FSNode *current_node;
+	FSNode *parent_node;
 	uint32_t current_inode = initial_inode;
-	FSNode *current_node = fsnodes_id_to_node(current_inode);
 	std::string current_name = "";
+	uint8_t status = verify_session(context, OperationMode::kReadOnly,
+	                                SessionType::kNotMeta);
+	if (status != SAUNAFS_STATUS_OK) { return status; }
+
+	status = fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny,
+	                                        MODE_MASK_R, initial_inode,
+	                                        &current_node);
+	if (status != SAUNAFS_STATUS_OK) { return status; }
 
 	while (current_inode != context.rootinode()) {
 		if (!current_node) { return SAUNAFS_ERROR_ENOENT; }
 		auto [parentId, nameHandle] = current_node->parent[0];
-		auto parent_node = fsnodes_id_to_node<FSNodeDirectory>(parentId);
+		status =
+		    fsnodes_get_node_for_operation(context, ExpectedNodeType::kAny,
+		                                   MODE_MASK_R, parentId, &parent_node);
+		if (status != SAUNAFS_STATUS_OK) { return status; }
 		current_name = nameHandle->get();
 		fullPath = current_inode == initial_inode
 		               ? current_name
