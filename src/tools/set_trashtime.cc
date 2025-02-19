@@ -54,7 +54,11 @@ static int set_trashtime(const char *fname, uint32_t trashtime, uint8_t mode, in
 	if (fd < 0) {
 		return -1;
 	}
+#ifdef _WIN32
+	uid = 0;
+#else
 	uid = getuid();
+#endif
 	wptr = reqbuff;
 	put32bit(&wptr, CLTOMA_FUSE_SETTRASHTIME);
 	put32bit(&wptr, 17);

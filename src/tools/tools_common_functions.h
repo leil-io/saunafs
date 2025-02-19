@@ -77,3 +77,13 @@ inline void print_extra_attributes() {
 		}
 	}
 }
+
+inline bool get_full_path(const char *file_name, char *path_buf) {
+#ifdef _WIN32
+	// Use GetFullPathName on Windows
+	return GetFullPathName(file_name, PATH_MAX, path_buf, NULL) != 0;
+#else
+	// Use realpath on Unix-like systems
+	return realpath(file_name, path_buf) != nullptr;
+#endif
+}

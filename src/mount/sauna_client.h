@@ -36,7 +36,7 @@
 #include "mount/group_cache.h"
 #include "mount/sauna_client_context.h"
 #include "mount/readdata_cache.h"
-#include "mount/stat_defs.h"
+#include "common/stat_defs.h"
 #include "protocol/chunkserver_list_entry.h"
 #include "protocol/lock_info.h"
 #include "protocol/named_inode_entry.h"
