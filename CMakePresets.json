@@ -35,8 +35,13 @@
             "inherits": ["default", "vcpkg"],
 			"generator": "MinGW Makefiles",
 			"cacheVariables": {
+				"CMAKE_MAKE_PROGRAM": "C:/msys64/mingw64/bin/mingw32-make.exe",
+				"CMAKE_C_COMPILER": "C:/msys64/mingw64/bin/gcc.exe",
+				"CMAKE_CXX_COMPILER": "C:/msys64/mingw64/bin/g++.exe",
 				"SOCKET_LIBRARIES": "C:/msys64/mingw64/lib/libws2_32.a",
 				"VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+				"VCPKG_DEFAULT_TRIPLET": "x64-mingw-static",
+				"VCPKG_HOST_TRIPLET": "x64-mingw-static",
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
 				"ENABLE_DOCS": "OFF",
 				"ENABLE_CLIENT_LIB": "OFF",
@@ -106,6 +111,11 @@
             "hidden": true
         },
         {
+            "name": "windows",
+            "configurePreset": "windows",
+            "inherits": ["default"]
+        },
+        {
             "name": "test",
             "configurePreset": "test",
             "inherits": ["default"]
@@ -157,6 +167,19 @@
                 {
                     "type": "build",
                     "name": "debug"
+                }
+            ]
+        },
+        {
+            "name": "windows",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "windows"
+                },
+                {
+                    "type": "build",
+                    "name": "windows"
                 }
             ]
         },
