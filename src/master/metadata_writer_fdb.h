@@ -20,12 +20,14 @@
 
 #include "common/platform.h"
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <memory>
 #include <mutex>
 #include <span>
+#include <thread>
 #include <vector>
 
 #include "common/type_defs.h"
@@ -268,13 +270,25 @@ public:
 	/// badly.
 	static constexpr size_t kDefaultBacklogHighWatermark_ = 100000;
 
+	/// How the writer drains its queue. A scoped enum rather than a bool so a stray positional
+	/// argument cannot silently select the wrong mode.
+	enum class WriterMode : uint8_t {
+		kSynchronous,  ///< The caller drives flush() (e.g. the migration bootstrap).
+		kAsync,        ///< A background worker thread drains and commits the queue.
+	};
+
 	/// @param kvEngine          Key-value engine used for flush transactions.
 	/// @param checkpointManager Optional checkpoint manager (undo/first-touch capture).
+	/// @param mode              kAsync starts a background worker thread that drains and commits
+	///        the queue off the caller's thread, so enqueue() never blocks on FDB commit latency.
+	///        kSynchronous (the default, e.g. the migration bootstrap) leaves the caller to drive
+	///        flush().
 	/// @param backlogHighWatermark Pending-update count at which the backlog is reported critical
 	///        (see isBacklogCritical()). Injectable so tests can use a small threshold; defaults
 	///        to kDefaultBacklogHighWatermark_.
 	explicit MetadataWriterFDB(kv::IKVEngine *kvEngine,
 	                           MetadataCheckpointManager *checkpointManager = nullptr,
+	                           WriterMode mode = WriterMode::kSynchronous,
 	                           size_t backlogHighWatermark = kDefaultBacklogHighWatermark_);
 
 	/// Flushes any remaining pending updates so they are not lost on shutdown/restart.
@@ -292,6 +306,13 @@ public:
 	/// Flushes pending updates that were queued when the call started (thread-safe).
 	/// Intended for periodic/background flushing to avoid unbounded backlog growth.
 	bool flush(FlushMode mode = FlushMode::kSnapshot);
+
+	/// Drains the queue and blocks until every queued update is committed to FDB (or a commit
+	/// fails). For an async writer this parks the caller until the background worker reports the
+	/// queue empty and idle; for a sync writer it is equivalent to flush(kDrainUntilEmpty).
+	/// The checkpoint seal path uses this so the worker is idle before begin/seal mutate
+	/// checkpoint-manager state. Returns false if a commit failed or the writer is stopping.
+	bool flushAndWait();
 
 	/// Get count of pending updates
 	size_t pendingCount() const;
@@ -312,6 +333,16 @@ private:
 
 	UpdateQueue takeBatch(size_t maxUpdates);
 	void restoreBatch(UpdateQueue updates);
+	/// Applies and commits a batch in a single transaction, honoring the per-transaction size cap
+	/// (deferring events once the measured size reaches kTxnSoftLimitBytes_). Reports the number of
+	/// events applied+committed in `appliedOut`. Does NOT take from or restore to the queue -- the
+	/// caller owns the batch: it retries the whole batch on failure and re-queues the deferred tail
+	/// on success. Returns false (without throwing) on commit/apply failure.
+	bool commitBatch(UpdateQueue &batch, size_t &appliedOut);
+
+	/// Synchronous path (asyncFlush_ == false, e.g. migration bootstrap): takes up to `maxUpdates`,
+	/// commits them via commitBatch(), restores the batch on failure and re-queues any deferred
+	/// tail. Reports the number of events consumed in `consumedOut`.
 	bool flushBatch(size_t maxUpdates, size_t &consumedOut);
 
 	/// Updates backlog bookkeeping after the queue grew to `depth` (called under mutex_).
@@ -322,8 +353,14 @@ private:
 	/// back below the low-watermark. Called after a flush drains the queue.
 	void maybeLogBacklogRecovery();
 
+	/// Background-writer lifecycle (async mode only).
+	void startWorker();
+	void stopWorker();
+	void workerLoop();
+
 	kv::IKVEngine *kvEngine_;
 	MetadataCheckpointManager *checkpointManager_;
+	const bool asyncFlush_;
 
 	mutable std::mutex mutex_;
 	UpdateQueue pendingUpdates_;
@@ -346,8 +383,6 @@ private:
 	const size_t backlogLogStep_;
 	const size_t backlogLowWatermark_;
 
-	constexpr static size_t kMaxUpdatesPerFlush_ = 1000;
-
 	// Soft cap on a flush transaction's approximate size. While applying a batch, the real
 	// transaction size (IReadWriteTransaction::getApproximateSize(), which counts the mutations,
 	// the per-first-touch undo rows written in the same transaction, conflict ranges and
@@ -356,4 +391,18 @@ private:
 	// headroom for the single event that crosses the threshold. At least one event is always
 	// applied so an oversized event still makes progress.
 	constexpr static size_t kTxnSoftLimitBytes_ = 8UL * 1000 * 1000;
+
+	// Async-writer coordination (all guarded by mutex_).
+	std::thread workerThread_;
+	std::condition_variable workCv_;     ///< wakes the worker when work arrives or on stop
+	std::condition_variable spaceCv_;    ///< wakes enqueuers blocked on backpressure as space frees
+	std::condition_variable drainedCv_;  ///< wakes flushAndWait() when the queue is empty and idle
+	bool stop_ = false;
+	bool busy_ = false;             ///< worker holds a batch that is being committed
+	bool lastFlushFailed_ = false;  ///< a commit failed since the last flushAndWait() reset it
+	size_t maxPending_;             ///< backpressure high-water mark (async mode)
+
+	constexpr static size_t kMaxUpdatesPerFlush_ = 1000;
+	constexpr static size_t kDefaultMaxPending_ = 200000;
+	constexpr static int kCommitRetryBackoffMs_ = 20;
 };

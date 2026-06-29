@@ -100,7 +100,8 @@ std::unique_ptr<IMetadataUpdateEvent> makeEvent(uint64_t seed) {
 TEST(MetadataWriterFDBBacklog, SignalEscalatesAndRecovers) {
 	NoopKVEngine engine;
 	constexpr size_t kHighWatermark = 8;  // step == high-watermark, low-watermark == 4
-	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr, kHighWatermark);
+	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr,
+	                         MetadataWriterFDB::WriterMode::kSynchronous, kHighWatermark);
 
 	auto enqueueN = [&](size_t count) {
 		for (size_t i = 0; i < count; ++i) { writer.enqueue(makeEvent(i)); }
