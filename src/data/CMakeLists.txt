@@ -54,22 +54,22 @@ if(BUILD_TESTS)
   # Create a mock include dir.
   # We do this because we want to preserve the proper include directives in the example code
   # and still build this example program in the build step before the needed headers are installed.
-  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/leil)
   add_custom_command(
     OUTPUT
-      ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_c_api.h
-      ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_error_codes.h
+      ${CMAKE_CURRENT_BINARY_DIR}/include/leil/saunafs_c_api.h
+      ${CMAKE_CURRENT_BINARY_DIR}/include/leil/saunafs_error_codes.h
     COMMAND ${CMAKE_COMMAND} -E create_symlink
       ${CMAKE_SOURCE_DIR}/src/mount/client/saunafs_c_api.h
-      ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_c_api.h
+      ${CMAKE_CURRENT_BINARY_DIR}/include/leil/saunafs_c_api.h
     COMMAND ${CMAKE_COMMAND} -E create_symlink
       ${CMAKE_SOURCE_DIR}/src/errors/saunafs_error_codes.h
-      ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_error_codes.h
+      ${CMAKE_CURRENT_BINARY_DIR}/include/leil/saunafs_error_codes.h
   )
   add_executable(c-client-example
     libsaunafs-client-example.c
-    ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_c_api.h
-    ${CMAKE_CURRENT_BINARY_DIR}/include/saunafs/saunafs_error_codes.h)
+    ${CMAKE_CURRENT_BINARY_DIR}/include/leil/saunafs_c_api.h
+    ${CMAKE_CURRENT_BINARY_DIR}/include/leil/saunafs_error_codes.h)
   target_include_directories(c-client-example PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
   target_link_libraries(c-client-example saunafs-client stdc++ m)
   install(TARGETS c-client-example RUNTIME DESTINATION ${BIN_SUBDIR})

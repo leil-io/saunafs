@@ -11,8 +11,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <saunafs/saunafs_c_api.h>
-#include <saunafs/saunafs_error_codes.h>
+#include <leil/saunafs_c_api.h>
+#include <leil/saunafs_error_codes.h>
 
 /* Function that copies saunafs lock interrupt data to provided buffer */
 int register_interrupt(sau_lock_interrupt_info_t *info, void *priv) {
