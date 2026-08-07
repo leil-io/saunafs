@@ -45,10 +45,13 @@ public:
 	/// Override this method if you need to change the version for testing.
 	unsigned int version() override { return SAUNAFS_VERSHEX; }
 
-	/// Returns the disk prefix handled by this plugin.
-	/// For instance, to handle the following hdd.conf line:
+	/// Returns the disk prefix handled by this plugin, the part of an hdd.cfg
+	/// line before the ':'. For instance, a plugin returning 'zonefs' handles
 	/// zonefs:/mnt/saunafs/meta/nvme1 | /mnt/saunafs/data/smr1
-	/// the prefix must be 'zonefs'.
+	///
+	/// Only letters, digits and '_' are accepted (disk::kDiskPrefixCharacters),
+	/// and the prefix must be free: a plugin offering anything else, or one
+	/// already claimed, is ignored at load time rather than registered.
 	virtual std::string prefix() = 0;
 
 	/// Returns a newly created concrete Disk with the given configuration.
