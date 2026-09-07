@@ -16,19 +16,29 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <gtest/gtest.h>
+#include "common/platform.h"
+
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <future>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <vector>
+
+#include <gtest/gtest.h>
 
 #include "kv/ifuture.h"
 #include "kv/ikv_engine.h"
 #include "kv/itransaction.h"
+#include "kv/kv_utils.h"
+#include "master/kv_common_keys.h"
+#include "master/metadata_node_undo_recorder.h"
 #include "master/metadata_writer_fdb.h"
 
 namespace {
@@ -176,6 +186,209 @@ bool waitFor(Predicate predicate, std::chrono::milliseconds limit) {
 	return predicate();
 }
 
+// Shared gate used to hold one asynchronous commit at a deterministic point.
+struct CommitGate {
+	std::mutex mutex;
+	std::condition_variable cv;
+	bool ready{false};
+	bool getResultEntered{false};
+	bool consumed{false};
+	void (*readyCallback)(void *){nullptr};
+	void *readyCallbackArgument{nullptr};
+};
+
+void releaseCommitGate(const std::shared_ptr<CommitGate> &gate) {
+	void (*callback)(void *) = nullptr;
+	void *callbackArgument = nullptr;
+	{
+		std::lock_guard<std::mutex> lock(gate->mutex);
+		gate->ready = true;
+		callback = gate->readyCallback;
+		callbackArgument = gate->readyCallbackArgument;
+	}
+	gate->cv.notify_all();
+	if (callback != nullptr) { callback(callbackArgument); }
+}
+
+class BlockingCommitFuture final : public kv::ICommitFuture {
+public:
+	explicit BlockingCommitFuture(std::shared_ptr<CommitGate> gate) : gate_(std::move(gate)) {}
+
+	bool isReady() override {
+		std::lock_guard<std::mutex> lock(gate_->mutex);
+		return gate_->ready;
+	}
+
+	bool getResult(int *error, bool *retryable) override {
+		std::unique_lock<std::mutex> lock(gate_->mutex);
+		gate_->getResultEntered = true;
+		gate_->cv.notify_all();
+		gate_->cv.wait(lock, [this] { return gate_->ready; });
+
+		if (error != nullptr) { *error = 0; }
+		if (retryable != nullptr) { *retryable = false; }
+		if (gate_->consumed) { return false; }
+		gate_->consumed = true;
+		return true;
+	}
+
+	void setReadyCallback(void (*callback)(void *), void *arg) override {
+		bool callNow = false;
+		{
+			std::lock_guard<std::mutex> lock(gate_->mutex);
+			if (gate_->ready) {
+				callNow = true;
+			} else {
+				gate_->readyCallback = callback;
+				gate_->readyCallbackArgument = arg;
+			}
+		}
+		if (callNow && callback != nullptr) { callback(arg); }
+	}
+
+private:
+	std::shared_ptr<CommitGate> gate_;
+};
+
+class BlockingTransaction final : public NoopTransaction {
+public:
+	explicit BlockingTransaction(std::shared_ptr<CommitGate> gate) : gate_(std::move(gate)) {}
+
+	std::unique_ptr<kv::ICommitFuture> commitAsync() override {
+		return std::make_unique<BlockingCommitFuture>(gate_);
+	}
+
+private:
+	std::shared_ptr<CommitGate> gate_;
+};
+
+class BlockingKVEngine final : public kv::IKVEngine {
+public:
+	std::unique_ptr<kv::IReadOnlyTransaction> createReadOnlyTransaction() override {
+		return std::make_unique<NoopTransaction>();
+	}
+
+	std::unique_ptr<kv::IReadWriteTransaction> createReadWriteTransaction() override {
+		auto gate = std::make_shared<CommitGate>();
+		size_t index = 0;
+		bool releaseImmediately = false;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			index = commitGates_.size();
+			commitGates_.push_back(gate);
+			releaseImmediately = releaseAll_;
+		}
+		cv_.notify_all();
+
+		if (index == 0) {
+			std::unique_lock<std::mutex> lock(mutex_);
+			cv_.wait(lock, [this] { return allowFirstTransaction_ || releaseAll_; });
+			releaseImmediately = releaseImmediately || releaseAll_;
+		}
+
+		if (releaseImmediately) { releaseCommitGate(gate); }
+		return std::make_unique<BlockingTransaction>(std::move(gate));
+	}
+
+	bool waitForTransactionCount(size_t count, std::chrono::milliseconds limit) {
+		std::unique_lock<std::mutex> lock(mutex_);
+		return cv_.wait_for(lock, limit, [this, count] { return commitGates_.size() >= count; });
+	}
+
+	bool waitForCommitWaiter(size_t index, std::chrono::milliseconds limit) {
+		std::shared_ptr<CommitGate> gate;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			if (index >= commitGates_.size()) { return false; }
+			gate = commitGates_[index];
+		}
+
+		std::unique_lock<std::mutex> lock(gate->mutex);
+		return gate->cv.wait_for(lock, limit, [&gate] { return gate->getResultEntered; });
+	}
+
+	size_t transactionCount() const {
+		std::lock_guard<std::mutex> lock(mutex_);
+		return commitGates_.size();
+	}
+
+	void allowFirstTransaction() {
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			allowFirstTransaction_ = true;
+		}
+		cv_.notify_all();
+	}
+
+	void releaseCommit(size_t index) {
+		std::shared_ptr<CommitGate> gate;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			if (index >= commitGates_.size()) { return; }
+			gate = commitGates_[index];
+		}
+		releaseCommitGate(gate);
+	}
+
+	void releaseAllCommits() {
+		std::vector<std::shared_ptr<CommitGate>> gates;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			releaseAll_ = true;
+			allowFirstTransaction_ = true;
+			gates = commitGates_;
+		}
+		cv_.notify_all();
+		for (const auto &gate : gates) { releaseCommitGate(gate); }
+	}
+
+private:
+	mutable std::mutex mutex_;
+	std::condition_variable cv_;
+	std::vector<std::shared_ptr<CommitGate>> commitGates_;
+	bool allowFirstTransaction_{false};
+	bool releaseAll_{false};
+};
+
+using DurableStore = std::map<kv::Key, kv::Value>;
+
+class RecordingTransaction final : public NoopTransaction {
+public:
+	RecordingTransaction(DurableStore &store, bool commitSucceeds)
+	    : store_(store), commitSucceeds_(commitSucceeds) {}
+
+	std::optional<kv::Value> get(const kv::Key &key) override {
+		if (const auto pending = writes_.find(key); pending != writes_.end()) {
+			return pending->second;
+		}
+		if (const auto durable = store_.find(key); durable != store_.end()) {
+			return durable->second;
+		}
+		return std::nullopt;
+	}
+
+	void set(const kv::Key &key, const kv::Value &value) override { writes_[key] = value; }
+
+	void remove(const kv::Key &key) override { writes_[key] = std::nullopt; }
+
+	bool commit() override {
+		if (!commitSucceeds_) { return false; }
+		for (const auto &[key, value] : writes_) {
+			if (value.has_value()) {
+				store_[key] = *value;
+			} else {
+				store_.erase(key);
+			}
+		}
+		return true;
+	}
+
+private:
+	DurableStore &store_;
+	bool commitSucceeds_;
+	std::map<kv::Key, std::optional<kv::Value>> writes_;
+};
+
 }  // namespace
 
 // The pending-update backlog is a health signal: crossing the injected high-watermark flips
@@ -278,4 +491,85 @@ TEST(MetadataWriterFDBAsync, BuildFailureRequeuesEventsInsteadOfDroppingThem) {
 	EXPECT_TRUE(writer.flushAndWait());
 	EXPECT_EQ(writer.pendingCount(), 0U);
 	EXPECT_EQ(engine.applied(), kEvents) << "events were lost or duplicated across the requeue";
+}
+
+TEST(MetadataWriterFDBAsync, DoesNotSubmitNewerBatchUntilOlderCommitCompletes) {
+	BlockingKVEngine engine;
+	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr,
+	                         MetadataWriterFDB::WriterMode::kAsync);
+
+	constexpr inode_t kInode = 42;
+	writer.enqueue(std::make_unique<NodeRemoveEvent>(kInode));
+
+	const bool firstCreated = engine.waitForTransactionCount(1, std::chrono::seconds(5));
+	writer.enqueue(std::make_unique<NodeRemoveEvent>(kInode));
+	engine.allowFirstTransaction();
+
+	// With a pipeline depth greater than one, the worker creates the second transaction before
+	// blocking in the first future's getResult(). The stabilized writer must reach getResult()
+	// while the newer event is still queued.
+	const bool firstCommitWaiting = engine.waitForCommitWaiter(0, std::chrono::seconds(5));
+	const size_t transactionsBeforeRelease = engine.transactionCount();
+
+	engine.releaseCommit(0);
+	const bool secondCreated = engine.waitForTransactionCount(2, std::chrono::seconds(5));
+	engine.releaseAllCommits();
+	const bool drained = writer.flushAndWait();
+
+	EXPECT_TRUE(firstCreated);
+	EXPECT_TRUE(firstCommitWaiting);
+	EXPECT_EQ(transactionsBeforeRelease, 1U)
+	    << "a newer transaction was submitted before the older commit completed";
+	EXPECT_TRUE(secondCreated);
+	EXPECT_TRUE(drained);
+	EXPECT_EQ(writer.pendingCount(), 0U);
+}
+
+TEST(MetadataUndoRecorder, FailedFirstTouchRetryPreservesOriginalNodePreimage) {
+	NoopKVEngine engine;
+	NodeUndoRecorder recorder(&engine);
+
+	constexpr uint64_t kCheckpointVersion = 17;
+	constexpr inode_t kInode = 42;
+	const kv::Key liveKey = kv::encodeKeyBE(kNodeKeyPrefix, kInode);
+	const kv::Key undoKey = kv::encodeKeyBE(kNodeUndoKeyPrefix, kCheckpointVersion, kInode);
+	const kv::Value originalValue{0x01, 0x02, 0x03};
+	const kv::Value updatedValue{0x04, 0x05, 0x06};
+
+	DurableStore store{{liveKey, originalValue}};
+	const MetadataMutation mutation = NodeSetMutation{
+	    .inode = kInode,
+	    .liveKey = liveKey,
+	};
+
+	{
+		RecordingTransaction failedTransaction(store, /*commitSucceeds=*/false);
+		recorder.beforeMutation(
+		    MetadataMutationContext{
+		        .transaction = &failedTransaction,
+		        .checkpointVersion = kCheckpointVersion,
+		    },
+		    mutation);
+		failedTransaction.set(liveKey, updatedValue);
+		EXPECT_FALSE(failedTransaction.commit());
+	}
+
+	EXPECT_EQ(store.count(undoKey), 0U);
+	ASSERT_EQ(store.at(liveKey), originalValue);
+
+	{
+		RecordingTransaction retryTransaction(store, /*commitSucceeds=*/true);
+		recorder.beforeMutation(
+		    MetadataMutationContext{
+		        .transaction = &retryTransaction,
+		        .checkpointVersion = kCheckpointVersion,
+		    },
+		    mutation);
+		retryTransaction.set(liveKey, updatedValue);
+		ASSERT_TRUE(retryTransaction.commit());
+	}
+
+	ASSERT_EQ(store.count(undoKey), 1U);
+	EXPECT_EQ(store.at(undoKey), originalValue);
+	EXPECT_EQ(store.at(liveKey), updatedValue);
 }

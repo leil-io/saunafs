@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include "common/platform.h"
+
 #include <cstdint>
 #include <span>
-#include <string>
-#include <unordered_set>
 
 #include "common/type_defs.h"
 #include "kv/ikv_engine.h"
@@ -73,7 +73,8 @@ public:
 	/// Only the first touch of each xattr per interval is recorded.
 	///
 	/// @param context  Active write transaction and current checkpoint version of the flush.
-	/// @param mutation Must hold an XAttrSetMutation, XAttrRemoveMutation or XAttrRangeRemoveMutation.
+	/// @param mutation Must hold an XAttrSetMutation, XAttrRemoveMutation or
+	/// XAttrRangeRemoveMutation.
 	void beforeMutation(const MetadataMutationContext &context,
 	                    const MetadataMutation &mutation) override;
 
@@ -110,13 +111,13 @@ public:
 	int8_t dropCheckpointData(kv::IReadWriteTransaction *transaction,
 	                          uint64_t droppedCheckpointVersion) override;
 
-	/// Clears the per-interval first-touch tracking. Called after a checkpoint is sealed so the
-	/// next interval starts recording fresh pre-images.
-	void resetIntervalState() override { touchedXAttrs_.clear(); }
+	/// No in-memory first-touch state is retained; durable undo keys are authoritative.
+	/// Kept for the common recorder lifecycle interface.
+	void resetIntervalState() override {}
 
 private:
-	/// Records the pre-image for one xattr identified by (inode, name) once per interval and marks
-	/// it as touched. Shared by the set and single-remove mutation paths.
+	/// Records the pre-image for one xattr identified by (inode, name), using the durable undo key
+	/// as the first-touch guard. Shared by the set and single-remove mutation paths.
 	void beforeXAttrKey(const MetadataMutationContext &context, inode_t inode,
 	                    std::span<const uint8_t> name, const kv::Key &liveKey);
 
@@ -134,8 +135,4 @@ private:
 
 	/// Key-value engine used for all durable undo state. Not owned.
 	kv::IKVEngine *kvEngine_{nullptr};
-
-	/// Live XATR_ keys already captured in the active checkpoint interval (first-touch guard).
-	/// Keyed by the live-key bytes, which uniquely identify an xattr (inode, name).
-	std::unordered_set<std::string> touchedXAttrs_;
 };

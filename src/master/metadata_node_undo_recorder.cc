@@ -16,6 +16,8 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "common/platform.h"
+
 #include "master/metadata_node_undo_recorder.h"
 
 #include <cstdint>
@@ -80,9 +82,7 @@ void NodeUndoRecorder::beforeMutation(const MetadataMutationContext &context,
 	    },
 	    mutation);
 
-	if (!handled) {
-		safs::log_warn("{}: received non-node mutation for node recorder", __func__);
-	}
+	if (!handled) { safs::log_warn("{}: received non-node mutation for node recorder", __func__); }
 }
 
 bool NodeUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
@@ -114,7 +114,8 @@ bool NodeUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
 	// Iterate checkpoints in descending order and apply those for which checkpoint >= targetVersion
 	for (const auto checkpointVersion : std::views::reverse(retainedCheckpointVersions)) {
 		// Important: we must also apply rollback when checkpoint == targetVersion.
-		// Please see ChunkUndoRecorder::restoreToCheckpointVersion() for rationale on this stopping condition.
+		// Please see ChunkUndoRecorder::restoreToCheckpointVersion() for rationale on this stopping
+		// condition.
 		if (checkpointVersion < targetVersion) { break; }
 
 		auto [entries, success] =
@@ -172,7 +173,6 @@ int8_t NodeUndoRecorder::dropCheckpointData(kv::IReadWriteTransaction *transacti
 void NodeUndoRecorder::beforeNodeSet(const MetadataMutationContext &context,
                                      const NodeSetMutation &mutation) {
 	if (context.checkpointVersion == 0) { return; }
-	if (touchedNodeIds_.contains(mutation.inode)) { return; }
 
 	// currentValue will be the value of NODE_<inode> key if it exists, or std::nullopt
 	// if the key does not exist (i.e. node is being created)
@@ -190,7 +190,6 @@ void NodeUndoRecorder::beforeNodeSet(const MetadataMutationContext &context,
 void NodeUndoRecorder::beforeNodeRemove(const MetadataMutationContext &context,
                                         const NodeRemoveMutation &mutation) {
 	if (context.checkpointVersion == 0) { return; }
-	if (touchedNodeIds_.contains(mutation.inode)) { return; }
 
 	// currentValue will be the value of NODE_<inode> key if it exists, or std::nullopt
 	// if the key does not exist (i.e. node is being removed)
@@ -211,13 +210,8 @@ void NodeUndoRecorder::recordNodeUndoSet(kv::IReadWriteTransaction *transaction,
 	kv::Key undoKey = nodeUndoKey(checkpointVersion, inode);
 
 	// Preserve the original pre-image if already recorded.
-	if (transaction->get(undoKey).has_value()) {
-		touchedNodeIds_.insert(inode);
-		return;
-	}
-
+	if (transaction->get(undoKey).has_value()) { return; }
 	transaction->set(undoKey, serializedNode);
-	touchedNodeIds_.insert(inode);
 }
 
 void NodeUndoRecorder::recordNodeUndoRemove(kv::IReadWriteTransaction *transaction,
@@ -228,18 +222,13 @@ void NodeUndoRecorder::recordNodeUndoRemove(kv::IReadWriteTransaction *transacti
 	kv::Key undoKey = nodeUndoKey(checkpointVersion, inode);
 
 	// Preserve the original pre-image if already recorded.
-	if (transaction->get(undoKey).has_value()) {
-		touchedNodeIds_.insert(inode);
-		return;
-	}
-
+	if (transaction->get(undoKey).has_value()) { return; }
 	// Tombstone: node did not exist before the first mutation in this checkpoint interval
 	transaction->set(undoKey, kv::Value{});
-	touchedNodeIds_.insert(inode);
 }
 
-bool NodeUndoRecorder::applyNodeUndoEntry(const FilesystemOperationContext &fsOpContext, inode_t nodeId,
-	                        const kv::Value &undoValue) {
+bool NodeUndoRecorder::applyNodeUndoEntry(const FilesystemOperationContext &fsOpContext,
+                                          inode_t nodeId, const kv::Value &undoValue) {
 	if (undoValue.empty()) {
 		if (metadata::nodes::removeLoadedNode(fsOpContext, nodeId) != kOpSuccess) { return false; }
 		// Track the deletion so the forkless edge load can skip live edges that point at this

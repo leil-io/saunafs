@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "common/platform.h"
+
 #include <cstdint>
 #include <unordered_set>
 
@@ -67,7 +69,8 @@ public:
 	/// interval-start image.
 	///
 	/// @param context  Active write transaction and current checkpoint version of the flush.
-	/// @param mutation Must hold a NodeSetMutation or NodeRemoveMutation (inode and live NODE_ key).
+	/// @param mutation Must hold a NodeSetMutation or NodeRemoveMutation (inode and live NODE_
+	/// key).
 	void beforeMutation(const MetadataMutationContext &context,
 	                    const MetadataMutation &mutation) override;
 
@@ -105,9 +108,9 @@ public:
 	int8_t dropCheckpointData(kv::IReadWriteTransaction *transaction,
 	                          uint64_t droppedCheckpointVersion) override;
 
-	/// Clears the per-interval first-touch tracking. Called after a checkpoint is sealed so the
-	/// next interval starts recording fresh pre-images.
-	void resetIntervalState() override { touchedNodeIds_.clear(); }
+	/// No in-memory first-touch state is retained; durable undo keys are authoritative.
+	/// Kept for the common recorder lifecycle interface.
+	void resetIntervalState() override {}
 
 	/// Inodes removed from the in-memory node table during the most recent rollback.
 	///
@@ -116,7 +119,9 @@ public:
 	/// edge load consults this set so it can skip live edges whose child was rolled back away
 	/// (post-checkpoint drift) instead of failing the load; those edges are reconciled by edge
 	/// rollback and changelog replay.
-	const std::unordered_set<uint64_t> &removedDuringRestore() const { return removedDuringRestore_; }
+	const std::unordered_set<uint64_t> &removedDuringRestore() const {
+		return removedDuringRestore_;
+	}
 
 private:
 	/// Handles a NodeSetMutation: reads the current live value and records either the existing
@@ -126,17 +131,18 @@ private:
 
 	/// Handles a NodeRemoveMutation: records the existing node pre-image so the removal can be
 	/// undone. No-op when the live key is already absent. Recorded once per node per interval.
-	void beforeNodeRemove(const MetadataMutationContext &context, const NodeRemoveMutation &mutation);
+	void beforeNodeRemove(const MetadataMutationContext &context,
+	                      const NodeRemoveMutation &mutation);
 
 	/// Writes the undo row holding the serialized node pre-image for inode under
 	/// checkpointVersion. Never overwrites an existing undo row, so the interval-start pre-image
-	/// is preserved, and marks the inode as touched.
+	/// is preserved.
 	void recordNodeUndoSet(kv::IReadWriteTransaction *transaction, uint64_t checkpointVersion,
 	                       inode_t inode, const kv::Value &serializedNode);
 
 	/// Writes an empty-value tombstone undo row for inode under checkpointVersion, recording
 	/// that the node did not exist before the first mutation in the interval. Never overwrites
-	/// an existing undo row, and marks the inode as touched.
+	/// an existing undo row.
 	void recordNodeUndoRemove(kv::IReadWriteTransaction *transaction, uint64_t checkpointVersion,
 	                          inode_t inode);
 
@@ -148,9 +154,6 @@ private:
 
 	/// Key-value engine used for all durable undo state. Not owned.
 	kv::IKVEngine *kvEngine_{nullptr};
-
-	/// Inodes already captured in the active checkpoint interval (first-touch guard).
-	std::unordered_set<uint64_t> touchedNodeIds_;
 
 	/// Inodes deleted during the most recent restoreToCheckpointVersion() (see
 	/// removedDuringRestore()). Cleared at the start of each restore.

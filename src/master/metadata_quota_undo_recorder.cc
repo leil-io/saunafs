@@ -16,6 +16,8 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "common/platform.h"
+
 #include "master/metadata_quota_undo_recorder.h"
 
 #include <array>
@@ -122,9 +124,9 @@ bool QuotaUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
 	}
 
 	uint64_t restoredEntries = 0;
-	// Iterate checkpoints in descending order and apply those for which checkpoint >= targetVersion.
-	// Please see ChunkUndoRecorder::restoreToCheckpointVersion() for rationale on this stopping
-	// condition (the target interval itself must be undone).
+	// Iterate checkpoints in descending order and apply those for which checkpoint >=
+	// targetVersion. Please see ChunkUndoRecorder::restoreToCheckpointVersion() for rationale on
+	// this stopping condition (the target interval itself must be undone).
 	for (const auto checkpointVersion : std::views::reverse(retainedCheckpointVersions)) {
 		if (checkpointVersion < targetVersion) { break; }
 
@@ -161,7 +163,9 @@ std::pair<uint64_t, bool> QuotaUndoRecorder::restoreSingleCheckpoint(
 		for (const auto &pair : page.getPairs()) {
 			QuotaOwnerType ownerType{};
 			inode_t ownerId = 0;
-			if (!decodeQuotaUndoKey(pair.key, ownerType, ownerId) || pair.value.empty()) { continue; }
+			if (!decodeQuotaUndoKey(pair.key, ownerType, ownerId) || pair.value.empty()) {
+				continue;
+			}
 
 			if (pair.value[0] == kQuotaTombstone) {
 				// Owner had no limits at the checkpoint: remove it.
@@ -210,15 +214,8 @@ void QuotaUndoRecorder::beforeOwnerMutation(const MetadataMutationContext &conte
                                             const kv::Key &rangeBegin, const kv::Key &rangeEnd) {
 	if (context.checkpointVersion == 0) { return; }
 
-	// The owner prefix (rangeBegin) uniquely identifies the owner; use it as the first-touch dedup
-	// key so only the interval-start pre-image is captured.
-	std::string dedupKey(rangeBegin.begin(), rangeBegin.end());
-	if (touchedOwners_.contains(dedupKey)) { return; }
-
 	recordOwnerUndo(context.transaction, context.checkpointVersion, ownerType, ownerId, rangeBegin,
 	                rangeEnd);
-
-	touchedOwners_.insert(std::move(dedupKey));
 }
 
 void QuotaUndoRecorder::recordOwnerUndo(kv::IReadWriteTransaction *transaction,

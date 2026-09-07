@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "common/platform.h"
+
 #include <cstdint>
-#include <string>
-#include <unordered_set>
 
 #include "common/type_defs.h"
 #include "kv/ikv_engine.h"
@@ -107,13 +107,13 @@ public:
 	int8_t dropCheckpointData(kv::IReadWriteTransaction *transaction,
 	                          uint64_t droppedCheckpointVersion) override;
 
-	/// Clears the per-interval first-touch tracking. Called after a checkpoint is sealed so the
-	/// next interval starts recording fresh pre-images.
-	void resetIntervalState() override { touchedOwners_.clear(); }
+	/// No in-memory first-touch state is retained; durable undo keys are authoritative.
+	/// Kept for the common recorder lifecycle interface.
+	void resetIntervalState() override {}
 
 private:
-	/// Records the pre-image of one owner once per interval (scanning its live QUOT_ range) and
-	/// marks it as touched. Shared by the set and remove mutation paths.
+	/// Records the pre-image of one owner once per interval by consulting the durable undo key and
+	/// scanning its live QUOT_ range. Shared by the set and remove mutation paths.
 	void beforeOwnerMutation(const MetadataMutationContext &context, QuotaOwnerType ownerType,
 	                         inode_t ownerId, const kv::Key &rangeBegin, const kv::Key &rangeEnd);
 
@@ -127,8 +127,4 @@ private:
 
 	/// Key-value engine used for all durable undo state. Not owned.
 	kv::IKVEngine *kvEngine_{nullptr};
-
-	/// QUOT_<ownerType><ownerId> prefixes already captured in the active interval (first-touch
-	/// guard), keyed by the owner-prefix bytes.
-	std::unordered_set<std::string> touchedOwners_;
 };

@@ -18,8 +18,9 @@
 
 #pragma once
 
+#include "common/platform.h"
+
 #include <cstdint>
-#include <unordered_set>
 
 #include "kv/ikv_engine.h"
 #include "kv/kv_types.h"
@@ -102,13 +103,13 @@ public:
 	int8_t dropCheckpointData(kv::IReadWriteTransaction *transaction,
 	                          uint64_t droppedCheckpointVersion) override;
 
-	/// Clears the per-interval first-touch tracking. Called after a checkpoint is sealed so the
-	/// next interval starts recording fresh pre-images.
-	void resetIntervalState() override { touchedChunkIds_.clear(); }
+	/// No in-memory first-touch state is retained; durable undo keys are authoritative.
+	/// Kept for the common recorder lifecycle interface.
+	void resetIntervalState() override {}
 
 private:
-	/// Handles a ChunkSetMutation: records the pre-image once per chunk per interval and marks
-	/// the chunk as touched.
+	/// Handles a ChunkSetMutation: records the pre-image once per chunk per interval, using the
+	/// durable undo key as the first-touch guard.
 	void beforeChunkSet(const MetadataMutationContext &context, const ChunkSetMutation &mutation);
 
 	/// Writes the undo row for chunkId under checkpointVersion, copying the current live value
@@ -119,7 +120,4 @@ private:
 
 	/// Key-value engine used for all durable undo state. Not owned.
 	kv::IKVEngine *kvEngine_{nullptr};
-
-	/// Chunk ids already captured in the active checkpoint interval (first-touch guard).
-	std::unordered_set<uint64_t> touchedChunkIds_;
 };

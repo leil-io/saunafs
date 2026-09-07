@@ -16,6 +16,8 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "common/platform.h"
+
 #include "master/metadata_edge_undo_recorder.h"
 
 #include <cstdint>
@@ -104,9 +106,9 @@ bool EdgeUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
 	}
 
 	uint64_t restoredEntries = 0;
-	// Iterate checkpoints in descending order and apply those for which checkpoint >= targetVersion.
-	// Please see ChunkUndoRecorder::restoreToCheckpointVersion() for rationale on this stopping
-	// condition (the target interval itself must be undone).
+	// Iterate checkpoints in descending order and apply those for which checkpoint >=
+	// targetVersion. Please see ChunkUndoRecorder::restoreToCheckpointVersion() for
+	// rationale on this stopping condition (the target interval itself must be undone).
 	for (const auto checkpointVersion : std::views::reverse(retainedCheckpointVersions)) {
 		if (checkpointVersion < targetVersion) { break; }
 
@@ -150,7 +152,8 @@ std::pair<uint64_t, bool> EdgeUndoRecorder::restoreSingleCheckpoint(
 				const uint8_t *ptr = pair.value.data();
 				inode_t childId{};
 				getINode(&ptr, childId);
-				status = metadata::edges::restoreLoadedEdge(fsOpContext, parentId, childId, edgeName);
+				status =
+				    metadata::edges::restoreLoadedEdge(fsOpContext, parentId, childId, edgeName);
 			}
 
 			if (status != kOpSuccess) { return {restoredEntries, false}; }
@@ -178,14 +181,7 @@ void EdgeUndoRecorder::beforeEdgeMutation(const MetadataMutationContext &context
                                           const HString &name, const kv::Key &liveKey) {
 	if (context.checkpointVersion == 0) { return; }
 
-	// The live EDGE_ key uniquely identifies the edge (parentId, name); use it as the
-	// first-touch dedup key so only the interval-start pre-image is captured.
-	std::string dedupKey(liveKey.begin(), liveKey.end());
-	if (touchedEdges_.contains(dedupKey)) { return; }
-
 	recordEdgeUndo(context.transaction, context.checkpointVersion, parentId, name, liveKey);
-
-	touchedEdges_.insert(std::move(dedupKey));
 }
 
 void EdgeUndoRecorder::recordEdgeUndo(kv::IReadWriteTransaction *transaction,

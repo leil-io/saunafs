@@ -263,8 +263,8 @@ public:
 	/// Drain-until-empty mode keeps flushing until the queue becomes empty, including updates
 	/// enqueued while the flush is in progress.
 	enum class FlushMode : uint8_t {
-		kSnapshot,        ///< Flush only the initial snapshot of pending updates.
-		kDrainUntilEmpty, ///< Keep flushing until no pending updates remain.
+		kSnapshot,         ///< Flush only the initial snapshot of pending updates.
+		kDrainUntilEmpty,  ///< Keep flushing until no pending updates remain.
 	};
 
 	/// Default pending-update count at which the backlog is reported critical: far above what a
@@ -370,14 +370,14 @@ private:
 	/// back below the low-watermark. Called after a flush drains the queue.
 	void maybeLogBacklogRecovery();
 
-	// Async pipeline (asyncFlush == true): a background worker keeps up to kMaxInFlight_ commitAsync()
-	// transactions in flight -- all off the event loop -- and reaps them in submission order.
+	// Async writer (asyncFlush == true): a background worker builds and commits batches off the
+	// event loop. Only one transaction is submitted at a time so durable commit order matches event
+	// order; queueing, group-commit batching, and caller-side enqueue remain asynchronous.
 	void startWorker();
 	void stopWorker();
 	void workerLoop();
-	/// Requeues every in-flight batch's events to the FRONT of the pending queue in submission order,
-	/// then clears the pipeline (lock held). On a commit failure this lets the in-order re-commit
-	/// produce the correct final per-key state even though newer commits may already have landed.
+	/// Requeues the failed in-flight batch at the FRONT of the pending queue, preserving strict
+	/// head-of-line retry order, then clears the in-flight slot (lock held).
 	void requeueInFlightLocked();
 
 	kv::IKVEngine *kvEngine_;
@@ -416,21 +416,25 @@ private:
 
 	// Async-writer coordination (all guarded by mutex_).
 	std::thread workerThread_;
-	std::condition_variable workCv_;     ///< wakes the worker when work arrives, a slot frees, or stop
+	std::condition_variable workCv_;  ///< wakes the worker when work arrives, a slot frees, or stop
 	std::condition_variable spaceCv_;    ///< wakes enqueuers blocked on backpressure as space frees
-	std::condition_variable drainedCv_;  ///< wakes flushAndWait() when the pipeline is fully drained
-	std::condition_variable lingerCv_;   ///< group-commit linger; NOT signalled by enqueue (no storm)
+	std::condition_variable drainedCv_;  ///< wakes flushAndWait() when the writer is fully drained
+	std::condition_variable
+	    lingerCv_;  ///< group-commit linger; NOT signalled by enqueue (no storm)
 	bool stop_ = false;
-	bool drainNow_ = false;         ///< seal/shutdown wants an immediate drain: cut the linger short
+	bool drainNow_ = false;  ///< seal/shutdown wants an immediate drain: cut the linger short
 	bool lastFlushFailed_ = false;  ///< a commit failed since the last flushAndWait() reset it
 	size_t maxPending_;             ///< backpressure high-water mark (async mode)
 
-	// In-flight commits, guarded by mutex_ (all push/pop happen under the lock; only the blocking
-	// getResult() on a held future pointer runs off-lock). flushAndWait() reads its emptiness.
+	// The single in-flight commit, guarded by mutex_ (all push/pop happen under the lock; only the
+	// blocking getResult() on a held future pointer runs off-lock). A deque keeps ownership simple
+	// while enforcing kMaxInFlight_ == 1; flushAndWait() reads its emptiness.
 	std::deque<InFlightCommit> inFlight_;
 
 	constexpr static size_t kMaxUpdatesPerFlush_ = 1000;
-	constexpr static size_t kMaxInFlight_ = 8;  ///< pipeline depth (commits kept in flight)
+	// Correctness baseline: do not submit a newer transaction until the older one commits. This may
+	// be raised only after the writer has explicit non-overlapping conflict domains and FIFO lanes.
+	constexpr static size_t kMaxInFlight_ = 1;
 	constexpr static size_t kDefaultMaxPending_ = 200000;
 	constexpr static int kCommitRetryBackoffMs_ = 20;
 	constexpr static int kBatchLingerMs_ = 2;  ///< trickle-only group-commit linger (pipeline idle)

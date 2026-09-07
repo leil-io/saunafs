@@ -185,7 +185,7 @@ void FreeNodeUpdateEvent::applyEvent(const MetadataWriteContext &context) {
 }
 
 EdgeUpdateEvent::EdgeUpdateEvent(inode_t _parentId, HString _name, inode_t _childId)
-	: parentId(_parentId), name(std::move(_name)), childId(_childId) {}
+    : parentId(_parentId), name(std::move(_name)), childId(_childId) {}
 
 void EdgeUpdateEvent::applyEvent(const MetadataWriteContext &context) {
 	if (context.transaction == nullptr) {
@@ -222,7 +222,7 @@ void EdgeUpdateEvent::applyEvent(const MetadataWriteContext &context) {
 }
 
 EdgeRemoveEvent::EdgeRemoveEvent(inode_t _parentId, HString _name)
-	: parentId(_parentId), name(std::move(_name)) {}
+    : parentId(_parentId), name(std::move(_name)) {}
 
 void EdgeRemoveEvent::applyEvent(const MetadataWriteContext &context) {
 	if (context.transaction == nullptr) {
@@ -400,7 +400,8 @@ void QuotaUpdateEvent::applyEvent(const MetadataWriteContext &context) {
 	// Persist only the soft/hard limit entries provided by the caller. Usage (kUsed) is rebuilt
 	// from node loading and is intentionally excluded (it is not part of the quota checksum).
 	for (const QuotaEntry &entry : entries) {
-		kv::Key key = quotaEntryKey(ownerType, ownerId, entry.entryKey.rigor, entry.entryKey.resource);
+		kv::Key key =
+		    quotaEntryKey(ownerType, ownerId, entry.entryKey.rigor, entry.entryKey.resource);
 		kv::Value value(kv::toBytesBE(static_cast<uint64_t>(entry.limit)));
 		context.transaction->set(key, value);
 	}
@@ -508,9 +509,11 @@ void MetadataWriterFDB::enqueue(std::unique_ptr<IMetadataUpdateEvent> event) {
 			// stalled -- block the caller until space frees. The changelog is the durability
 			// record, so throttling here only paces the in-memory->FDB mirror; nothing is lost.
 			if (pendingUpdates_.size() >= maxPending_) {
-				safs::log_warn("MetadataWriterFDB queue full ({} >= {}), throttling until it drains",
-				               pendingUpdates_.size(), maxPending_);
-				spaceCv_.wait(lock, [this] { return stop_ || pendingUpdates_.size() < maxPending_; });
+				safs::log_warn(
+				    "MetadataWriterFDB queue full ({} >= {}), throttling until it drains",
+				    pendingUpdates_.size(), maxPending_);
+				spaceCv_.wait(lock,
+				              [this] { return stop_ || pendingUpdates_.size() < maxPending_; });
 			}
 		}
 		pendingUpdates_.emplace_back(std::move(event));
@@ -609,8 +612,8 @@ bool MetadataWriterFDB::flushAndWait() {
 	std::unique_lock<std::mutex> lock(mutex_);
 	// Observe only failures from this point on; ignore a stale failure from a previous caller.
 	lastFlushFailed_ = false;
-	// Cut any active group-commit linger short: the seal needs the queue empty and the pipeline idle
-	// as soon as possible, not after the linger window elapses.
+	// Cut any active group-commit linger short: the seal needs the queue empty and the pipeline
+	// idle as soon as possible, not after the linger window elapses.
 	drainNow_ = true;
 	workCv_.notify_all();
 	lingerCv_.notify_all();
@@ -749,11 +752,9 @@ void MetadataWriterFDB::stopWorker() {
 }
 
 void MetadataWriterFDB::requeueInFlightLocked() {
-	// Move every in-flight batch's events, oldest batch first, back to the FRONT of the pending
-	// queue preserving submission order, then clear the pipeline. The abandoned futures may still
-	// land, but each re-commit writes the same self-contained snapshots (idempotent), so the
-	// in-order re-commit yields the correct final per-key state even if a newer commit already
-	// landed before an older one failed. Caller holds mutex_.
+	// Only one commit may be in flight. Restore its events to the FRONT so a retryable failure is
+	// retried before any newer queued event; no newer transaction has been submitted and therefore
+	// cannot land first. Caller holds mutex_.
 	UpdateQueue events;
 	for (auto &commit : inFlight_) {
 		while (!commit.events.empty()) {
@@ -775,21 +776,21 @@ void MetadataWriterFDB::workerLoop() {
 		             [this] { return stop_ || !pendingUpdates_.empty() || !inFlight_.empty(); });
 		if (stop_ && pendingUpdates_.empty() && inFlight_.empty()) { break; }
 
-		// Group-commit linger (trickle only): if the pipeline is idle and the queue holds less than a
-		// full batch, wait briefly so a trickle of enqueues coalesces into one fatter commit instead
-		// of many tiny ones. Gated on inFlight_ being empty -- when commits are already in flight,
-		// their duration is itself the accumulation window, so we never delay a reap under load. The
-		// wait is on lingerCv_, which enqueue() does NOT signal (no per-enqueue wakeup storm); only
-		// stop_ or a seal/shutdown drain (drainNow_) cuts the window short.
+		// Group-commit linger (trickle only): if the pipeline is idle and the queue holds less than
+		// a full batch, wait briefly so a trickle of enqueues coalesces into one fatter commit
+		// instead of many tiny ones. Gated on inFlight_ being empty -- when commits are already in
+		// flight, their duration is itself the accumulation window, so we never delay a reap under
+		// load. The wait is on lingerCv_, which enqueue() does NOT signal (no per-enqueue wakeup
+		// storm); only stop_ or a seal/shutdown drain (drainNow_) cuts the window short.
 		if (!stop_ && !drainNow_ && inFlight_.empty() && !pendingUpdates_.empty() &&
 		    pendingUpdates_.size() < kMaxUpdatesPerFlush_) {
 			lingerCv_.wait_for(lock, std::chrono::milliseconds(kBatchLingerMs_),
 			                   [this] { return stop_ || drainNow_; });
 		}
 
-		// Fill the pipeline: keep up to kMaxInFlight_ commitAsync() transactions in flight so commit
-		// latency overlaps with more work. The txn build + applyEvent (incl. recordPreMutation FDB
-		// reads) + commitAsync run WITHOUT the lock, so enqueue() never blocks on FDB.
+		// Submit a batch only when the single commit slot is free. Transaction build + applyEvent
+		// (including recordPreMutation FDB reads) + commitAsync run WITHOUT the lock, so callers
+		// can continue enqueueing while commit order remains strictly serial.
 		while (inFlight_.size() < kMaxInFlight_ && !pendingUpdates_.empty()) {
 			UpdateQueue batch;
 			const size_t batchSize = std::min(pendingUpdates_.size(), kMaxUpdatesPerFlush_);
@@ -812,14 +813,12 @@ void MetadataWriterFDB::workerLoop() {
 			} catch (const std::exception &e) {
 				safs::log_err("Exception starting async commit of {} updates: {}; requeuing",
 				              batch.size(), e.what());
-			} catch (...) {
-				safs::log_err("Unknown exception starting async commit; requeuing");
-			}
+			} catch (...) { safs::log_err("Unknown exception starting async commit; requeuing"); }
 
 			lock.lock();
 			if (built) {
 				// The size cap may have deferred a tail: return it to the FRONT, in order, so the
-				// pipeline picks it up as a following batch. The in-flight commit then holds only
+				// writer picks it up as a following batch. The in-flight commit then holds only
 				// the events actually written into its transaction (needed so a failure requeue via
 				// requeueInFlightLocked() re-commits exactly those events, in order).
 				while (batch.size() > applied) {
@@ -835,17 +834,18 @@ void MetadataWriterFDB::workerLoop() {
 					batch.pop_back();
 				}
 				lastFlushFailed_ = true;
-				// Unblock a waiting flushAndWait(): its predicate observes lastFlushFailed_, but the
-				// reap below only runs (and only it notifies) when the pipeline is non-empty. Without
-				// this the seal would sleep forever on a build failure with nothing in flight.
+				// Unblock a waiting flushAndWait(): its predicate observes lastFlushFailed_, but
+				// the reap below only runs (and only it notifies) when the pipeline is non-empty.
+				// Without this the seal would sleep forever on a build failure with nothing in
+				// flight.
 				drainedCv_.notify_all();
 				break;  // stop filling; reap / back off below
 			}
 		}
 
-		// Reap the oldest in-flight commit in submission order. Block on getResult() WITHOUT the lock
-		// so the producer can keep enqueuing while we wait for durability. Only the worker mutates
-		// inFlight_, so front() stays valid across the unlock.
+		// Reap the oldest in-flight commit in submission order. Block on getResult() WITHOUT the
+		// lock so the producer can keep enqueuing while we wait for durability. Only the worker
+		// mutates inFlight_, so front() stays valid across the unlock.
 		if (!inFlight_.empty()) {
 			kv::ICommitFuture *future = inFlight_.front().future.get();
 			lock.unlock();
@@ -855,12 +855,12 @@ void MetadataWriterFDB::workerLoop() {
 			lock.lock();
 
 			if (committed) {
-				safs::log_info("Flushed {} metadata updates to FDB", inFlight_.front().events.size());
+				safs::log_info("Flushed {} metadata updates to FDB",
+				               inFlight_.front().events.size());
 				inFlight_.pop_front();
 			} else {
-				// Forkless is the sole writer, so a failed commit means FDB is transiently
-				// unavailable -- the whole pipeline is affected. Requeue this batch and every newer
-				// in-flight batch in order, then retry. See requeueInFlightLocked().
+				// Restore this sole in-flight batch at the head of the queue. The worker retries it
+				// before building any newer batch, preserving durable event order.
 				safs::log_err(
 				    "Async commit failed (err {}, retryable {}); requeuing {} in-flight batch(es)",
 				    commitError, retryable, inFlight_.size());
