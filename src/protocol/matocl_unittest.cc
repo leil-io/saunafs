@@ -175,6 +175,44 @@ TEST(MatoclCommunicationTests, XorChunksHealth) {
 	}
 }
 
+TEST(MatoclCommunicationTests, ChunksHealthWithFreshness) {
+	SAUNAFS_DEFINE_INOUT_PAIR(bool, fromScan, true, false);
+	SAUNAFS_DEFINE_INOUT_PAIR(uint32_t, serverTime, 1757000000, 0);
+	ChunksAvailabilityState availIn, availOut;
+	ChunksReplicationState replIn, replOut;
+	ChunkHealthFreshness freshnessIn, freshnessOut;
+
+	availIn.addChunk(1, ChunksAvailabilityState::kEndangered);
+	replIn.addChunk(1, 1, 0);
+
+	freshnessIn.generation = 7;
+	freshnessIn.scanStart = 1756999000;
+	freshnessIn.scanEnd = 1756999480;
+	freshnessIn.chunksScanned = 5000000000ULL;
+	freshnessIn.chunksExcluded = 3;
+	freshnessIn.chunkserversDown = 2;
+
+	std::vector<uint8_t> buffer;
+	ASSERT_NO_THROW(matocl::chunksHealth::serialize(buffer, availIn, replIn, fromScanIn,
+	                                                freshnessIn, serverTimeIn));
+
+	verifyHeader(buffer, SAU_MATOCL_CHUNKS_HEALTH);
+	removeHeaderInPlace(buffer);
+	ASSERT_NO_THROW(matocl::chunksHealth::deserialize(buffer, availOut, replOut, fromScanOut,
+	                                                  freshnessOut, serverTimeOut));
+
+	SAUNAFS_VERIFY_INOUT_PAIR(fromScan);
+	SAUNAFS_VERIFY_INOUT_PAIR(serverTime);
+	EXPECT_EQ(freshnessIn.generation, freshnessOut.generation);
+	EXPECT_EQ(freshnessIn.scanStart, freshnessOut.scanStart);
+	EXPECT_EQ(freshnessIn.scanEnd, freshnessOut.scanEnd);
+	EXPECT_EQ(freshnessIn.chunksScanned, freshnessOut.chunksScanned);
+	EXPECT_EQ(freshnessIn.chunksExcluded, freshnessOut.chunksExcluded);
+	EXPECT_EQ(freshnessIn.chunkserversDown, freshnessOut.chunkserversDown);
+	EXPECT_EQ(availIn.endangeredChunks(1), availOut.endangeredChunks(1));
+	EXPECT_EQ(replIn.chunksToReplicate(1, 1), replOut.chunksToReplicate(1, 1));
+}
+
 TEST(MatoclCommunicationTests, FuseDeleteAcl) {
 	SAUNAFS_DEFINE_INOUT_PAIR(uint32_t, messageId, 123, 0);
 	SAUNAFS_DEFINE_INOUT_PAIR(uint8_t, status, SAUNAFS_ERROR_EPERM, 0);

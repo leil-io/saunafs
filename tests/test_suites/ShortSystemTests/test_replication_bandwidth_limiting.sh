@@ -13,8 +13,18 @@ CHUNKSERVERS=2 \
 			`|OPERATIONS_DELAY_DISCONNECT = 0" \
 	setup_local_empty_saunafs info
 
+# Chunks the emptied chunkserver has taken a complete copy of. A replication in flight holds its
+# files at version zero until it commits, so counting those would end the wait when the last
+# transfer starts rather than when it finishes.
+fully_replicated_chunks_on_emptied_chunkserver() {
+	find_chunkserver_metadata_chunks 0 \
+		-not -name "*_00000000${chunk_metadata_extension}" | wc -l
+}
+
+# Without the measurement row: this compares the counts, and a backend that measures chunk health
+# in the background reports when it did, which moves on every measurement.
 chunks_health() {
-	saunafs_admin_command chunks-health --porcelain localhost "${info[matocl]}"
+	saunafs_admin_command chunks-health --porcelain localhost "${info[matocl]}" | grep -v "^MEA "
 }
 
 cd "${info[mount0]}"
@@ -28,6 +38,9 @@ FILE_SIZE=${file_size_kb}K file-generate $(seq 1 $chunks_count)
 
 assert_equals $chunks_count $(find_chunkserver_metadata_chunks 0 | wc -l)
 
+# The healthy report to come back to has to be one that covers the chunks just written, not
+# whatever the last measurement of a backend that takes them in the background happened to hold.
+wait_for_chunk_health_measurement "${info[matocl]}"
 health_ok=$(chunks_health)
 saunafs_chunkserver_daemon 0 stop
 
@@ -43,9 +56,22 @@ accepted_inaccuracy_s=5
 if valgrind_enabled; then
 	accepted_inaccuracy_s=30
 fi;
-assert_success wait_for \
-		'[ "$health_ok" == "$(chunks_health)" ]' \
+# Timed on the copies landing on the emptied chunkserver's disk, which is what the bandwidth
+# limit governs. On the in-memory master the health report has to agree within the same window,
+# as it always had to. On the FDB backend the report is not the clock: it answers from its own
+# records, which still name this chunkserver for every chunk whose metadata file was deleted
+# behind its back, so it reads as served the moment the server is back and before a single byte
+# has been copied.
+replication_complete() {
+	[ "$chunks_count" == "$(fully_replicated_chunks_on_emptied_chunkserver)" ] || return 1
+	[[ "${METADATA_BACKEND:-}" == "FDB" ]] || [ "$health_ok" == "$(chunks_health)" ]
+}
+assert_success wait_for replication_complete \
 		"$((expected_time_s + accepted_inaccuracy_s)) seconds"
 end_TS=$(timestamp)
 assert_near $expected_time_s $((end_TS - start_TS)) $accepted_inaccuracy_s
+
+# The copies are on disk; the report has to say so too. On the FDB backend that is a measurement
+# later, and timing it would measure the report's own delay, so it is asserted after the clock.
+assert_eventually '[ "$health_ok" == "$(chunks_health)" ]'
 

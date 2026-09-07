@@ -22,6 +22,7 @@
 #include "admin/chunk_health_command.h"
 
 #include <iostream>
+#include <memory>
 
 #include "protocol/cltoma.h"
 #include "protocol/matocl.h"
@@ -80,32 +81,102 @@ void ChunksHealthCommand::run(const Options& options) const {
 	auto tlsCfg =
 	    options.getValue<std::string>("--tlsconfigfile", std::string(TlsSession::kNoFile));
 
-	ServerConnection connection(options.argument(0), options.argument(1), tlsCfg);
-	bool regularOnly = false;
-	auto request = cltoma::chunksHealth::build(regularOnly);
-	auto response = connection.sendAndReceive(request, SAU_MATOCL_CHUNKS_HEALTH);
-	ChunksAvailabilityState availability;
-	ChunksReplicationState replication;
-	matocl::chunksHealth::deserialize(response, regularOnly, availability, replication);
-	if (regularOnly) {
-		throw Exception("Incorrect response type received");
+	auto connection =
+	    std::make_unique<ServerConnection>(options.argument(0), options.argument(1), tlsCfg);
+
+	// Ask in the version that also reports when the answer was measured. A server that does not
+	// know that version closes the connection, so any failure here is retried once with the
+	// original request on a fresh connection (as metadataserver_status_command.cc does); decoding
+	// stays outside the catch, since a malformed answer says nothing about which request fits.
+	MessageBuffer response;
+	try {
+		response =
+		    connection->sendAndReceive(cltoma::chunksHealth::build(), SAU_MATOCL_CHUNKS_HEALTH);
+	} catch (std::exception &) {
+		connection =
+		    std::make_unique<ServerConnection>(options.argument(0), options.argument(1), tlsCfg);
+		response = connection->sendAndReceive(cltoma::chunksHealth::build(false),
+		                                      SAU_MATOCL_CHUNKS_HEALTH);
 	}
 
-	initializeGoals(connection);
+	ChunksAvailabilityState availability;
+	ChunksReplicationState replication;
+	bool healthFromScan = false;
+	ChunkHealthFreshness freshness;
+	uint32_t serverTime = 0;
+
+	PacketVersion responseVersion = 0;
+	deserializePacketVersionNoHeader(response, responseVersion);
+
+	if (responseVersion == matocl::chunksHealth::kWithFreshness) {
+		matocl::chunksHealth::deserialize(response, availability, replication, healthFromScan,
+		                                  freshness, serverTime);
+	} else {
+		bool regularOnly = false;
+		matocl::chunksHealth::deserialize(response, regularOnly, availability, replication);
+		if (regularOnly) { throw Exception("Incorrect response type received"); }
+	}
+
+	initializeGoals(*connection);
 
 	bool showAllReports = !options.isSet(kOptionAvailability)
 			&& !options.isSet(kOptionReplication)
 			&& !options.isSet(kOptionDeletion);
+	// A server that measures its counters in the background reports when, whichever report was
+	// asked for: a count read without its date cannot be told from one nobody has taken yet, and
+	// that is as true of the replication counts as of the availability ones. A reader wants the
+	// context before the counts; a script wants the counts first, and the row after them.
+	const bool isPorcelain = options.isSet(kPorcelainMode);
+	if (healthFromScan && !isPorcelain) { printFreshness(freshness, serverTime); }
+
 	if (showAllReports || options.isSet(kOptionAvailability)) {
-		printState(availability, options.isSet(kPorcelainMode));
+		printState(availability, isPorcelain);
 	}
 	if (showAllReports || options.isSet(kOptionReplication)) {
-		printState(true, replication, options.isSet(kPorcelainMode));
+		printState(true, replication, isPorcelain);
 	}
 	if (showAllReports || options.isSet(kOptionDeletion)) {
-		printState(false, replication, options.isSet(kPorcelainMode));
+		printState(false, replication, isPorcelain);
 	}
 
+	if (healthFromScan && isPorcelain) { printFreshnessRow(freshness, serverTime); }
+}
+
+/// Seconds between the end of the measurement and the answering server's clock, never negative.
+static uint32_t measurementAge(const ChunkHealthFreshness &freshness, uint32_t serverTime) {
+	return serverTime > freshness.scanEnd ? serverTime - freshness.scanEnd : 0;
+}
+
+/// Seconds the measurement took, never negative.
+static uint32_t measurementDuration(const ChunkHealthFreshness &freshness) {
+	return freshness.scanEnd > freshness.scanStart ? freshness.scanEnd - freshness.scanStart : 0;
+}
+
+void ChunksHealthCommand::printFreshness(const ChunkHealthFreshness &freshness,
+                                         uint32_t serverTime) const {
+	if (!freshness.measured()) {
+		std::cout << "Chunk health has not been measured yet, so the counts below are not a"
+		             " statement about the installation."
+		          << std::endl
+		          << std::endl;
+		return;
+	}
+
+	std::cout << "Measured " << measurementAge(freshness, serverTime) << "s ago (scan "
+	          << freshness.generation << " took " << measurementDuration(freshness) << "s, "
+	          << freshness.chunksScanned << " chunks, " << freshness.chunksExcluded << " excluded, "
+	          << freshness.chunkserversDown << " chunkservers unreachable)" << std::endl
+	          << std::endl;
+}
+
+void ChunksHealthCommand::printFreshnessRow(const ChunkHealthFreshness &freshness,
+                                            uint32_t serverTime) const {
+	// One shape whether or not anything has been measured: a generation of 0 is the unmeasured
+	// answer, since real ones start at 1, and every other field is 0 with it.
+	const uint32_t age = freshness.measured() ? measurementAge(freshness, serverTime) : 0;
+	std::cout << "MEA " << freshness.generation << ' ' << age << ' '
+	          << measurementDuration(freshness) << ' ' << freshness.chunksScanned << ' '
+	          << freshness.chunksExcluded << ' ' << freshness.chunkserversDown << std::endl;
 }
 
 void ChunksHealthCommand::printState(const ChunksAvailabilityState& state, bool isPorcelain) const {

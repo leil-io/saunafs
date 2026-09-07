@@ -86,6 +86,9 @@ int hddChunkWriteFullBlocks(uint64_t chunkId, uint32_t version, ChunkPartType ch
 /* chunk info */
 int hddChunkGetNumberOfBlocks(uint64_t chunkId, ChunkPartType chunkType,
                               uint32_t version, uint16_t *blocks);
+/// Reports the stored version of a chunk part, NOCHUNK when the part is not on this server; the
+/// answer to a metadata server's probe, which needs the version without a block count.
+int hddChunkGetVersion(uint64_t chunkId, ChunkPartType chunkType, uint32_t *version);
 
 /* chunk operations */
 int hddTruncate(uint64_t chunkId, uint32_t chunkVersion, ChunkPartType chunkType,

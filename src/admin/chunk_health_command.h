@@ -24,9 +24,10 @@
 
 #include <map>
 
+#include "admin/saunafs_admin_command.h"
+#include "common/chunk_health_freshness.h"
 #include "common/chunks_availability_state.h"
 #include "common/server_connection.h"
-#include "admin/saunafs_admin_command.h"
 
 class ChunksHealthCommand : public SaunaFsAdminCommand {
 public:
@@ -43,6 +44,11 @@ private:
 
 	static void initializeGoals(ServerConnection& connection);
 
+	/// Human-readable paragraph on when the counts were measured, printed before them.
+	void printFreshness(const ChunkHealthFreshness &freshness, uint32_t serverTime) const;
+	/// Porcelain MEA row, printed after the counters: generation, age, duration, chunks scanned,
+	/// chunks excluded, chunkservers unreachable. Generation 0 means nothing measured yet.
+	void printFreshnessRow(const ChunkHealthFreshness &freshness, uint32_t serverTime) const;
 	void printState(const ChunksAvailabilityState& state, bool isPorcelain) const;
 	void printState(bool isReplication, const ChunksReplicationState& state,
 			bool isPorcelain) const;

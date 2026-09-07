@@ -73,3 +73,33 @@ function check_one_file_replicated() {
 	assert_eventually 'check_one_file_part_coverage_impl_ "${path}" "${expected_number_of_parts}"' "${replication_timeout}"
 }
 
+
+# Generation of the chunk health measurement the server at port $1 is answering with. Zero on a
+# server that has measured nothing yet; empty on a server whose counters are current as chunks
+# change and so prints no measurement row.
+function chunk_health_measurement_generation_() {
+	saunafs-admin chunks-health --porcelain localhost "${1}" \
+		| awk '/^MEA /{print $2}'
+}
+
+# Waits until the chunk health report at port $1 covers the cluster as it is now, on a backend
+# that measures it in the background instead of counting as chunks change. On any other backend
+# the counters are already current and this returns at once, without a request.
+#
+# The backend is named explicitly rather than detected from the report: the admin CLI falls back
+# to the original request when the measured one is refused, and that answer carries no
+# measurement row, so a probe would take the no-wait branch on the very run that needs the wait.
+#
+# It waits for two measurements, not one: a measurement already in flight when the caller changed
+# the cluster describes the cluster before that change, so only the next one is sure to see it.
+function wait_for_chunk_health_measurement() {
+	local port="${1}"
+	local timeout="${2:-}"
+	[[ "${METADATA_BACKEND:-}" == "FDB" ]] || return 0
+
+	assert_eventually 'test "$(chunk_health_measurement_generation_ "${port}")" -gt 0' "${timeout}"
+	local generation="$(chunk_health_measurement_generation_ "${port}")"
+	assert_eventually \
+		'test "$(chunk_health_measurement_generation_ "${port}")" -ge "$((generation + 2))"' \
+		"${timeout}"
+}

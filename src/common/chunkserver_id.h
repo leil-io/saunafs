@@ -1,7 +1,5 @@
 /*
-   Copyright 2013-2014 EditShare
-   Copyright 2013-2015 Skytechnology sp. z o.o.
-   Copyright 2023      Leil Storage OÜ
+   Copyright 2026      Leil Storage OÜ
 
    This file is part of SaunaFS.
 
@@ -18,18 +16,17 @@
    along with SaunaFS. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include "common/platform.h"
-#include "common/saunafs_version.h"
 
-#include <gtest/gtest.h>
+#include <array>
+#include <cstdint>
 
-TEST(SaunaFsVersionTests, SaunaFsVersion) {
-	EXPECT_EQ(0x01061BU, saunafsVersion(1, 6, 27));
-	EXPECT_EQ(0x01061CU, saunafsVersion(1, 6, 28));
-	EXPECT_EQ(0x01071BU, saunafsVersion(1, 7, 27));
-	EXPECT_EQ(0x02061BU, saunafsVersion(2, 6, 27));
-}
+namespace chunkserver {
 
-TEST(SaunaFsVersionTests, ChunkserverIdentityVersion) {
-	EXPECT_EQ(saunafsVersion(5, 13, 0), kFirstVersionWithChunkserverIdentity);
-}
+/// The chunkserver's persistent identity, a UUID it keeps across restarts and address changes;
+/// shared with the master so both sides name a server the same way.
+using ChunkserverId = std::array<uint8_t, 16>;
+
+}  // namespace chunkserver

@@ -818,6 +818,14 @@ static bool matoclserv_replay_members_iteration(std::vector<BatchMember> &member
 		matoclserv_finish_member(member, SAUNAFS_ERROR_IO);
 		members.erase(members.begin() + idx);
 		return true;
+	} catch (const std::exception &e) {
+		// Any other exception from a body (malformed durable state, codec errors) fails this
+		// member with EIO instead of taking the whole server down with std::terminate.
+		ctx.finishTransactionEffects(FilesystemTransactionOutcome::kAborted);
+		safs::log_err("matoclserv: exception in batch member: {}", e.what());
+		matoclserv_finish_member(member, SAUNAFS_ERROR_IO);
+		members.erase(members.begin() + idx);
+		return true;
 	}
 }
 
@@ -1403,7 +1411,7 @@ uint8_t matoclserv_fuse_write_chunk_respond(matoclserventry *eptr,
                                             uint32_t lockId) {
 	uint32_t chunkVersion;
 	std::vector<ChunkTypeWithAddress> allChunkCopies;
-	uint8_t status = gChunkOperations->getVersionAndLocations(
+	uint8_t status = gChunkOperations->getWriteVersionAndLocations(
 	    chunkId, eptr->peerIpAddress, chunkVersion, kMaxNumberOfChunkCopies, allChunkCopies);
 
 	remove_unsupported_ec_parts(eptr->version, allChunkCopies);
@@ -1865,17 +1873,36 @@ void matoclserv_list_goals(matoclserventry* eptr) {
 /// @param data Pointer to the data received from the client
 /// @param length The length of the data received
 ///
-/// This function deserializes the request data to determine if only regular chunks should be
-/// considered for health checks, and then builds a response message containing the health status
-/// of the chunks, including their availability and replication states.
+/// This function builds a response message containing the health status of the chunks, including
+/// their availability and replication states, in the version the client asked in. A client asking
+/// in the newer version also receives when those states were measured, which matters on a backend
+/// that derives them from its records instead of maintaining them as chunks change.
 void matoclserv_chunks_health(matoclserventry *eptr, const uint8_t *data, uint32_t length) {
-	bool regularChunksOnly;
-	cltoma::chunksHealth::deserialize(data, length, regularChunksOnly);
-	auto message =
-	    matocl::chunksHealth::build(regularChunksOnly, gChunkOperations->getAvailabilityState(),
-	                                gChunkOperations->getReplicationState());
+	PacketVersion version = 0;
+	deserializePacketVersionNoHeader(data, length, version);
 
-	matoclserv_createpacket(eptr, std::move(message));
+	MessageBuffer buffer;
+
+	if (version == cltoma::chunksHealth::kStandard) {
+		bool regularChunksOnly = false;
+		cltoma::chunksHealth::deserialize(data, length, regularChunksOnly);
+		matocl::chunksHealth::serialize(buffer, regularChunksOnly,
+		                                gChunkOperations->getAvailabilityState(),
+		                                gChunkOperations->getReplicationState());
+	} else if (version == cltoma::chunksHealth::kWithFreshness) {
+		cltoma::chunksHealth::deserialize(data, length);
+		auto freshness = gChunkOperations->getHealthFreshness();
+		matocl::chunksHealth::serialize(
+		    buffer, gChunkOperations->getAvailabilityState(),
+		    gChunkOperations->getReplicationState(), freshness.has_value(),
+		    freshness.value_or(ChunkHealthFreshness()), static_cast<uint32_t>(eventloop_time()));
+	} else {
+		safs::log_info("SAU_CLTOMA_CHUNKS_HEALTH - wrong packet version {}", version);
+		eptr->mode = ClientConnectionMode::KILL;
+		return;
+	}
+
+	matoclserv_createpacket(eptr, std::move(buffer));
 }
 
 /// Handles the CLTOMA_SESSION_LIST command, which lists all active sessions.

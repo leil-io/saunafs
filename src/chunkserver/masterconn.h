@@ -20,10 +20,30 @@
 
 #pragma once
 
-#include "chunkserver/bgjobs.h"
 #include "common/platform.h"
 
 #include <cstdint>
+#include <functional>
+
+#include "chunkserver/bgjobs.h"
+#include "protocol/chunks_with_type.h"
+
+class MasterConn;
+
+/// Queues the lost report for a copy a failed write had to delete.
+JobPool::JobCallback masterconn_jobDeleteAfterErrorFinished(ChunkWithType chunkWithType);
+
+/// Prepares both completion listeners before a peer is admitted. Failure leaves the output
+/// descriptors unchanged so the caller can defer admission until its next reconnect tick.
+bool masterconn_prepare_listeners(MasterJobPool &jobPool, MasterJobPool &replicationJobPool,
+                                  uint32_t listenerId, int &jobDescriptor,
+                                  int &replicationDescriptor);
+
+/// Releases one connection and abandons only its listener's replies in both pools, so the other
+/// connections keep their jobs. The caller must have marked the connection KILL first, which
+/// invalidates the callbacks of the old socket.
+void masterconn_close_connection(MasterJobPool &jobPool, MasterJobPool &replicationJobPool,
+                                 MasterConn &connection, uint32_t listenerId);
 
 void masterconn_stats(uint64_t *bin, uint64_t *bout, uint32_t *maxjobscnt);
 int masterconn_init(void);

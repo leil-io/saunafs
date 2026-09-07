@@ -28,12 +28,14 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <exception>
 
 #include "chunkserver/bgjobs.h"
 #include "chunkserver/hddspacemgr.h"
@@ -57,18 +59,31 @@ static bool gEnableLoadFactor;
 
 static const uint64_t kSendStatusDelay = 5;
 
-//  JobPool shared between all connections to MDSs
+// Shared worker pools, with a distinct completion listener for each connection.
 static std::shared_ptr<MasterJobPool> gJobPool;
 static std::shared_ptr<MasterJobPool> gReplicationJobPool;
 
-//  Singleton for the MasterConn instance (will become a list of connections in the future)
-static std::unique_ptr<MasterConn> gMasterConnSingleton = nullptr;
+/// One metadata server connection and the poll bookkeeping of its job listener.
+struct ConnectionSlot {
+	std::unique_ptr<MasterConn> connection;
+	/// Closed but kept until both pools have no job left for its listener.
+	bool retiring = false;
+	uint8_t lastLoadFactor = 0;
+	int32_t jobPollPosition = -1;
+	int32_t replicationPollPosition = -1;
+};
 
-static int gJobFD{-1};  ///< File descriptor for the job pool notifications
-static int32_t gJobFDpDescPos{-1};  ///< Position in the pollfd array for the job pool notifications
-static int gReplicationJobFD{-1}; ///< File descriptor for the replication job pool notifications
-/// Position in the pollfd array for the replication job pool notifications
-static int32_t gReplicationJobFDpDescPos{-1};
+/// Slot index is the job-pool listener id; slot 0 is the configured connection and never retires.
+static std::array<ConnectionSlot, kMaxMetadataConnections> gConnections;
+/// Peers the latest discovery snapshot named; the reconcile step makes the slots match it.
+static std::vector<MetadataClusterMember> gDesiredMembers;
+/// Completion pipes of the two pools, indexed by listener id like the slots.
+static std::vector<int> gJobFDs;
+static std::vector<int> gReplicationJobFDs;
+/// Retry failed admission on the reconnect tick, while existing connections keep being served.
+static bool gDiscoveryAdmissionDeferred = false;
+
+static MasterConn *configuredConnection() { return gConnections.front().connection.get(); }
 
 constexpr uint32_t kDefaultNumberOfWorkers = 10;
 constexpr uint32_t kMinNumberOfWorkers = 2;
@@ -78,20 +93,20 @@ constexpr uint32_t kDefaultReplicationNumberOfWorkers = 5;
 constexpr uint32_t kMinReplicationNumberOfWorkers = 1;
 static uint32_t gReplicationNumberOfWorkers = kDefaultReplicationNumberOfWorkers;
 
-static void* gReconnectHook;
+static void *gReconnectHook;
 
 //  Stats
 static uint32_t stats_maxjobscnt = 0;
 
-void masterconn_stats(uint64_t *bin,uint64_t *bout,uint32_t *maxjobscnt) {
-	//  For each connection, add the statistics
-	auto totalBytesIn = gMasterConnSingleton->bytesIn();
-	auto totalBytesOut = gMasterConnSingleton->bytesOut();
-
-	*bin = totalBytesIn;
-	*bout = totalBytesOut;
-
-	gMasterConnSingleton->resetStats();
+void masterconn_stats(uint64_t *bin, uint64_t *bout, uint32_t *maxjobscnt) {
+	*bin = 0;
+	*bout = 0;
+	for (auto &slot : gConnections) {
+		if (!slot.connection) { continue; }
+		*bin += slot.connection->bytesIn();
+		*bout += slot.connection->bytesOut();
+		slot.connection->resetStats();
+	}
 
 	// Get the stats non dependent on specific connections
 	*maxjobscnt = stats_maxjobscnt;
@@ -99,18 +114,31 @@ void masterconn_stats(uint64_t *bin,uint64_t *bout,uint32_t *maxjobscnt) {
 }
 
 void masterconn_check_hdd_reports() {
-	MasterConn *eptr = gMasterConnSingleton.get();
-	uint32_t errorcounter;
-	if (eptr->mode() == ConnectionMode::CONNECTED &&
-	    eptr->registrationStatus() == RegistrationStatus::kChunksRegistered) {
-		if (hddGetAndResetSpaceChanged()) {
-			uint64_t usedspace, totalspace, tdusedspace, tdtotalspace;
-			uint32_t chunkcount, tdchunkcount;
-			hddGetTotalSpace(&usedspace, &totalspace, &chunkcount, &tdusedspace, &tdtotalspace,
-			                 &tdchunkcount);
-			eptr->createAttachedNoVersionPacket(CSTOMA_SPACE, usedspace, totalspace, chunkcount,
-			                                    tdusedspace, tdtotalspace, tdchunkcount);
+	const bool hasRegisteredConnection =
+	    std::any_of(gConnections.begin(), gConnections.end(), [](const auto &slot) {
+		    return slot.connection && !slot.retiring && slot.connection->isRegistered();
+	    });
+	if (!hasRegisteredConnection) { return; }
+
+	// Gather shared counters once, then send them to every registered peer.
+	if (hddGetAndResetSpaceChanged()) {
+		uint64_t usedSpace, totalSpace, deletedUsedSpace, deletedTotalSpace;
+		uint32_t chunkCount, deletedChunkCount;
+		hddGetTotalSpace(&usedSpace, &totalSpace, &chunkCount, &deletedUsedSpace,
+		                 &deletedTotalSpace, &deletedChunkCount);
+		for (auto &slot : gConnections) {
+			if (slot.connection && !slot.retiring && slot.connection->isRegistered()) {
+				slot.connection->createAttachedNoVersionPacket(
+				    CSTOMA_SPACE, usedSpace, totalSpace, chunkCount, deletedUsedSpace,
+				    deletedTotalSpace, deletedChunkCount);
+			}
 		}
+	}
+
+	// Only the configured connection consumes physical loss and damage reports.
+	MasterConn *eptr = configuredConnection();
+	uint32_t errorcounter;
+	if (eptr->isRegistered()) {
 		errorcounter = hddGetAndResetErrorCounter();
 		while (errorcounter) {
 			eptr->createAttachedNoVersionPacket(CSTOMA_ERROR_OCCURRED);
@@ -132,7 +160,7 @@ void masterconn_check_hdd_reports() {
 
 		std::vector<ChunkWithVersionAndType> chunks_with_version;
 		hddGetNewChunks(chunks_with_version, chunkBulkSize);
-		if (!chunks_with_version.empty()) {
+		if (eptr->sendsInventory() && !chunks_with_version.empty()) {
 			eptr->createAttachedPacket(cstoma::chunkNew::build(chunks_with_version));
 		}
 	}
@@ -143,27 +171,22 @@ void masterconn_unwantedjobfinished(uint8_t status, void *packet) {
 	MasterConn::deletePacket(packet);
 }
 
-std::function<void(uint8_t, void *)> masterconn_jobDeleteAfterErrorFinished(
-    ChunkWithType chunkWithType) {
+JobPool::JobCallback masterconn_jobDeleteAfterErrorFinished(ChunkWithType chunkWithType) {
 	return [chunkWithType](uint8_t status, void *packet) {
 		(void)packet;
 		// packet should be nullptr
 
-		if (status == SAUNAFS_STATUS_OK &&
-		    gMasterConnSingleton->mode() == ConnectionMode::CONNECTED) {
-			// Report the chunk as lost to the master server, so it won't be registered again and
-			// won't cause any inconsistencies. If the mode is connected, it means that registration
-			// with the master server was successful, so we can safely report the chunk as lost. If
-			// the mode is not connected, it means that registration with the master server was not
-			// successful, so we can skip reporting the chunk as lost, as it won't be registered
-			// anyway.
+		if (status == SAUNAFS_STATUS_OK) {
+			// Queued whatever the connection is doing. The released code only polled completions
+			// while connected, so this report always reached the metadata server, late; these
+			// pools drain while disconnected, so skipping it here would lose it instead.
 			hddReportLostChunk(chunkWithType.id, chunkWithType.type);
 		}
 	};
 }
 
-std::function<void(uint8_t, void *)> masterconn_unwantedLockJobFinished(
-    ChunkWithType chunkWithType, uint32_t listenerId) {
+std::function<void(uint8_t, void *)> masterconn_unwantedLockJobFinished(ChunkWithType chunkWithType,
+                                                                        uint32_t listenerId) {
 	return [chunkWithType, listenerId](uint8_t status, void *packet) {
 		MasterConn::deletePacket(packet);
 
@@ -178,21 +201,31 @@ std::function<void(uint8_t, void *)> masterconn_unwantedLockJobFinished(
 	};
 }
 
-MasterJobPool* masterconn_get_job_pool() {
-	return gJobPool.get();
-}
+MasterJobPool *masterconn_get_job_pool() { return gJobPool.get(); }
 
 bool masterconn_canexit() {
-	return gMasterConnSingleton->mode() != ConnectionMode::CONNECTED ||
-	       (gJobPool->isEmpty() && gReplicationJobPool->isEmpty() &&
-	        gMasterConnSingleton->isOutputQueueEmpty());
+	// A chunkserver with nothing established may exit whatever is still queued, since none of it
+	// can be delivered; this is the single-connection rule applied to the whole set.
+	const bool anyConnected =
+	    std::any_of(gConnections.begin(), gConnections.end(), [](const auto &slot) {
+		    return slot.connection && slot.connection->mode() == ConnectionMode::CONNECTED;
+	    });
+	if (!anyConnected) { return true; }
+
+	if (!gJobPool->isEmpty() || !gReplicationJobPool->isEmpty()) { return false; }
+	return std::all_of(gConnections.begin(), gConnections.end(), [](const auto &slot) {
+		return !slot.connection || slot.connection->mode() != ConnectionMode::CONNECTED ||
+		       slot.connection->isOutputQueueEmpty();
+	});
 }
 
 void masterconn_term(void) {
-	//  For each connection (currently only one), release its resources.
-	MasterConn *eptr = gMasterConnSingleton.get();
-	eptr->releaseResources();
-	gMasterConnSingleton.reset();
+	for (auto &slot : gConnections) {
+		if (!slot.connection) { continue; }
+		slot.connection->setMode(ConnectionMode::KILL);
+		slot.connection->releaseResources();
+		slot.connection.reset();
+	}
 
 	//  Now reset the last reference to the job pools.
 	gReplicationJobPool.reset();
@@ -201,83 +234,160 @@ void masterconn_term(void) {
 
 void masterconn_desc(std::vector<pollfd> &pdesc) {
 	LOG_AVG_TILL_END_OF_SCOPE0("master_desc");
+	for (uint32_t index = 0; index < gConnections.size(); ++index) {
+		auto &slot = gConnections[index];
+		slot.jobPollPosition = -1;
+		slot.replicationPollPosition = -1;
+		if (!slot.connection) { continue; }
 
-	// For each connection to master (currently only one), add its socket to the pollfd array.
-	MasterConn *eptr = gMasterConnSingleton.get();
-
-	// Add the descriptor for listening for background jobs finishing.
-	gJobFDpDescPos = -1;
-	gReplicationJobFDpDescPos = -1;
-
-	if (eptr->mode() == ConnectionMode::CONNECTED) {
-		if(gJobFD >= 0) {
-			pdesc.emplace_back(gJobFD, POLLIN, 0);
-			gJobFDpDescPos = static_cast<int32_t>(pdesc.size() - 1);
-		}
-		if(gReplicationJobFD >= 0) {
-			pdesc.emplace_back(gReplicationJobFD, POLLIN, 0);
-			gReplicationJobFDpDescPos = static_cast<int32_t>(pdesc.size() - 1);
-		}
+		// Keep draining completions even after the socket has closed.
+		pdesc.emplace_back(gJobFDs[index], POLLIN, 0);
+		slot.jobPollPosition = static_cast<int32_t>(pdesc.size() - 1);
+		pdesc.emplace_back(gReplicationJobFDs[index], POLLIN, 0);
+		slot.replicationPollPosition = static_cast<int32_t>(pdesc.size() - 1);
+		slot.connection->providePollDescriptors(pdesc, doTerminate());
 	}
-
-	eptr->providePollDescriptors(pdesc, doTerminate());
 }
 
 void masterconn_send_status() {
-	static uint8_t prev_factor = 0;
-	MasterConn *eptr = gMasterConnSingleton.get();
-
 	if (gEnableLoadFactor) {
 		uint8_t load_factor = hddGetLoadFactor();
-		if (eptr->mode() == ConnectionMode::CONNECTED && load_factor != prev_factor) {
-			eptr->createAttachedPacket(cstoma::status::build(load_factor));
-			prev_factor = load_factor;
+		for (auto &slot : gConnections) {
+			if (!slot.connection || slot.retiring) { continue; }
+
+			// The configured connection keeps the released rule, any connected socket; a
+			// discovered one has nothing to say before it is registered.
+			const bool ready = slot.connection->isConfigured()
+			                       ? slot.connection->mode() == ConnectionMode::CONNECTED
+			                       : slot.connection->isRegistered();
+			if (ready && slot.lastLoadFactor != load_factor) {
+				slot.connection->createAttachedPacket(cstoma::status::build(load_factor));
+				slot.lastLoadFactor = load_factor;
+			}
 		}
+	}
+}
+
+void masterconn_close_connection(MasterJobPool &jobPool, MasterJobPool &replicationJobPool,
+                                 MasterConn &connection, uint32_t listenerId) {
+	jobPool.disableAndChangeCallbackAll(masterconn_unwantedjobfinished, listenerId);
+	jobPool.changeLockJobsCallback(masterconn_unwantedLockJobFinished, listenerId);
+	replicationJobPool.disableAndChangeCallbackAll(masterconn_unwantedjobfinished, listenerId);
+	connection.closeSocketQuietly();
+	if (!connection.sendsInventory()) { connection.requeueUnsentReports(); }
+	connection.resetPackets();
+	connection.setMode(ConnectionMode::FREE);
+}
+
+static void closeConnection(uint32_t index) {
+	masterconn_close_connection(*gJobPool, *gReplicationJobPool, *gConnections[index].connection,
+	                            index);
+}
+
+bool masterconn_prepare_listeners(MasterJobPool &jobPool, MasterJobPool &replicationJobPool,
+                                  uint32_t listenerId, int &jobDescriptor,
+                                  int &replicationDescriptor) {
+	try {
+		const int jobs = jobPool.allocateListener(listenerId);
+		const int replications = replicationJobPool.allocateListener(listenerId);
+		if (jobs < 0 || replications < 0) { return false; }
+		jobDescriptor = jobs;
+		replicationDescriptor = replications;
+		return true;
+	} catch (const std::exception &exception) {
+		safs::log_warn("Deferring peer admission: {}", exception.what());
+		return false;
+	}
+}
+
+/// Brings the discovered connections in line with the latest snapshot: retire peers no longer
+/// named, then admit new ones into free slots.
+static void reconcileConnections() {
+	if (auto snapshot = configuredConnection()->takeClusterSnapshot()) {
+		gDesiredMembers = std::move(snapshot->members);
+	}
+	// A metadata server that took the inventory runs alone; forget any earlier discovery.
+	if (configuredConnection()->isRegistered() && configuredConnection()->sendsInventory()) {
+		gDesiredMembers.clear();
+	}
+
+	// Retire removed or changed peers before admitting replacements into unused listener slots.
+	for (uint32_t index = 1; index < gConnections.size(); ++index) {
+		auto &slot = gConnections[index];
+		if (!slot.connection) { continue; }
+		const auto wanted = std::find_if(
+		    gDesiredMembers.begin(), gDesiredMembers.end(), [&slot](const auto &member) {
+			    return member.serverId == slot.connection->serverId() &&
+			           NetworkAddress(member.ip, member.port) == slot.connection->address();
+		    });
+		if (!slot.retiring && wanted == gDesiredMembers.end()) {
+			slot.retiring = true;
+			slot.connection->setMode(ConnectionMode::KILL);
+			closeConnection(index);
+		}
+		if (slot.retiring && gJobPool->isListenerIdle(index) &&
+		    gReplicationJobPool->isListenerIdle(index)) {
+			slot = ConnectionSlot{};
+		}
+	}
+
+	// Admit named peers this process does not talk to yet, one per free slot.
+	if (gDiscoveryAdmissionDeferred) { return; }
+	for (const auto &member : gDesiredMembers) {
+		const auto existing =
+		    std::find_if(gConnections.begin(), gConnections.end(), [&member](const auto &slot) {
+			    return slot.connection && slot.connection->serverId() == member.serverId;
+		    });
+		if (existing != gConnections.end()) { continue; }
+		const auto available = std::find_if(gConnections.begin() + 1, gConnections.end(),
+		                                    [](const auto &slot) { return !slot.connection; });
+		if (available == gConnections.end()) { break; }
+		const auto index = static_cast<uint32_t>(available - gConnections.begin());
+		if (!masterconn_prepare_listeners(*gJobPool, *gReplicationJobPool, index, gJobFDs[index],
+		                                  gReplicationJobFDs[index])) {
+			gDiscoveryAdmissionDeferred = true;
+			break;
+		}
+		available->connection = std::make_unique<MasterConn>(
+		    ipToString(member.ip), std::to_string(member.port), configuredConnection()->clusterId(),
+		    gJobPool, gReplicationJobPool, index, member.serverId);
+		available->connection->setMasterAddress(member.ip, member.port);
+		available->connection->initConnect();
 	}
 }
 
 void masterconn_serve(const std::vector<pollfd> &pdesc) {
 	LOG_AVG_TILL_END_OF_SCOPE0("master_serve");
-	
-	MasterConn *eptr = gMasterConnSingleton.get();
+	for (uint32_t index = 0; index < gConnections.size(); ++index) {
+		auto &slot = gConnections[index];
+		if (!slot.connection) { continue; }
+		auto &connection = *slot.connection;
+		connection.handlePollErrors(pdesc);
+		if (connection.mode() == ConnectionMode::KILL) { closeConnection(index); }
 
-	eptr->handlePollErrors(pdesc);
-	
-	// Check if there are any background jobs to process.
-	if (eptr->mode() == ConnectionMode::CONNECTED) {
-		if (gJobFDpDescPos >= 0 && (pdesc[gJobFDpDescPos].revents & POLLIN)) {
-			gJobPool->processCompletedJobs();
+		if (slot.jobPollPosition >= 0 && (pdesc[slot.jobPollPosition].revents & POLLIN)) {
+			gJobPool->processCompletedJobs(index);
 		}
-		if (gReplicationJobFDpDescPos >= 0 && (pdesc[gReplicationJobFDpDescPos].revents & POLLIN)) {
-			gReplicationJobPool->processCompletedJobs();
+		if (slot.replicationPollPosition >= 0 &&
+		    (pdesc[slot.replicationPollPosition].revents & POLLIN)) {
+			gReplicationJobPool->processCompletedJobs(index);
 		}
+		connection.servePoll(pdesc);
+		if (connection.mode() == ConnectionMode::KILL) { closeConnection(index); }
 	}
 
-	// For each connection to master (currently only one), process its socket.
-	eptr->servePoll(pdesc);
-
-	// Update general statistics
-	if (eptr->mode() == ConnectionMode::CONNECTED) {
-		uint32_t totalJobCount = 0;
-		totalJobCount += (gJobPool->getJobCount() + gReplicationJobPool->getJobCount());
-		stats_maxjobscnt = std::max(totalJobCount, stats_maxjobscnt);
-	}
-
-	// If the connection is in KILL mode, disable the job pool and close the socket.
-	if (eptr->mode() == ConnectionMode::KILL) {
-		gJobPool->disableAndChangeCallbackAll(masterconn_unwantedjobfinished);
-		gJobPool->changeLockJobsCallback(masterconn_unwantedLockJobFinished);
-		gReplicationJobPool->disableAndChangeCallbackAll(masterconn_unwantedjobfinished);
-		tcpclose(eptr->socketFD());
-		eptr->resetPackets();
-		eptr->setMode(ConnectionMode::FREE);
-	}
+	stats_maxjobscnt =
+	    std::max(stats_maxjobscnt, gJobPool->getJobCount() + gReplicationJobPool->getJobCount());
+	// Snapshot handlers only stage data; no connection is added while poll entries are in use.
+	if (!doTerminate()) { reconcileConnections(); }
 }
 
 void masterconn_reconnect(void) {
-	MasterConn *eptr = gMasterConnSingleton.get();
-	if (eptr->mode() == ConnectionMode::FREE) {
-		eptr->initConnect();
+	gDiscoveryAdmissionDeferred = false;
+	for (auto &slot : gConnections) {
+		if (slot.connection && !slot.retiring && slot.connection->mode() == ConnectionMode::FREE) {
+			slot.connection->initConnect();
+		}
 	}
 }
 
@@ -301,29 +411,30 @@ void masterconn_reload(void) {
 	gBindHostStr = cfg_getstring("BIND_HOST", "*");
 	gEnableLoadFactor = static_cast<bool>(cfg_getuint32("ENABLE_LOAD_FACTOR", 0));
 
-	uint32_t bip = 0;
-
-	if (tcpresolve(gBindHostStr.c_str(), nullptr, &bip, nullptr, 1) < 0) { bip = 0; }
+	uint32_t bindIp = 0;
+	if (tcpresolve(gBindHostStr.c_str(), nullptr, &bindIp, nullptr, 1) < 0) { bindIp = 0; }
+	gTimeout_ms = get_cfg_timeout();
+	const bool labelChanged = masterconn_load_label();
 
 	// For each connection, reload the configuration and reconnect if needed.
-	MasterConn *eptr = gMasterConnSingleton.get();
-
-	if (eptr->isMasterAddressValid() && eptr->mode() != ConnectionMode::FREE) {
-		if (eptr->bindHostAddress().ip != bip) {
-			eptr->setBindHostAddress(bip, eptr->bindHostAddress().port);
-			eptr->setMode(ConnectionMode::KILL);
+	for (auto &slot : gConnections) {
+		if (!slot.connection || slot.retiring) { continue; }
+		auto &connection = *slot.connection;
+		if (connection.isMasterAddressValid() && connection.mode() != ConnectionMode::FREE) {
+			if (connection.bindHostAddress().ip != bindIp) {
+				connection.setBindHostAddress(bindIp, connection.bindHostAddress().port);
+				connection.setMode(ConnectionMode::KILL);
+			}
+			connection.reloadConfig();
+		} else {
+			connection.setMasterAddressValid(false);
 		}
-
-		eptr->reloadConfig();
-	} else {
-		eptr->setMasterAddressValid(false);
+		// A discovered connection has nothing to say before it is registered; the configured one
+		// keeps the released behaviour of sending on any connected socket.
+		if (!connection.isConfigured() && !connection.isRegistered()) { continue; }
+		if (labelChanged) { connection.sendRegisterLabel(); }
+		connection.sendConfig();
 	}
-
-	gTimeout_ms = get_cfg_timeout();
-
-	if (masterconn_load_label()) { eptr->sendRegisterLabel(); }
-
-	eptr->sendConfig();
 
 	uint32_t reconnectionDelay = cfg_getuint32("MASTER_RECONNECTION_DELAY", 5);
 	eventloop_timechange(gReconnectHook, TIMEMODE_RUN_LATE, reconnectionDelay, 0);
@@ -341,10 +452,10 @@ int masterconn_init(void) {
 
 	if (!masterconn_load_label()) { return -1; }
 
-	// Create the connections (only one at this point)
-	gMasterConnSingleton = std::make_unique<MasterConn>(gMasterHost, gMasterPort, clusterId,
-	                                                    gJobPool, gReplicationJobPool);
-	MasterConn *eptr = gMasterConnSingleton.get();
+	// The configured seed supplies the first discovery snapshot after registration.
+	gConnections.front().connection = std::make_unique<MasterConn>(
+	    gMasterHost, gMasterPort, clusterId, gJobPool, gReplicationJobPool);
+	MasterConn *eptr = configuredConnection();
 	passert(eptr);
 
 	// Init the connections
@@ -370,12 +481,11 @@ int masterconn_init_threads(void) {
 	                                              kMinNumberOfWorkers);
 
 	try {
-		// Create the JobPool instance with the specified number of workers, it would be serving
-		// only this master network thread, thus the number of listeners is 1.
-		std::vector<int> bgJobPoolFDs(1);
+		gJobFDs.assign(kMaxMetadataConnections, -1);
+		std::vector<int> initFDs;
 		gJobPool = std::make_shared<MasterJobPool>("ma", gNumberOfWorkers, kMaxBackgroundJobsCount,
-		                                           1, bgJobPoolFDs);
-		gJobFD = bgJobPoolFDs[0];
+		                                           1, initFDs);
+		if (!initFDs.empty()) { gJobFDs[0] = initFDs[0]; }
 	} catch (const std::exception &e) {
 		safs::log_err("masterconn_init_threads: Failed to create JobPool instance: {}", e.what());
 		return -1;
@@ -389,16 +499,15 @@ int masterconn_init_threads(void) {
 	safs::log_info("master connection: {} background workers created", gNumberOfWorkers);
 
 	gReplicationNumberOfWorkers = cfg_get_minvalue<uint32_t>("MASTER_REPLICATION_NR_OF_WORKERS",
-		kDefaultReplicationNumberOfWorkers, kMinReplicationNumberOfWorkers);
+	                                                         kDefaultReplicationNumberOfWorkers,
+	                                                         kMinReplicationNumberOfWorkers);
 
 	try {
-		// Create the ReplicationJobPool instance with the specified number of workers, it would be
-		// serving only this master network thread, thus the number of listeners is 1.
-		std::vector<int> replicationJobPoolFDs(1);
-		gReplicationJobPool =
-		    std::make_shared<MasterJobPool>("ma_repl", gReplicationNumberOfWorkers,
-		                                    kMaxBackgroundJobsCount, 1, replicationJobPoolFDs);
-		gReplicationJobFD = replicationJobPoolFDs[0];
+		gReplicationJobFDs.assign(kMaxMetadataConnections, -1);
+		std::vector<int> initReplFDs;
+		gReplicationJobPool = std::make_shared<MasterJobPool>(
+		    "ma_repl", gReplicationNumberOfWorkers, kMaxBackgroundJobsCount, 1, initReplFDs);
+		if (!initReplFDs.empty()) { gReplicationJobFDs[0] = initReplFDs[0]; }
 	} catch (const std::exception &e) {
 		safs::log_err("masterconn_init_threads: Failed to create ReplicationJobPool instance: {}",
 		              e.what());

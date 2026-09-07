@@ -24,6 +24,7 @@
 
 #include "common/access_control_list.h"
 #include "common/attributes.h"
+#include "common/chunk_health_freshness.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunks_availability_state.h"
@@ -246,11 +247,19 @@ SAUNAFS_DEFINE_PACKET_SERIALIZATION(
 		std::vector<SerializedGoal>, serializedGoals)
 
 // SAU_MATOCL_CHUNKS_HEALTH
-SAUNAFS_DEFINE_PACKET_SERIALIZATION(
-		matocl, chunksHealth, SAU_MATOCL_CHUNKS_HEALTH, 0,
-		bool, regularChunksOnly,
-		ChunksAvailabilityState, availability,
-		ChunksReplicationState, replication)
+SAUNAFS_DEFINE_PACKET_VERSION(matocl, chunksHealth, kStandard, 0)
+SAUNAFS_DEFINE_PACKET_VERSION(matocl, chunksHealth, kWithFreshness, 1)
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(matocl, chunksHealth, SAU_MATOCL_CHUNKS_HEALTH, kStandard, bool,
+                                    regularChunksOnly, ChunksAvailabilityState, availability,
+                                    ChunksReplicationState, replication)
+// healthFromScan says whether this server measures the two states above rather than keeping
+// them current as chunks change; only then does freshness describe anything, and only then does
+// an unset generation mean nothing has been measured yet. serverTime is the answering server's
+// clock, so a client can age the measurement without comparing it against its own.
+SAUNAFS_DEFINE_PACKET_SERIALIZATION(matocl, chunksHealth, SAU_MATOCL_CHUNKS_HEALTH, kWithFreshness,
+                                    ChunksAvailabilityState, availability, ChunksReplicationState,
+                                    replication, bool, healthFromScan, ChunkHealthFreshness,
+                                    freshness, uint32_t, serverTime)
 
 // SAU_MATOCL_CSERV_LIST
 SAUNAFS_DEFINE_PACKET_VERSION(matocl, cservList, kStandard, 0)

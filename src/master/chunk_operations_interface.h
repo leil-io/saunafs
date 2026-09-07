@@ -22,18 +22,36 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
+#include "common/chunk_health_freshness.h"
 #include "common/chunk_part_type.h"
 #include "common/chunk_type_with_address.h"
 #include "common/chunk_with_address_and_label.h"
 #include "common/chunk_with_version_and_type.h"
 #include "common/chunks_availability_state.h"
+#include "common/chunkserver_id.h"
 #include "common/media_label.h"
+#include "common/network_address.h"
 #include "master/checksum.h"
+#include "protocol/chunks_with_type.h"
 
 struct matocsserventry;
 class FilesystemOperationContext;
+
+/// What a chunkserver announced by the time its registration completed, passed whole to
+/// serverRegistered so the seam signature survives additions to the registration packets.
+struct ChunkserverRegistration {
+	/// Address clients and other chunkservers use to reach this server.
+	NetworkAddress endpoint;
+	/// Software version; the identity exchange needs kFirstVersionWithChunkserverIdentity.
+	uint32_t version;
+	/// Keepalive timeout the chunkserver requested for this connection, in milliseconds.
+	uint32_t timeoutMs;
+	/// Persistent identity; absent when the backend did not ask or the peer predates it.
+	std::optional<chunkserver::ChunkserverId> chunkserverId;
+};
 
 /// Operations over chunk metadata, behind a swappable/extensible backend.
 ///
@@ -111,6 +129,12 @@ public:
 	                              uint64_t *nchunkid) = 0;
 	virtual int canUnlock(uint64_t chunkid, uint32_t lockid) = 0;
 
+	/// Locations for a client that holds the write lock. A backend that hides a chunk's readable
+	/// locations for the duration of a write still answers the writer from its own state.
+	virtual int getWriteVersionAndLocations(uint64_t chunkid, uint32_t currentIp, uint32_t &version,
+	                                        uint32_t maxNumberOfChunkCopies,
+	                                        std::vector<ChunkTypeWithAddress> &serversList) = 0;
+
 	// --- Read path (locations) ---
 	virtual int getVersionAndLocations(uint64_t chunkid, uint32_t currentIp, uint32_t &version,
 	                                   uint32_t maxNumberOfChunkCopies,
@@ -133,6 +157,27 @@ public:
 	                             const std::vector<ChunkWithVersionAndType> &chunks) = 0;
 	virtual void damaged(matocsserventry *ptr, uint64_t chunkid, ChunkPartType chunkType) = 0;
 	virtual void lost(matocsserventry *ptr, uint64_t chunkid, ChunkPartType chunkType) = 0;
+	/// A whole damaged-report packet, so a backend can apply it in one transaction; the base
+	/// applies the single-chunk handler to each entry in order.
+	virtual void damagedChunks(matocsserventry *ptr, const std::vector<ChunkWithType> &chunks) = 0;
+	/// A whole lost-report packet, with the same contract as damagedChunks.
+	virtual void lostChunks(matocsserventry *ptr, const std::vector<ChunkWithType> &chunks) = 0;
+	/// Whether registration asks the chunkserver for its persistent identity before completing.
+	/// A backend that records chunk locations by chunkserver identity needs it; the in-memory
+	/// registry keys copies by connection and does not.
+	virtual bool requestsChunkserverIdentity() const = 0;
+	/// Whether the backend feeds the maintenance loop bounded snapshots of its own records
+	/// instead of letting it walk the cached chunk table; the loop then drives maintenanceTick
+	/// and maintenanceStep.
+	virtual bool usesExternalMaintenance() const = 0;
+	/// Arms one tick of external maintenance work; maintenanceStep spends it in slices.
+	virtual void maintenanceTick() = 0;
+	/// One slice of the current tick's work, called between polls; true when more slices remain.
+	virtual bool maintenanceStep() = 0;
+	/// The chunkserver's registration completed, identity included when it was requested; a
+	/// backend without a registration inventory restores what it knows about the server here.
+	virtual void serverRegistered(matocsserventry *ptr,
+	                              const ChunkserverRegistration &registration) = 0;
 	virtual void serverDisconnected(matocsserventry *ptr, const MediaLabel &label) = 0;
 	virtual void serverUnlabelledConnected() = 0;
 	virtual void serverLabelChanged(const MediaLabel &previousLabel,
@@ -157,6 +202,16 @@ public:
 	                               uint8_t status) = 0;
 	virtual void gotDuptruncStatus(matocsserventry *ptr, uint64_t chunkId, ChunkPartType chunkType,
 	                               uint8_t status) = 0;
+	/// Reply to a chunk probe: the version the chunkserver holds, or a NOCHUNK status. A backend
+	/// without a registration inventory asks instead of trusting what it last recorded.
+	virtual void gotProbeStatus(matocsserventry *ptr, uint64_t chunkId, ChunkPartType chunkType,
+	                            uint32_t chunkVersion, uint8_t status) = 0;
+	/// Every part answered the chunk's pending operation and the chunk is idle again. A backend
+	/// that keeps the part set outside memory publishes it here.
+	virtual void operationSettled(uint64_t chunkId) = 0;
+	/// A part of @p chunkId held by the disconnected chunkserver @p csid left memory. A backend
+	/// without a registration inventory restores it from its own records when the server returns.
+	virtual void copyDropped(uint64_t chunkId, uint16_t csid) = 0;
 
 	// --- Stats / introspection ---
 	virtual void stats(uint32_t *del, uint32_t *repl) = 0;
@@ -167,6 +222,10 @@ public:
 	virtual uint32_t count() = 0;
 	virtual const ChunksReplicationState &getReplicationState() = 0;
 	virtual const ChunksAvailabilityState &getAvailabilityState() = 0;
+	/// When the two states above were measured, for a backend that derives them from its records
+	/// instead of maintaining them as chunks change. Empty means the counters are current by
+	/// construction, so there is no measurement to date.
+	virtual std::optional<ChunkHealthFreshness> getHealthFreshness() = 0;
 	virtual void info(uint32_t *allChunks, uint32_t *allCopies, uint32_t *regCopies) = 0;
 	virtual int invalidateGoalCache() = 0;
 #endif  // METARESTORE
