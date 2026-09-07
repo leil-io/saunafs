@@ -120,28 +120,19 @@ public:
 
 	/// Flush pending batched updates.
 	///
-	/// This backend batches metadata updates (e.g. chunk changes) and periodically flushes
-	/// them to the KV store to avoid stalling the master event loop.
+	/// Drains all pending metadata updates and waits for the background writer to become idle.
 	///
-	/// If flushAll is false, flushes all the batches that are currently pending at the time of the
-	/// call.
-	/// If flushAll is true, continues flushing until no pending batches remain (or until a
-	/// commit fails).
+	/// Used as a checkpoint barrier before persisting restore-relevant keys in fs_storeall().
 	///
-	/// The flushAll=true mode is intended for operations that must leave the KV store in a
-	/// self-consistent state before proceeding (e.g. before persisting restore-relevant keys
-	/// in fs_storeall()).
-	///
-	/// @param flushAll Whether to flush until the queue becomes empty.
-	/// @return true on success; false if a KV commit failed while flushing.
-	bool flushPendingUpdates(bool flushAll = false);
+	/// @return true on success; false if the writer is unavailable or a KV commit failed.
+	bool flushPendingUpdates();
 
 	/// Called when this server is promoted from Shadow to Master.
 	///
-	/// Creates the metadata writer and registers the periodic flush timer so that
-	/// FDB persistence begins from this point forward. On shadow servers the writer
-	/// is intentionally left null until promotion; all on* signal handlers already
-	/// guard on metadataWriter_ != nullptr, so no writes reach FDB before this call.
+	/// Creates the asynchronous metadata writer so that FDB persistence begins from this point
+	/// forward. On shadow servers the writer is intentionally left null until promotion; all on*
+	/// signal handlers already guard on metadataWriter_ != nullptr, so no writes reach FDB before
+	/// this call.
 	void onPromotedToMaster();
 
 private:
@@ -181,7 +172,7 @@ private:
 	/// key in a per-section dirty set (reset on each FDB load); on promotion this method resolves
 	/// each dirty key against the authoritative in-memory state and enqueues an update or a remove.
 	/// Bounded by changes since the last load, not by namespace size. Routed through the writer
-	/// queue so the flush timer drains it and the checkpoint undo stays consistent.
+	/// queue so the background worker drains it and the checkpoint undo stays consistent.
 	/// TODO: Bound the dirty sets so they cannot grow unboundedly in a long-running shadow. A
 	/// shadow must never write to FDB (see fs_storeall(): that races the live master), so they
 	/// cannot simply be flushed early. Two workable directions: prune entries already sealed in

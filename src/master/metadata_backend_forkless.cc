@@ -178,7 +178,7 @@ uint8_t MetadataBackendForkless::fs_storeall(DumpType /*dumpType*/) {
 
 		// Flush ALL pending batched updates to FDB before saving metadata keys,
 		// so restore-relevant keys reflect the fully persisted state.
-		if (!flushPendingUpdates(true)) {
+		if (!flushPendingUpdates()) {
 			safs::log_err("Failed to fully flush pending updates before saving metadata keys");
 			broadcast_metadata_saved(SAUNAFS_ERROR_IO);
 			return SAUNAFS_ERROR_IO;
@@ -1322,7 +1322,7 @@ void MetadataBackendForkless::store_fd(FILE *fd) {
 
 #endif  // #ifndef METALOGGER
 
-bool MetadataBackendForkless::flushPendingUpdates(bool /*flushAll*/) {
+bool MetadataBackendForkless::flushPendingUpdates() {
 	if (!metadataWriter_) { return false; }
 	// Drain everything and wait for the background worker to go idle. The checkpoint seal path is
 	// the only caller; it needs all pending updates committed (and the worker parked) before

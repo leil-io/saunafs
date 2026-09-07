@@ -424,7 +424,7 @@ private:
 	bool stop_ = false;
 	bool drainNow_ = false;  ///< seal/shutdown wants an immediate drain: cut the linger short
 	bool lastFlushFailed_ = false;  ///< a commit failed since the last flushAndWait() reset it
-	size_t maxPending_;             ///< backpressure high-water mark (async mode)
+	const size_t maxPending_;       ///< backpressure high-water mark (async mode)
 
 	// The single in-flight commit, guarded by mutex_ (all push/pop happen under the lock; only the
 	// blocking getResult() on a held future pointer runs off-lock). A deque keeps ownership simple
