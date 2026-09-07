@@ -2859,12 +2859,15 @@ int initDiskManager() {
 }
 
 int loadPlugins() {
-	const std::array<std::string, 5> pluginPaths = {
+	const std::array<std::string, 8> pluginPaths = {
 	    cfg_getstring("PLUGINS_DIR", ""),              // Higher priority (user-defined)
 	    PLUGINS_PATH "/chunkserver",                   // Build-time defined path
 	    BUILD_PATH "/plugins/chunkserver",             // Build tree (for development)
 	    "/usr/local/lib/leil/plugins/chunkserver",     // Local install
-	    "/usr/lib/leil/plugins/chunkserver"           // Standard install
+	    "/usr/lib/leil/plugins/chunkserver",           // Standard install
+	    PLUGINS_PATH_LEGACY "/chunkserver",            // Legacy build-time defined path
+	    "/usr/local/lib/saunafs/plugins/chunkserver",  // Legacy local install
+	    "/usr/lib/saunafs/plugins/chunkserver"         // Legacy standard install
 	};
 
 	for (const auto &path : pluginPaths) {
