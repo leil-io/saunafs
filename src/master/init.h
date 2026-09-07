@@ -28,6 +28,9 @@
 #include "common/random.h"
 #include "common/run_tab.h"
 #include "config/cfg.h"
+#ifdef ENABLE_FOUNDATIONDB
+#include "fdb/fdb_runtime.h"
+#endif
 #include "master/chartsdata.h"
 #include "master/datacachemgr.h"
 #include "master/exports.h"
@@ -62,6 +65,13 @@ inline int prometheus_init() {
 	return 0;
 }
 
+inline void metadata_backend_term() {
+	gMetadataBackend.reset();
+#ifdef ENABLE_FOUNDATIONDB
+	fdb::Runtime::shutdown();
+#endif
+}
+
 inline int metadata_backend_init() {
 	std::string backendType = cfg_getstr("METADATA_BACKEND", "FILE");
 	safs::log_info("Initializing metadata backend of type: {}", backendType);
@@ -88,6 +98,7 @@ inline int metadata_backend_init() {
 			gMetadataBackend->init();
 			gInodeIdGenerator = std::make_unique<IdGeneratorWithDetainer>();
 			safs::log_info("Initialized {} metadata backend", backendType);
+			eventloop_destructregister(metadata_backend_term);
 		} catch (const std::exception &e) {
 			constexpr auto kErrorMessage = "Failed to initialize metadata backend";
 			safs::log_err("{}: {}", kErrorMessage, e.what());
