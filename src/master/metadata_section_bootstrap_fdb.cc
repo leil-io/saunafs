@@ -30,6 +30,7 @@
 #include <span>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/datapack.h"
 #include "common/memory_mapped_file.h"
@@ -42,6 +43,7 @@
 #include "master/kv_common_keys.h"
 #include "master/metadata_backend_common.h"
 #include "master/metadata_backend_interface.h"
+#include "master/metadata_checkpoint_helpers.h"
 #include "master/metadata_writer_fdb.h"
 #include "protocol/quota.h"
 #include "slogger/slogger.h"
@@ -147,6 +149,11 @@ bool MetadataSectionBootstrapFDB::bootstrapSections() {
 }
 
 int8_t MetadataSectionBootstrapFDB::saveMetadataHeader() {
+	if (metadataVersion_ == 0) {
+		safs::log_err("Cannot bootstrap metadata with version 0");
+		return kOpFailure;
+	}
+
 	auto transaction = kvEngine_->createReadWriteTransaction();
 
 	transaction->set(kv::toBytes(kMetaHeaderKey), kv::toBytes(SFSSIGNATURE "M 2.9"));
@@ -163,6 +170,12 @@ int8_t MetadataSectionBootstrapFDB::saveMetadataHeader() {
 	kv::Value nextSessionIdValue;
 	serialize(nextSessionIdValue, nextSessionId_);
 	transaction->set(kv::toBytes(kMetaNextSessionKey), nextSessionIdValue);
+
+	std::vector<uint64_t> checkpointVersions{metadataVersion_};
+	if (checkpoints::saveCheckpointVersions(transaction.get(), checkpointVersions) != kOpSuccess) {
+		safs::log_err("Failed to persist initial checkpoint catalog during bootstrap");
+		return kOpFailure;
+	}
 
 	if (!transaction->commit()) {
 		safs::log_err("Failed to commit bootstrapped metadata header to FDB");

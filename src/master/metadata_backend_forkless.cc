@@ -67,6 +67,21 @@
 namespace {
 MetadataBackendForkless *gForklessBackend = nullptr;
 
+class CheckpointLoadLeaseGuard {
+public:
+	explicit CheckpointLoadLeaseGuard(MetadataCheckpointManager *checkpointManager)
+	    : checkpointManager_(checkpointManager) {}
+	~CheckpointLoadLeaseGuard() {
+		if (checkpointManager_ != nullptr) { checkpointManager_->releaseLoadLease(); }
+	}
+
+	CheckpointLoadLeaseGuard(const CheckpointLoadLeaseGuard &) = delete;
+	CheckpointLoadLeaseGuard &operator=(const CheckpointLoadLeaseGuard &) = delete;
+
+private:
+	MetadataCheckpointManager *checkpointManager_;
+};
+
 #ifndef METARESTORE
 bool hasPersistedMetadataSectionData(kv::IKVEngine *kvEngine,
 	                                 const std::vector<MetadataSectionFDB> &metadataSections) {
@@ -461,6 +476,11 @@ void MetadataBackendForkless::onChunkRemoved(uint64_t chunkId) {
 
 int MetadataBackendForkless::fsLoad(bool ignoreFlag) {
 	for (const auto &section : metadataSections_) {
+		if (!checkpointManager_->validateLoadLease()) {
+			safs::log_err("Checkpoint load lease was lost before loading section {}", section.name);
+			return kOpFailure;
+		}
+
 		auto result = section.loadFunction(ignoreFlag);
 
 		if (result != kOpSuccess) {
@@ -1295,7 +1315,9 @@ void MetadataBackendForkless::loadall(int ignoreflag) {
 		throw MetadataConsistencyException(
 		    "failed to drain metadata writer before loading checkpoint");
 	}
-	applyCheckpointDescriptor(checkpointManager_->loadLatestCheckpoint());
+	const auto checkpointDescriptor = checkpointManager_->loadLatestCheckpoint();
+	CheckpointLoadLeaseGuard loadLeaseGuard(checkpointManager_.get());
+	applyCheckpointDescriptor(checkpointDescriptor);
 
 	// Load the metadata sections
 
@@ -1313,6 +1335,11 @@ void MetadataBackendForkless::loadall(int ignoreflag) {
 	{
 		util::ScopedTimer timer("calculating checksum of the metadata took");
 		gFSOperations->metadataChecksum(ChecksumMode::kForceRecalculate);
+	}
+
+	if (!checkpointManager_->validateLoadLease()) {
+		throw MetadataConsistencyException(
+		    "checkpoint load lease was lost before publishing reconstructed metadata");
 	}
 
 #ifndef METARESTORE

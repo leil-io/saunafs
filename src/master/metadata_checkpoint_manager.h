@@ -18,9 +18,16 @@
 
 #pragma once
 
+#include "common/platform.h"
+
 #include <array>
+#include <condition_variable>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <optional>
+#include <string_view>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -31,8 +38,8 @@
 #include "master/metadata_edge_undo_recorder.h"
 #include "master/metadata_node_undo_recorder.h"
 #include "master/metadata_quota_undo_recorder.h"
-#include "master/metadata_xattr_undo_recorder.h"
 #include "master/metadata_section_undo_recorder.h"
+#include "master/metadata_xattr_undo_recorder.h"
 
 /// Snapshot descriptor bound to one metadata checkpoint boundary.
 ///
@@ -62,9 +69,9 @@ struct MetadataCheckpointDescriptor {
 /// pending writer batches, and then calls sealCheckpoint(). The active checkpoint version
 /// advances only after the seal transaction commits successfully.
 ///
-/// Retention: the last K sealed checkpoint versions are kept, where K is currently
-/// gStoredPreviousBackMetaCopies + 1. Sealing a new checkpoint trims older versions from
-/// the catalog and removes the per-checkpoint data associated with them.
+/// Retention: the last K sealed checkpoint versions are normally kept, where K is currently
+/// gStoredPreviousBackMetaCopies + 1. A renewable load lease temporarily preserves its target and
+/// every newer undo interval; sealing trims only history older than the oldest live target.
 ///
 /// Section-local restore support plugs in through the ISectionUndoRecorder extension
 /// point: the manager routes pre-mutation notifications and restore requests to the
@@ -75,6 +82,7 @@ public:
 	/// Creates a manager bound to the given key-value engine.
 	/// @param kvEngine Key-value engine used for all durable checkpoint state. Not owned.
 	explicit MetadataCheckpointManager(kv::IKVEngine *kvEngine);
+	~MetadataCheckpointManager();
 
 	/// Stages a checkpoint boundary while the current active interval is still draining.
 	///
@@ -90,8 +98,9 @@ public:
 	/// catalog.
 	///
 	/// In a single read-write transaction this writes the descriptor restore keys, inserts
-	/// descriptor.metadataVersion into META_CHECKPOINT_VERSIONS, trims versions that fall
-	/// out of retention, and removes the per-checkpoint data of the trimmed versions.
+	/// descriptor.metadataVersion into META_CHECKPOINT_VERSIONS, conflict-reads active load leases,
+	/// trims versions that fall out of retention without crossing a live target, and removes the
+	/// per-checkpoint data of the trimmed versions.
 	///
 	/// On successful commit the active checkpoint version advances to
 	/// descriptor.metadataVersion and subsequent updates are associated with the new
@@ -107,15 +116,22 @@ public:
 
 	/// Loads the latest checkpoint descriptor and the retained checkpoint catalog from FDB.
 	///
-	/// Reads the descriptor restore keys (missing keys keep their defaults) and
-	/// META_CHECKPOINT_VERSIONS through one read-only transaction, then adopts the newest retained
-	/// version as the active checkpoint version (0 when no checkpoint has been sealed yet). Any
-	/// staged checkpoint is discarded.
+	/// Reads the descriptor restore keys and META_CHECKPOINT_VERSIONS and acquires a renewable load
+	/// lease through one read-write transaction. The catalog must be non-empty, ordered and end in
+	/// the descriptor's metadata version. Any staged checkpoint is discarded.
 	///
 	/// Called during backend load, before section data is read.
 	///
 	/// @return Descriptor describing the newest sealed checkpoint.
 	MetadataCheckpointDescriptor loadLatestCheckpoint();
+
+	/// Verifies that this loader still owns a live lease and that its target remains retained.
+	/// Called before each reconstruction section and before publishing the completed image.
+	bool validateLoadLease();
+
+	/// Stops the lease heartbeat and removes this loader's lease.
+	/// Safe to call repeatedly; expiry is the fallback if cleanup cannot reach the store.
+	void releaseLoadLease() noexcept;
 
 	/// Refreshes the in-memory checkpoint catalog from FDB without reading the descriptor.
 	///
@@ -209,11 +225,29 @@ private:
 	/// Works on local outputs only and does not mutate any member, so the caller can apply the
 	/// result after the seal transaction commits successfully.
 	///
-	/// @param newVersion New checkpoint version to insert.
-	/// @param retained   Output: the catalog trimmed to the retention limit, ascending.
-	/// @param dropped    Output: versions trimmed off the front (to be cleaned up).
-	void computeRetainedCheckpointVersions(uint64_t newVersion, std::vector<uint64_t> &retained,
+	/// @param newVersion       New checkpoint version to insert.
+	/// @param protectedVersion Oldest live load target; no version at or above it may be dropped.
+	/// @param retained         Output: the lease-aware retained catalog, ascending.
+	/// @param dropped          Output: versions trimmed off the front (to be cleaned up).
+	void computeRetainedCheckpointVersions(uint64_t newVersion,
+	                                       std::optional<uint64_t> protectedVersion,
+	                                       std::vector<uint64_t> &retained,
 	                                       std::vector<uint64_t> &dropped) const;
+
+	/// Reads every load lease in the seal transaction, removes expired leases and returns the
+	/// oldest live target. The range read conflicts with concurrent acquisition and renewal.
+	bool collectProtectedCheckpointVersion(kv::IReadWriteTransaction *transaction,
+	                                       std::optional<uint64_t> &oldestTarget);
+
+	/// Runs the renewable lease heartbeat until release or terminal lease loss.
+	void loadLeaseHeartbeatLoop();
+
+	/// Renews the active lease once. Transient failures leave the cached lease intact so the
+	/// heartbeat can retry until its expiry (including the clock-skew grace) is exhausted.
+	bool renewLoadLease();
+
+	/// Marks the active lease terminally lost and emits one diagnostic.
+	void markLoadLeaseLost(std::string_view reason);
 
 	/// Remove keys associated with checkpoints that were dropped during trimming.
 	///
@@ -256,4 +290,15 @@ private:
 	/// Whether the retained checkpoint catalog has been loaded from FDB yet, so it is read
 	/// at most once before the first seal.
 	bool checkpointVersionsLoaded_{false};
+
+	/// Unique durable key and synchronized lifecycle state for an in-progress load lease.
+	kv::Key loadLeaseKey_;
+	std::mutex loadLeaseMutex_;
+	std::condition_variable loadLeaseCv_;
+	std::thread loadLeaseHeartbeat_;
+	uint64_t loadLeaseTargetVersion_{0};
+	uint64_t loadLeaseExpiryUnixMs_{0};
+	bool loadLeaseActive_{false};
+	bool loadLeaseStop_{false};
+	bool loadLeaseLost_{false};
 };

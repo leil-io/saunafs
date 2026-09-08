@@ -16,12 +16,17 @@
    along with SaunaFS  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "master/metadata_checkpoint_manager.h"
+#include "common/platform.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cstring>
+#include <functional>
+#include <random>
 #include <set>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 #include "common/datapack.h"
@@ -32,13 +37,78 @@
 #include "master/kv_common_keys.h"
 #include "master/metadata_backend_interface.h"
 #include "master/metadata_checkpoint_helpers.h"
+#include "master/metadata_checkpoint_manager.h"
 #include "master/metadata_section_undo_recorder.h"
 #include "slogger/slogger.h"
 
+namespace {
+using namespace std::chrono_literals;
+
+// A heartbeat normally has 25 seconds to be scheduled before the lease expires. Sealers keep an
+// additional ten seconds of clock-skew grace before treating the lease as dead, so modest
+// wall-clock disagreement cannot make one host prune history that another still owns.
+constexpr auto kLoadLeaseDuration = 30s;
+constexpr auto kLoadLeaseHeartbeatInterval = 5s;
+constexpr auto kLoadLeaseClockSkewGrace = 10s;
+
+struct LoadLeaseRecord {
+	uint64_t targetVersion;
+	uint64_t expiryUnixMs;
+};
+
+uint64_t unixTimeMilliseconds() {
+	return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+	                                 std::chrono::system_clock::now().time_since_epoch())
+	                                 .count());
+}
+
+constexpr uint64_t durationMilliseconds(std::chrono::milliseconds duration) {
+	return static_cast<uint64_t>(duration.count());
+}
+
+bool leaseIsLive(uint64_t expiryUnixMs, uint64_t nowUnixMs) {
+	if (expiryUnixMs >= nowUnixMs) { return true; }
+	return nowUnixMs - expiryUnixMs <= durationMilliseconds(kLoadLeaseClockSkewGrace);
+}
+
+kv::Value serializeLoadLease(uint64_t targetVersion, uint64_t expiryUnixMs) {
+	auto value = kv::toBytesBE(targetVersion);
+	auto encodedExpiry = kv::toBytesBE(expiryUnixMs);
+	value.insert(value.end(), encodedExpiry.begin(), encodedExpiry.end());
+	return value;
+}
+
+std::optional<LoadLeaseRecord> deserializeLoadLease(const kv::Value &value) {
+	if (value.size() != 2 * sizeof(uint64_t)) { return std::nullopt; }
+
+	const uint8_t *valuePtr = value.data();
+	LoadLeaseRecord record{.targetVersion = get64bit(&valuePtr),
+	                       .expiryUnixMs = get64bit(&valuePtr)};
+	if (record.targetVersion == 0) { return std::nullopt; }
+	return record;
+}
+
+bool isValidCheckpointCatalog(const std::vector<uint64_t> &versions) {
+	if (versions.empty() || versions.front() == 0) { return false; }
+	return std::ranges::adjacent_find(versions, std::greater_equal<>()) == versions.end();
+}
+
+kv::Key makeLoadLeaseKey() {
+	std::random_device randomDevice;
+	auto random64 = [&randomDevice] {
+		return (static_cast<uint64_t>(randomDevice()) << 32U) ^
+		       static_cast<uint64_t>(randomDevice());
+	};
+	return kv::encodeKeyBE(kMetaLoadLeaseKeyPrefix, random64(), random64());
+}
+}  // namespace
+
 MetadataCheckpointManager::MetadataCheckpointManager(kv::IKVEngine *kvEngine)
-    : kvEngine_(kvEngine) {
+    : kvEngine_(kvEngine), loadLeaseKey_(makeLoadLeaseKey()) {
 	initializeRecorders();
 }
+
+MetadataCheckpointManager::~MetadataCheckpointManager() { releaseLoadLease(); }
 
 bool MetadataCheckpointManager::beginCheckpoint(const MetadataCheckpointDescriptor &descriptor) {
 	if (pendingCheckpoint_.has_value()) {
@@ -58,6 +128,15 @@ bool MetadataCheckpointManager::sealCheckpoint(const MetadataCheckpointDescripto
 
 	auto transaction = kvEngine_->createReadWriteTransaction();
 	if (!checkpointVersionsLoaded_) { loadCheckpointVersions(transaction.get()); }
+	if (!retainedCheckpointVersions_.empty() &&
+	    !isValidCheckpointCatalog(retainedCheckpointVersions_)) {
+		safs::log_err("Cannot seal checkpoint version {}: retained catalog is malformed",
+		              descriptor.metadataVersion);
+		return false;
+	}
+
+	std::optional<uint64_t> protectedVersion;
+	if (!collectProtectedCheckpointVersion(transaction.get(), protectedVersion)) { return false; }
 
 	if (!persistCheckpointDescriptor(transaction.get(), descriptor)) {
 		safs::log_err(
@@ -70,8 +149,8 @@ bool MetadataCheckpointManager::sealCheckpoint(const MetadataCheckpointDescripto
 	// in-memory state is mutated only after the transaction commits successfully.
 	std::vector<uint64_t> nextCheckpointVersions;
 	std::vector<uint64_t> droppedVersions;
-	computeRetainedCheckpointVersions(descriptor.metadataVersion, nextCheckpointVersions,
-	                                  droppedVersions);
+	computeRetainedCheckpointVersions(descriptor.metadataVersion, protectedVersion,
+	                                  nextCheckpointVersions, droppedVersions);
 
 	if (checkpoints::saveCheckpointVersions(transaction.get(), nextCheckpointVersions) !=
 	    kOpSuccess) {
@@ -99,8 +178,16 @@ bool MetadataCheckpointManager::sealCheckpoint(const MetadataCheckpointDescripto
 }
 
 MetadataCheckpointDescriptor MetadataCheckpointManager::loadLatestCheckpoint() {
+	{
+		std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+		if (loadLeaseActive_) {
+			throw MetadataConsistencyException(
+			    "checkpoint reconstruction already owns a load lease");
+		}
+	}
+
 	MetadataCheckpointDescriptor descriptor;
-	auto transaction = kvEngine_->createReadOnlyTransaction();
+	auto transaction = kvEngine_->createReadWriteTransaction();
 
 	// A present-but-undersized key means corrupted restore state; fail fast instead of
 	// silently falling back to defaults (which could reuse inode/chunk/session ids).
@@ -140,13 +227,210 @@ MetadataCheckpointDescriptor MetadataCheckpointManager::loadLatestCheckpoint() {
 		descriptor.nextChunkId = get64bit(&data);
 	}
 
-	loadCheckpointVersions(transaction.get());
+	auto checkpointVersions = checkpoints::loadCheckpointVersions(transaction.get());
+	if (!isValidCheckpointCatalog(checkpointVersions)) {
+		throw MetadataConsistencyException("Checkpoint catalog is empty or malformed");
+	}
+	if (descriptor.metadataVersion == 0 ||
+	    checkpointVersions.back() != descriptor.metadataVersion) {
+		throw MetadataConsistencyException(
+		    "Checkpoint descriptor version does not match the retained catalog");
+	}
+
+	const uint64_t expiryUnixMs = unixTimeMilliseconds() + durationMilliseconds(kLoadLeaseDuration);
+	transaction->set(loadLeaseKey_, serializeLoadLease(descriptor.metadataVersion, expiryUnixMs));
+	if (!transaction->commit()) {
+		throw MetadataConsistencyException(
+		    "Failed to acquire checkpoint reconstruction load lease");
+	}
+
+	retainedCheckpointVersions_ = std::move(checkpointVersions);
+	activeCheckpointVersion_ = descriptor.metadataVersion;
 
 	resetIntervalState();
 	pendingCheckpoint_.reset();
 	checkpointVersionsLoaded_ = true;
 
+	{
+		std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+		loadLeaseTargetVersion_ = descriptor.metadataVersion;
+		loadLeaseExpiryUnixMs_ = expiryUnixMs;
+		loadLeaseStop_ = false;
+		loadLeaseLost_ = false;
+		loadLeaseActive_ = true;
+	}
+
+	try {
+		loadLeaseHeartbeat_ = std::thread(&MetadataCheckpointManager::loadLeaseHeartbeatLoop, this);
+	} catch (...) {
+		releaseLoadLease();
+		throw;
+	}
+
+	safs::log_info("Acquired checkpoint load lease for version {}", descriptor.metadataVersion);
+
 	return descriptor;
+}
+
+bool MetadataCheckpointManager::validateLoadLease() {
+	kv::Key leaseKey;
+	uint64_t targetVersion = 0;
+	{
+		std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+		if (!loadLeaseActive_ || loadLeaseLost_ ||
+		    !leaseIsLive(loadLeaseExpiryUnixMs_, unixTimeMilliseconds())) {
+			return false;
+		}
+		leaseKey = loadLeaseKey_;
+		targetVersion = loadLeaseTargetVersion_;
+	}
+
+	try {
+		auto transaction = kvEngine_->createReadOnlyTransaction();
+		auto leaseValue = transaction->get(leaseKey);
+		auto checkpointVersions = checkpoints::loadCheckpointVersions(transaction.get());
+		if (!leaseValue.has_value()) {
+			markLoadLeaseLost("durable lease key is missing");
+			return false;
+		}
+
+		auto record = deserializeLoadLease(*leaseValue);
+		if (!record.has_value() || record->targetVersion != targetVersion ||
+		    !leaseIsLive(record->expiryUnixMs, unixTimeMilliseconds())) {
+			markLoadLeaseLost("durable lease is malformed, changed, or expired");
+			return false;
+		}
+		if (!isValidCheckpointCatalog(checkpointVersions) ||
+		    !std::ranges::binary_search(checkpointVersions, targetVersion)) {
+			markLoadLeaseLost("checkpoint catalog is malformed or no longer contains the target");
+			return false;
+		}
+	} catch (const std::exception &exception) {
+		safs::log_err("Failed to validate checkpoint load lease: {}", exception.what());
+		markLoadLeaseLost("lease validation transaction failed");
+		return false;
+	} catch (...) {
+		markLoadLeaseLost("lease validation transaction failed with an unknown exception");
+		return false;
+	}
+
+	return true;
+}
+
+void MetadataCheckpointManager::releaseLoadLease() noexcept {
+	bool hadActiveLease = false;
+	{
+		std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+		hadActiveLease = loadLeaseActive_;
+		loadLeaseStop_ = true;
+	}
+	loadLeaseCv_.notify_all();
+
+	if (loadLeaseHeartbeat_.joinable()) { loadLeaseHeartbeat_.join(); }
+
+	if (hadActiveLease) {
+		try {
+			auto transaction = kvEngine_->createReadWriteTransaction();
+			transaction->remove(loadLeaseKey_);
+			if (!transaction->commit()) {
+				safs::log_warn(
+				    "Failed to release checkpoint load lease; it will be removed after expiry");
+			} else {
+				safs::log_info("Released checkpoint load lease");
+			}
+		} catch (const std::exception &exception) {
+			safs::log_warn("Failed to release checkpoint load lease: {}; it will expire",
+			               exception.what());
+		} catch (...) {
+			safs::log_warn(
+			    "Failed to release checkpoint load lease: unknown error; it will expire");
+		}
+	}
+
+	std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+	loadLeaseTargetVersion_ = 0;
+	loadLeaseExpiryUnixMs_ = 0;
+	loadLeaseActive_ = false;
+	loadLeaseStop_ = false;
+	loadLeaseLost_ = false;
+}
+
+void MetadataCheckpointManager::loadLeaseHeartbeatLoop() {
+	while (true) {
+		std::unique_lock<std::mutex> lock(loadLeaseMutex_);
+		if (loadLeaseCv_.wait_for(lock, kLoadLeaseHeartbeatInterval, [this] {
+			    return loadLeaseStop_ || loadLeaseLost_ || !loadLeaseActive_;
+		    })) {
+			return;
+		}
+		lock.unlock();
+
+		if (!renewLoadLease()) { return; }
+	}
+}
+
+bool MetadataCheckpointManager::renewLoadLease() {
+	kv::Key leaseKey;
+	uint64_t targetVersion = 0;
+	uint64_t cachedExpiryUnixMs = 0;
+	{
+		std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+		if (!loadLeaseActive_ || loadLeaseStop_ || loadLeaseLost_) { return false; }
+		leaseKey = loadLeaseKey_;
+		targetVersion = loadLeaseTargetVersion_;
+		cachedExpiryUnixMs = loadLeaseExpiryUnixMs_;
+	}
+
+	try {
+		auto transaction = kvEngine_->createReadWriteTransaction();
+		auto leaseValue = transaction->get(leaseKey);
+		if (!leaseValue.has_value()) {
+			markLoadLeaseLost("heartbeat found that the durable lease key is missing");
+			return false;
+		}
+
+		auto record = deserializeLoadLease(*leaseValue);
+		const uint64_t nowUnixMs = unixTimeMilliseconds();
+		if (!record.has_value() || record->targetVersion != targetVersion ||
+		    !leaseIsLive(record->expiryUnixMs, nowUnixMs)) {
+			markLoadLeaseLost("heartbeat found that the durable lease changed or expired");
+			return false;
+		}
+
+		const uint64_t nextExpiryUnixMs = nowUnixMs + durationMilliseconds(kLoadLeaseDuration);
+		transaction->set(leaseKey, serializeLoadLease(targetVersion, nextExpiryUnixMs));
+		if (transaction->commit()) {
+			std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+			if (loadLeaseActive_ && loadLeaseTargetVersion_ == targetVersion) {
+				loadLeaseExpiryUnixMs_ = nextExpiryUnixMs;
+			}
+			return true;
+		}
+		safs::log_warn("Checkpoint load lease heartbeat commit failed; retrying while live");
+	} catch (const std::exception &exception) {
+		safs::log_warn("Checkpoint load lease heartbeat failed: {}; retrying while live",
+		               exception.what());
+	} catch (...) {
+		safs::log_warn(
+		    "Checkpoint load lease heartbeat failed with an unknown error; retrying while live");
+	}
+
+	if (leaseIsLive(cachedExpiryUnixMs, unixTimeMilliseconds())) { return true; }
+	markLoadLeaseLost("heartbeat could not renew the lease before its expiry margin");
+	return false;
+}
+
+void MetadataCheckpointManager::markLoadLeaseLost(std::string_view reason) {
+	bool newlyLost = false;
+	{
+		std::lock_guard<std::mutex> lock(loadLeaseMutex_);
+		if (loadLeaseActive_ && !loadLeaseLost_) {
+			loadLeaseLost_ = true;
+			newlyLost = true;
+		}
+	}
+	loadLeaseCv_.notify_all();
+	if (newlyLost) { safs::log_err("Checkpoint load lease lost: {}", reason); }
 }
 
 void MetadataCheckpointManager::reloadDurableCheckpointState() {
@@ -283,8 +567,60 @@ void MetadataCheckpointManager::loadCheckpointVersions(kv::IReadOnlyTransaction 
 	checkpointVersionsLoaded_ = true;
 }
 
+bool MetadataCheckpointManager::collectProtectedCheckpointVersion(
+    kv::IReadWriteTransaction *transaction, std::optional<uint64_t> &oldestTarget) {
+	if (transaction == nullptr) { return false; }
+
+	const kv::Key leasePrefix = kv::toBytes(kMetaLoadLeaseKeyPrefix);
+	const kv::Key leaseRangeEnd = kv::prefixEnd(leasePrefix);
+	kv::KeySelector startSelector(leasePrefix, true, 0);
+	const kv::KeySelector endSelector(leaseRangeEnd, true, 0);
+	const uint64_t nowUnixMs = unixTimeMilliseconds();
+	oldestTarget.reset();
+
+	while (true) {
+		auto page = transaction->getRange(startSelector, endSelector, kv::kDefaultGetRangeLimit);
+		for (const auto &pair : page.getPairs()) {
+			if (pair.key.size() != kMetaLoadLeaseKeyPrefix.size() + (2 * sizeof(uint64_t))) {
+				safs::log_err("Cannot seal checkpoint: malformed load lease key {}",
+				              kv::keyToEscapedAscii(pair.key));
+				return false;
+			}
+
+			auto record = deserializeLoadLease(pair.value);
+			if (!record.has_value()) {
+				safs::log_err("Cannot seal checkpoint: malformed load lease value at {}",
+				              kv::keyToEscapedAscii(pair.key));
+				return false;
+			}
+
+			if (!leaseIsLive(record->expiryUnixMs, nowUnixMs)) {
+				transaction->remove(pair.key);
+				continue;
+			}
+
+			if (!std::ranges::binary_search(retainedCheckpointVersions_, record->targetVersion)) {
+				safs::log_err(
+				    "Cannot seal checkpoint: live load lease targets unretained version {}",
+				    record->targetVersion);
+				return false;
+			}
+
+			if (!oldestTarget.has_value() || record->targetVersion < *oldestTarget) {
+				oldestTarget = record->targetVersion;
+			}
+		}
+
+		if (!page.hasMore() || page.getPairs().empty()) { break; }
+		startSelector = kv::KeySelector(page.getPairs().back().key, false, 0);
+	}
+
+	return true;
+}
+
 void MetadataCheckpointManager::computeRetainedCheckpointVersions(
-    uint64_t newVersion, std::vector<uint64_t> &retained, std::vector<uint64_t> &dropped) const {
+    uint64_t newVersion, std::optional<uint64_t> protectedVersion, std::vector<uint64_t> &retained,
+    std::vector<uint64_t> &dropped) const {
 	std::set<uint64_t> checkpointVersionsSet(retainedCheckpointVersions_.begin(),
 	                                         retainedCheckpointVersions_.end());
 
@@ -297,9 +633,17 @@ void MetadataCheckpointManager::computeRetainedCheckpointVersions(
 
 	// Trim the set to keep only the last 'gStoredPreviousBackMetaCopies + 1' versions
 	dropped.clear();
-	while (checkpointVersionsSet.size() > maxRetainedCheckpoints) {
+	while (checkpointVersionsSet.size() > maxRetainedCheckpoints &&
+	       (!protectedVersion.has_value() || *checkpointVersionsSet.begin() < *protectedVersion)) {
 		dropped.push_back(*checkpointVersionsSet.begin());
 		checkpointVersionsSet.erase(checkpointVersionsSet.begin());
+	}
+
+	if (checkpointVersionsSet.size() > maxRetainedCheckpoints) {
+		safs::log_warn(
+		    "Checkpoint load lease for version {} retains {} checkpoints, exceeding configured "
+		    "retention of {}",
+		    *protectedVersion, checkpointVersionsSet.size(), maxRetainedCheckpoints);
 	}
 
 	retained.assign(checkpointVersionsSet.begin(), checkpointVersionsSet.end());

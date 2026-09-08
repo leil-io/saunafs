@@ -194,6 +194,11 @@ inline constexpr std::string_view kChunkUndoKeyPrefix = "CHNU_";  // Undo chunk 
 /// metadata/chunk state to a target snapshot version.
 inline constexpr std::string_view kMetaCheckpointVersionsKey = "META_CHECKPOINT_VERSIONS";
 
+/// Prefix for renewable leases that protect checkpoint undo history during reconstruction.
+/// Format: META_LOAD_LEASE_<LoaderIdHigh><LoaderIdLow>:<CheckpointVersion><ExpiryUnixMs>
+/// @note Loader-id key components and value fields are unsigned 64-bit Big Endian integers.
+inline constexpr std::string_view kMetaLoadLeaseKeyPrefix = "META_LOAD_LEASE_";
+
 /// Prefix for extended attributes (xattrs)
 /// Format: XATR_<InodeId><AttributeName>:<AttributeValue>
 /// e.g.: XATR_1999UserAttr:UserValue
