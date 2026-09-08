@@ -310,11 +310,13 @@ public:
 	/// sole committer; the requested mode is ignored and the complete queue is drained.
 	bool flush(FlushMode mode = FlushMode::kSnapshot);
 
-	/// Drains the queue and blocks until every queued update is committed to FDB (or a commit
-	/// fails). For an async writer this parks the caller until the background worker reports the
-	/// queue empty and idle; for a sync writer it is equivalent to flush(kDrainUntilEmpty).
+	/// Drains the queue and blocks until every queued update is committed to FDB. For an async
+	/// writer this parks the caller while retryable commit failures are replayed, until the worker
+	/// reports the queue empty and idle or the retry budget is exhausted; non-retryable failures
+	/// are reported immediately. For a sync writer it is equivalent to flush(kDrainUntilEmpty).
 	/// The checkpoint seal path uses this so the worker is idle before begin/seal mutate
-	/// checkpoint-manager state. Returns false if a commit failed or the writer is stopping.
+	/// checkpoint-manager state. Returns false if a terminal commit failure occurs or the writer is
+	/// stopping.
 	bool flushAndWait();
 
 	/// Get count of pending updates
@@ -424,13 +426,16 @@ private:
 	    lingerCv_;  ///< group-commit linger; NOT signalled by enqueue (no storm)
 	bool stop_ = false;
 	bool drainNow_ = false;  ///< seal/shutdown wants an immediate drain: cut the linger short
-	bool lastFlushFailed_ = false;  ///< a commit failed since the last flushAndWait() reset it
+	bool commitBuildInProgress_ = false;  ///< a batch is between the pending and in-flight queues
+	bool lastFlushFailed_ = false;        ///< a terminal failure since flushAndWait() reset it
+	size_t retryableFlushFailures_ = 0;   ///< consecutive transient failures in this flush interval
 	bool backpressureActive_ = false;  ///< the current queue-full episode was already logged
 	const size_t maxPending_;       ///< backpressure high-water mark (async mode)
 
 	// The single in-flight commit, guarded by mutex_ (all push/pop happen under the lock; only the
 	// blocking getResult() on a held future pointer runs off-lock). A deque keeps ownership simple
-	// while enforcing kMaxInFlight_ == 1; flushAndWait() reads its emptiness.
+	// while enforcing kMaxInFlight_ == 1; flushAndWait() reads its emptiness together with the
+	// commit-build state above.
 	std::deque<InFlightCommit> inFlight_;
 
 	constexpr static size_t kMaxUpdatesPerFlush_ = 1000;
@@ -438,6 +443,7 @@ private:
 	// be raised only after the writer has explicit non-overlapping conflict domains and FIFO lanes.
 	constexpr static size_t kMaxInFlight_ = 1;
 	constexpr static size_t kDefaultMaxPending_ = 200000;
+	constexpr static size_t kMaxCommitRetries_ = 5;
 	constexpr static int kCommitRetryBackoffMs_ = 20;
 	constexpr static int kBatchLingerMs_ = 2;  ///< trickle-only group-commit linger (pipeline idle)
 };

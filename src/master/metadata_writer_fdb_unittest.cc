@@ -193,15 +193,23 @@ struct CommitGate {
 	bool ready{false};
 	bool getResultEntered{false};
 	bool consumed{false};
+	bool success{true};
+	int error{0};
+	bool retryable{false};
 	void (*readyCallback)(void *){nullptr};
 	void *readyCallbackArgument{nullptr};
 };
 
-void releaseCommitGate(const std::shared_ptr<CommitGate> &gate) {
+void releaseCommitGate(const std::shared_ptr<CommitGate> &gate, bool success = true, int error = 0,
+                       bool retryable = false) {
 	void (*callback)(void *) = nullptr;
 	void *callbackArgument = nullptr;
 	{
 		std::lock_guard<std::mutex> lock(gate->mutex);
+		if (gate->ready) { return; }
+		gate->success = success;
+		gate->error = error;
+		gate->retryable = retryable;
 		gate->ready = true;
 		callback = gate->readyCallback;
 		callbackArgument = gate->readyCallbackArgument;
@@ -225,11 +233,11 @@ public:
 		gate_->cv.notify_all();
 		gate_->cv.wait(lock, [this] { return gate_->ready; });
 
-		if (error != nullptr) { *error = 0; }
-		if (retryable != nullptr) { *retryable = false; }
+		if (error != nullptr) { *error = gate_->error; }
+		if (retryable != nullptr) { *retryable = gate_->retryable; }
 		if (gate_->consumed) { return false; }
 		gate_->consumed = true;
-		return true;
+		return gate_->success;
 	}
 
 	void setReadyCallback(void (*callback)(void *), void *arg) override {
@@ -328,6 +336,17 @@ public:
 			gate = commitGates_[index];
 		}
 		releaseCommitGate(gate);
+	}
+
+	void failCommit(size_t index, bool retryable) {
+		std::shared_ptr<CommitGate> gate;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			if (index >= commitGates_.size()) { return; }
+			gate = commitGates_[index];
+		}
+		const int error = retryable ? 1020 : 1021;
+		releaseCommitGate(gate, /*success=*/false, error, retryable);
 	}
 
 	void releaseAllCommits() {
@@ -557,6 +576,120 @@ TEST(MetadataWriterFDBAsync, FlushDoesNotCommitAlongsideWorker) {
 	EXPECT_TRUE(secondCreated);
 	EXPECT_TRUE(flushResult.get());
 	EXPECT_EQ(writer.pendingCount(), 0U);
+}
+
+TEST(MetadataWriterFDBAsync, FlushWaitsThroughRetryableCommitFailure) {
+	BlockingKVEngine engine;
+	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr,
+	                         MetadataWriterFDB::WriterMode::kAsync);
+
+	writer.enqueue(makeEvent(0));
+	const bool firstCreated = engine.waitForTransactionCount(1, std::chrono::seconds(5));
+
+	std::promise<bool> outcome;
+	auto flushResult = outcome.get_future();
+	std::thread flusher([&] { outcome.set_value(writer.flushAndWait()); });
+
+	// Keep the first commit blocked long enough for flushAndWait() to install its barrier, then
+	// fail it with a transient conflict. The worker must replay the event and keep the barrier
+	// pending until that retry becomes durable.
+	const bool initiallyBlocked =
+	    flushResult.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout;
+	engine.allowFirstTransaction();
+	const bool firstCommitWaiting = engine.waitForCommitWaiter(0, std::chrono::seconds(5));
+	engine.failCommit(0, /*retryable=*/true);
+	const bool retryCreated = engine.waitForTransactionCount(2, std::chrono::seconds(5));
+	const bool waitedForRetry =
+	    flushResult.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout;
+	const bool retryCommitWaiting = engine.waitForCommitWaiter(1, std::chrono::seconds(5));
+	engine.releaseCommit(1);
+	const bool returned =
+	    flushResult.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+
+	engine.releaseAllCommits();
+	flusher.join();
+
+	EXPECT_TRUE(firstCreated);
+	EXPECT_TRUE(initiallyBlocked);
+	EXPECT_TRUE(firstCommitWaiting);
+	EXPECT_TRUE(retryCreated);
+	EXPECT_TRUE(waitedForRetry) << "a retryable conflict prematurely failed the flush barrier";
+	EXPECT_TRUE(retryCommitWaiting);
+	EXPECT_TRUE(returned);
+	EXPECT_TRUE(flushResult.get());
+	EXPECT_EQ(writer.pendingCount(), 0U);
+}
+
+TEST(MetadataWriterFDBAsync, FlushFailsAfterRetryBudgetIsExhausted) {
+	BlockingKVEngine engine;
+	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr,
+	                         MetadataWriterFDB::WriterMode::kAsync);
+
+	writer.enqueue(makeEvent(0));
+	const bool firstCreated = engine.waitForTransactionCount(1, std::chrono::seconds(5));
+
+	std::promise<bool> outcome;
+	auto flushResult = outcome.get_future();
+	std::thread flusher([&] { outcome.set_value(writer.flushAndWait()); });
+	const bool initiallyBlocked =
+	    flushResult.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout;
+	engine.allowFirstTransaction();
+
+	constexpr size_t kAttemptsThroughRetryBudget = 6;  // initial attempt plus five retries
+	bool allAttemptsObserved = firstCreated;
+	bool returnedBeforeBudget = false;
+	for (size_t attempt = 0; attempt < kAttemptsThroughRetryBudget; ++attempt) {
+		allAttemptsObserved =
+		    allAttemptsObserved && engine.waitForCommitWaiter(attempt, std::chrono::seconds(5));
+		engine.failCommit(attempt, /*retryable=*/true);
+		if (attempt + 1 < kAttemptsThroughRetryBudget) {
+			allAttemptsObserved = allAttemptsObserved && engine.waitForTransactionCount(
+			                                                 attempt + 2, std::chrono::seconds(5));
+			returnedBeforeBudget =
+			    returnedBeforeBudget ||
+			    flushResult.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+		}
+	}
+
+	const bool returnedAfterBudget =
+	    flushResult.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+	engine.releaseAllCommits();
+	flusher.join();
+
+	EXPECT_TRUE(initiallyBlocked);
+	EXPECT_TRUE(allAttemptsObserved);
+	EXPECT_FALSE(returnedBeforeBudget);
+	EXPECT_TRUE(returnedAfterBudget);
+	EXPECT_FALSE(flushResult.get());
+}
+
+TEST(MetadataWriterFDBAsync, FlushReportsNonRetryableCommitFailure) {
+	BlockingKVEngine engine;
+	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr,
+	                         MetadataWriterFDB::WriterMode::kAsync);
+
+	writer.enqueue(makeEvent(0));
+	const bool firstCreated = engine.waitForTransactionCount(1, std::chrono::seconds(5));
+
+	std::promise<bool> outcome;
+	auto flushResult = outcome.get_future();
+	std::thread flusher([&] { outcome.set_value(writer.flushAndWait()); });
+	const bool initiallyBlocked =
+	    flushResult.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout;
+	engine.allowFirstTransaction();
+	const bool commitWaiting = engine.waitForCommitWaiter(0, std::chrono::seconds(5));
+	engine.failCommit(0, /*retryable=*/false);
+	const bool returned =
+	    flushResult.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+
+	engine.releaseAllCommits();
+	flusher.join();
+
+	EXPECT_TRUE(firstCreated);
+	EXPECT_TRUE(initiallyBlocked);
+	EXPECT_TRUE(commitWaiting);
+	EXPECT_TRUE(returned);
+	EXPECT_FALSE(flushResult.get());
 }
 
 TEST(MetadataUndoRecorder, FailedFirstTouchRetryPreservesOriginalNodePreimage) {

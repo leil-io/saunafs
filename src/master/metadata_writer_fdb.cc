@@ -627,6 +627,7 @@ bool MetadataWriterFDB::flushAndWait() {
 	std::unique_lock<std::mutex> lock(mutex_);
 	// Observe only failures from this point on; ignore a stale failure from a previous caller.
 	lastFlushFailed_ = false;
+	retryableFlushFailures_ = 0;
 	// Cut any active group-commit linger short: the seal needs the queue empty and the pipeline
 	// idle as soon as possible, not after the linger window elapses.
 	drainNow_ = true;
@@ -635,7 +636,8 @@ bool MetadataWriterFDB::flushAndWait() {
 	// Wait until the worker has committed everything: the pending queue is empty and no commit is
 	// still in flight. The checkpoint seal then runs with the pipeline fully drained.
 	drainedCv_.wait(lock, [this] {
-		return stop_ || lastFlushFailed_ || (pendingUpdates_.empty() && inFlight_.empty());
+		return stop_ || lastFlushFailed_ ||
+		       (pendingUpdates_.empty() && !commitBuildInProgress_ && inFlight_.empty());
 	});
 	// Re-arm the group-commit linger for the next interval now that this drain is complete.
 	drainNow_ = false;
@@ -814,6 +816,7 @@ void MetadataWriterFDB::workerLoop() {
 				pendingUpdates_.pop_front();
 			}
 			if (pendingUpdates_.size() < maxPending_) { backpressureActive_ = false; }
+			commitBuildInProgress_ = true;
 			spaceCv_.notify_all();  // freed queue space for any blocked enqueuer
 			lock.unlock();
 
@@ -832,6 +835,7 @@ void MetadataWriterFDB::workerLoop() {
 			} catch (...) { safs::log_err("Unknown exception starting async commit; requeuing"); }
 
 			lock.lock();
+			commitBuildInProgress_ = false;
 			if (built) {
 				// The size cap may have deferred a tail: return it to the FRONT, in order, so the
 				// writer picks it up as a following batch. The in-flight commit then holds only
@@ -849,6 +853,7 @@ void MetadataWriterFDB::workerLoop() {
 					pendingUpdates_.push_front(std::move(batch.back()));
 					batch.pop_back();
 				}
+				retryableFlushFailures_ = 0;
 				lastFlushFailed_ = true;
 				// Unblock a waiting flushAndWait(): its predicate observes lastFlushFailed_, but
 				// the reap below only runs (and only it notifies) when the pipeline is non-empty.
@@ -874,6 +879,7 @@ void MetadataWriterFDB::workerLoop() {
 				safs::log_info("Flushed {} metadata updates to FDB",
 				               inFlight_.front().events.size());
 				inFlight_.pop_front();
+				retryableFlushFailures_ = 0;
 			} else {
 				// Restore this sole in-flight batch at the head of the queue. The worker retries it
 				// before building any newer batch, preserving durable event order.
@@ -881,11 +887,23 @@ void MetadataWriterFDB::workerLoop() {
 				    "Async commit failed (err {}, retryable {}); requeuing {} in-flight batch(es)",
 				    commitError, retryable, inFlight_.size());
 				requeueInFlightLocked();
-				lastFlushFailed_ = true;
+				if (retryable) {
+					++retryableFlushFailures_;
+					if (retryableFlushFailures_ > kMaxCommitRetries_) {
+						safs::log_err("Async metadata flush exhausted {} commit retries",
+						              kMaxCommitRetries_);
+						lastFlushFailed_ = true;
+					}
+				} else {
+					retryableFlushFailures_ = 0;
+					lastFlushFailed_ = true;
+				}
 			}
 
 			spaceCv_.notify_all();
-			if (pendingUpdates_.empty() && inFlight_.empty()) { drainedCv_.notify_all(); }
+			if (lastFlushFailed_ || (pendingUpdates_.empty() && inFlight_.empty())) {
+				drainedCv_.notify_all();
+			}
 
 			if (!committed) {
 				if (stop_) {
