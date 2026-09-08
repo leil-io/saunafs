@@ -23,7 +23,19 @@
 #include <boost/filesystem/exception.hpp>
 
 #include "chunkserver-common/disk_plugin.h"
+#include "chunkserver-common/disk_utils.h"
 #include "slogger/slogger.h"
+
+namespace {
+
+/// An hdd.cfg selector holds nothing else, so any other prefix is unreachable.
+bool isUsableDiskPrefix(const std::string &prefix) {
+	return !prefix.empty() &&
+	       prefix.find_first_not_of(disk::kDiskPrefixCharacters) ==
+	           std::string::npos;
+}
+
+}  // namespace
 
 bool PluginManager::loadPlugins(const std::string &directory) {
 	try {
@@ -65,10 +77,32 @@ bool PluginManager::loadPlugins(const std::string &directory) {
 
 				if (!checkVersion(plugin.get())) { continue; }
 
-				allPlugins_.insert(std::make_pair(plugin->name(), plugin));
-
 				boost::shared_ptr<DiskPlugin> diskPlugin =
 				    boost::dynamic_pointer_cast<DiskPlugin>(plugin);
+
+				// Both rejections happen before any registration, so a plugin
+				// that cannot serve a prefix is never advertised, reloaded or
+				// cleaned up as a loaded one.
+				if (diskPlugin != nullptr &&
+				    !isUsableDiskPrefix(diskPlugin->prefix())) {
+					safs::log_warn(
+					    "Ignoring plugin {}: '{}' is not a usable hdd.cfg prefix",
+					    plugin->name(), diskPlugin->prefix());
+					continue;
+				}
+
+				// Load order follows directory enumeration, so name the winner
+				// rather than leaving the choice silent.
+				if (diskPlugin != nullptr &&
+				    diskPlugins_.count(diskPlugin->prefix()) > 0) {
+					safs::log_warn(
+					    "Ignoring plugin {}: prefix '{}' is already served by {}",
+					    plugin->name(), diskPlugin->prefix(),
+					    diskPlugins_.at(diskPlugin->prefix())->name());
+					continue;
+				}
+
+				allPlugins_.insert(std::make_pair(plugin->name(), plugin));
 
 				if (diskPlugin != nullptr) {
 					diskPlugins_.insert(std::make_pair(diskPlugin->prefix(),
@@ -93,6 +127,17 @@ IDisk *PluginManager::createDisk(const disk::Configuration &configuration) {
 	}
 
 	return nullptr;
+}
+
+std::string PluginManager::loadedDiskPrefixes() const {
+	std::string prefixes;
+
+	for (const auto &[prefix, plugin] : diskPlugins_) {
+		if (!prefixes.empty()) { prefixes += ", "; }
+		prefixes += prefix;
+	}
+
+	return prefixes.empty() ? "none" : prefixes;
 }
 
 void PluginManager::showLoadedPlugins() {
