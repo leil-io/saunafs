@@ -89,7 +89,8 @@ bool NodeUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
 	// Fresh per-load record of inodes this rollback deletes (consumed by the forkless edge load).
 	removedDuringRestore_.clear();
 
-	auto retainedCheckpointVersions = checkpoints::loadCheckpointVersions(kvEngine_);
+	auto transaction = kvEngine_->createReadOnlyTransaction();
+	auto retainedCheckpointVersions = checkpoints::loadCheckpointVersions(transaction.get());
 	if (retainedCheckpointVersions.empty()) {
 		safs::log_info("No retained node checkpoints found");
 		return true;

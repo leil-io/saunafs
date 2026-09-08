@@ -107,10 +107,10 @@ public:
 
 	/// Loads the latest checkpoint descriptor and the retained checkpoint catalog from FDB.
 	///
-	/// Reads the descriptor restore keys (missing keys keep their defaults), loads
-	/// META_CHECKPOINT_VERSIONS, and adopts the newest retained version as the active
-	/// checkpoint version (0 when no checkpoint has been sealed yet). Any staged
-	/// checkpoint is discarded.
+	/// Reads the descriptor restore keys (missing keys keep their defaults) and
+	/// META_CHECKPOINT_VERSIONS through one read-only transaction, then adopts the newest retained
+	/// version as the active checkpoint version (0 when no checkpoint has been sealed yet). Any
+	/// staged checkpoint is discarded.
 	///
 	/// Called during backend load, before section data is read.
 	///
@@ -196,12 +196,13 @@ private:
 	bool persistCheckpointDescriptor(kv::IReadWriteTransaction *transaction,
 	                                 const MetadataCheckpointDescriptor &descriptor) const;
 
-	/// Loads META_CHECKPOINT_VERSIONS into retainedCheckpointVersions_ and sets the active
-	/// checkpoint version to the newest retained version (0 if none).
+	/// Loads META_CHECKPOINT_VERSIONS through the caller-owned transaction into
+	/// retainedCheckpointVersions_ and sets the active checkpoint version to the newest retained
+	/// version (0 if none).
 	///
 	/// Lazily invoked by sealCheckpoint() when the catalog has not been loaded yet, and
 	/// marks it loaded via checkpointVersionsLoaded_.
-	void loadCheckpointVersions();
+	void loadCheckpointVersions(kv::IReadOnlyTransaction *transaction);
 
 	/// Computes the next retained catalog from the current one plus a new checkpoint version.
 	///

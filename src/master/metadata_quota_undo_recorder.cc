@@ -102,7 +102,8 @@ void QuotaUndoRecorder::beforeMutation(const MetadataMutationContext &context,
 }
 
 bool QuotaUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
-	auto retainedCheckpointVersions = checkpoints::loadCheckpointVersions(kvEngine_);
+	auto transaction = kvEngine_->createReadOnlyTransaction();
+	auto retainedCheckpointVersions = checkpoints::loadCheckpointVersions(transaction.get());
 	if (retainedCheckpointVersions.empty()) {
 		safs::log_info("No retained quota checkpoints found");
 		return true;

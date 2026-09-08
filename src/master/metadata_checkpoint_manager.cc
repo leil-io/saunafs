@@ -56,9 +56,8 @@ bool MetadataCheckpointManager::sealCheckpoint(const MetadataCheckpointDescripto
 		return false;
 	}
 
-	if (!checkpointVersionsLoaded_) { loadCheckpointVersions(); }
-
 	auto transaction = kvEngine_->createReadWriteTransaction();
+	if (!checkpointVersionsLoaded_) { loadCheckpointVersions(transaction.get()); }
 
 	if (!persistCheckpointDescriptor(transaction.get(), descriptor)) {
 		safs::log_err(
@@ -141,8 +140,7 @@ MetadataCheckpointDescriptor MetadataCheckpointManager::loadLatestCheckpoint() {
 		descriptor.nextChunkId = get64bit(&data);
 	}
 
-	retainedCheckpointVersions_ = checkpoints::loadCheckpointVersions(kvEngine_);
-	activeCheckpointVersion_ = retainedCheckpointVersions_.empty() ? 0 : retainedCheckpointVersions_.back();
+	loadCheckpointVersions(transaction.get());
 
 	resetIntervalState();
 	pendingCheckpoint_.reset();
@@ -152,7 +150,8 @@ MetadataCheckpointDescriptor MetadataCheckpointManager::loadLatestCheckpoint() {
 }
 
 void MetadataCheckpointManager::reloadDurableCheckpointState() {
-	loadCheckpointVersions();
+	auto transaction = kvEngine_->createReadOnlyTransaction();
+	loadCheckpointVersions(transaction.get());
 	resetIntervalState();
 	pendingCheckpoint_.reset();
 }
@@ -269,8 +268,8 @@ bool MetadataCheckpointManager::persistCheckpointDescriptor(
 	return true;
 }
 
-void MetadataCheckpointManager::loadCheckpointVersions() {
-	retainedCheckpointVersions_ = checkpoints::loadCheckpointVersions(kvEngine_);
+void MetadataCheckpointManager::loadCheckpointVersions(kv::IReadOnlyTransaction *transaction) {
+	retainedCheckpointVersions_ = checkpoints::loadCheckpointVersions(transaction);
 
 	std::string checkpoints;
 	for (const auto &checkpoint : retainedCheckpointVersions_) {

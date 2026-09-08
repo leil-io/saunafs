@@ -17,6 +17,7 @@ if(NOT ENABLE_FOUNDATIONDB)
   )
   # These tests exercise FDB-only classes, so exclude them from the non-FDB build.
   list(REMOVE_ITEM MASTER_TESTS
+    "${CMAKE_CURRENT_SOURCE_DIR}/metadata_checkpoint_manager_unittest.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/metadata_writer_fdb_unittest.cc"
   )
 endif()

@@ -84,7 +84,8 @@ void EdgeUndoRecorder::beforeMutation(const MetadataMutationContext &context,
 }
 
 bool EdgeUndoRecorder::restoreToCheckpointVersion(uint64_t targetVersion) {
-	auto retainedCheckpointVersions = checkpoints::loadCheckpointVersions(kvEngine_);
+	auto transaction = kvEngine_->createReadOnlyTransaction();
+	auto retainedCheckpointVersions = checkpoints::loadCheckpointVersions(transaction.get());
 	if (retainedCheckpointVersions.empty()) {
 		safs::log_info("No retained edge checkpoints found");
 		return true;

@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "common/datapack.h"
-#include "kv/ikv_engine.h"
 #include "kv/itransaction.h"
 #include "kv/kv_utils.h"
 #include "master/kv_common_keys.h"
@@ -74,17 +73,19 @@ inline std::vector<uint64_t> deserializeCheckpointVersions(const kv::Value &valu
 
 /// Loads the retained checkpoint version catalog from FDB.
 ///
-/// Reads the value stored under kMetaCheckpointVersionsKey in a new read-only transaction
-/// and deserializes it via deserializeCheckpointVersions(). Returns an empty list if the
-/// key is absent, the engine pointer is null, or the stored value is malformed.
+/// Reads the value stored under kMetaCheckpointVersionsKey in an existing transaction and
+/// deserializes it via deserializeCheckpointVersions(). Returns an empty list if the key is
+/// absent, the transaction pointer is null, or the stored value is malformed.
 ///
-/// @param kvEngine KV engine to read from. May be null (returns empty list).
+/// Keeping transaction ownership at the call site lets callers read the catalog together with
+/// related checkpoint state from one coherent snapshot.
+///
+/// @param transaction Open transaction to read from. May be null (returns empty list).
 /// @return Ordered list of retained checkpoint versions, or empty on any error.
-inline std::vector<uint64_t> loadCheckpointVersions(kv::IKVEngine *kvEngine) {
+inline std::vector<uint64_t> loadCheckpointVersions(kv::IReadOnlyTransaction *transaction) {
 	std::vector<uint64_t> versions;
-	if (kvEngine == nullptr) { return versions; }
+	if (transaction == nullptr) { return versions; }
 
-	auto transaction = kvEngine->createReadOnlyTransaction();
 	auto versionsValue = transaction->get(kv::toBytes(kMetaCheckpointVersionsKey));
 	if (!versionsValue.has_value()) { return versions; }
 
