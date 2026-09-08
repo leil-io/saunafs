@@ -202,8 +202,27 @@ void DefaultDiskManager::reloadDisksFromCfg() {
 	}
 
 	std::string line;
-	while (std::getline(hddFile, line)) {
-		parseCfgLine(std::move(line));
+
+	try {
+		while (std::getline(hddFile, line)) {
+			parseCfgLine(std::move(line));
+		}
+	} catch (...) {
+		// The pass never reached the lines below the failing one, so their
+		// Disks are still marked as gone. Clear the marks before anything acts
+		// on them and let disk actions resume: the reload failed, so the
+		// previous configuration stands.
+		{
+			std::lock_guard disksLockGuard(gDisksMutex);
+
+			for (auto &disk : gDisks) {
+				disk->setWasRemovedFromConfig(false);
+			}
+
+			gDiskActions = 1;
+		}
+
+		throw;
 	}
 
 	hddFile.close();
