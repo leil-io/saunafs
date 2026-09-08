@@ -1287,6 +1287,14 @@ void MetadataBackendForkless::loadall(int ignoreflag) {
 		throw MetadataConsistencyException(
 		    "checkpoint manager is not initialized for forkless metadata backend");
 	}
+
+	// A master creates its asynchronous writer during init(), before loadall(). Drain and park it
+	// before checkpoint restoration mutates recorder interval state and gMetadata. Restore helpers
+	// do not emit update signals, so the worker remains idle throughout the load.
+	if (metadataWriter_ != nullptr && !metadataWriter_->flushAndWait()) {
+		throw MetadataConsistencyException(
+		    "failed to drain metadata writer before loading checkpoint");
+	}
 	applyCheckpointDescriptor(checkpointManager_->loadLatestCheckpoint());
 
 	// Load the metadata sections

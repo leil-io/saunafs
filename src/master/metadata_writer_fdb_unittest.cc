@@ -525,6 +525,40 @@ TEST(MetadataWriterFDBAsync, DoesNotSubmitNewerBatchUntilOlderCommitCompletes) {
 	EXPECT_EQ(writer.pendingCount(), 0U);
 }
 
+TEST(MetadataWriterFDBAsync, FlushDoesNotCommitAlongsideWorker) {
+	BlockingKVEngine engine;
+	MetadataWriterFDB writer(&engine, /*checkpointManager=*/nullptr,
+	                         MetadataWriterFDB::WriterMode::kAsync);
+
+	writer.enqueue(makeEvent(0));
+	const bool firstCreated = engine.waitForTransactionCount(1, std::chrono::seconds(5));
+	writer.enqueue(makeEvent(1));
+
+	std::promise<bool> outcome;
+	auto flushResult = outcome.get_future();
+	std::thread flusher([&] { outcome.set_value(writer.flush()); });
+
+	// The first transaction factory is deliberately blocked. A direct synchronous flush would
+	// create and commit the newer transaction here; delegation to the worker leaves it queued.
+	const bool newerTransactionCreatedEarly =
+	    engine.waitForTransactionCount(2, std::chrono::milliseconds(100));
+
+	engine.allowFirstTransaction();
+	const bool firstCommitWaiting = engine.waitForCommitWaiter(0, std::chrono::seconds(5));
+	engine.releaseCommit(0);
+	const bool secondCreated = engine.waitForTransactionCount(2, std::chrono::seconds(5));
+	engine.releaseAllCommits();
+	flusher.join();
+
+	EXPECT_TRUE(firstCreated);
+	EXPECT_FALSE(newerTransactionCreatedEarly)
+	    << "flush() committed a newer batch alongside the worker's older transaction";
+	EXPECT_TRUE(firstCommitWaiting);
+	EXPECT_TRUE(secondCreated);
+	EXPECT_TRUE(flushResult.get());
+	EXPECT_EQ(writer.pendingCount(), 0U);
+}
+
 TEST(MetadataUndoRecorder, FailedFirstTouchRetryPreservesOriginalNodePreimage) {
 	NoopKVEngine engine;
 	NodeUndoRecorder recorder(&engine);

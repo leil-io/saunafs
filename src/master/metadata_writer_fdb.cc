@@ -509,11 +509,22 @@ void MetadataWriterFDB::enqueue(std::unique_ptr<IMetadataUpdateEvent> event) {
 			// stalled -- block the caller until space frees. The changelog is the durability
 			// record, so throttling here only paces the in-memory->FDB mirror; nothing is lost.
 			if (pendingUpdates_.size() >= maxPending_) {
-				safs::log_warn(
-				    "MetadataWriterFDB queue full ({} >= {}), throttling until it drains",
-				    pendingUpdates_.size(), maxPending_);
+				if (!backpressureActive_) {
+					backpressureActive_ = true;
+					const size_t throttledDepth = pendingUpdates_.size();
+					lock.unlock();
+					safs::log_warn(
+					    "MetadataWriterFDB queue full ({} >= {}), throttling until it drains",
+					    throttledDepth, maxPending_);
+					lock.lock();
+				}
 				spaceCv_.wait(lock,
 				              [this] { return stop_ || pendingUpdates_.size() < maxPending_; });
+			}
+			if (stop_) {
+				lock.unlock();
+				safs::log_warn("MetadataWriterFDB is stopping; metadata update was not enqueued");
+				return;
 			}
 		}
 		pendingUpdates_.emplace_back(std::move(event));
@@ -576,6 +587,10 @@ uint64_t MetadataWriterFDB::backlogEscalationCount() const {
 }
 
 bool MetadataWriterFDB::flush(FlushMode mode) {
+	// The worker must be the sole committer for an asynchronous writer; otherwise this path could
+	// take and synchronously commit a newer batch while an older worker transaction is in flight.
+	if (asyncFlush_) { return flushAndWait(); }
+
 	// Snapshot: flush only the updates queued when the call started. A batch may consume fewer
 	// than kMaxUpdatesPerFlush_ events when the byte cap splits it, so track how many were
 	// actually taken instead of assuming a fixed batch size.
@@ -798,6 +813,7 @@ void MetadataWriterFDB::workerLoop() {
 				batch.push_back(std::move(pendingUpdates_.front()));
 				pendingUpdates_.pop_front();
 			}
+			if (pendingUpdates_.size() < maxPending_) { backpressureActive_ = false; }
 			spaceCv_.notify_all();  // freed queue space for any blocked enqueuer
 			lock.unlock();
 

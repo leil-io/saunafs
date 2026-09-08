@@ -306,7 +306,8 @@ public:
 	void enqueue(std::unique_ptr<IMetadataUpdateEvent> event);
 
 	/// Flushes pending updates that were queued when the call started (thread-safe).
-	/// Intended for periodic/background flushing to avoid unbounded backlog growth.
+	/// On an asynchronous writer, delegates to flushAndWait() so the background worker remains the
+	/// sole committer; the requested mode is ignored and the complete queue is drained.
 	bool flush(FlushMode mode = FlushMode::kSnapshot);
 
 	/// Drains the queue and blocks until every queued update is committed to FDB (or a commit
@@ -424,6 +425,7 @@ private:
 	bool stop_ = false;
 	bool drainNow_ = false;  ///< seal/shutdown wants an immediate drain: cut the linger short
 	bool lastFlushFailed_ = false;  ///< a commit failed since the last flushAndWait() reset it
+	bool backpressureActive_ = false;  ///< the current queue-full episode was already logged
 	const size_t maxPending_;       ///< backpressure high-water mark (async mode)
 
 	// The single in-flight commit, guarded by mutex_ (all push/pop happen under the lock; only the
