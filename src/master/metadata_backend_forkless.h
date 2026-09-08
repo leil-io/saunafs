@@ -52,6 +52,10 @@ struct MetadataSectionFDB {
 	std::function<int8_t(bool)> loadFunction;  ///< Function to load the section
 };
 
+/// Describes how a metadata-change handler dealt with a persistence request.
+/// Promotion reconciliation uses the result to report updates and removals accurately.
+enum class PersistAction : uint8_t { kDeferred, kUpdated, kRemoved };
+
 class MetadataBackendForkless : public IMetadataBackend {
 public:
 	MetadataBackendForkless();
@@ -392,7 +396,8 @@ private:
 	///
 	/// @param ownerType Quota owner type (user, group, inode/directory).
 	/// @param ownerId   Quota owner id.
-	void onQuotaChanged(QuotaOwnerType ownerType, inode_t ownerId);
+	/// @return Whether persistence was deferred or an update/removal was enqueued.
+	PersistAction onQuotaChanged(QuotaOwnerType ownerType, inode_t ownerId);
 
 	/// Enqueue an ACL update or removal event to the metadata writer.
 	///
@@ -401,7 +406,8 @@ private:
 	/// enqueues an AclRemoveEvent.
 	///
 	/// @param inode Inode whose ACL changed.
-	void onAclChanged(inode_t inode);
+	/// @return Whether persistence was deferred or an update/removal was enqueued.
+	PersistAction onAclChanged(inode_t inode);
 
 	/// Enqueue a chunk update or removal event to the metadata writer. On a shadow (no writer) the
 	/// chunk id is recorded in the dirty set instead, to be reconciled on promotion.

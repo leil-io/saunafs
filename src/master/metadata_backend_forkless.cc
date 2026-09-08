@@ -411,10 +411,10 @@ void MetadataBackendForkless::onXAttrRemoved(inode_t inode, std::span<const uint
 	}
 }
 
-void MetadataBackendForkless::onQuotaChanged(QuotaOwnerType ownerType, inode_t ownerId) {
+PersistAction MetadataBackendForkless::onQuotaChanged(QuotaOwnerType ownerType, inode_t ownerId) {
 	if (!metadataWriter_) {
 		dirtyQuotaOwners_.emplace(ownerType, ownerId);
-		return;
+		return PersistAction::kDeferred;
 	}
 
 	// Snapshot the owner's current soft/hard limits now (the signal fires synchronously, after the
@@ -422,7 +422,7 @@ void MetadataBackendForkless::onQuotaChanged(QuotaOwnerType ownerType, inode_t o
 	const auto *limits = gMetadata->quotaDatabase.get(ownerType, ownerId);
 	if (limits == nullptr) {
 		metadataWriter_->enqueue(std::make_unique<QuotaRemoveEvent>(ownerType, ownerId));
-		return;
+		return PersistAction::kRemoved;
 	}
 
 	std::vector<QuotaEntry> entries;
@@ -435,12 +435,13 @@ void MetadataBackendForkless::onQuotaChanged(QuotaOwnerType ownerType, inode_t o
 	}
 	metadataWriter_->enqueue(
 	    std::make_unique<QuotaUpdateEvent>(ownerType, ownerId, std::move(entries)));
+	return PersistAction::kUpdated;
 }
 
-void MetadataBackendForkless::onAclChanged(inode_t inode) {
+PersistAction MetadataBackendForkless::onAclChanged(inode_t inode) {
 	if (!metadataWriter_) {
 		dirtyAcls_.insert(inode);
-		return;
+		return PersistAction::kDeferred;
 	}
 
 	// Snapshot the inode's current ACL now (the signal fires synchronously, after the aclStorage
@@ -448,12 +449,13 @@ void MetadataBackendForkless::onAclChanged(inode_t inode) {
 	const RichACL *acl = gMetadata->aclStorage.get(inode);
 	if (acl == nullptr) {
 		metadataWriter_->enqueue(std::make_unique<AclRemoveEvent>(inode));
-		return;
+		return PersistAction::kRemoved;
 	}
 
 	std::vector<uint8_t> buffer;
 	serialize(buffer, *acl);
 	metadataWriter_->enqueue(std::make_unique<AclUpdateEvent>(inode, std::move(buffer)));
+	return PersistAction::kUpdated;
 }
 
 void MetadataBackendForkless::onChunkChanged(uint64_t chunkId, uint32_t version, uint32_t lockedTo,
@@ -1500,18 +1502,26 @@ void MetadataBackendForkless::reconcileDirtyXAttrsToFDB(uint64_t &persisted, uin
 
 // Quotas: the handler re-reads current state and enqueues an update or a remove.
 void MetadataBackendForkless::reconcileDirtyQuotasToFDB(uint64_t &persisted,
-                                                        uint64_t & /*removed*/) {
+                                                        uint64_t &removed) {
 	for (const auto &[ownerType, ownerId] : dirtyQuotaOwners_) {
-		onQuotaChanged(ownerType, ownerId);
-		++persisted;
+		const auto action = onQuotaChanged(ownerType, ownerId);
+		if (action == PersistAction::kUpdated) {
+			++persisted;
+		} else if (action == PersistAction::kRemoved) {
+			++removed;
+		}
 	}
 }
 
 // ACLs: the handler re-reads current state and enqueues an update or a remove.
-void MetadataBackendForkless::reconcileDirtyAclsToFDB(uint64_t &persisted, uint64_t & /*removed*/) {
+void MetadataBackendForkless::reconcileDirtyAclsToFDB(uint64_t &persisted, uint64_t &removed) {
 	for (const inode_t inode : dirtyAcls_) {
-		onAclChanged(inode);
-		++persisted;
+		const auto action = onAclChanged(inode);
+		if (action == PersistAction::kUpdated) {
+			++persisted;
+		} else if (action == PersistAction::kRemoved) {
+			++removed;
+		}
 	}
 }
 
