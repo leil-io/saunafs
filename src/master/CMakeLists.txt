@@ -11,6 +11,7 @@ if(NOT ENABLE_FOUNDATIONDB)
   list(REMOVE_ITEM MASTER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/kv_connector_fdb.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/metadata_backend_forkless.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/metadata_mutation_persistence_fdb.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/metadata_section_bootstrap_fdb.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/metadata_writer_fdb.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/metadata_checkpoint_manager.cc"
