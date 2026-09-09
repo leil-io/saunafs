@@ -64,6 +64,7 @@ http://leil.io
 Summary:        LeilFS master server
 Requires:       user(saunafs)
 Requires:       group(saunafs)
+Requires:       %{name}-user = %{version}-%{release}
 %{?systemd_requires}
 
 %description master
@@ -76,6 +77,7 @@ LeilFS master (metadata) server together with metarestore utility.
 Summary:        LeilFS metalogger server
 Requires:       user(saunafs)
 Requires:       group(saunafs)
+Requires:       %{name}-user = %{version}-%{release}
 %{?systemd_requires}
 
 %description metalogger
@@ -88,6 +90,7 @@ LeilFS metalogger (metadata replication) server.
 Summary:        LeilFS data server
 Requires:       user(saunafs)
 Requires:       group(saunafs)
+Requires:       %{name}-user = %{version}-%{release}
 %{?systemd_requires}
 
 %description chunkserver
@@ -369,8 +372,6 @@ rm -f %{buildroot}%{_libdir}/libsaunafsmount_shared.so
 %{_docdir}/leil-master/examples/leil-master.cfg
 %{_docdir}/leil-master/examples/sfsglobaliolimits.cfg
 %{_docdir}/leil-master/examples/leil-globaliolimits.cfg
-%config(noreplace) %{_sysconfdir}/pam.d/saunafs
-%config(noreplace) %{_sysconfdir}/security/limits.d/%{leil_limits_conf}
 
 # Files - metalogger
 ############################################################
@@ -415,8 +416,6 @@ rm -f %{buildroot}%{_libdir}/libsaunafsmount_shared.so
 %{_docdir}/leil-chunkserver/examples/leil-chunkserver.cfg
 %{_docdir}/leil-chunkserver/examples/sfshdd.cfg
 %{_docdir}/leil-chunkserver/examples/leil-hdd.cfg
-%config(noreplace) %{_sysconfdir}/pam.d/saunafs
-%config(noreplace) %{_sysconfdir}/security/limits.d/%{leil_limits_conf}
 
 # Files - client
 ############################################################
@@ -586,6 +585,8 @@ rm -f %{buildroot}%{_libdir}/libsaunafsmount_shared.so
 %license COPYING
 %doc NEWS README.md
 %{_sysusersdir}/leilfs.conf
+%config(noreplace) %{_sysconfdir}/pam.d/saunafs
+%config(noreplace) %{_sysconfdir}/security/limits.d/%{leil_limits_conf}
 
 %changelog
 %autochangelog
