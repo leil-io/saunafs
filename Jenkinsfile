@@ -247,7 +247,7 @@ pipeline {
     options {
         skipStagesAfterUnstable()
         // TODO: Add more lenient rules for dev
-        buildDiscarder(logRotator(artifactDaysToKeepStr: "7", artifactNumToKeepStr: "2"))
+        buildDiscarder(logRotator(numToKeepStr: '70', artifactDaysToKeepStr: "7", artifactNumToKeepStr: "2"))
         parallelsAlwaysFailFast()
     }
     tools { go '1.22.2' }
