@@ -22,8 +22,10 @@ assert_program_installed setfacl getfacl
 # so the reload validates that promotion persists all of them, not just names.
 
 # Disable periodic metadata dumping so the burst is not auto-saved before the crash; the shadow
-# must recover it from the streamed changelog.
-master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0"
+# must recover it from the streamed changelog. A one-entry dirty cap deliberately overflows the
+# NODE, EDGE, XATR, QUOT, ACLS and CHNK sections, exercising their complete-section replacement
+# during promotion.
+master_cfg="METADATA_DUMP_PERIOD_SECONDS = 0|FORKLESS_DIRTY_SET_MAX_ENTRIES = 1"
 
 CHUNKSERVERS=1 \
 	MASTERSERVERS=2 \
@@ -50,11 +52,15 @@ assert_eventually "saunafs_shadow_synchronized 1"
 # quota and an ACL, plus deletions, so the reload validates that promotion persists every kind.
 cd "${info[mount0]}"
 touch crash_file{1..1000}
-echo "crash-window-payload" > crash_content_file              # allocates a chunk
-setfattr -n user.crashattr -v crashval crash_content_file     # xattr
-saunafs setquota -u 4242 1GB 2GB 10 20 .                      # quota (limits for uid 4242)
-setfacl -m user:saunafstest:rwx crash_content_file            # ACL
-rm baseline_dir/baseline_file{1..10}                          # deletions in the unsaved tail
+echo "crash-window-payload-1" > crash_content_file_1               # allocates chunk 1
+echo "crash-window-payload-2" > crash_content_file_2               # allocates chunk 2
+setfattr -n user.crashattr -v crashval1 crash_content_file_1        # xattr 1
+setfattr -n user.crashattr -v crashval2 crash_content_file_2        # xattr 2
+saunafs setquota -u 4242 1GB 2GB 10 20 .                           # quota owner 1
+saunafs setquota -u 4243 1GB 2GB 10 20 .                           # quota owner 2
+setfacl -m user:saunafstest:rwx crash_content_file_1                # ACL 1
+setfacl -m user:saunafstest:rwx crash_content_file_2                # ACL 2
+rm baseline_dir/baseline_file{1..10}                               # node/edge removals
 cd
 saunafs_master_daemon kill   # SIGKILL: no graceful metadata save
 
@@ -68,8 +74,10 @@ wait_for 'ls "${info[mount0]}" >/dev/null 2>&1' '60 seconds'
 # Live filesystem after promotion: the shadow recovered the crash-window files from the changelog.
 cd "${info[mount0]}"
 live_count=$(ls -1 crash_file* 2>/dev/null | wc -l)
-quota_live=$(saunafs repquota -u 4242 .)
-acl_live=$(getfacl --absolute-names crash_content_file)
+quota_live_1=$(saunafs repquota -u 4242 .)
+quota_live_2=$(saunafs repquota -u 4243 .)
+acl_live_1=$(getfacl --absolute-names crash_content_file_1)
+acl_live_2=$(getfacl --absolute-names crash_content_file_2)
 cd
 echo "crash_files present after promotion (live, via changelog replay): $live_count"
 if (( live_count == 0 )); then
@@ -95,10 +103,14 @@ assert_equals "$live_count" "$reload_count"
 # reload. Each is compared against the live (post-promotion) value, so a kind the promotion forgets
 # to persist diverges.
 cd "${info[mount0]}"
-assert_equals "crash-window-payload" "$(cat crash_content_file)"
-assert_equals "crashval" "$(getfattr --absolute-names --only-values -n user.crashattr crash_content_file 2>/dev/null)"
-assert_equals "$quota_live" "$(saunafs repquota -u 4242 .)"
-assert_equals "$acl_live" "$(getfacl --absolute-names crash_content_file)"
+assert_equals "crash-window-payload-1" "$(cat crash_content_file_1)"
+assert_equals "crash-window-payload-2" "$(cat crash_content_file_2)"
+assert_equals "crashval1" "$(getfattr --absolute-names --only-values -n user.crashattr crash_content_file_1 2>/dev/null)"
+assert_equals "crashval2" "$(getfattr --absolute-names --only-values -n user.crashattr crash_content_file_2 2>/dev/null)"
+assert_equals "$quota_live_1" "$(saunafs repquota -u 4242 .)"
+assert_equals "$quota_live_2" "$(saunafs repquota -u 4243 .)"
+assert_equals "$acl_live_1" "$(getfacl --absolute-names crash_content_file_1)"
+assert_equals "$acl_live_2" "$(getfacl --absolute-names crash_content_file_2)"
 
 # Deletion handling: 20 baseline files saved, 10 removed in the unsaved tail. The promotion must
 # persist the deletions, so exactly 10 survive the reload (a re-add-only recovery would resurrect

@@ -795,6 +795,19 @@ void chunk_emit_changed(uint64_t chunkId) {
 	}
 }
 
+uint64_t chunk_emit_all_changed() {
+	if (gChunksMetadata == nullptr) { return 0; }
+
+	uint64_t emitted = 0;
+	for (const auto &bucket : gChunksMetadata->chunkhash) {
+		for (const Chunk *chunk : bucket) {
+			emit_chunk_changed(chunk);
+			++emitted;
+		}
+	}
+	return emitted;
+}
+
 uint64_t chunk_checksum(ChecksumMode mode) {
 	uint64_t checksum = 46586918175221;
 	addToChecksum(checksum, ChunksMetadata::getNextChunkId());

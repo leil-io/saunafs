@@ -83,6 +83,11 @@ int chunk_restore_remove(uint64_t chunkId);
 /// mutations replayed signal-free into a shadow's memory never reached FDB.
 void chunk_emit_changed(uint64_t chunkId);
 
+/// Re-emits gChunkChangedSignal for every live chunk and returns the number
+/// emitted. Used when bounded promotion tracking overflows and the complete
+/// chunk section must be reconstructed from the promoted master's memory.
+uint64_t chunk_emit_all_changed();
+
 int chunk_increase_version(uint64_t chunkid);
 int chunk_set_version(uint64_t chunkid,uint32_t version);
 int chunk_change_file(uint64_t chunkid,uint8_t prevgoal,uint8_t newgoal);

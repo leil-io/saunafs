@@ -132,6 +132,9 @@ public:
 	void onPromotedToMaster();
 
 private:
+	/// Periodically prunes shadow mutations already covered by the master's durable checkpoint.
+	static void pruneDirtyTrackingTimer();
+
 	/// Connects the process-global signals (gChunkChangedSignal, gXAttr*,
 	/// initializeNewMetadataHeaderSignal) exactly once per process.
 	///
@@ -315,4 +318,6 @@ private:
 	/// Bootstrapper for metadata sections
 	std::unique_ptr<MetadataSectionBootstrapFDB> sectionBootstrapper_ = nullptr;
 #endif  // #ifndef METARESTORE
+
+	void *dirtyPruneTimer_{nullptr};
 };

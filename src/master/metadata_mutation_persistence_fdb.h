@@ -20,9 +20,11 @@
 
 #include "common/platform.h"
 
+#include <cstddef>
 #include <cstdint>
-#include <set>
+#include <map>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -32,6 +34,9 @@
 
 class FSNode;
 class MetadataWriterFDB;
+namespace kv {
+class IKVEngine;
+}
 
 /// Describes how a metadata-mutation handler dealt with a persistence request.
 /// Promotion reconciliation uses the result to report updates and removals accurately.
@@ -48,6 +53,8 @@ enum class PersistAction : uint8_t {
 /// recorded delta can be resolved against the authoritative in-memory metadata and persisted.
 class MetadataMutationPersistenceFDB {
 public:
+	static constexpr size_t kDefaultDirtyEntryLimit = 1000000;
+
 	MetadataMutationPersistenceFDB() = default;
 	~MetadataMutationPersistenceFDB() = default;
 
@@ -56,8 +63,15 @@ public:
 	MetadataMutationPersistenceFDB(MetadataMutationPersistenceFDB &&) = delete;
 	MetadataMutationPersistenceFDB &operator=(MetadataMutationPersistenceFDB &&) = delete;
 
-	/// Attaches the non-owning writer used for all subsequent mutation persistence.
-	void attachWriter(MetadataWriterFDB &writer);
+	/// Sets the hard per-section entry limit used while tracking shadow mutations.
+	/// Must be called before mutation signals can be received.
+	void setDirtyEntryLimit(size_t limit);
+
+	/// Attaches the non-owning writer and KV engine used after master startup or promotion.
+	void attachWriter(MetadataWriterFDB &writer, kv::IKVEngine &kvEngine);
+
+	/// Drops dirty entries whose version is older than the durable FDB metadata version.
+	void pruneDirtyTracking(uint64_t persistedVersion);
 
 	/// Resolves and persists the dirty shadow delta after promotion.
 	void reconcilePromotion();
@@ -170,6 +184,25 @@ public:
 	void onChunkRemoved(uint64_t chunkId);
 
 private:
+	struct DirtySectionState {
+		bool overflowed{false};
+		uint64_t newestVersion{0};
+	};
+
+	template <typename Map, typename Key>
+	void recordDirtyEntry(Map &entries, Key &&key, DirtySectionState &state,
+	                      std::string_view section);
+	void recordDirtyXAttr(inode_t inode, std::vector<uint8_t> name);
+	void recordDirtyXAttrInode(inode_t inode);
+
+	void replaceNodes(uint64_t &persisted, uint64_t &removed);
+	void replaceEdges(uint64_t &persisted, uint64_t &removed);
+	void replaceXAttrs(uint64_t &persisted, uint64_t &removed);
+	void replaceQuotas(uint64_t &persisted, uint64_t &removed);
+	void replaceAcls(uint64_t &persisted, uint64_t &removed);
+	void replaceFreeInodes(uint64_t &persisted, uint64_t &removed);
+	void replaceChunks(uint64_t &persisted, uint64_t &removed);
+
 	void reconcileDirtyNodes(uint64_t &persisted, uint64_t &removed);
 	void reconcileDirtyEdges(uint64_t &persisted, uint64_t &removed);
 	void reconcileDirtyXAttrs(uint64_t &persisted, uint64_t &removed);
@@ -179,19 +212,27 @@ private:
 	void reconcileDirtyChunks(uint64_t &persisted, uint64_t &removed);
 
 	MetadataWriterFDB *writer_{nullptr};
+	kv::IKVEngine *kvEngine_{nullptr};
 
-	/// Keys touched by changelog replay while running without a writer. Reset after an FDB load
-	/// and drained after promotion reconciliation.
-	///
-	/// TODO: Bound these sets for long-running shadows. A shadow must never flush them directly to
-	/// FDB because that races the live master. The follow-up should combine persisted-version
-	/// pruning with a per-section cap and complete-section reconstruction after overflow.
-	std::set<inode_t> dirtyNodes_;
-	std::set<std::pair<inode_t, HString>> dirtyEdges_;
-	std::set<std::pair<inode_t, std::vector<uint8_t>>> dirtyXattrs_;
-	std::set<inode_t> dirtyXattrInodes_;
-	std::set<std::pair<QuotaOwnerType, inode_t>> dirtyQuotaOwners_;
-	std::set<inode_t> dirtyAcls_;
-	std::set<inode_t> dirtyFreeInodes_;
-	std::set<uint64_t> dirtyChunks_;
+	/// Version-tagged keys touched by changelog replay while running without a writer. A repeated
+	/// key retains its newest version. Xattr point and inode-range keys share one section state and
+	/// one combined cap.
+	std::map<inode_t, uint64_t> dirtyNodes_;
+	std::map<std::pair<inode_t, HString>, uint64_t> dirtyEdges_;
+	std::map<std::pair<inode_t, std::vector<uint8_t>>, uint64_t> dirtyXattrs_;
+	std::map<inode_t, uint64_t> dirtyXattrInodes_;
+	std::map<std::pair<QuotaOwnerType, inode_t>, uint64_t> dirtyQuotaOwners_;
+	std::map<inode_t, uint64_t> dirtyAcls_;
+	std::map<inode_t, uint64_t> dirtyFreeInodes_;
+	std::map<uint64_t, uint64_t> dirtyChunks_;
+
+	DirtySectionState dirtyNodesState_;
+	DirtySectionState dirtyEdgesState_;
+	DirtySectionState dirtyXattrsState_;
+	DirtySectionState dirtyQuotasState_;
+	DirtySectionState dirtyAclsState_;
+	DirtySectionState dirtyFreeInodesState_;
+	DirtySectionState dirtyChunksState_;
+
+	size_t dirtyEntryLimit_{kDefaultDirtyEntryLimit};
 };

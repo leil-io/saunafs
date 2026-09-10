@@ -248,6 +248,16 @@
 ## (Default: 3600)
 # METADATA_DUMP_PERIOD_SECONDS = 3600
 
+## Maximum number of changelog-replayed keys tracked per metadata section by a forkless shadow.
+## Exceeding the limit switches promotion reconciliation to a bounded full-section replacement.
+## (Default: 1000000)
+# FORKLESS_DIRTY_SET_MAX_ENTRIES = 1000000
+
+## How often a forkless shadow removes tracked mutations covered by the master's latest durable
+## checkpoint, in seconds.
+## (Default: 60)
+# FORKLESS_DIRTY_PRUNE_PERIOD_SECONDS = 60
+
 # deprecated:
 # CHUNKS_DEL_LIMIT - use CHUNKS_SOFT_DEL_LIMIT instead
 

@@ -39,6 +39,7 @@
 #include "common/scoped_timer.h"
 #include "common/serialization.h"
 #include "common/time_utils.h"
+#include "config/cfg.h"
 #include "kv/itransaction.h"
 #include "kv/kv_utils.h"
 #include "master/acl_storage.h"
@@ -68,6 +69,7 @@
 
 namespace {
 MetadataBackendForkless *gForklessBackend = nullptr;
+constexpr uint32_t kDefaultDirtyPrunePeriodSeconds = 60;
 
 class CheckpointLoadLeaseGuard {
 public:
@@ -126,6 +128,21 @@ static void forklessBackendBecameMaster() {
 	if (gForklessBackend != nullptr) { gForklessBackend->onPromotedToMaster(); }
 }
 
+void MetadataBackendForkless::pruneDirtyTrackingTimer() {
+	if (gForklessBackend == nullptr || gForklessBackend->metadataWriter_ != nullptr) { return; }
+
+	try {
+		const uint64_t persistedVersion = gForklessBackend->getVersion("");
+		if (persistedVersion > 0) {
+			gForklessBackend->mutationPersistence_->pruneDirtyTracking(persistedVersion);
+		}
+	} catch (const std::exception &exception) {
+		safs::log_warn("Failed to prune forkless shadow dirty tracking: {}", exception.what());
+	} catch (...) {
+		safs::log_warn("Failed to prune forkless shadow dirty tracking: unknown error");
+	}
+}
+
 inline Signal initializeNewMetadataHeaderSignal;
 
 MetadataBackendForkless::MetadataBackendForkless()
@@ -143,6 +160,11 @@ MetadataBackendForkless::MetadataBackendForkless()
 }
 
 MetadataBackendForkless::~MetadataBackendForkless() {
+	if (dirtyPruneTimer_ != nullptr) {
+		eventloop_timeunregister(dirtyPruneTimer_);
+		dirtyPruneTimer_ = nullptr;
+	}
+
 	// The async metadata writer owns a background thread that commits to FDB. It is a member
 	// declared after kvConnector_/checkpointManager_, so it is destroyed first: ~MetadataWriterFDB
 	// stops and joins the worker (final drain) while the KV engine and checkpoint manager are still
@@ -1239,6 +1261,10 @@ bool MetadataBackendForkless::flushPendingUpdates() {
 void MetadataBackendForkless::onPromotedToMaster() {
 	// Idempotent: a node promoted once already has its writer; ignore repeat promotions.
 	if (metadataWriter_ != nullptr) { return; }
+	if (dirtyPruneTimer_ != nullptr) {
+		eventloop_timeunregister(dirtyPruneTimer_);
+		dirtyPruneTimer_ = nullptr;
+	}
 
 	safs::log_info("MetadataBackendForkless: promoted to master, initializing metadata writer");
 
@@ -1247,6 +1273,8 @@ void MetadataBackendForkless::onPromotedToMaster() {
 	// In-memory metadata is authoritative here (kept current by changelog replay), so only the
 	// checkpoint catalog is refreshed, not the metadata globals.
 	checkpointManager_->reloadDurableCheckpointState();
+	const uint64_t persistedVersion = getVersion("");
+	mutationPersistence_->pruneDirtyTracking(persistedVersion);
 
 	// Async writer: a background thread drains and commits the queue off the event loop, so client
 	// mutations never block on FDB commit latency. The seal path (fs_storeall -> flushPendingUpdates)
@@ -1254,7 +1282,7 @@ void MetadataBackendForkless::onPromotedToMaster() {
 	metadataWriter_ = std::make_unique<MetadataWriterFDB>(
 	    kvConnector_->getKVEngine(), checkpointManager_.get(),
 	    MetadataWriterFDB::WriterMode::kAsync);
-	mutationPersistence_->attachWriter(*metadataWriter_);
+	mutationPersistence_->attachWriter(*metadataWriter_, *kvConnector_->getKVEngine());
 
 	// Close the promotion crash-window gap. If the previous master was killed within its
 	// flush window, the tail of its writes reached the changelog (and thus this node's memory via
@@ -1262,7 +1290,6 @@ void MetadataBackendForkless::onPromotedToMaster() {
 	// persist that tail and a later FDB-only reload would lose it. Persist only the recorded dirty
 	// delta -- and only when FDB is actually behind memory; a graceful handoff seals FDB == memory,
 	// so there is no gap and the (redundant) dirty set is simply discarded.
-	const uint64_t persistedVersion = getVersion("");
 	if (gMetadata != nullptr && persistedVersion < gMetadata->metadataVersion) {
 		safs::log_info(
 		    "Promotion reconcile: FDB persisted version {} is behind in-memory version {}; "
@@ -1327,6 +1354,17 @@ void MetadataBackendForkless::init() {
 	}
 
 	checkpointManager_ = std::make_unique<MetadataCheckpointManager>(kvConnector_->getKVEngine());
+	const uint32_t configuredDirtyEntryLimit = cfg_getuint32(
+	    "FORKLESS_DIRTY_SET_MAX_ENTRIES",
+	    MetadataMutationPersistenceFDB::kDefaultDirtyEntryLimit);
+	if (configuredDirtyEntryLimit == 0) {
+		safs::log_warn("FORKLESS_DIRTY_SET_MAX_ENTRIES must be positive; using default {}",
+		               MetadataMutationPersistenceFDB::kDefaultDirtyEntryLimit);
+		mutationPersistence_->setDirtyEntryLimit(
+		    MetadataMutationPersistenceFDB::kDefaultDirtyEntryLimit);
+	} else {
+		mutationPersistence_->setDirtyEntryLimit(configuredDirtyEntryLimit);
+	}
 
 	// The (async) writer is only initialized for the master personality. The mutation-persistence
 	// component remains detached while shadowing, so it tracks replayed mutations without writing
@@ -1335,7 +1373,7 @@ void MetadataBackendForkless::init() {
 		metadataWriter_ = std::make_unique<MetadataWriterFDB>(
 		    kvConnector_->getKVEngine(), checkpointManager_.get(),
 		    MetadataWriterFDB::WriterMode::kAsync);
-		mutationPersistence_->attachWriter(*metadataWriter_);
+		mutationPersistence_->attachWriter(*metadataWriter_, *kvConnector_->getKVEngine());
 	}
 
 	// Register the promotion callback so a shadow that becomes master starts writing to FDB.
@@ -1354,6 +1392,20 @@ void MetadataBackendForkless::init() {
 	// gChunkChangedSignal is among the global ones; it is connected here, still before any
 	// runtime chunk mutation; the mutation-persistence component has no writer while shadowing.
 	createConnections();
+
+	if (!metadataserver::isMaster()) {
+		uint32_t dirtyPrunePeriod =
+		    cfg_getuint32("FORKLESS_DIRTY_PRUNE_PERIOD_SECONDS",
+		                  kDefaultDirtyPrunePeriodSeconds);
+		if (dirtyPrunePeriod == 0) {
+			safs::log_warn(
+			    "FORKLESS_DIRTY_PRUNE_PERIOD_SECONDS must be positive; using default {}",
+			    kDefaultDirtyPrunePeriodSeconds);
+			dirtyPrunePeriod = kDefaultDirtyPrunePeriodSeconds;
+		}
+		dirtyPruneTimer_ =
+		    eventloop_timeregister(TIMEMODE_RUN_LATE, dirtyPrunePeriod, 0, pruneDirtyTrackingTimer);
+	}
 
 	safs::log_info("MetadataBackendForkless version: {}", version);
 }
