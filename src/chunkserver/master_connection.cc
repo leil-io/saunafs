@@ -54,6 +54,7 @@
 static constexpr uint32_t kMaxBackgroundJobsThreshold = (kMaxBackgroundJobsCount * 9) / 10;
 
 MasterConn::~MasterConn() {
+	*callbackActive_ = false;
 	if (socketFD_ >= 0) { tcpclose(socketFD_); }
 }
 
@@ -911,7 +912,12 @@ void MasterConn::replicateChunk(const std::vector<uint8_t> &data) {
 
 std::function<void(uint8_t status, void *packet)> MasterConn::sauJobFinishedAndLock(
     MasterConn *masterConn, uint64_t chunkId, ChunkPartType chunkType) {
-	return [masterConn, chunkId, chunkType](uint8_t status, void *packet) {
+	return [masterConn, chunkId, chunkType, active = masterConn->callbackActive_](uint8_t status,
+	                                                                              void *packet) {
+		if (!*active) {
+			deletePacket(packet);
+			return;
+		}
 		// The original job's output packet is sent as the response to the master's request
 		masterConn->sauJobFinished(status, packet);
 
@@ -935,8 +941,13 @@ std::function<void(uint8_t status, void *packet)> MasterConn::sauJobFinishedAndL
 
 std::function<void(uint8_t status, void *packet)> MasterConn::sauJobFinished(
     MasterConn *masterConn) {
-	return
-	    [masterConn](uint8_t status, void *packet) { masterConn->sauJobFinished(status, packet); };
+	return [masterConn, active = masterConn->callbackActive_](uint8_t status, void *packet) {
+		if (*active) {
+			masterConn->sauJobFinished(status, packet);
+		} else {
+			deletePacket(packet);
+		}
+	};
 }
 
 void MasterConn::sauJobFinished(uint8_t status, void *packet) {

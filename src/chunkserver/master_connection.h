@@ -185,9 +185,14 @@ public:
 	RegistrationStatus registrationStatus() const { return registrationStatus_; }
 
 	void setMode(ConnectionMode newMode) {
+		// A new socket gets a new flag, so replies owed to the previous one stay disarmed.
+		if (newMode == ConnectionMode::CONNECTED && mode_ != newMode) {
+			callbackActive_ = std::make_shared<bool>(true);
+		}
 		mode_ = newMode;
 
 		if (mode_ == ConnectionMode::KILL) {  // The socket will be closed soon.
+			*callbackActive_ = false;
 			registrationStatus_ = RegistrationStatus::kUnregistered;
 		}
 	}
@@ -242,6 +247,9 @@ private:
 	bool isVersionLessThan5_{false};    ///< Indicates if the master server is an old version.
 
 	ConnectionMode mode_{ConnectionMode::FREE};  ///< Current mode of the connection to this master.
+	/// Cleared when the socket dies, so a job finishing afterwards drops its reply instead of
+	/// writing it to whatever occupies this connection by then.
+	std::shared_ptr<bool> callbackActive_{std::make_shared<bool>(true)};
 	/// Registration status to this MDS.
 	RegistrationStatus registrationStatus_{RegistrationStatus::kUnregistered};
 	int socketFD_{-1};                           ///< Socket file descriptor for this connection.
