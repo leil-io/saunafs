@@ -45,9 +45,20 @@ std::atomic<int> Client::instance_count_(0);
 void *Client::linkLibrary() {
 	void *ret;
 
+	// RTLD_DEEPBIND: without it, this library's own weak/vague-linkage
+	// symbols (class statics, namespace-scope globals - exactly what
+	// chunk_reader.cc and chunkserver_stats.cc export) can get silently,
+	// *inconsistently* interposed by whatever the main executable already
+	// linked, since both compile the same translation units. Some
+	// references end up bound to this copy, others to the executable's,
+	// which is what caused ChunkserverStats to be destructed twice at
+	// exit. DEEPBIND makes this library's own symbol resolution always
+	// prefer its own definitions, closing that off for every symbol at
+	// once instead of chasing each one individually via visibility.
+
 	// Special case for the first instance - no copying needed
 	if (instance_count_++ == 0) {
-		ret = dlopen(kLibraryPath, RTLD_NOW);
+		ret = dlopen(kLibraryPath, RTLD_NOW | RTLD_DEEPBIND);
 		if (ret == nullptr) {
 			instance_count_--;
 			throw std::runtime_error(std::string("Cannot link: ") + dlerror());
@@ -69,7 +80,7 @@ void *Client::linkLibrary() {
 
 	source.close();
 	dest.close();
-	ret = dlopen(pattern, RTLD_NOW);
+	ret = dlopen(pattern, RTLD_NOW | RTLD_DEEPBIND);
 	::close(out_fd);
 	::unlink(pattern);
 	if (ret == nullptr) {
