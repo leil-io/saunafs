@@ -22,19 +22,25 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
+#include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "kv/ikv_engine.h"
 #include "master/filesystem_operation_context.h"
+#include "master/hstring.h"
 #include "master/kv_connector_interface.h"
 #include "master/metadata_backend_interface.h"
 #include "master/metadata_checkpoint_manager.h"
 #include "master/metadata_section_bootstrap_fdb.h"
 #include "master/metadata_writer_fdb.h"
+#include "protocol/quota.h"
 
 // Forward declarations to avoid heavy includes in the header
 struct ChangelogEvent;
@@ -177,8 +183,54 @@ private:
 	void initializeNewMetadataHeader();
 	void initializeEmptyMetadataHeader();
 
-	///  Registers observers/watchers on selected metadata properties
+	///  Registers observers/watchers on selected metadata properties.
+	///  Wires the process-global signals (once) and the per-load gMetadata signals for the
+	///  currently live gMetadata instance.
 	void createConnections();
+
+	/// Connects the per-load gMetadata signals (node/edge changed/removed) for the current
+	/// gMetadata instance. gMetadata is destroyed and recreated on every shadow (re)load
+	/// (fs_strinit), and Signal has no per-slot disconnect, so these must be reconnected once per
+	/// fresh instance -- on every loadall -- not once at init. Without this, a shadow that is later
+	/// promoted has a live writer but no signal->writer wiring, so its mutations never reach FDB.
+	void connectPerLoadSignals();
+
+	/// Promotion crash-window gap: persist the changelog-replayed state that a shadow
+	/// applied while the writer was null (so it never reached FDB -- e.g. the previous master was
+	/// SIGKILLed within its flush window). Instead of re-writing the whole namespace, only the
+	/// delta is reconciled: while running as a shadow, every signal handler records the touched
+	/// key in a per-section dirty set (reset on each FDB load); on promotion this method resolves
+	/// each dirty key against the authoritative in-memory state and enqueues an update or a remove.
+	/// Bounded by changes since the last load, not by namespace size. Routed through the writer
+	/// queue so the flush timer drains it and the checkpoint undo stays consistent.
+	/// TODO: Bound the dirty sets so they cannot grow unboundedly in a long-running shadow. A
+	/// shadow must never write to FDB (see fs_storeall(): that races the live master), so they
+	/// cannot simply be flushed early. Two workable directions: prune entries already sealed in
+	/// FDB (tag each entry with its metadataVersion and drop those at or below META_VERSION, which
+	/// only advances after the master drains its writer), and/or cap each section with an overflow
+	/// flag that switches promotion to a full reconcile of that section -- clearing its key range
+	/// and rewriting it from memory, since re-persisting alone would resurrect deleted rows.
+	void reconcileDirtyToFDB();
+
+	/// Per-section reconcile helpers invoked by reconcileDirtyToFDB(). Each resolves its own dirty
+	/// set against the authoritative in-memory state, enqueues updates/removals through the writer,
+	/// and accumulates counts into the shared persisted/removed references.
+	void reconcileDirtyNodesToFDB(uint64_t &persisted, uint64_t &removed);
+	void reconcileDirtyEdgesToFDB(uint64_t &persisted, uint64_t &removed);
+	void reconcileDirtyXAttrsToFDB(uint64_t &persisted, uint64_t &removed);
+	void reconcileDirtyQuotasToFDB(uint64_t &persisted, uint64_t &removed);
+	void reconcileDirtyAclsToFDB(uint64_t &persisted, uint64_t &removed);
+	void reconcileDirtyFreeInodesToFDB(uint64_t &persisted, uint64_t &removed);
+	void reconcileDirtyChunksToFDB(uint64_t &persisted, uint64_t &removed);
+
+	/// Persists a detained/released inode immediately when the writer is active, or records it for
+	/// promotion reconciliation while running as a shadow.
+	void onFreeInodeDetained(inode_t inode, uint32_t timestamp);
+	void onFreeInodeReleased(inode_t inode);
+
+	/// Clears all dirty state. Called on each load: after loading FDB, memory matches the FDB
+	/// snapshot, so there is nothing dirty until the next changelog-replay mutation.
+	void clearDirtySets();
 
 	// FS Load from FDB
 
@@ -237,6 +289,28 @@ private:
 	/// @param ignoreFlag When true, entries with oversized names or values are skipped.
 	/// @return kOpSuccess on success, kOpFailure or SAUNAFS_ERROR_ERANGE on error.
 	int8_t loadXAttr(bool ignoreFlag);
+
+	/// Loads QUOT_ metadata
+	/// Loads all quota limits from the KV store into gMetadata->quotaDatabase and recomputes the
+	/// quota checksum.
+	///
+	/// Quota limits are stored as `QUOT_<OwnerType><OwnerId><Rigor><Resource>: <Limit>` entries
+	/// (soft/hard only). Usage (kUsed) is not persisted; it is rebuilt from node loading and is
+	/// excluded from the quota checksum.
+	///
+	/// @param ignoreFlag Currently unused; reserved for consistency with other load functions.
+	/// @return kOpSuccess on success, kOpFailure on error.
+	int8_t loadQuotas(bool ignoreFlag);
+
+	/// Loads ACLS_ metadata
+	/// Loads all per-inode ACLs from the KV store into gMetadata->aclStorage.
+	///
+	/// ACLs are stored as `ACLS_<InodeId>: <serialized RichACL>` entries. ACLs are not part of the
+	/// metadata checksum, but they must be persisted so a forkless reload/shadow reconstructs them.
+	///
+	/// @param ignoreFlag Currently unused; reserved for consistency with other load functions.
+	/// @return kOpSuccess on success, kOpFailure on error.
+	int8_t loadACLs(bool ignoreFlag);
 
 	/// Loads EDGE_ metadata
 	/// Loads all edges from the KV store and reconstructs the in-memory directory tree.
@@ -345,6 +419,35 @@ private:
 	/// @param name  Attribute name bytes.
 	void onXAttrRemoved(inode_t inode, std::span<const uint8_t> name);
 
+	/// Enqueue a quota update or removal event to the metadata writer.
+	///
+	/// Called when an owner's quota limits change. Reads the owner's current limits from
+	/// gMetadata->quotaDatabase: if the owner still has limits, enqueues a QuotaUpdateEvent that
+	/// rewrites its soft/hard rows; otherwise enqueues a QuotaRemoveEvent that drops them.
+	///
+	/// @param ownerType Quota owner type (user, group, inode/directory).
+	/// @param ownerId   Quota owner id.
+	void onQuotaChanged(QuotaOwnerType ownerType, inode_t ownerId);
+
+	/// Enqueue an ACL update or removal event to the metadata writer.
+	///
+	/// Called when an inode's ACL changes. Reads the inode's current ACL from
+	/// gMetadata->aclStorage: if present, serializes it and enqueues an AclUpdateEvent; otherwise
+	/// enqueues an AclRemoveEvent.
+	///
+	/// @param inode Inode whose ACL changed.
+	void onAclChanged(inode_t inode);
+
+	/// Enqueue a chunk update or removal event to the metadata writer. On a shadow (no writer) the
+	/// chunk id is recorded in the dirty set instead, to be reconciled on promotion.
+	///
+	/// @param chunkId  Chunk whose metadata changed/was removed.
+	/// @param version  Chunk version (changed only).
+	/// @param lockedTo Lock expiry timestamp (changed only).
+	/// @param lockId   Lock id (changed only).
+	void onChunkChanged(uint64_t chunkId, uint32_t version, uint32_t lockedTo, uint32_t lockId);
+	void onChunkRemoved(uint64_t chunkId);
+
 	/// Provides connection to the key-value store (FoundationDB for this implementation)
 	std::shared_ptr<IKVConnector> kvConnector_;
 
@@ -376,4 +479,20 @@ private:
 	/// Bootstrapper for metadata sections
 	std::unique_ptr<MetadataSectionBootstrapFDB> sectionBootstrapper_ = nullptr;
 #endif  // #ifndef METARESTORE
+
+	/// Per-section dirty state: keys touched by changelog replay while running as a shadow (the
+	/// writer is null then, so nothing is persisted). Reset on each FDB load (clearDirtySets()),
+	/// drained on promotion (reconcileDirtyToFDB()). See reconcileDirtyToFDB().
+	std::set<inode_t> dirtyNodes_;
+	std::set<std::pair<inode_t, HString>> dirtyEdges_;
+	std::set<std::pair<inode_t, std::vector<uint8_t>>> dirtyXattrs_;
+	std::set<inode_t> dirtyXattrInodes_;
+	std::set<std::pair<QuotaOwnerType, inode_t>> dirtyQuotaOwners_;
+	std::set<inode_t> dirtyAcls_;
+	/// Final desired FREE value per dirty inode. Retaining the timestamp or removal at signal time
+	/// keeps promotion reconciliation bounded by dirty keys instead of scanning the inode pool.
+	std::map<inode_t, std::optional<uint32_t>> dirtyFreeInodeValues_;
+	std::set<uint64_t> dirtyChunks_;
+
+	friend struct MetadataBackendForklessTestAccess;
 };

@@ -90,6 +90,8 @@ private:
 	int8_t loadEdgesSection();
 	int8_t loadFreeSection();
 	int8_t loadXAttrSection();
+	int8_t loadACLSection();
+	int8_t loadQuotaSection();
 
 	inode_t maxInodeId_ = 0;
 	uint64_t metadataVersion_ = 0;
@@ -100,4 +102,6 @@ private:
 
 	/// Sections to bootstrap from metadata.sfs
 	std::vector<MetadataFileSection> metadataFileSections_;
+
+	friend struct MetadataSectionBootstrapFDBTestAccess;
 };
